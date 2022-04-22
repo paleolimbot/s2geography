@@ -9,6 +9,9 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(ABSL_PROPAGATE_CXX_STD ON)
+set(ABSL_ENABLE_INSTALL ON)
+
+option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 
 # Download s2 and abseil
 FetchContent_Declare(
@@ -26,6 +29,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(s2)
 
 include_directories(src ${OPENSSL_INCLUDE_DIR})
+include_directories(src ${ABSL_INCLUDE_DIR})
 add_library(s2geography
     src/s2geography/accessors-geog.cpp
     src/s2geography/coverings.cpp
@@ -36,21 +40,10 @@ add_library(s2geography
     src/s2geography/build.cpp
     src/s2geography/geography.cpp)
 
+set_target_properties(s2geography PROPERTIES
+    POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+
 target_link_libraries(s2geography s2)
 
 install(TARGETS s2geography DESTINATION lib)
-install(
-    FILES
-    src/s2geography/accessors-geog.hpp
-    src/s2geography/constructor.hpp
-    src/s2geography/index.hpp
-    src/s2geography/accessors.hpp
-    src/s2geography/coverings.hpp
-    src/s2geography/linear-referencing.hpp
-    src/s2geography/aggregator.hpp
-    src/s2geography/distance.hpp
-    src/s2geography/predicates.hpp
-    src/s2geography/build.hpp
-    src/s2geography/geography.hpp
-    src/s2geography.hpp
-    DESTINATION include)
+install(DIRECTORY src/ DESTINATION include FILES_MATCHING PATTERN "*.hpp")

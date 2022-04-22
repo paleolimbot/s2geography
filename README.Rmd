@@ -1,0 +1,66 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+library(cpp11)
+Sys.setenv(
+  PKG_CXXFLAGS = paste0("-I", getwd(), "/dist/include -I/opt/homebrew/opt/openssl@1.1/include"),
+  PKG_LIBS = paste0("-L", getwd(), "/dist/lib -ls2geography -ls2")
+)
+
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+
+# s2geography
+
+<!-- badges: start -->
+<!-- badges: end -->
+
+## Installation
+
+This is a brand new library, so build + install may not work everywhere (PR fixes or open issues if this fails!). You can build and install using `cmake`, and the project is structured such that the VSCode `cmake` integeration "just works" (if it doesn't, consider using `CMakeUserPresets.json` to configure things like the install directory/location of OpenSSL).
+
+You can also configure manually using `cmake`:
+
+```bash
+mkdir build
+cd build
+
+# you may need to specify the location of OpenSSL
+# (e.g., `cmake .. -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl@1.1` on M1 mac)
+cmake ..
+cmake --build .
+cmake --install . --prefix ../dist
+```
+
+This will download, build, and install s2 to the install directory as well.
+
+You should then be able to `#include "s2geography.hpp"` and go!
+
+```{cpp11}
+#include "cpp11.hpp"
+#include "s2geography.hpp"
+
+using namespace s2geography;
+
+[[cpp11::register]]
+void test_s2geography() {
+  PointGeography point1 = S2LatLng::FromDegrees(45, -64).ToPoint();
+  PointGeography point2 = S2LatLng::FromDegrees(45, 0).ToPoint();
+  
+  ShapeIndexGeography point1_index(point1);
+  ShapeIndexGeography point2_index(point2);
+  
+  double dist = s2_distance(point1_index, point2_index);
+  
+  printf("distance result is %g", dist);
+}
+```
