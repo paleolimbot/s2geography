@@ -27,30 +27,30 @@ FetchContent_MakeAvailable(s2)
 
 include_directories(src ${OPENSSL_INCLUDE_DIR})
 add_library(s2geography
-    src/accessors-geog.cpp
-    src/coverings.cpp
-    src/linear-referencing.cpp
-    src/accessors.cpp
-    src/distance.cpp
-    src/predicates.cpp
-    src/build.cpp
-    src/geography.cpp)
+    src/s2geography/accessors-geog.cpp
+    src/s2geography/coverings.cpp
+    src/s2geography/linear-referencing.cpp
+    src/s2geography/accessors.cpp
+    src/s2geography/distance.cpp
+    src/s2geography/predicates.cpp
+    src/s2geography/build.cpp
+    src/s2geography/geography.cpp)
 
 target_link_libraries(s2geography s2)
 
 install(TARGETS s2geography DESTINATION lib)
 install(
     FILES
-    src/accessors-geog.hpp
-    src/constructor.hpp
-    src/index.hpp
-    src/accessors.hpp
-    src/coverings.hpp
-    src/linear-referencing.hpp
-    src/aggregator.hpp
-    src/distance.hpp
-    src/predicates.hpp
-    src/build.hpp
-    src/geography.hpp
-    src/s2-geography.hpp
+    src/s2geography/accessors-geog.hpp
+    src/s2geography/constructor.hpp
+    src/s2geography/index.hpp
+    src/s2geography/accessors.hpp
+    src/s2geography/coverings.hpp
+    src/s2geography/linear-referencing.hpp
+    src/s2geography/aggregator.hpp
+    src/s2geography/distance.hpp
+    src/s2geography/predicates.hpp
+    src/s2geography/build.hpp
+    src/s2geography/geography.hpp
+    src/s2geography.hpp
     DESTINATION include)
