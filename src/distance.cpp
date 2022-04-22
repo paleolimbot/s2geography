@@ -1,6 +1,6 @@
 
-#include "s2/s2closest_edge_query.h"
-#include "s2/s2furthest_edge_query.h"
+#include <s2/s2closest_edge_query.h>
+#include <s2/s2furthest_edge_query.h>
 
 #include "geography.hpp"
 #include "distance.hpp"

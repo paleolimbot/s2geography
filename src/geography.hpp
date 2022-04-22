@@ -5,8 +5,8 @@
 #include <stdexcept>
 #include <string>
 
-#include "s2/s2polygon.h"
-#include "s2/s2polyline.h"
+#include <s2/s2polygon.h>
+#include <s2/s2polyline.h>
 
 namespace s2geography {
 

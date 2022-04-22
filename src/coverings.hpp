@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "s2/s2region_coverer.h"
+#include <s2/s2region_coverer.h>
 
 #include "geography.hpp"
 

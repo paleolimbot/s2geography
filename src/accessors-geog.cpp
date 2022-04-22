@@ -1,5 +1,5 @@
 
-#include "s2/s2centroids.h"
+#include <s2/s2centroids.h>
 
 #include "accessors-geog.hpp"
 #include "geography.hpp"

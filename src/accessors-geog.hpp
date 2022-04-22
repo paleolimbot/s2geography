@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "s2/s2convex_hull_query.h"
+#include <s2/s2convex_hull_query.h>
 
 #include "geography.hpp"
 #include "aggregator.hpp"

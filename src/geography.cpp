@@ -1,16 +1,16 @@
 
-#include "s2/s2shape.h"
-#include "s2/s2region.h"
-#include "s2/s2region_union.h"
+#include <s2/s2shape.h>
+#include <s2/s2region.h>
+#include <s2/s2region_union.h>
 
-#include "s2/s2point_region.h"
-#include "s2/s2point_vector_shape.h"
-#include "s2/s2polyline.h"
-#include "s2/s2polygon.h"
+#include <s2/s2point_region.h>
+#include <s2/s2point_vector_shape.h>
+#include <s2/s2polyline.h>
+#include <s2/s2polygon.h>
 
-#include "s2/mutable_s2shape_index.h"
-#include "s2/s2shape_index_region.h"
-#include "s2/s2shapeutil_coding.h"
+#include <s2/mutable_s2shape_index.h>
+#include <s2/s2shape_index_region.h>
+#include <s2/s2shapeutil_coding.h>
 
 #include "geography.hpp"
 using namespace s2geography;

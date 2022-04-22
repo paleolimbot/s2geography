@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "s2/s2boolean_operation.h"
+#include <s2/s2boolean_operation.h>
 
 #include "geography.hpp"
 
