@@ -6,9 +6,9 @@
 #include <s2/s2builderutil_s2point_vector_layer.h>
 #include <s2/s2builderutil_closed_set_normalizer.h>
 
-#include "geography.hpp"
-#include "build.hpp"
-#include "accessors.hpp"
+#include "s2geography/geography.hpp"
+#include "s2geography/build.hpp"
+#include "s2geography/accessors.hpp"
 
 namespace s2geography {
 

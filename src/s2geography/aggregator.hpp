@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "geography.hpp"
+#include "s2geography/geography.hpp"
 
 namespace s2geography {
 

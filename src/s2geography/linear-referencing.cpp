@@ -1,8 +1,8 @@
 
-#include "geography.hpp"
-#include "linear-referencing.hpp"
-#include "build.hpp"
-#include "accessors.hpp"
+#include "s2geography/geography.hpp"
+#include "s2geography/linear-referencing.hpp"
+#include "s2geography/build.hpp"
+#include "s2geography/accessors.hpp"
 
 namespace s2geography {
 

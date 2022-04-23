@@ -3,8 +3,8 @@
 
 #include <s2/s2convex_hull_query.h>
 
-#include "geography.hpp"
-#include "aggregator.hpp"
+#include "s2geography/geography.hpp"
+#include "s2geography/aggregator.hpp"
 
 namespace s2geography {
 

@@ -2,8 +2,8 @@
 #include <s2/s2closest_edge_query.h>
 #include <s2/s2furthest_edge_query.h>
 
-#include "geography.hpp"
-#include "distance.hpp"
+#include "s2geography/geography.hpp"
+#include "s2geography/distance.hpp"
 
 namespace s2geography {
 

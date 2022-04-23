@@ -1,10 +1,10 @@
 
 #include <s2/s2centroids.h>
 
-#include "accessors-geog.hpp"
-#include "geography.hpp"
-#include "build.hpp"
-#include "accessors.hpp"
+#include "s2geography/accessors-geog.hpp"
+#include "s2geography/geography.hpp"
+#include "s2geography/build.hpp"
+#include "s2geography/accessors.hpp"
 
 namespace s2geography {
 
