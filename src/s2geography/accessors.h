@@ -16,4 +16,4 @@ double s2_x(const S2Geography& geog);
 double s2_y(const S2Geography& geog);
 bool s2_find_validation_error(const S2Geography& geog, S2Error* error);
 
-}
+}  // namespace s2geography

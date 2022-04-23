@@ -5,11 +5,11 @@
 
 namespace s2geography {
 
-template <typename ReturnType, typename ...Params>
+template <typename ReturnType, typename... Params>
 class Aggregator {
-public:
-    virtual void Add(const S2Geography& geog, Params... parameters) = 0;
-    virtual ReturnType Finalize() = 0;
+ public:
+  virtual void Add(const S2Geography& geog, Params... parameters) = 0;
+  virtual ReturnType Finalize() = 0;
 };
 
-}
+}  // namespace s2geography
