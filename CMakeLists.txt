@@ -31,14 +31,14 @@ FetchContent_MakeAvailable(s2)
 include_directories(src ${OPENSSL_INCLUDE_DIR})
 include_directories(src ${ABSL_INCLUDE_DIR})
 add_library(s2geography
-    src/s2geography/accessors-geog.cpp
-    src/s2geography/coverings.cpp
-    src/s2geography/linear-referencing.cpp
-    src/s2geography/accessors.cpp
-    src/s2geography/distance.cpp
-    src/s2geography/predicates.cpp
-    src/s2geography/build.cpp
-    src/s2geography/geography.cpp)
+    src/s2geography/accessors-geog.cc
+    src/s2geography/coverings.cc
+    src/s2geography/linear-referencing.cc
+    src/s2geography/accessors.cc
+    src/s2geography/distance.cc
+    src/s2geography/predicates.cc
+    src/s2geography/build.cc
+    src/s2geography/geography.cc)
 
 set_target_properties(s2geography PROPERTIES
     POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
