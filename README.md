@@ -6,20 +6,24 @@
 <!-- badges: start -->
 <!-- badges: end -->
 
-## Installation
+## Usage
 
-This is a brand new library, so build + install may not work everywhere
-(PR fixes or open issues if this fails!). You can build and install
-using `cmake`, and the project is structured such that the VSCode
-`cmake` integeration “just works” (if it doesn’t, consider using
-`CMakeUserPresets.json` to configure things like the install
-directory/location of OpenSSL).
+s2geography depends on
+[s2geometry](https://github.com/google/s2geometry), which depends on
+[Abseil](https://github.com/abseil/abseil-cpp) and OpenSSL. If you
+already have a project that uses s2geometry, you should probably just
+copy the contents of the src/ directory into your project and
+`#include "s2geography.hpp"` when needed.
 
-You can also configure manually using `cmake`:
+Otherwise you can build and install using `cmake`. The project is
+structured such that the VSCode `cmake` integration “just works” (if it
+doesn’t, consider adding `CMakeUserPresets.json` to configure things
+like the install directory or location of OpenSSL). You can also
+configure manually:
 
 ``` bash
-mkdir build
-cd build
+git clone https://github.com/paleolimbot/s2geography.git s2geography
+mkdir s2geography/build && cd s2geography/build
 
 # you may need to specify the location of OpenSSL
 # (e.g., `cmake .. -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl@1.1` on M1 mac)
@@ -28,8 +32,37 @@ cmake --build .
 cmake --install . --prefix ../dist
 ```
 
-This will download, build, and install s2 to the install directory as
-well.
+This will also download, build, and install Abseil and s2geometry to the
+install directory. By default this will build and install static
+libraries for s2geography, s2, and many abseil libraries. If you are
+building your own project with CMake, you should be able to do:
+
+``` cmake
+include(FetchContent)
+FetchContent_Declare(
+  s2geography
+  GIT_REPOSITORY https://github.com/paleolimbot/s2geography.git
+  GIT_TAG <PICK A COMMIT SHA1>
+  GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(s2geography)
+```
+
+Otherwise, you can add some compier/linker flags and
+`#include "s2geography.hpp"`. This will also let you `#include` any/all
+of s2geometry.
+
+    CPPFLAGS = -I<install_prefix>/include -I<openssl_root_dir>/include
+    LDFLAGS = -L<openssl_root_dir>/lib -lssl -lcrypto -L<install_prefix>/lib -ls2geography -ls2 -labsl_base -labsl_city -labsl_demangle_internal -labsl_flags_reflection -labsl_graphcycles_internal -labsl_hash -labsl_hashtablez_sampler -labsl_int128 -labsl_low_level_hash -labsl_malloc_internal -labsl_raw_hash_set -labsl_raw_logging_internal -labsl_spinlock_wait -labsl_stacktrace -labsl_str_format_internal -labsl_strings -labsl_symbolize -labsl_synchronization -labsl_throw_delegate -labsl_time_zone -labsl_time
+
+Somebody who is better than me at `cmake` could probably do a better job
+making the CMake build more flexible and/or get shared libraries to
+work.
+
+# Example
+
+A quick example (using R and the [cpp11](https://cpp11.r-lib.org/)
+package) (using `Sys.setenv()` to set the `PKG_CXXFLAGS` and `PKG_LIBS`
+environment variables to the `CPPFLAGS` and `LDFLAGS`)
 
 ``` cpp
 #include "cpp11.hpp"
@@ -47,16 +80,11 @@ void test_s2geography() {
   
   double dist = s2_distance(point1_index, point2_index);
   
-  printf("distance result is %g", dist);
+  Rprintf("distance result is %g", dist);
 }
 ```
 
 ``` r
 test_s2geography()
+#> distance result is 0.768167
 ```
-
-You should then be able to `#include "s2geography.hpp"` and go! I
-haven’t quite triaged the `-labsl_*` flags yet, but it is a subset of:
-
-    CPPFLAGS = -I<install_prefix>/include -I<openssl_root_dir>/include
-    LDFLAGS = -L<install_prefix>/lib -ls2geography -ls2 -labsl_bad_any_cast_impl -labsl_bad_optional_access -labsl_bad_variant_access -labsl_base -labsl_city -labsl_civil_time -labsl_cord_internal -labsl_cord -labsl_cordz_functions -labsl_cordz_handle -labsl_cordz_info -labsl_cordz_sample_token -labsl_debugging_internal -labsl_demangle_internal -labsl_examine_stack -labsl_exponential_biased -labsl_failure_signal_handler -labsl_flags_commandlineflag_internal -labsl_flags_commandlineflag -labsl_flags_config -labsl_flags_internal -labsl_flags_marshalling -labsl_flags_parse -labsl_flags_private_handle_accessor -labsl_flags_program_name -labsl_flags_reflection -labsl_flags_usage_internal -labsl_flags_usage -labsl_flags -labsl_graphcycles_internal -labsl_hash -labsl_hashtablez_sampler -labsl_int128 -labsl_leak_check_disable -labsl_leak_check -labsl_log_severity -labsl_low_level_hash -labsl_malloc_internal -labsl_periodic_sampler -labsl_random_distributions -labsl_random_internal_distribution_test_util -labsl_random_internal_platform -labsl_random_internal_pool_urbg -labsl_random_internal_randen_hwaes_impl -labsl_random_internal_randen_hwaes -labsl_random_internal_randen_slow -labsl_random_internal_randen -labsl_random_internal_seed_material -labsl_random_seed_gen_exception -labsl_random_seed_sequences -labsl_raw_hash_set -labsl_raw_logging_internal -labsl_scoped_set_env -labsl_spinlock_wait -labsl_stacktrace -labsl_status -labsl_statusor -labsl_str_format_internal -labsl_strerror -labsl_strings_internal -labsl_strings -labsl_symbolize -labsl_synchronization -labsl_throw_delegate -labsl_time_zone -labsl_time
