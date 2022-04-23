@@ -13,7 +13,7 @@ s2geography depends on
 [Abseil](https://github.com/abseil/abseil-cpp) and OpenSSL. If you
 already have a project that uses s2geometry, you should probably just
 copy the contents of the src/ directory into your project and
-`#include "s2geography.hpp"` when needed.
+`#include "s2geography.h"` when needed.
 
 Otherwise you can build and install using `cmake`. The project is
 structured such that the VSCode `cmake` integration “just works” (if it
@@ -48,8 +48,8 @@ FetchContent_MakeAvailable(s2geography)
 ```
 
 Otherwise, you can add some compier/linker flags and
-`#include "s2geography.hpp"`. This will also let you `#include` any/all
-of s2geometry.
+`#include "s2geography.h"`. This will also let you `#include` any/all of
+s2geometry.
 
     CPPFLAGS = -I<install_prefix>/include -I<openssl_root_dir>/include
     LDFLAGS = -L<openssl_root_dir>/lib -lssl -lcrypto -L<install_prefix>/lib -ls2geography -ls2 -labsl_base -labsl_city -labsl_demangle_internal -labsl_flags_reflection -labsl_graphcycles_internal -labsl_hash -labsl_hashtablez_sampler -labsl_int128 -labsl_low_level_hash -labsl_malloc_internal -labsl_raw_hash_set -labsl_raw_logging_internal -labsl_spinlock_wait -labsl_stacktrace -labsl_str_format_internal -labsl_strings -labsl_symbolize -labsl_synchronization -labsl_throw_delegate -labsl_time_zone -labsl_time
@@ -66,7 +66,7 @@ environment variables to the `CPPFLAGS` and `LDFLAGS`)
 
 ``` cpp
 #include "cpp11.hpp"
-#include "s2geography.hpp"
+#include "s2geography.h"
 
 using namespace s2geography;
 
@@ -74,12 +74,12 @@ using namespace s2geography;
 void test_s2geography() {
   PointGeography point1 = S2LatLng::FromDegrees(45, -64).ToPoint();
   PointGeography point2 = S2LatLng::FromDegrees(45, 0).ToPoint();
-  
+
   ShapeIndexGeography point1_index(point1);
   ShapeIndexGeography point2_index(point2);
-  
+
   double dist = s2_distance(point1_index, point2_index);
-  
+
   Rprintf("distance result is %g", dist);
 }
 ```

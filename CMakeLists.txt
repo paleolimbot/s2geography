@@ -46,4 +46,4 @@ set_target_properties(s2geography PROPERTIES
 target_link_libraries(s2geography s2)
 
 install(TARGETS s2geography DESTINATION lib)
-install(DIRECTORY src/ DESTINATION include FILES_MATCHING PATTERN "*.hpp")
+install(DIRECTORY src/ DESTINATION include FILES_MATCHING PATTERN "*.h")

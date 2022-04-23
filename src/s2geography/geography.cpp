@@ -12,7 +12,7 @@
 #include <s2/s2shape_index_region.h>
 #include <s2/s2shapeutil_coding.h>
 
-#include "s2geography/geography.hpp"
+#include "s2geography/geography.h"
 
 using namespace s2geography;
 

@@ -2,10 +2,10 @@
 #include <s2/s2region_coverer.h>
 #include <s2/s2shape_index_buffered_region.h>
 
-#include "s2geography/geography.hpp"
-#include "s2geography/coverings.hpp"
-#include "s2geography/accessors.hpp"
-#include "s2geography/accessors-geog.hpp"
+#include "s2geography/geography.h"
+#include "s2geography/coverings.h"
+#include "s2geography/accessors.h"
+#include "s2geography/accessors-geog.h"
 
 namespace s2geography {
 

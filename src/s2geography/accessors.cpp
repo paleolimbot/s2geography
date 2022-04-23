@@ -1,7 +1,7 @@
 
-#include "s2geography/geography.hpp"
-#include "s2geography/accessors.hpp"
-#include "s2geography/build.hpp"
+#include "s2geography/geography.h"
+#include "s2geography/accessors.h"
+#include "s2geography/build.h"
 
 namespace s2geography {
 

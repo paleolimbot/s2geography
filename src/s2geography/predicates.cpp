@@ -3,8 +3,8 @@
 #include <s2/s2edge_tessellator.h>
 #include <s2/s2lax_loop_shape.h>
 
-#include "s2geography/accessors.hpp"
-#include "s2geography/predicates.hpp"
+#include "s2geography/accessors.h"
+#include "s2geography/predicates.h"
 
 namespace s2geography {
 

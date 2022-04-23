@@ -3,7 +3,7 @@
 
 #include <s2/s2boolean_operation.h>
 
-#include "s2geography/geography.hpp"
+#include "s2geography/geography.h"
 
 namespace s2geography {
 
