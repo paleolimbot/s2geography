@@ -1,0 +1,42 @@
+# Workflow derived from https://github.com/r-lib/actions/tree/master/examples
+# Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
+on:
+  push:
+    paths: ['**.Rmd']
+
+name: render-rmarkdown
+
+jobs:
+  render-rmarkdown:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y cmake libssl-dev
+
+      - name: Build s2geography
+        run: |
+          mkdir build && cd build
+          cmake ..
+          cmake --build .
+          cmake --install . --prefix ../dist
+
+      - uses: r-lib/actions/setup-pandoc@v1
+      - uses: r-lib/actions/setup-r@v1
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: rmarkdown,cpp11,decor
+
+      - name: Render examples/example-rmarkdown/example.Rmd
+        run: |
+          Rscript -e 'rmarkdown::render("examples/example-rmarkdown/example.Rmd")'
+
+      - name: Show examples/example-rmarkdown/example.md
+        if: always()
+        run: |
+          find examples/example-rmarkdown -name 'example.md*' -exec cat '{}' \; || true
