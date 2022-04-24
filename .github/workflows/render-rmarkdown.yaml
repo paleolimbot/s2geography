@@ -22,10 +22,17 @@ jobs:
         run: |
           sudo apt-get install -y cmake libssl-dev
 
+      - name: Build and install Abseil
+        run: |
+          mkdir abseil-build && cd abseil-build
+          cmake ../abseil-cpp
+          cmake --build .
+          cmake --install . --prefix ../dist-abseil
+
       - name: Build s2geography
         run: |
           mkdir build && cd build
-          cmake ..
+          cmake .. -DCMAKE_PREFIX_PATH=../dist-abseil
           cmake --build .
           cmake --install . --prefix ../dist
 

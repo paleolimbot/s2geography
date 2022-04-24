@@ -13,10 +13,7 @@ set(ABSL_ENABLE_INSTALL ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
-
-list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/abseil-cpp")
 add_subdirectory(s2geometry)
-
 
 include_directories(src ${OPENSSL_INCLUDE_DIR})
 include_directories(src ${ABSL_INCLUDE_DIR})
