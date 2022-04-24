@@ -2,12 +2,14 @@
 # Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
 on:
   push:
-    paths: ['**.Rmd']
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
 
-name: render-rmarkdown
+name: Example rmarkdown
 
 jobs:
-  render-rmarkdown:
+  built-and-render:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
