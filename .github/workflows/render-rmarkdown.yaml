@@ -17,7 +17,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get install -y cmake libssl-dev
+          sudo apt-get install -y cmake libssl-dev libabsl-dev
 
       - name: Build s2geography
         run: |
