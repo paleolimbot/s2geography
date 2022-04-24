@@ -10,23 +10,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(ABSL_PROPAGATE_CXX_STD ON)
 set(ABSL_ENABLE_INSTALL ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
+option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
 
-# Download s2 and abseil
-FetchContent_Declare(
-  absl
-  GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
-  GIT_TAG tags/20211102.0
-  GIT_SHALLOW TRUE)
-FetchContent_MakeAvailable(absl)
-
-FetchContent_Declare(
-  s2
-  GIT_REPOSITORY https://github.com/google/s2geometry.git
-  GIT_TAG tags/v0.10.0
-  GIT_SHALLOW TRUE)
-FetchContent_MakeAvailable(s2)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/s2geometry/third_party/cmake")
+add_subdirectory(s2geometry)
+add_subdirectory(abseil-cpp)
 
 include_directories(src ${OPENSSL_INCLUDE_DIR})
 include_directories(src ${ABSL_INCLUDE_DIR})
