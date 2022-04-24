@@ -38,6 +38,9 @@ jobs:
 
       - uses: r-lib/actions/setup-pandoc@v1
       - uses: r-lib/actions/setup-r@v1
+      - name: Write dummy DESCRIPTION
+        run: |
+          echo "Package: dummypackage" > DESCRIPTION
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: rmarkdown,cpp11,decor
