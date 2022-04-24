@@ -16,10 +16,11 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+          submodules: yes
 
       - name: Install dependencies
         run: |
-          sudo apt-get install -y cmake libssl-dev libabsl-dev
+          sudo apt-get install -y cmake libssl-dev
 
       - name: Build s2geography
         run: |
