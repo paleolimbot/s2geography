@@ -3,26 +3,14 @@
 
 #include <sstream>
 
+#include "s2geography/geoarrow-imports.h"
 #include "s2geography/geography.h"
 
 namespace s2geography {
 
 namespace util {
 
-enum GeometryType {
-  GEOMETRY_TYPE_UNKNOWN = 0,
-  POINT = 1,
-  LINESTRING = 2,
-  POLYGON = 3,
-  MULTIPOINT = 4,
-  MULTILINESTRING = 5,
-  MULTIPOLYGON = 6,
-  GEOMETRYCOLLECTION = 7
-};
-
-}
-
-class Constructor {
+class Constructor : public Handler {
  public:
   class Options {
    public:
@@ -43,19 +31,16 @@ class Constructor {
 
   Options* mutable_options() { return &options_; }
 
-  virtual void geom_start(util::GeometryType geometry_type, int64_t size) {}
-  virtual void ring_start(int32_t size) {}
-
-  virtual void coords(const double* coord, int64_t n, int32_t coord_size) {
+  virtual Result coords(const double* coord, int64_t n, int32_t coord_size) {
     for (int64_t i = 0; i < n; i++) {
       S2LatLng pt = S2LatLng::FromDegrees(coord[i * coord_size + 1],
                                           coord[i * coord_size]);
       points_.push_back(pt.Normalized().ToPoint());
     }
+
+    return Result::CONTINUE;
   }
 
-  virtual void ring_end() {}
-  virtual void geom_end() {}
   virtual std::unique_ptr<S2Geography> finish() = 0;
 
  protected:
@@ -67,7 +52,7 @@ class PointConstructor : public Constructor {
  public:
   PointConstructor() : Constructor(Options()) {}
 
-  void geom_start(util::GeometryType geometry_type, int64_t size) {
+  Result geom_start(util::GeometryType geometry_type, int64_t size) {
     if (size != 0 && geometry_type != util::GeometryType::POINT &&
         geometry_type != util::GeometryType::MULTIPOINT &&
         geometry_type != util::GeometryType::GEOMETRYCOLLECTION) {
@@ -79,9 +64,11 @@ class PointConstructor : public Constructor {
     if (size > 0) {
       points_.reserve(points_.size() + size);
     }
+
+    return Result::CONTINUE;
   }
 
-  void coords(const double* coord, int64_t n, int32_t coord_size) {
+  Result coords(const double* coord, int64_t n, int32_t coord_size) {
     for (int64_t i = 0; i < n; i++) {
       if (coord_empty(coord + (i * coord_size), coord_size)) {
         continue;
@@ -91,6 +78,8 @@ class PointConstructor : public Constructor {
                                           coord[i * coord_size]);
       points_.push_back(pt.ToPoint());
     }
+
+    return Result::CONTINUE;
   }
 
   std::unique_ptr<S2Geography> finish() {
@@ -115,7 +104,7 @@ class PolylineConstructor : public Constructor {
  public:
   PolylineConstructor(const Options& options) : Constructor(options) {}
 
-  void geom_start(util::GeometryType geometry_type, int64_t size) {
+  Result geom_start(util::GeometryType geometry_type, int64_t size) {
     if (size != 0 && geometry_type != util::GeometryType::LINESTRING &&
         geometry_type != util::GeometryType::MULTILINESTRING &&
         geometry_type != util::GeometryType::GEOMETRYCOLLECTION) {
@@ -127,9 +116,11 @@ class PolylineConstructor : public Constructor {
     if (size > 0 && geometry_type == util::GeometryType::LINESTRING) {
       points_.reserve(size);
     }
+
+    return Result::CONTINUE;
   }
 
-  void geom_end() {
+  Result geom_end() {
     if (points_.size() > 0) {
       auto polyline = absl::make_unique<S2Polyline>();
       polyline->Init(std::move(points_));
@@ -142,6 +133,8 @@ class PolylineConstructor : public Constructor {
       polylines_.push_back(std::move(polyline));
       points_.clear();
     }
+
+    return Result::CONTINUE;
   }
 
   std::unique_ptr<S2Geography> finish() {
@@ -166,16 +159,18 @@ class PolygonConstructor : public Constructor {
  public:
   PolygonConstructor(const Options& options) : Constructor(options) {}
 
-  void ring_start(int32_t size) {
+  Result ring_start(int32_t size) {
     points_.clear();
     if (size > 0) {
       points_.reserve(size);
     }
+
+    return Result::CONTINUE;
   }
 
-  void ring_end() {
+  Result ring_end() {
     if (points_.size() == 0) {
-      return;
+      return Result::CONTINUE;
     }
 
     // S2Loop is open instead of closed
@@ -198,6 +193,7 @@ class PolygonConstructor : public Constructor {
 
     loops_.push_back(std::move(loop));
     points_.clear();
+    return Result::CONTINUE;
   }
 
   std::unique_ptr<S2Geography> finish() {
@@ -234,17 +230,17 @@ class CollectionConstructor : public Constructor {
         collection_constructor_(nullptr),
         level_(0) {}
 
-  void geom_start(util::GeometryType geometry_type, int64_t size) {
+  Result geom_start(util::GeometryType geometry_type, int64_t size) {
     level_++;
     if (level_ == 1 &&
         geometry_type == util::GeometryType::GEOMETRYCOLLECTION) {
       active_constructor_ = nullptr;
-      return;
+      return Result::CONTINUE;
     }
 
     if (active_constructor_ != nullptr) {
       active_constructor_->geom_start(geometry_type, size);
-      return;
+      return Result::CONTINUE;
     }
 
     switch (geometry_type) {
@@ -270,17 +266,25 @@ class CollectionConstructor : public Constructor {
     }
 
     active_constructor_->geom_start(geometry_type, size);
+    return Result::CONTINUE;
   }
 
-  void ring_start(int32_t size) { active_constructor_->ring_start(size); }
+  Result ring_start(int32_t size) {
+    active_constructor_->ring_start(size);
+    return Result::CONTINUE;
+  }
 
-  void coords(const double* coord, int64_t n, int32_t coord_size) {
+  Result coords(const double* coord, int64_t n, int32_t coord_size) {
     active_constructor_->coords(coord, n, coord_size);
+    return Result::CONTINUE;
   }
 
-  void ring_end() { active_constructor_->ring_end(); }
+  Result ring_end() {
+    active_constructor_->ring_end();
+    return Result::CONTINUE;
+  }
 
-  void geom_end() {
+  Result geom_end() {
     level_--;
 
     if (level_ >= 1) {
@@ -292,6 +296,8 @@ class CollectionConstructor : public Constructor {
       features_.push_back(std::move(feature));
       active_constructor_ = nullptr;
     }
+
+    return Result::CONTINUE;
   }
 
   std::unique_ptr<S2Geography> finish() {
@@ -313,15 +319,16 @@ class CollectionConstructor : public Constructor {
   std::vector<std::unique_ptr<S2Geography>> features_;
 };
 
-class VectorConstructor : public CollectionConstructor {
+class FeatureConstructor : public CollectionConstructor {
  public:
-  VectorConstructor(const Options& options) : CollectionConstructor(options) {}
+  FeatureConstructor(const Options& options) : CollectionConstructor(options) {}
 
-  void start_feature() {
+  Result feat_start() {
     active_constructor_ = nullptr;
     level_ = 0;
     features_.clear();
     geom_start(util::GeometryType::GEOMETRYCOLLECTION, 1);
+    return Result::CONTINUE;
   }
 
   std::unique_ptr<S2Geography> finish_feature() {
@@ -340,5 +347,7 @@ class VectorConstructor : public CollectionConstructor {
     }
   }
 };
+
+}  // namespace util
 
 }  // namespace s2geography
