@@ -36,14 +36,14 @@ jobs:
       - name: Build abseil
         run: |
           cd build/absl-src
-          cmake . -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_CXX_STANDARD=11
+          cmake . -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_CXX_STANDARD=11 -DABSL_ENABLE_INSTALL=ON
           cmake --build .
           cmake --install . --prefix ../absl-dist
 
       - name: Build s2geography
         run: |
           cd build
-          cmake .. -Dabsl_DIR=absl-dist
+          cmake .. -Dabsl_DIR=`pwd`/absl-dist
           cmake --build .
           cmake --install . --prefix ../dist
 
