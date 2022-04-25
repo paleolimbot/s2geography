@@ -22,10 +22,19 @@ jobs:
         run: |
           sudo apt-get install -y cmake libssl-dev
 
+      - name: Cache Build Directory
+        id: cache-build
+        uses: actions/cache@v3
+        with:
+          path: build
+          key: ${{ runner.os }}-0
+
       - name: Init build dir
+        if: steps.cache-build.outputs.cache-hit != 'true'
         run: mkdir build
 
       - name: Fetch abseil
+        if: steps.cache-build.outputs.cache-hit != 'true'
         uses: actions/checkout@v3
         with:
           repository: abseil/abseil-cpp
@@ -33,22 +42,25 @@ jobs:
           path: build/absl-src
           fetch-depth: 0
 
-      - name: Build abseil
+      - name: Configure and Build Abseil
+        if: steps.cache-build.outputs.cache-hit != 'true'
         run: |
           cd build/absl-src
           cmake . -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_CXX_STANDARD=11 -DABSL_ENABLE_INSTALL=ON
           cmake --build .
-          cmake --install . --prefix ../absl-dist
 
       - name: Build s2geography
         run: |
           cd build
-          cmake .. -Dabsl_DIR=`pwd`/absl-dist/lib/x86_64-linux-gnu/cmake/absl
+          cmake --install absl-src --prefix ../dist
+          cmake .. -Dabsl_DIR=`pwd`/dist/lib/x86_64-linux-gnu/cmake/absl
           cmake --build .
           cmake --install . --prefix ../dist
 
       - uses: r-lib/actions/setup-pandoc@v1
       - uses: r-lib/actions/setup-r@v1
+        with:
+          use-public-rspm: true
       - name: Write dummy DESCRIPTION
         run: |
           printf "Package: dummypackage\nVersion: 0.0.0.9000" > DESCRIPTION
