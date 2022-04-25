@@ -21,7 +21,7 @@ FetchContent_Declare(
   GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(absl)
 
-list(APPEND CMAKE_PREFIX_PATH ${absl_SOURCE_DIR})
+list(APPEND CMAKE_PREFIX_PATH ${absl_BINARY_DIR})
 
 FetchContent_Declare(
   s2
