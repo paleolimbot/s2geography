@@ -14,8 +14,8 @@ class WKTReader {
  public:
   WKTReader() : WKTReader(util::Constructor::Options()) {}
   WKTReader(const util::Constructor::Options& options);
-  std::unique_ptr<S2Geography> read_feature(const char* text, int64_t size);
-  std::unique_ptr<S2Geography> read_feature(const char* text);
+  std::unique_ptr<Geography> read_feature(const char* text, int64_t size);
+  std::unique_ptr<Geography> read_feature(const char* text);
 
  private:
   util::Constructor::Options options_;

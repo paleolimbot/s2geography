@@ -9,8 +9,8 @@ using namespace s2geography;
 
 int main(int argc, char *argv[]) {
   WKTReader reader;
-  std::unique_ptr<S2Geography> geog1 = reader.read_feature("POINT (-64 45)");
-  std::unique_ptr<S2Geography> geog2 = reader.read_feature(
+  std::unique_ptr<Geography> geog1 = reader.read_feature("POINT (-64 45)");
+  std::unique_ptr<Geography> geog2 = reader.read_feature(
       "GEOMETRYCOLLECTION (POINT (30 10), LINESTRING (30 10, 10 30, 40 40), "
       "POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10)))");
 

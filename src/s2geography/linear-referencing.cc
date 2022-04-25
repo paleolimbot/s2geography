@@ -18,8 +18,8 @@ double s2_project_normalized(const PolylineGeography& geog1,
   return geog1.Polylines()[0]->UnInterpolate(point_on_line, next_vertex);
 }
 
-double s2_project_normalized(const S2Geography& geog1,
-                             const S2Geography& geog2) {
+double s2_project_normalized(const Geography& geog1,
+                             const Geography& geog2) {
   if (geog1.dimension() != 1 || geog2.dimension() != 0) {
     return NAN;
   }
@@ -41,7 +41,7 @@ double s2_project_normalized(const S2Geography& geog1,
     return s2_project_normalized(*geog1_poly_ptr, point);
   }
 
-  std::unique_ptr<S2Geography> geog_poly = s2_rebuild(geog1, GlobalOptions());
+  std::unique_ptr<Geography> geog_poly = s2_rebuild(geog1, GlobalOptions());
   return s2_project_normalized(*geog_poly, geog2);
 }
 
@@ -56,7 +56,7 @@ S2Point s2_interpolate_normalized(const PolylineGeography& geog,
   }
 }
 
-S2Point s2_interpolate_normalized(const S2Geography& geog,
+S2Point s2_interpolate_normalized(const Geography& geog,
                                   double distance_norm) {
   if (s2_is_empty(geog)) {
     return S2Point();
@@ -71,7 +71,7 @@ S2Point s2_interpolate_normalized(const S2Geography& geog,
     return s2_interpolate_normalized(*geog_poly_ptr, distance_norm);
   }
 
-  std::unique_ptr<S2Geography> geog_poly = s2_rebuild(geog, GlobalOptions());
+  std::unique_ptr<Geography> geog_poly = s2_rebuild(geog, GlobalOptions());
   return s2_interpolate_normalized(*geog_poly, distance_norm);
 }
 

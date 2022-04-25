@@ -8,13 +8,13 @@
 
 namespace s2geography {
 
-S2Point s2_centroid(const S2Geography& geog);
-std::unique_ptr<S2Geography> s2_boundary(const S2Geography& geog);
-std::unique_ptr<S2Geography> s2_convex_hull(const S2Geography& geog);
+S2Point s2_centroid(const Geography& geog);
+std::unique_ptr<Geography> s2_boundary(const Geography& geog);
+std::unique_ptr<Geography> s2_convex_hull(const Geography& geog);
 
 class CentroidAggregator : public Aggregator<S2Point> {
  public:
-  void Add(const S2Geography& geog);
+  void Add(const Geography& geog);
   void Merge(const CentroidAggregator& other);
   S2Point Finalize();
 
@@ -25,12 +25,12 @@ class CentroidAggregator : public Aggregator<S2Point> {
 class S2ConvexHullAggregator
     : public Aggregator<std::unique_ptr<PolygonGeography>> {
  public:
-  void Add(const S2Geography& geog);
+  void Add(const Geography& geog);
   std::unique_ptr<PolygonGeography> Finalize();
 
  private:
   S2ConvexHullQuery query_;
-  std::vector<std::unique_ptr<S2Geography>> keep_alive_;
+  std::vector<std::unique_ptr<Geography>> keep_alive_;
 };
 
 }  // namespace s2geography

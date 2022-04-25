@@ -41,7 +41,7 @@ class Constructor : public Handler {
     return Result::CONTINUE;
   }
 
-  virtual std::unique_ptr<S2Geography> finish() = 0;
+  virtual std::unique_ptr<Geography> finish() = 0;
 
  protected:
   std::vector<S2Point> points_;
@@ -82,10 +82,10 @@ class PointConstructor : public Constructor {
     return Result::CONTINUE;
   }
 
-  std::unique_ptr<S2Geography> finish() {
+  std::unique_ptr<Geography> finish() {
     auto result = absl::make_unique<PointGeography>(std::move(points_));
     points_.clear();
-    return std::unique_ptr<S2Geography>(result.release());
+    return std::unique_ptr<Geography>(result.release());
   }
 
  private:
@@ -137,7 +137,7 @@ class PolylineConstructor : public Constructor {
     return Result::CONTINUE;
   }
 
-  std::unique_ptr<S2Geography> finish() {
+  std::unique_ptr<Geography> finish() {
     std::unique_ptr<PolylineGeography> result;
 
     if (polylines_.size() > 0) {
@@ -147,7 +147,7 @@ class PolylineConstructor : public Constructor {
       result = absl::make_unique<PolylineGeography>();
     }
 
-    return std::unique_ptr<S2Geography>(result.release());
+    return std::unique_ptr<Geography>(result.release());
   }
 
  private:
@@ -196,7 +196,7 @@ class PolygonConstructor : public Constructor {
     return Result::CONTINUE;
   }
 
-  std::unique_ptr<S2Geography> finish() {
+  std::unique_ptr<Geography> finish() {
     auto polygon = absl::make_unique<S2Polygon>();
     polygon->set_s2debug_override(S2Debug::DISABLE);
     if (options_.oriented()) {
@@ -213,7 +213,7 @@ class PolygonConstructor : public Constructor {
     }
 
     auto result = absl::make_unique<PolygonGeography>(std::move(polygon));
-    return std::unique_ptr<S2Geography>(result.release());
+    return std::unique_ptr<Geography>(result.release());
   }
 
  private:
@@ -300,11 +300,11 @@ class CollectionConstructor : public Constructor {
     return Result::CONTINUE;
   }
 
-  std::unique_ptr<S2Geography> finish() {
+  std::unique_ptr<Geography> finish() {
     auto result =
-        absl::make_unique<S2GeographyCollection>(std::move(features_));
+        absl::make_unique<GeographyCollection>(std::move(features_));
     features_.clear();
-    return std::unique_ptr<S2Geography>(result.release());
+    return std::unique_ptr<Geography>(result.release());
   }
 
  private:
@@ -316,7 +316,7 @@ class CollectionConstructor : public Constructor {
  protected:
   Constructor* active_constructor_;
   int level_;
-  std::vector<std::unique_ptr<S2Geography>> features_;
+  std::vector<std::unique_ptr<Geography>> features_;
 };
 
 class FeatureConstructor : public CollectionConstructor {
@@ -331,13 +331,13 @@ class FeatureConstructor : public CollectionConstructor {
     return Result::CONTINUE;
   }
 
-  std::unique_ptr<S2Geography> finish_feature() {
+  std::unique_ptr<Geography> finish_feature() {
     geom_end();
 
     if (features_.empty()) {
-      return absl::make_unique<S2GeographyCollection>();
+      return absl::make_unique<GeographyCollection>();
     } else {
-      std::unique_ptr<S2Geography> feature = std::move(features_.back());
+      std::unique_ptr<Geography> feature = std::move(features_.back());
       if (feature.get() == nullptr) {
         throw Exception("finish_feature() generated nullptr");
       }

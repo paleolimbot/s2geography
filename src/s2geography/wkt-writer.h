@@ -12,7 +12,7 @@ namespace s2geography {
 class WKTWriter {
  public:
   WKTWriter();
-  std::string write_feature(const S2Geography& geog);
+  std::string write_feature(const Geography& geog);
 
  private:
   std::unique_ptr<Handler> exporter_;
@@ -24,9 +24,9 @@ class WKTWriter {
                                    Handler* handler);
   Handler::Result handle_polygon(const PolygonGeography& geog,
                                  Handler* handler);
-  Handler::Result handle_collection(const S2GeographyCollection& geog,
+  Handler::Result handle_collection(const GeographyCollection& geog,
                                     Handler* handler);
-  Handler::Result handle_feature(const S2Geography& geog, Handler* handler);
+  Handler::Result handle_feature(const Geography& geog, Handler* handler);
 };
 
 }  // namespace s2geography

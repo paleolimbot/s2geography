@@ -13,7 +13,7 @@
 
 namespace s2geography {
 
-std::unique_ptr<S2Geography> s2_geography_from_layers(
+std::unique_ptr<Geography> s2_geography_from_layers(
     std::vector<S2Point> points,
     std::vector<std::unique_ptr<S2Polyline>> polylines,
     std::unique_ptr<S2Polygon> polygon,
@@ -62,7 +62,7 @@ std::unique_ptr<S2Geography> s2_geography_from_layers(
 
   // return mixed dimension output
   if (non_empty_dimensions > 1) {
-    std::vector<std::unique_ptr<S2Geography>> features;
+    std::vector<std::unique_ptr<Geography>> features;
 
     if (has_points) {
       features.push_back(absl::make_unique<PointGeography>(std::move(points)));
@@ -78,7 +78,7 @@ std::unique_ptr<S2Geography> s2_geography_from_layers(
           absl::make_unique<PolygonGeography>(std::move(polygon)));
     }
 
-    return absl::make_unique<S2GeographyCollection>(std::move(features));
+    return absl::make_unique<GeographyCollection>(std::move(features));
   }
 
   // return single dimension output
@@ -89,11 +89,11 @@ std::unique_ptr<S2Geography> s2_geography_from_layers(
   } else if (has_points || (included_dimensions == 1 && include_points)) {
     return absl::make_unique<PointGeography>(std::move(points));
   } else {
-    return absl::make_unique<S2GeographyCollection>();
+    return absl::make_unique<GeographyCollection>();
   }
 }
 
-std::unique_ptr<S2Geography> s2_boolean_operation(
+std::unique_ptr<Geography> s2_boolean_operation(
     const ShapeIndexGeography& geog1, const ShapeIndexGeography& geog2,
     S2BooleanOperation::OpType op_type, const GlobalOptions& options) {
   // Create the data structures that will contain the output.
@@ -190,7 +190,7 @@ std::unique_ptr<PolygonGeography> s2_unary_union(const PolygonGeography& geog,
   return absl::make_unique<PolygonGeography>(std::move(accumulated_polygon));
 }
 
-std::unique_ptr<S2Geography> s2_unary_union(const ShapeIndexGeography& geog,
+std::unique_ptr<Geography> s2_unary_union(const ShapeIndexGeography& geog,
                                             const GlobalOptions& options) {
   // complex union only needed when a polygon is involved
   bool simple_union_ok = s2_is_empty(geog) || s2_dimension(geog) < 2;
@@ -225,8 +225,8 @@ std::unique_ptr<S2Geography> s2_unary_union(const ShapeIndexGeography& geog,
       "s2_unary_union() for multidimensional collections not implemented");
 }
 
-std::unique_ptr<S2Geography> s2_rebuild(
-    const S2Geography& geog, const GlobalOptions& options,
+std::unique_ptr<Geography> s2_rebuild(
+    const Geography& geog, const GlobalOptions& options,
     GlobalOptions::OutputAction point_layer_action,
     GlobalOptions::OutputAction polyline_layer_action,
     GlobalOptions::OutputAction polygon_layer_action) {
@@ -279,15 +279,15 @@ std::unique_ptr<S2Geography> s2_rebuild(
       options.polygon_layer_action);
 }
 
-std::unique_ptr<S2Geography> s2_rebuild(const S2Geography& geog,
+std::unique_ptr<Geography> s2_rebuild(const Geography& geog,
                                         const GlobalOptions& options) {
   return s2_rebuild(geog, options, options.point_layer_action,
                     options.polyline_layer_action,
                     options.polygon_layer_action);
 }
 
-std::unique_ptr<PointGeography> s2_build_point(const S2Geography& geog) {
-  std::unique_ptr<S2Geography> geog_out = s2_rebuild(
+std::unique_ptr<PointGeography> s2_build_point(const Geography& geog) {
+  std::unique_ptr<Geography> geog_out = s2_rebuild(
       geog, GlobalOptions(), GlobalOptions::OutputAction::OUTPUT_ACTION_INCLUDE,
       GlobalOptions::OutputAction::OUTPUT_ACTION_ERROR,
       GlobalOptions::OutputAction::OUTPUT_ACTION_ERROR);
@@ -296,8 +296,8 @@ std::unique_ptr<PointGeography> s2_build_point(const S2Geography& geog) {
       dynamic_cast<PointGeography*>(geog_out.release()));
 }
 
-std::unique_ptr<PolylineGeography> s2_build_polyline(const S2Geography& geog) {
-  std::unique_ptr<S2Geography> geog_out = s2_rebuild(
+std::unique_ptr<PolylineGeography> s2_build_polyline(const Geography& geog) {
+  std::unique_ptr<Geography> geog_out = s2_rebuild(
       geog, GlobalOptions(), GlobalOptions::OutputAction::OUTPUT_ACTION_ERROR,
       GlobalOptions::OutputAction::OUTPUT_ACTION_INCLUDE,
       GlobalOptions::OutputAction::OUTPUT_ACTION_ERROR);
@@ -306,8 +306,8 @@ std::unique_ptr<PolylineGeography> s2_build_polyline(const S2Geography& geog) {
       dynamic_cast<PolylineGeography*>(geog_out.release()));
 }
 
-std::unique_ptr<PolygonGeography> s2_build_polygon(const S2Geography& geog) {
-  std::unique_ptr<S2Geography> geog_out = s2_rebuild(
+std::unique_ptr<PolygonGeography> s2_build_polygon(const Geography& geog) {
+  std::unique_ptr<Geography> geog_out = s2_rebuild(
       geog, GlobalOptions(), GlobalOptions::OutputAction::OUTPUT_ACTION_ERROR,
       GlobalOptions::OutputAction::OUTPUT_ACTION_ERROR,
       GlobalOptions::OutputAction::OUTPUT_ACTION_INCLUDE);
@@ -316,23 +316,23 @@ std::unique_ptr<PolygonGeography> s2_build_polygon(const S2Geography& geog) {
       dynamic_cast<PolygonGeography*>(geog_out.release()));
 }
 
-void RebuildAggregator::Add(const S2Geography& geog) { index_.Add(geog); }
+void RebuildAggregator::Add(const Geography& geog) { index_.Add(geog); }
 
-std::unique_ptr<S2Geography> RebuildAggregator::Finalize() {
+std::unique_ptr<Geography> RebuildAggregator::Finalize() {
   return s2_rebuild(index_, options_);
 }
 
-void S2CoverageUnionAggregator::Add(const S2Geography& geog) {
+void S2CoverageUnionAggregator::Add(const Geography& geog) {
   index_.Add(geog);
 }
 
-std::unique_ptr<S2Geography> S2CoverageUnionAggregator::Finalize() {
+std::unique_ptr<Geography> S2CoverageUnionAggregator::Finalize() {
   ShapeIndexGeography empty_index_;
   return s2_boolean_operation(index_, empty_index_,
                               S2BooleanOperation::OpType::UNION, options_);
 }
 
-void S2UnionAggregator::Add(const S2Geography& geog) {
+void S2UnionAggregator::Add(const Geography& geog) {
   if (geog.dimension() == 0 || geog.dimension() == 1) {
     root_.index1.Add(geog);
     return;
@@ -355,13 +355,13 @@ void S2UnionAggregator::Add(const S2Geography& geog) {
   }
 }
 
-std::unique_ptr<S2Geography> S2UnionAggregator::Node::Merge(
+std::unique_ptr<Geography> S2UnionAggregator::Node::Merge(
     const GlobalOptions& options) {
   return s2_boolean_operation(index1, index2, S2BooleanOperation::OpType::UNION,
                               options);
 }
 
-std::unique_ptr<S2Geography> S2UnionAggregator::Finalize() {
+std::unique_ptr<Geography> S2UnionAggregator::Finalize() {
   for (int j = 0; j < 100; j++) {
     if (other_.size() <= 1) {
       break;
@@ -370,8 +370,8 @@ std::unique_ptr<S2Geography> S2UnionAggregator::Finalize() {
     for (int64_t i = static_cast<int64_t>(other_.size()) - 1; i >= 1;
          i = i - 2) {
       // merge other_[i] with other_[i - 1]
-      std::unique_ptr<S2Geography> merged = other_[i]->Merge(options_);
-      std::unique_ptr<S2Geography> merged_prev = other_[i - 1]->Merge(options_);
+      std::unique_ptr<Geography> merged = other_[i]->Merge(options_);
+      std::unique_ptr<Geography> merged_prev = other_[i - 1]->Merge(options_);
 
       // erase the last two nodes
       other_.erase(other_.begin() + i - 1, other_.begin() + i + 1);
@@ -390,7 +390,7 @@ std::unique_ptr<S2Geography> S2UnionAggregator::Finalize() {
   if (other_.size() == 0) {
     return root_.Merge(options_);
   } else {
-    std::unique_ptr<S2Geography> merged = other_[0]->Merge(options_);
+    std::unique_ptr<Geography> merged = other_[0]->Merge(options_);
     root_.index2.Add(*merged);
     return root_.Merge(options_);
   }

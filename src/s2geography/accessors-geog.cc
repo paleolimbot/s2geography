@@ -9,7 +9,7 @@
 
 namespace s2geography {
 
-S2Point s2_centroid(const S2Geography& geog) {
+S2Point s2_centroid(const Geography& geog) {
   S2Point centroid(0, 0, 0);
 
   if (geog.dimension() == 0) {
@@ -47,7 +47,7 @@ S2Point s2_centroid(const S2Geography& geog) {
     return centroid.Normalize();
   }
 
-  auto collection_ptr = dynamic_cast<const S2GeographyCollection*>(&geog);
+  auto collection_ptr = dynamic_cast<const GeographyCollection*>(&geog);
   if (collection_ptr == nullptr) {
     throw Exception(
         "Can't compute s2_centroid() on custom collection geography");
@@ -60,7 +60,7 @@ S2Point s2_centroid(const S2Geography& geog) {
   return centroid.Normalize();
 }
 
-std::unique_ptr<S2Geography> s2_boundary(const S2Geography& geog) {
+std::unique_ptr<Geography> s2_boundary(const Geography& geog) {
   int dimension = s2_dimension(geog);
 
   if (dimension == 1) {
@@ -113,16 +113,16 @@ std::unique_ptr<S2Geography> s2_boundary(const S2Geography& geog) {
     return absl::make_unique<PolylineGeography>(std::move(polylines));
   }
 
-  return absl::make_unique<S2GeographyCollection>();
+  return absl::make_unique<GeographyCollection>();
 }
 
-std::unique_ptr<S2Geography> s2_convex_hull(const S2Geography& geog) {
+std::unique_ptr<Geography> s2_convex_hull(const Geography& geog) {
   S2ConvexHullAggregator agg;
   agg.Add(geog);
   return agg.Finalize();
 }
 
-void CentroidAggregator::Add(const S2Geography& geog) {
+void CentroidAggregator::Add(const Geography& geog) {
   S2Point centroid = s2_centroid(geog);
   if (centroid.Norm2() > 0) {
     centroid_ += centroid.Normalize();
@@ -141,7 +141,7 @@ S2Point CentroidAggregator::Finalize() {
   }
 }
 
-void S2ConvexHullAggregator::Add(const S2Geography& geog) {
+void S2ConvexHullAggregator::Add(const Geography& geog) {
   if (geog.dimension() == 0) {
     auto point_ptr = dynamic_cast<const PointGeography*>(&geog);
     if (point_ptr != nullptr) {
@@ -182,7 +182,7 @@ void S2ConvexHullAggregator::Add(const S2Geography& geog) {
     return;
   }
 
-  auto collection_ptr = dynamic_cast<const S2GeographyCollection*>(&geog);
+  auto collection_ptr = dynamic_cast<const GeographyCollection*>(&geog);
   if (collection_ptr != nullptr) {
     for (const auto& feature : collection_ptr->Features()) {
       Add(*feature);

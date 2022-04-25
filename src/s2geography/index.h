@@ -8,8 +8,8 @@
 namespace s2geography {
 
 // Unlike the ShapeIndexGeography, whose function is to index a single
-// S2Geography or index multiple S2Geography objects as if they were a single
-// S2Geography, the GeographyIndex exists to index a vector of S2Geography
+// Geography or index multiple Geography objects as if they were a single
+// Geography, the GeographyIndex exists to index a vector of Geography
 // objects (like a GEOSSTRTree index), providing (hopefully) rapid access to
 // possibly intersecting features.
 class GeographyIndex {
@@ -18,7 +18,7 @@ class GeographyIndex {
       MutableS2ShapeIndex::Options options = MutableS2ShapeIndex::Options())
       : index_(options) {}
 
-  void Add(const S2Geography& geog, int value) {
+  void Add(const Geography& geog, int value) {
     values_.reserve(values_.size() + geog.num_shapes());
     for (int i = 0; i < geog.num_shapes(); i++) {
       int new_shape_id = index_.Add(geog.Shape(i));

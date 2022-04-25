@@ -18,8 +18,8 @@ using namespace s2geography;
 // which is required by MutableS2ShapeIndex::Add(), without copying the
 // underlying data. S2Shape instances do not typically own their data (e.g.,
 // S2Polygon::Shape), so this does not change the general relationship (that
-// anything returned by S2Geography::Shape() is only valid within the scope of
-// the S2Geography). Note that this class is also available (but not exposed) in
+// anything returned by Geography::Shape() is only valid within the scope of
+// the Geography). Note that this class is also available (but not exposed) in
 // s2/s2shapeutil_coding.cc.
 class S2ShapeWrapper : public S2Shape {
  public:
@@ -44,11 +44,11 @@ class S2ShapeWrapper : public S2Shape {
 };
 
 // Just like the S2ShapeWrapper, the S2RegionWrapper helps reconcile the
-// differences in lifecycle expectation between S2 and S2Geography. We often
+// differences in lifecycle expectation between S2 and Geography. We often
 // need access to a S2Region to generalize algorithms; however, there are some
 // operations that need ownership of the region (e.g., the S2RegionUnion). In
-// S2Geography the assumption is that anything returned by a S2Geography is only
-// valid for the lifetime of the underlying S2Geography. A different design of
+// Geography the assumption is that anything returned by a Geography is only
+// valid for the lifetime of the underlying Geography. A different design of
 // the algorithms implemented here might well make this unnecessary.
 class S2RegionWrapper : public S2Region {
  public:
@@ -69,7 +69,7 @@ class S2RegionWrapper : public S2Region {
   S2Region* region_;
 };
 
-void S2Geography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
+void Geography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
   MutableS2ShapeIndex index;
   for (int i = 0; i < num_shapes(); i++) {
     index.Add(Shape(i));
@@ -100,7 +100,7 @@ void PointGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
       cell_ids->push_back(S2CellId(point));
     }
   } else {
-    S2Geography::GetCellUnionBound(cell_ids);
+    Geography::GetCellUnionBound(cell_ids);
   }
 }
 
@@ -140,9 +140,9 @@ void PolygonGeography::GetCellUnionBound(
   polygon_->GetCellUnionBound(cell_ids);
 }
 
-int S2GeographyCollection::num_shapes() const { return total_shapes_; }
+int GeographyCollection::num_shapes() const { return total_shapes_; }
 
-std::unique_ptr<S2Shape> S2GeographyCollection::Shape(int id) const {
+std::unique_ptr<S2Shape> GeographyCollection::Shape(int id) const {
   int sum_shapes_ = 0;
   for (int i = 0; i < features_.size(); i++) {
     sum_shapes_ += num_shapes_[i];
@@ -154,7 +154,7 @@ std::unique_ptr<S2Shape> S2GeographyCollection::Shape(int id) const {
   throw Exception("shape id out of bounds");
 }
 
-std::unique_ptr<S2Region> S2GeographyCollection::Region() const {
+std::unique_ptr<S2Region> GeographyCollection::Region() const {
   auto region = absl::make_unique<S2RegionUnion>();
   for (const auto& feature : features_) {
     region->Add(feature->Region());

@@ -7,10 +7,10 @@
 
 namespace s2geography {
 
-S2Point s2_point_on_surface(const S2Geography& geog, S2RegionCoverer& coverer);
-void s2_covering(const S2Geography& geog, std::vector<S2CellId>* covering,
+S2Point s2_point_on_surface(const Geography& geog, S2RegionCoverer& coverer);
+void s2_covering(const Geography& geog, std::vector<S2CellId>* covering,
                  S2RegionCoverer& coverer);
-void s2_interior_covering(const S2Geography& geog,
+void s2_interior_covering(const Geography& geog,
                           std::vector<S2CellId>* covering,
                           S2RegionCoverer& coverer);
 void s2_covering_buffered(const ShapeIndexGeography& geog,

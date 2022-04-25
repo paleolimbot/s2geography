@@ -10,7 +10,7 @@
 
 namespace s2geography {
 
-S2Point s2_point_on_surface(const S2Geography& geog, S2RegionCoverer& coverer) {
+S2Point s2_point_on_surface(const Geography& geog, S2RegionCoverer& coverer) {
   if (s2_is_empty(geog)) {
     return S2Point();
   }
@@ -59,12 +59,12 @@ S2Point s2_point_on_surface(const S2Geography& geog, S2RegionCoverer& coverer) {
   throw Exception("s2_point_on_surface() not implemented for polyline");
 }
 
-void s2_covering(const S2Geography& geog, std::vector<S2CellId>* covering,
+void s2_covering(const Geography& geog, std::vector<S2CellId>* covering,
                  S2RegionCoverer& coverer) {
   coverer.GetCovering(*geog.Region(), covering);
 }
 
-void s2_interior_covering(const S2Geography& geog,
+void s2_interior_covering(const Geography& geog,
                           std::vector<S2CellId>* covering,
                           S2RegionCoverer& coverer) {
   coverer.GetInteriorCovering(*geog.Region(), covering);

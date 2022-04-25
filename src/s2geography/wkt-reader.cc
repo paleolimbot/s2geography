@@ -723,7 +723,7 @@ WKTReader::WKTReader(const util::Constructor::Options& options)
   constructor_ = absl::make_unique<util::FeatureConstructor>(options);
 }
 
-std::unique_ptr<S2Geography> WKTReader::read_feature(const char* text,
+std::unique_ptr<Geography> WKTReader::read_feature(const char* text,
                                                      int64_t size) {
   constructor_->feat_start();
   reader_->read_buffer(constructor_.get(),
@@ -732,7 +732,7 @@ std::unique_ptr<S2Geography> WKTReader::read_feature(const char* text,
   return constructor_->finish_feature();
 }
 
-std::unique_ptr<S2Geography> WKTReader::read_feature(const char* text) {
+std::unique_ptr<Geography> WKTReader::read_feature(const char* text) {
   return read_feature(text, strlen(text));
 }
 

@@ -189,7 +189,7 @@ WKTWriter::WKTWriter()
   exporter_->new_geometry_type(util::GeometryType::GEOMETRY_TYPE_UNKNOWN);
 }
 
-std::string WKTWriter::write_feature(const S2Geography& geog) {
+std::string WKTWriter::write_feature(const Geography& geog) {
   stream_.str("");
   handle_feature(geog, exporter_.get());
   return stream_.str();
@@ -402,7 +402,7 @@ Handler::Result WKTWriter::handle_polygon(const PolygonGeography& geog,
   return Handler::Result::CONTINUE;
 }
 
-Handler::Result WKTWriter::handle_collection(const S2GeographyCollection& geog,
+Handler::Result WKTWriter::handle_collection(const GeographyCollection& geog,
                                              Handler* handler) {
   Handler::Result result;
   handler->new_geometry_type(util::GeometryType::GEOMETRYCOLLECTION);
@@ -424,11 +424,11 @@ Handler::Result WKTWriter::handle_collection(const S2GeographyCollection& geog,
           HANDLE_OR_RETURN(handle_polygon(*child_polygon, handler));
         } else {
           auto child_collection =
-              dynamic_cast<const S2GeographyCollection*>(child_geog.get());
+              dynamic_cast<const GeographyCollection*>(child_geog.get());
           if (child_collection != nullptr) {
             HANDLE_OR_RETURN(handle_collection(*child_collection, handler));
           } else {
-            throw Exception("Unsupported S2Geography subclass");
+            throw Exception("Unsupported Geography subclass");
           }
         }
       }
@@ -438,7 +438,7 @@ Handler::Result WKTWriter::handle_collection(const S2GeographyCollection& geog,
   return Handler::Result::CONTINUE;
 }
 
-Handler::Result WKTWriter::handle_feature(const S2Geography& geog,
+Handler::Result WKTWriter::handle_feature(const Geography& geog,
                                           Handler* handler) {
   Handler::Result result;
 
@@ -457,11 +457,11 @@ Handler::Result WKTWriter::handle_feature(const S2Geography& geog,
         HANDLE_OR_RETURN(handle_polygon(*child_polygon, handler));
       } else {
         auto child_collection =
-            dynamic_cast<const S2GeographyCollection*>(&geog);
+            dynamic_cast<const GeographyCollection*>(&geog);
         if (child_collection != nullptr) {
           HANDLE_OR_RETURN(handle_collection(*child_collection, handler));
         } else {
-          throw Exception("Unsupported S2Geography subclass");
+          throw Exception("Unsupported Geography subclass");
         }
       }
     }

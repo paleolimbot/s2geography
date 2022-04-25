@@ -15,16 +15,16 @@ class Exception : public std::runtime_error {
   Exception(std::string what) : std::runtime_error(what.c_str()) {}
 };
 
-// An S2Geography is an abstraction of S2 types that is designed to closely
+// An Geography is an abstraction of S2 types that is designed to closely
 // match the scope of a GEOS Geometry. Its methods are limited to those needed
-// to implement C API functions. From an S2 perspective, an S2Geography is an
+// to implement C API functions. From an S2 perspective, an Geography is an
 // S2Region that can be represented by zero or more S2Shape objects. Current
-// implementations of S2Geography own their data (i.e., the coordinate vectors
+// implementations of Geography own their data (i.e., the coordinate vectors
 // and underlying S2 objects), however, the interface is designed to allow
 // future abstractions where this is not the case.
-class S2Geography {
+class Geography {
  public:
-  virtual ~S2Geography() {}
+  virtual ~Geography() {}
 
   // Returns 0, 1, or 2 if all Shape()s that are returned will have
   // the same dimension (i.e., they are all points, all lines, or
@@ -44,18 +44,18 @@ class S2Geography {
     return dim;
   }
 
-  // The number of S2Shape objects needed to represent this S2Geography
+  // The number of S2Shape objects needed to represent this Geography
   virtual int num_shapes() const = 0;
 
   // Returns the given S2Shape (where 0 <= id < num_shapes()). The
   // caller retains ownership of the S2Shape but the data pointed to
-  // by the object requires that the underlying S2Geography outlives
+  // by the object requires that the underlying Geography outlives
   // the returned object.
   virtual std::unique_ptr<S2Shape> Shape(int id) const = 0;
 
   // Returns an S2Region that represents the object. The caller retains
   // ownership of the S2Region but the data pointed to by the object
-  // requires that the underlying S2Geography outlives the returned
+  // requires that the underlying Geography outlives the returned
   // object.
   virtual std::unique_ptr<S2Region> Region() const = 0;
 
@@ -66,9 +66,9 @@ class S2Geography {
   virtual void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const;
 };
 
-// An S2Geography representing zero or more points using a std::vector<S2Point>
+// An Geography representing zero or more points using a std::vector<S2Point>
 // as the underlying representation.
-class PointGeography : public S2Geography {
+class PointGeography : public Geography {
  public:
   PointGeography() {}
   PointGeography(S2Point point) { points_.push_back(point); }
@@ -86,9 +86,9 @@ class PointGeography : public S2Geography {
   std::vector<S2Point> points_;
 };
 
-// An S2Geography representing zero or more polylines using the S2Polyline class
+// An Geography representing zero or more polylines using the S2Polyline class
 // as the underlying representation.
-class PolylineGeography : public S2Geography {
+class PolylineGeography : public Geography {
  public:
   PolylineGeography() {}
   PolylineGeography(std::unique_ptr<S2Polyline> polyline) {
@@ -111,11 +111,11 @@ class PolylineGeography : public S2Geography {
   std::vector<std::unique_ptr<S2Polyline>> polylines_;
 };
 
-// An S2Geography representing zero or more polygons using the S2Polygon class
+// An Geography representing zero or more polygons using the S2Polygon class
 // as the underlying representation. Note that a single S2Polygon (from the S2
 // perspective) can represent zero or more polygons (from the simple features
 // perspective).
-class PolygonGeography : public S2Geography {
+class PolygonGeography : public Geography {
  public:
   PolygonGeography() {}
   PolygonGeography(std::unique_ptr<S2Polygon> polygon)
@@ -133,13 +133,13 @@ class PolygonGeography : public S2Geography {
   std::unique_ptr<S2Polygon> polygon_;
 };
 
-// An S2Geography wrapping zero or more S2Geography objects. These objects
+// An Geography wrapping zero or more Geography objects. These objects
 // can be used to represent a simple features GEOMETRYCOLLECTION.
-class S2GeographyCollection : public S2Geography {
+class GeographyCollection : public Geography {
  public:
-  S2GeographyCollection() : total_shapes_(0) {}
+  GeographyCollection() : total_shapes_(0) {}
 
-  S2GeographyCollection(std::vector<std::unique_ptr<S2Geography>> features)
+  GeographyCollection(std::vector<std::unique_ptr<Geography>> features)
       : features_(std::move(features)), total_shapes_(0) {
     for (const auto& feature : features_) {
       num_shapes_.push_back(feature->num_shapes());
@@ -151,35 +151,35 @@ class S2GeographyCollection : public S2Geography {
   std::unique_ptr<S2Shape> Shape(int id) const;
   std::unique_ptr<S2Region> Region() const;
 
-  const std::vector<std::unique_ptr<S2Geography>>& Features() const {
+  const std::vector<std::unique_ptr<Geography>>& Features() const {
     return features_;
   }
 
  private:
-  std::vector<std::unique_ptr<S2Geography>> features_;
+  std::vector<std::unique_ptr<Geography>> features_;
   std::vector<int> num_shapes_;
   int total_shapes_;
 };
 
-// An S2Geography with a MutableS2ShapeIndex as the underlying data.
+// An Geography with a MutableS2ShapeIndex as the underlying data.
 // These are used as inputs for operations that are implemented in S2
-// using the S2ShapeIndex (e.g., boolean operations). If an S2Geography
+// using the S2ShapeIndex (e.g., boolean operations). If an Geography
 // instance will be used repeatedly, it will be faster to construct
 // one ShapeIndexGeography and use it repeatedly. This class does not
-// own any S2Geography objects that are added do it and thus is only
+// own any Geography objects that are added do it and thus is only
 // valid for the scope of those objects.
-class ShapeIndexGeography : public S2Geography {
+class ShapeIndexGeography : public Geography {
  public:
   ShapeIndexGeography(
       MutableS2ShapeIndex::Options options = MutableS2ShapeIndex::Options())
       : shape_index_(options) {}
 
-  explicit ShapeIndexGeography(const S2Geography& geog) { Add(geog); }
+  explicit ShapeIndexGeography(const Geography& geog) { Add(geog); }
 
-  // Add a S2Geography to the index, returning the last shape_id
+  // Add a Geography to the index, returning the last shape_id
   // that was added to the index or -1 if no shapes were added
   // to the index.
-  int Add(const S2Geography& geog) {
+  int Add(const Geography& geog) {
     int id = -1;
     for (int i = 0; i < geog.num_shapes(); i++) {
       id = shape_index_.Add(geog.Shape(i));

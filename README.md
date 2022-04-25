@@ -1,104 +1,59 @@
 
-<!-- README.md is generated from README.Rmd. Please edit that file -->
-
 # s2geography
 
-<!-- badges: start -->
-<!-- badges: end -->
+[![Examples](https://github.com/paleolimbot/s2geography/actions/workflows/run-examples.yaml/badge.svg)](https://github.com/paleolimbot/s2geography/actions/workflows/run-examples.yaml)
 
-Google’s [s2geometry](https://github.com/google/s2geometry) is a
-spherical geometry engine providing accurate and performant geometry
-operations for geometries on the sphere. This library provides a
-compatability layer on top of s2geometry for those more familiar with
-[simple features](https://en.wikipedia.org/wiki/Simple_Features),
-[GEOS](https://libgeos.org), and/or the [GEOS C
-API](https://libgeos.org/doxygen/geos__c_8h.html).
+Google's [s2geometry](https://github.com/google/s2geometry) is a spherical geometry engine providing accurate and performant geometry operations for geometries on the sphere. This library provides a compatability layer on top of s2geometry for those more familiar with [simple features](https://en.wikipedia.org/wiki/Simple_Features), [GEOS](https://libgeos.org), and/or the [GEOS C API](https://libgeos.org/doxygen/geos__c_8h.html).
 
-The s2geography library was refactored out of the [s2 package for
-R](https://github.com/r-spatial/s2), which has served as the backend for
-geometries with geographic coordinates in the popular [sf package for
-R](https://github.com/r-spatial/sf) since version 1.0.0. The library is
-currently under construction as it adapts to suit the needs of more than
-just a single R package.
+The s2geography library was refactored out of the [s2 package for R](https://github.com/r-spatial/s2), which has served as the backend for geometries with geographic coordinates in the popular [sf package for R](https://github.com/r-spatial/sf) since version 1.0.0. The library is currently under construction as it adapts to suit the needs of more than just a single R package. Suggestions to modify, replace, or completely rewrite this library are welcome!
 
 ## Usage
 
-s2geography depends on s2geometry, which depends on
-[Abseil](https://github.com/abseil/abseil-cpp) and OpenSSL. If you
-already have a project that uses s2geometry, you should probably just
-copy the contents of the src/ directory into your project and
-`#include "s2geography.h"`.
+s2geography depends on s2geometry, which depends on [Abseil](https://github.com/abseil/abseil-cpp) and OpenSSL. You will need to install Abseil from source and install it to the same place you install s2geography (e.g., the homebrew/distributed versions are unlikely to work). Configure with `cmake <src dir> -Dabsl_DIR=.../cmake/absl`, where `.../cmake/absl` contains the `abslConfig.cmake` file. You may also need to specify the location of OpenSSL using `-DOPENSSL_ROOT_DIR=/path/to/openssl@1.1`. The s2 library is fetched and built using CMake's FetchContent module, so you don't need to clone it separately.
 
-Otherwise you can build and install using `cmake`. The project is
-structured such that the VSCode `cmake` integration is triggered when
-the folder is open (if the default build doesn’t work, consider adding
-`CMakeUserPresets.json` to configure things like the install directory
-or the location of OpenSSL). You can also configure manually:
+The project is structured such that the VSCode `cmake` integration is triggered when the folder is open (if the default build doesn't work, consider adding `CMakeUserPresets.json` to configure things like the install directory, absl_DIR, or the location of OpenSSL). You can also configure manually:
 
-``` bash
-git clone https://github.com/paleolimbot/s2geography.git s2geography
-mkdir s2geography/build && cd s2geography/build
+## Example
 
-# you may need to specify the location of OpenSSL
-# (e.g., `cmake .. -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl@1.1` on M1 mac)
-cmake ..
-cmake --build .
-cmake --install . --prefix ../dist
-```
+A quick example (see also the `examples/` directory):
 
-This will also download, build, and install Abseil and s2geometry to the
-install directory. By default this will build and install static
-libraries for s2geography, s2, and many abseil libraries to the dist/
-directory. If you are building your own project with CMake, you should
-be able to do:
+```cpp
+#include <stdio.h>
 
-``` cmake
-include(FetchContent)
-FetchContent_Declare(
-  s2geography
-  GIT_REPOSITORY https://github.com/paleolimbot/s2geography.git
-  GIT_TAG <PICK A COMMIT SHA1>
-  GIT_SHALLOW TRUE)
-FetchContent_MakeAvailable(s2geography)
-```
+#include <iostream>
 
-Otherwise, you can add some compier/linker flags and
-`#include "s2geography.h"`. This will also let you `#include` any/all of
-s2geometry.
-
-    CPPFLAGS = -I<install_prefix>/include -I<openssl_root_dir>/include
-    LDFLAGS = -L<openssl_root_dir>/lib -lssl -lcrypto -L<install_prefix>/lib -ls2geography -ls2 -labsl_base -labsl_city -labsl_demangle_internal -labsl_flags_reflection -labsl_graphcycles_internal -labsl_hash -labsl_hashtablez_sampler -labsl_int128 -labsl_low_level_hash -labsl_malloc_internal -labsl_raw_hash_set -labsl_raw_logging_internal -labsl_spinlock_wait -labsl_stacktrace -labsl_str_format_internal -labsl_strings -labsl_symbolize -labsl_synchronization -labsl_throw_delegate -labsl_time_zone -labsl_time
-
-Somebody who is better than me at `cmake` could probably do a better job
-making all of this flexible and/or get shared libraries to work.
-
-# Example
-
-A quick example (using R and the [cpp11](https://cpp11.r-lib.org/)
-package) (using `Sys.setenv()` to set the `PKG_CXXFLAGS` and `PKG_LIBS`
-environment variables to the `CPPFLAGS` and `LDFLAGS`)
-
-``` cpp
-#include "cpp11.hpp"
 #include "s2geography.h"
 
 using namespace s2geography;
 
-[[cpp11::register]]
-void test_s2geography() {
-  PointGeography point1 = S2LatLng::FromDegrees(45, -64).ToPoint();
-  PointGeography point2 = S2LatLng::FromDegrees(45, 0).ToPoint();
+int main(int argc, char *argv[]) {
+  WKTReader reader;
+  std::unique_ptr<Geography> geog1 = reader.read_feature("POINT (-64 45)");
+  std::unique_ptr<Geography> geog2 = reader.read_feature(
+      "GEOMETRYCOLLECTION (POINT (30 10), LINESTRING (30 10, 10 30, 40 40), "
+      "POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10)))");
 
-  ShapeIndexGeography point1_index(point1);
-  ShapeIndexGeography point2_index(point2);
+  ShapeIndexGeography geog1_index(*geog1);
+  ShapeIndexGeography geog2_index(*geog2);
 
-  double dist = s2_distance(point1_index, point2_index);
+  double dist = s2_distance(geog1_index, geog2_index);
 
-  Rprintf("distance result is %g", dist);
+  printf("distance result is %g\n", dist);
+
+  WKTWriter writer;
+  std::cout << "geog1: " << writer.write_feature(*geog1) << "\n";
+  std::cout << "geog2: " << writer.write_feature(*geog2) << "\n";
 }
 ```
 
-``` r
-test_s2geography()
-#> distance result is 0.768167
-```
+## Overview
+
+The basic unit in s2geography is the `Geography` class. The three main subclasses of this wrap `std::vector<S2Point>`, `std::vector<std::unique_ptr<S2Polyline>>`,, `std::unique_ptr<S2Polygon>`, and `std::vector<std::unique_ptr<Geography>>`; however, the `Geography` class is parameterized as zero or more `S2Shape` objects that also define an `S2Region`. This allows a flexible storage model (although only the four main subclasses have been tested).
+
+Many operations in S2 require a `S2ShapeIndex` as input. This concept is similar to the GEOS prepared geometry and maps to the `ShapeIndexGeography` in this library. For indexing a vector of features, use the `GeographyIndex` (similar to the GEOS STRTree object).
+
+The s2geography library sits on top of the s2geometry library, and you can and should use s2 directly!
+
+## TODO
+
+- [ ] Test using GTest. The original version in the s2 package for R has excellent test coverage, but the tests are written in R and should probably be ported here (original test folder: https://github.com/r-spatial/s2/tree/main/tests/testthat).

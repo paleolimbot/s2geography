@@ -19,7 +19,7 @@ bool s2_is_collection(const PolygonGeography& geog) {
   return false;
 }
 
-bool s2_is_collection(const S2Geography& geog) {
+bool s2_is_collection(const Geography& geog) {
   int dimension = s2_dimension(geog);
 
   if (dimension == -1) {
@@ -52,7 +52,7 @@ bool s2_is_collection(const S2Geography& geog) {
   }
 }
 
-int s2_dimension(const S2Geography& geog) {
+int s2_dimension(const Geography& geog) {
   int dimension = geog.dimension();
   if (dimension != -1) {
     return dimension;
@@ -68,7 +68,7 @@ int s2_dimension(const S2Geography& geog) {
   return dimension;
 }
 
-int s2_num_points(const S2Geography& geog) {
+int s2_num_points(const Geography& geog) {
   int num_points = 0;
   for (int i = 0; i < geog.num_shapes(); i++) {
     std::unique_ptr<S2Shape> shape = geog.Shape(i);
@@ -86,7 +86,7 @@ int s2_num_points(const S2Geography& geog) {
   return num_points;
 }
 
-bool s2_is_empty(const S2Geography& geog) {
+bool s2_is_empty(const Geography& geog) {
   for (int i = 0; i < geog.num_shapes(); i++) {
     std::unique_ptr<S2Shape> shape = geog.Shape(i);
     if (!shape->is_empty()) {
@@ -101,7 +101,7 @@ double s2_area(const PolygonGeography& geog) {
   return geog.Polygon()->GetArea();
 }
 
-double s2_area(const S2GeographyCollection& geog) {
+double s2_area(const GeographyCollection& geog) {
   double area = 0;
   for (auto& feature : geog.Features()) {
     area += s2_area(*feature);
@@ -109,7 +109,7 @@ double s2_area(const S2GeographyCollection& geog) {
   return area;
 }
 
-double s2_area(const S2Geography& geog) {
+double s2_area(const Geography& geog) {
   if (s2_dimension(geog) != 2) {
     return 0;
   }
@@ -119,7 +119,7 @@ double s2_area(const S2Geography& geog) {
     return s2_area(*polygon_geog_ptr);
   }
 
-  auto collection_geog_ptr = dynamic_cast<const S2GeographyCollection*>(&geog);
+  auto collection_geog_ptr = dynamic_cast<const GeographyCollection*>(&geog);
   if (collection_geog_ptr != nullptr) {
     return s2_area(*collection_geog_ptr);
   }
@@ -128,7 +128,7 @@ double s2_area(const S2Geography& geog) {
   return s2_area(*built);
 }
 
-double s2_length(const S2Geography& geog) {
+double s2_length(const Geography& geog) {
   double length = 0;
 
   if (s2_dimension(geog) == 1) {
@@ -145,7 +145,7 @@ double s2_length(const S2Geography& geog) {
   return length;
 }
 
-double s2_perimeter(const S2Geography& geog) {
+double s2_perimeter(const Geography& geog) {
   double length = 0;
 
   if (s2_dimension(geog) == 2) {
@@ -162,7 +162,7 @@ double s2_perimeter(const S2Geography& geog) {
   return length;
 }
 
-double s2_x(const S2Geography& geog) {
+double s2_x(const Geography& geog) {
   double out = NAN;
   for (int i = 0; i < geog.num_shapes(); i++) {
     std::unique_ptr<S2Shape> shape = geog.Shape(i);
@@ -177,7 +177,7 @@ double s2_x(const S2Geography& geog) {
   return out;
 }
 
-double s2_y(const S2Geography& geog) {
+double s2_y(const Geography& geog) {
   double out = NAN;
   for (int i = 0; i < geog.num_shapes(); i++) {
     std::unique_ptr<S2Shape> shape = geog.Shape(i);
@@ -206,7 +206,7 @@ bool s2_find_validation_error(const PolygonGeography& geog, S2Error* error) {
   return geog.Polygon()->FindValidationError(error);
 }
 
-bool s2_find_validation_error(const S2GeographyCollection& geog,
+bool s2_find_validation_error(const GeographyCollection& geog,
                               S2Error* error) {
   for (const auto& feature : geog.Features()) {
     if (s2_find_validation_error(*feature, error)) {
@@ -217,7 +217,7 @@ bool s2_find_validation_error(const S2GeographyCollection& geog,
   return false;
 }
 
-bool s2_find_validation_error(const S2Geography& geog, S2Error* error) {
+bool s2_find_validation_error(const Geography& geog, S2Error* error) {
   if (geog.dimension() == 0) {
     error->Clear();
     return false;
@@ -253,7 +253,7 @@ bool s2_find_validation_error(const S2Geography& geog, S2Error* error) {
     }
   }
 
-  auto collection_ptr = dynamic_cast<const S2GeographyCollection*>(&geog);
+  auto collection_ptr = dynamic_cast<const GeographyCollection*>(&geog);
   if (collection_ptr != nullptr) {
     return s2_find_validation_error(*collection_ptr, error);
   } else {
