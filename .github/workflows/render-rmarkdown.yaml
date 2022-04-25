@@ -28,7 +28,7 @@ jobs:
       - name: Fetch abseil
         uses: actions/checkout@v3
         with:
-          repo: abseil/abseil-cpp
+          repository: abseil/abseil-cpp
           ref: 215105818dfde3174fe799600bb0f3cae233d0bf
           path: build/absl-src
           fetch-depth: 0
