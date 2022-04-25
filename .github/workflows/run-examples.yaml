@@ -9,7 +9,7 @@ on:
 name: Example rmarkdown
 
 jobs:
-  built-and-render:
+  build-and-run-examples:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo

@@ -14,5 +14,5 @@ int main(int argc, char *argv[]) {
 
   double dist = s2_distance(point1_index, point2_index);
 
-  printf("distance result is %g", dist);
+  printf("distance result is %g\n", dist);
 }
