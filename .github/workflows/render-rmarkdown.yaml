@@ -22,17 +22,10 @@ jobs:
         run: |
           sudo apt-get install -y cmake libssl-dev
 
-      - name: Build and install Abseil
-        run: |
-          mkdir abseil-build && cd abseil-build
-          cmake ../abseil-cpp
-          cmake --build .
-          cmake --install . --prefix ../dist-abseil
-
       - name: Build s2geography
         run: |
           mkdir build && cd build
-          cmake .. -DCMAKE_PREFIX_PATH=../dist-abseil
+          cmake ..
           cmake --build .
           cmake --install . --prefix ../dist
 
@@ -40,7 +33,7 @@ jobs:
       - uses: r-lib/actions/setup-r@v1
       - name: Write dummy DESCRIPTION
         run: |
-          echo "Package: dummypackage" > DESCRIPTION
+          printf "Package: dummypackage\nVersion: 0.0.0.9000" > DESCRIPTION
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: rmarkdown,cpp11,decor

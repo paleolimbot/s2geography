@@ -13,7 +13,22 @@ set(ABSL_ENABLE_INSTALL ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
-add_subdirectory(s2geometry)
+
+FetchContent_Declare(
+  absl
+  GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
+  GIT_TAG tags/20211102.0
+  GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(absl)
+
+list(APPEND CMAKE_PREFIX_PATH ${absl_SOURCE_DIR})
+
+FetchContent_Declare(
+  s2
+  GIT_REPOSITORY https://github.com/google/s2geometry.git
+  GIT_TAG tags/v0.10.0
+  GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(s2)
 
 include_directories(src ${OPENSSL_INCLUDE_DIR})
 include_directories(src ${ABSL_INCLUDE_DIR})
