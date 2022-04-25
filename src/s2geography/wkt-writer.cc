@@ -195,7 +195,8 @@ std::string WKTWriter::write_feature(const S2Geography& geog) {
   return stream_.str();
 }
 
-Handler::Result WKTWriter::handle_points(const PointGeography& geog, Handler* handler) {
+Handler::Result WKTWriter::handle_points(const PointGeography& geog,
+                                         Handler* handler) {
   Handler::Result result;
   double coords[2];
 
@@ -213,9 +214,10 @@ Handler::Result WKTWriter::handle_points(const PointGeography& geog, Handler* ha
     HANDLE_OR_RETURN(handler->geom_end());
   } else {
     handler->new_geometry_type(util::GeometryType::MULTIPOINT);
-    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::MULTIPOINT, geog.Points().size()));
+    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::MULTIPOINT,
+                                         geog.Points().size()));
 
-    for (const S2Point& pt: geog.Points()) {
+    for (const S2Point& pt : geog.Points()) {
       handler->geom_start(util::GeometryType::POINT, 1);
       S2LatLng ll(pt);
       coords[0] = ll.lng().degrees();
@@ -231,7 +233,7 @@ Handler::Result WKTWriter::handle_points(const PointGeography& geog, Handler* ha
 }
 
 Handler::Result WKTWriter::handle_polylines(const PolylineGeography& geog,
-                                 Handler* handler) {
+                                            Handler* handler) {
   Handler::Result result;
   double coords[2];
 
@@ -243,7 +245,8 @@ Handler::Result WKTWriter::handle_polylines(const PolylineGeography& geog,
     handler->new_geometry_type(util::GeometryType::LINESTRING);
 
     const auto& poly = geog.Polylines()[0];
-    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::LINESTRING, poly->num_vertices()));
+    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::LINESTRING,
+                                         poly->num_vertices()));
 
     for (int i = 0; i < poly->num_vertices(); i++) {
       S2LatLng ll(poly->vertex(i));
@@ -255,10 +258,12 @@ Handler::Result WKTWriter::handle_polylines(const PolylineGeography& geog,
     handler->geom_end();
   } else {
     handler->new_geometry_type(util::GeometryType::MULTILINESTRING);
-    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::MULTILINESTRING, geog.Polylines().size()));
+    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::MULTILINESTRING,
+                                         geog.Polylines().size()));
 
-    for (const auto& poly: geog.Polylines()) {
-      HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::LINESTRING, poly->num_vertices()));
+    for (const auto& poly : geog.Polylines()) {
+      HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::LINESTRING,
+                                           poly->num_vertices()));
 
       for (int i = 0; i < poly->num_vertices(); i++) {
         S2LatLng ll(poly->vertex(i));
@@ -323,7 +328,8 @@ Handler::Result handle_loop_hole(const S2Loop* loop, Handler* handler) {
   return Handler::Result::CONTINUE;
 }
 
-Handler::Result handle_polygon_shell(const S2Polygon& poly, int loop_start, Handler* handler) {
+Handler::Result handle_polygon_shell(const S2Polygon& poly, int loop_start,
+                                     Handler* handler) {
   Handler::Result result;
 
   const S2Loop* loop0 = poly.loop(loop_start);
@@ -338,7 +344,8 @@ Handler::Result handle_polygon_shell(const S2Polygon& poly, int loop_start, Hand
   return Handler::Result::CONTINUE;
 }
 
-Handler::Result WKTWriter::handle_polygon(const PolygonGeography& geog, Handler* handler) {
+Handler::Result WKTWriter::handle_polygon(const PolygonGeography& geog,
+                                          Handler* handler) {
   const S2Polygon& poly = *geog.Polygon();
 
   // find the outer shells (loop depth = 0, 2, 4, etc.)
@@ -373,15 +380,20 @@ Handler::Result WKTWriter::handle_polygon(const PolygonGeography& geog, Handler*
     HANDLE_OR_RETURN(handler->geom_end());
   } else if (outer_shell_loop_ids.size() == 1) {
     handler->new_geometry_type(util::GeometryType::POLYGON);
-    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::POLYGON, outer_shell_loop_sizes[0]));
-    HANDLE_OR_RETURN(handle_polygon_shell(poly, outer_shell_loop_ids[0], handler));
+    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::POLYGON,
+                                         outer_shell_loop_sizes[0]));
+    HANDLE_OR_RETURN(
+        handle_polygon_shell(poly, outer_shell_loop_ids[0], handler));
     HANDLE_OR_RETURN(handler->geom_end());
   } else {
     handler->new_geometry_type(util::GeometryType::MULTIPOLYGON);
-    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::MULTIPOLYGON, outer_shell_loop_ids.size()));
+    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::MULTIPOLYGON,
+                                         outer_shell_loop_ids.size()));
     for (size_t i = 0; i < outer_shell_loop_sizes.size(); i++) {
-      HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::POLYGON, outer_shell_loop_sizes[i]));
-      HANDLE_OR_RETURN(handle_polygon_shell(poly, outer_shell_loop_ids[i], handler));
+      HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::POLYGON,
+                                           outer_shell_loop_sizes[i]));
+      HANDLE_OR_RETURN(
+          handle_polygon_shell(poly, outer_shell_loop_ids[i], handler));
       HANDLE_OR_RETURN(handler->geom_end());
     }
     HANDLE_OR_RETURN(handler->geom_end());
@@ -392,10 +404,42 @@ Handler::Result WKTWriter::handle_polygon(const PolygonGeography& geog, Handler*
 
 Handler::Result WKTWriter::handle_collection(const S2GeographyCollection& geog,
                                              Handler* handler) {
-  throw Exception("Collection not implemented");
+  Handler::Result result;
+  handler->new_geometry_type(util::GeometryType::GEOMETRYCOLLECTION);
+  HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::GEOMETRYCOLLECTION,
+                                       geog.Features().size()));
+  for (const auto& child_geog : geog.Features()) {
+    auto child_point = dynamic_cast<const PointGeography*>(child_geog.get());
+    if (child_point != nullptr) {
+      HANDLE_OR_RETURN(handle_points(*child_point, handler));
+    } else {
+      auto child_polyline =
+          dynamic_cast<const PolylineGeography*>(child_geog.get());
+      if (child_polyline != nullptr) {
+        HANDLE_OR_RETURN(handle_polylines(*child_polyline, handler));
+      } else {
+        auto child_polygon =
+            dynamic_cast<const PolygonGeography*>(child_geog.get());
+        if (child_polygon != nullptr) {
+          HANDLE_OR_RETURN(handle_polygon(*child_polygon, handler));
+        } else {
+          auto child_collection =
+              dynamic_cast<const S2GeographyCollection*>(child_geog.get());
+          if (child_collection != nullptr) {
+            HANDLE_OR_RETURN(handle_collection(*child_collection, handler));
+          } else {
+            throw Exception("Unsupported S2Geography subclass");
+          }
+        }
+      }
+    }
+  }
+  HANDLE_OR_RETURN(handler->geom_end());
+  return Handler::Result::CONTINUE;
 }
 
-Handler::Result WKTWriter::handle_feature(const S2Geography& geog, Handler* handler) {
+Handler::Result WKTWriter::handle_feature(const S2Geography& geog,
+                                          Handler* handler) {
   Handler::Result result;
 
   HANDLE_OR_RETURN(handler->feat_start());

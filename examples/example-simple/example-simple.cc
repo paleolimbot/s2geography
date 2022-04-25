@@ -1,5 +1,6 @@
 
 #include <stdio.h>
+
 #include <iostream>
 
 #include "s2geography.h"
@@ -9,7 +10,9 @@ using namespace s2geography;
 int main(int argc, char *argv[]) {
   WKTReader reader;
   std::unique_ptr<S2Geography> geog1 = reader.read_feature("POINT (-64 45)");
-  std::unique_ptr<S2Geography> geog2 = reader.read_feature("POINT (0 45)");
+  std::unique_ptr<S2Geography> geog2 = reader.read_feature(
+      "GEOMETRYCOLLECTION (POINT (30 10), LINESTRING (30 10, 10 30, 40 40), "
+      "POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10)))");
 
   ShapeIndexGeography geog1_index(*geog1);
   ShapeIndexGeography geog2_index(*geog2);
