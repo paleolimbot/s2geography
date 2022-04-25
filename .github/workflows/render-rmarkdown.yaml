@@ -22,10 +22,28 @@ jobs:
         run: |
           sudo apt-get install -y cmake libssl-dev
 
+      - name: Init build dir
+        run: mkdir build
+
+      - name: Fetch abseil
+        uses: actions/checkout@v3
+        with:
+          repo: abseil/abseil-cpp
+          ref: 215105818dfde3174fe799600bb0f3cae233d0bf
+          path: build/absl-src
+          fetch-depth: 0
+
+      - name: Build abseil
+        run: |
+          cd build/absl-src
+          cmake .
+          cmake --build .
+          cmake --install . --prefix ../absl-dist
+
       - name: Build s2geography
         run: |
-          mkdir build && cd build
-          cmake ..
+          cd build
+          cmake .. -DCMAKE_PREFIX_PATH=absl-dist
           cmake --build .
           cmake --install . --prefix ../dist
 

@@ -15,15 +15,6 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
 
 FetchContent_Declare(
-  absl
-  GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
-  GIT_TAG tags/20211102.0
-  GIT_SHALLOW TRUE)
-FetchContent_MakeAvailable(absl)
-
-list(APPEND CMAKE_PREFIX_PATH ${absl_BINARY_DIR} "${absl_BINARY_DIR}/CMakeFiles/Export/lib/cmake/absl")
-
-FetchContent_Declare(
   s2
   GIT_REPOSITORY https://github.com/google/s2geometry.git
   GIT_TAG tags/v0.10.0
