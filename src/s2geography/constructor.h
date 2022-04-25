@@ -159,7 +159,7 @@ class PolygonConstructor : public Constructor {
  public:
   PolygonConstructor(const Options& options) : Constructor(options) {}
 
-  Result ring_start(int32_t size) {
+  Result ring_start(int64_t size) {
     points_.clear();
     if (size > 0) {
       points_.reserve(size);
@@ -269,7 +269,7 @@ class CollectionConstructor : public Constructor {
     return Result::CONTINUE;
   }
 
-  Result ring_start(int32_t size) {
+  Result ring_start(int64_t size) {
     active_constructor_->ring_start(size);
     return Result::CONTINUE;
   }

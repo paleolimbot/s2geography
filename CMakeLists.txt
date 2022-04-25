@@ -32,7 +32,8 @@ add_library(s2geography
     src/s2geography/predicates.cc
     src/s2geography/build.cc
     src/s2geography/geography.cc
-    src/s2geography/wkt-reader.cc)
+    src/s2geography/wkt-reader.cc
+    src/s2geography/wkt-writer.cc)
 
 set_target_properties(s2geography PROPERTIES
     POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
