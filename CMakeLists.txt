@@ -21,7 +21,7 @@ FetchContent_Declare(
   GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(absl)
 
-list(APPEND CMAKE_PREFIX_PATH ${absl_BINARY_DIR})
+list(APPEND CMAKE_PREFIX_PATH ${absl_BINARY_DIR} "${absl_BINARY_DIR}/CMakeFiles/Export/lib/cmake/absl")
 
 FetchContent_Declare(
   s2
