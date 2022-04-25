@@ -43,7 +43,7 @@ jobs:
       - name: Build s2geography
         run: |
           cd build
-          cmake .. -Dabsl_DIR=`pwd`/absl-dist
+          cmake .. -Dabsl_DIR=`pwd`/absl-dist/lib/x86_64-linux-gnu/cmake/absl
           cmake --build .
           cmake --install . --prefix ../dist
 
