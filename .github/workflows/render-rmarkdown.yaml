@@ -49,11 +49,14 @@ jobs:
           cmake . -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_CXX_STANDARD=11 -DABSL_ENABLE_INSTALL=ON
           cmake --build .
 
+      - name: Install Abseil
+        run: |
+          cmake --install absl-src --prefix ../dist
+
       - name: Build s2geography
         run: |
           cd build
-          cmake --install absl-src --prefix ../dist
-          cmake .. -Dabsl_DIR=`pwd`/dist/lib/x86_64-linux-gnu/cmake/absl
+          cmake .. -Dabsl_DIR=`pwd`/../dist/lib/x86_64-linux-gnu/cmake/absl
           cmake --build .
           cmake --install . --prefix ../dist
 
