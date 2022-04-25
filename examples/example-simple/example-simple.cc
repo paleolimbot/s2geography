@@ -6,11 +6,12 @@
 using namespace s2geography;
 
 int main(int argc, char *argv[]) {
-  PointGeography point1 = S2LatLng::FromDegrees(45, -64).ToPoint();
-  PointGeography point2 = S2LatLng::FromDegrees(45, 0).ToPoint();
+  WKTReader reader;
+  std::unique_ptr<S2Geography> point1 = reader.read_feature("POINT (-64 45)");
+  std::unique_ptr<S2Geography> point2 = reader.read_feature("POINT (0 45)");
 
-  ShapeIndexGeography point1_index(point1);
-  ShapeIndexGeography point2_index(point2);
+  ShapeIndexGeography point1_index(*point1);
+  ShapeIndexGeography point2_index(*point2);
 
   double dist = s2_distance(point1_index, point2_index);
 

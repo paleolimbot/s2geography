@@ -725,8 +725,10 @@ WKTReader::WKTReader(const util::Constructor::Options& options)
 
 std::unique_ptr<S2Geography> WKTReader::read_feature(const char* text,
                                                      int64_t size) {
+  constructor_->feat_start();
   reader_->read_buffer(constructor_.get(),
                        reinterpret_cast<const uint8_t*>(text), size);
+  constructor_->feat_end();
   return constructor_->finish_feature();
 }
 

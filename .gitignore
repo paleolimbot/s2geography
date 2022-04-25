@@ -2,3 +2,4 @@ build/
 dist/
 CMakeUserPresets.json
 .DS_Store
+.vscode
