@@ -43,7 +43,7 @@ jobs:
       - name: Build s2geography
         run: |
           cd build
-          cmake .. -DCMAKE_PREFIX_PATH=absl-dist/lib/x86_64-linux-gnu/cmake/absl
+          cmake .. -DCMAKE_PREFIX_PATH=absl-dist/lib/x86_64-linux-gnu
           cmake --build .
           cmake --install . --prefix ../dist
 
