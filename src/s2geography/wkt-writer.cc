@@ -196,31 +196,32 @@ std::string WKTWriter::write_feature(const S2Geography& geog) {
 }
 
 Handler::Result WKTWriter::handle_points(const PointGeography& geog, Handler* handler) {
+  Handler::Result result;
   double coords[2];
 
   if (geog.Points().size() == 0) {
     handler->new_geometry_type(util::GeometryType::POINT);
-    handler->geom_start(util::GeometryType::POINT, 0);
-    handler->geom_end();
+    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::POINT, 0));
+    HANDLE_OR_RETURN(handler->geom_end());
   } else if (geog.Points().size() == 1) {
     handler->new_geometry_type(util::GeometryType::POINT);
     handler->geom_start(util::GeometryType::POINT, 1);
     S2LatLng ll(geog.Points()[0]);
     coords[0] = ll.lng().degrees();
     coords[1] = ll.lat().degrees();
-    handler->coords(coords, 1, 2);
-    handler->geom_end();
+    HANDLE_OR_RETURN(handler->coords(coords, 1, 2));
+    HANDLE_OR_RETURN(handler->geom_end());
   } else {
     handler->new_geometry_type(util::GeometryType::MULTIPOINT);
-    handler->geom_start(util::GeometryType::MULTIPOINT, geog.Points().size());
+    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::MULTIPOINT, geog.Points().size()));
 
     for (const S2Point& pt: geog.Points()) {
       handler->geom_start(util::GeometryType::POINT, 1);
       S2LatLng ll(pt);
       coords[0] = ll.lng().degrees();
       coords[1] = ll.lat().degrees();
-      handler->coords(coords, 1, 2);
-      handler->geom_end();
+      HANDLE_OR_RETURN(handler->coords(coords, 1, 2));
+      HANDLE_OR_RETURN(handler->geom_end());
     }
 
     handler->geom_end();
@@ -231,52 +232,162 @@ Handler::Result WKTWriter::handle_points(const PointGeography& geog, Handler* ha
 
 Handler::Result WKTWriter::handle_polylines(const PolylineGeography& geog,
                                  Handler* handler) {
-
+  Handler::Result result;
   double coords[2];
 
   if (geog.Polylines().size() == 0) {
     handler->new_geometry_type(util::GeometryType::LINESTRING);
-    handler->geom_start(util::GeometryType::LINESTRING, 0);
-    handler->geom_end();
+    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::LINESTRING, 0));
+    HANDLE_OR_RETURN(handler->geom_end());
   } else if (geog.Polylines().size() == 1) {
     handler->new_geometry_type(util::GeometryType::LINESTRING);
 
     const auto& poly = geog.Polylines()[0];
-    handler->geom_start(util::GeometryType::LINESTRING, poly->num_vertices());
+    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::LINESTRING, poly->num_vertices()));
 
     for (int i = 0; i < poly->num_vertices(); i++) {
       S2LatLng ll(poly->vertex(i));
       coords[0] = ll.lng().degrees();
       coords[1] = ll.lat().degrees();
-      handler->coords(coords, 1, 2);
+      HANDLE_OR_RETURN(handler->coords(coords, 1, 2));
     }
 
     handler->geom_end();
   } else {
     handler->new_geometry_type(util::GeometryType::MULTILINESTRING);
-    handler->geom_start(util::GeometryType::MULTILINESTRING, geog.Polylines().size());
+    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::MULTILINESTRING, geog.Polylines().size()));
 
     for (const auto& poly: geog.Polylines()) {
-      handler->geom_start(util::GeometryType::LINESTRING, poly->num_vertices());
+      HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::LINESTRING, poly->num_vertices()));
 
       for (int i = 0; i < poly->num_vertices(); i++) {
         S2LatLng ll(poly->vertex(i));
         coords[0] = ll.lng().degrees();
         coords[1] = ll.lat().degrees();
-        handler->coords(coords, 1, 2);
+        HANDLE_OR_RETURN(handler->coords(coords, 1, 2));
       }
 
-      handler->geom_end();
+      HANDLE_OR_RETURN(handler->geom_end());
     }
 
-    handler->geom_end();
+    HANDLE_OR_RETURN(handler->geom_end());
+  }
+
+  return Handler::Result::CONTINUE;
+}
+
+Handler::Result handle_loop_shell(const S2Loop* loop, Handler* handler) {
+  Handler::Result result;
+  double coords[2];
+
+  if (loop->num_vertices() == 0) {
+    throw Exception("Unexpected S2Loop with 0 verties");
+  }
+
+  HANDLE_OR_RETURN(handler->ring_start(loop->num_vertices() + 1));
+
+  for (int i = 0; i <= loop->num_vertices(); i++) {
+    S2LatLng ll(loop->vertex(i));
+    coords[0] = ll.lng().degrees();
+    coords[1] = ll.lat().degrees();
+    HANDLE_OR_RETURN(handler->coords(coords, 1, 2));
+  }
+
+  HANDLE_OR_RETURN(handler->ring_end());
+  return Handler::Result::CONTINUE;
+}
+
+Handler::Result handle_loop_hole(const S2Loop* loop, Handler* handler) {
+  Handler::Result result;
+  double coords[2];
+
+  if (loop->num_vertices() == 0) {
+    throw Exception("Unexpected S2Loop with 0 verties");
+  }
+
+  HANDLE_OR_RETURN(handler->ring_start(loop->num_vertices() + 1));
+
+  for (int i = loop->num_vertices() - 1; i >= 0; i--) {
+    S2LatLng ll(loop->vertex(i));
+    coords[0] = ll.lng().degrees();
+    coords[1] = ll.lat().degrees();
+    HANDLE_OR_RETURN(handler->coords(coords, 1, 2));
+  }
+
+  S2LatLng ll(loop->vertex(loop->num_vertices() - 1));
+  coords[0] = ll.lng().degrees();
+  coords[1] = ll.lat().degrees();
+  HANDLE_OR_RETURN(handler->coords(coords, 1, 2));
+
+  HANDLE_OR_RETURN(handler->ring_end());
+  return Handler::Result::CONTINUE;
+}
+
+Handler::Result handle_polygon_shell(const S2Polygon& poly, int loop_start, Handler* handler) {
+  Handler::Result result;
+
+  const S2Loop* loop0 = poly.loop(loop_start);
+  HANDLE_OR_RETURN(handle_loop_shell(loop0, handler));
+  for (int j = loop_start + 1; j <= poly.GetLastDescendant(loop_start); j++) {
+    const S2Loop* loop = poly.loop(j);
+    if (loop->depth() == (loop0->depth() + 1)) {
+      HANDLE_OR_RETURN(handle_loop_hole(loop, handler));
+    }
   }
 
   return Handler::Result::CONTINUE;
 }
 
 Handler::Result WKTWriter::handle_polygon(const PolygonGeography& geog, Handler* handler) {
-  throw Exception("Polygon not implemented");
+  const S2Polygon& poly = *geog.Polygon();
+
+  // find the outer shells (loop depth = 0, 2, 4, etc.)
+  std::vector<int> outer_shell_loop_ids;
+  std::vector<int> outer_shell_loop_sizes;
+
+  outer_shell_loop_ids.reserve(poly.num_loops());
+  for (int i = 0; i < poly.num_loops(); i++) {
+    if ((poly.loop(i)->depth() % 2) == 0) {
+      outer_shell_loop_ids.push_back(i);
+    }
+  }
+
+  // count the number of rings in each
+  outer_shell_loop_sizes.reserve(outer_shell_loop_ids.size());
+  for (const auto loop_start : outer_shell_loop_ids) {
+    const S2Loop* loop0 = poly.loop(loop_start);
+    int num_loops = 1;
+
+    for (int j = loop_start + 1; j <= poly.GetLastDescendant(loop_start); j++) {
+      const S2Loop* loop = poly.loop(j);
+      num_loops += loop->depth() == (loop0->depth() + 1);
+    }
+
+    outer_shell_loop_sizes.push_back(num_loops);
+  }
+
+  Handler::Result result;
+  if (outer_shell_loop_ids.size() == 0) {
+    handler->new_geometry_type(util::GeometryType::POLYGON);
+    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::POLYGON, 0));
+    HANDLE_OR_RETURN(handler->geom_end());
+  } else if (outer_shell_loop_ids.size() == 1) {
+    handler->new_geometry_type(util::GeometryType::POLYGON);
+    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::POLYGON, outer_shell_loop_sizes[0]));
+    HANDLE_OR_RETURN(handle_polygon_shell(poly, outer_shell_loop_ids[0], handler));
+    HANDLE_OR_RETURN(handler->geom_end());
+  } else {
+    handler->new_geometry_type(util::GeometryType::MULTIPOLYGON);
+    HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::MULTIPOLYGON, outer_shell_loop_ids.size()));
+    for (size_t i = 0; i < outer_shell_loop_sizes.size(); i++) {
+      HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::POLYGON, outer_shell_loop_sizes[i]));
+      HANDLE_OR_RETURN(handle_polygon_shell(poly, outer_shell_loop_ids[i], handler));
+      HANDLE_OR_RETURN(handler->geom_end());
+    }
+    HANDLE_OR_RETURN(handler->geom_end());
+  }
+
+  return Handler::Result::CONTINUE;
 }
 
 Handler::Result WKTWriter::handle_collection(const S2GeographyCollection& geog,
