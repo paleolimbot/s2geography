@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main, master]
 
-name: Example rmarkdown
+name: Run Examples
 
 jobs:
   build-and-run-examples:
