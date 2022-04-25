@@ -231,7 +231,48 @@ Handler::Result WKTWriter::handle_points(const PointGeography& geog, Handler* ha
 
 Handler::Result WKTWriter::handle_polylines(const PolylineGeography& geog,
                                  Handler* handler) {
-  throw Exception("Polyline not implemented");
+
+  double coords[2];
+
+  if (geog.Polylines().size() == 0) {
+    handler->new_geometry_type(util::GeometryType::LINESTRING);
+    handler->geom_start(util::GeometryType::LINESTRING, 0);
+    handler->geom_end();
+  } else if (geog.Polylines().size() == 1) {
+    handler->new_geometry_type(util::GeometryType::LINESTRING);
+
+    const auto& poly = geog.Polylines()[0];
+    handler->geom_start(util::GeometryType::LINESTRING, poly->num_vertices());
+
+    for (int i = 0; i < poly->num_vertices(); i++) {
+      S2LatLng ll(poly->vertex(i));
+      coords[0] = ll.lng().degrees();
+      coords[1] = ll.lat().degrees();
+      handler->coords(coords, 1, 2);
+    }
+
+    handler->geom_end();
+  } else {
+    handler->new_geometry_type(util::GeometryType::MULTILINESTRING);
+    handler->geom_start(util::GeometryType::MULTILINESTRING, geog.Polylines().size());
+
+    for (const auto& poly: geog.Polylines()) {
+      handler->geom_start(util::GeometryType::LINESTRING, poly->num_vertices());
+
+      for (int i = 0; i < poly->num_vertices(); i++) {
+        S2LatLng ll(poly->vertex(i));
+        coords[0] = ll.lng().degrees();
+        coords[1] = ll.lat().degrees();
+        handler->coords(coords, 1, 2);
+      }
+
+      handler->geom_end();
+    }
+
+    handler->geom_end();
+  }
+
+  return Handler::Result::CONTINUE;
 }
 
 Handler::Result WKTWriter::handle_polygon(const PolygonGeography& geog, Handler* handler) {
