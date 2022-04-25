@@ -51,6 +51,7 @@ jobs:
 
       - name: Install Abseil
         run: |
+          cd build
           cmake --install absl-src --prefix ../dist
 
       - name: Build s2geography
