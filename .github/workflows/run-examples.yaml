@@ -57,26 +57,10 @@ jobs:
       - name: Build s2geography
         run: |
           cd build
-          cmake .. -Dabsl_DIR=`pwd`/../dist/lib/x86_64-linux-gnu/cmake/absl
+          cmake .. -Dabsl_DIR=`pwd`/../dist/lib/x86_64-linux-gnu/cmake/absl -DBUILD_EXAMPLES=ON
           cmake --build .
           cmake --install . --prefix ../dist
 
-      - uses: r-lib/actions/setup-pandoc@v1
-      - uses: r-lib/actions/setup-r@v1
-        with:
-          use-public-rspm: true
-      - name: Write dummy DESCRIPTION
+      - name: Run example-simple
         run: |
-          printf "Package: dummypackage\nVersion: 0.0.0.9000" > DESCRIPTION
-      - uses: r-lib/actions/setup-r-dependencies@v2
-        with:
-          extra-packages: rmarkdown,cpp11,decor
-
-      - name: Render examples/example-rmarkdown/example.Rmd
-        run: |
-          Rscript -e 'rmarkdown::render("examples/example-rmarkdown/example.Rmd")'
-
-      - name: Show examples/example-rmarkdown/example.md
-        if: always()
-        run: |
-          find examples/example-rmarkdown -name 'example.md*' -exec cat '{}' \; || true
+          ./dist/examples/example-simple

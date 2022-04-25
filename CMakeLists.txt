@@ -8,10 +8,10 @@ project(S2Geography)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(ABSL_PROPAGATE_CXX_STD ON)
-set(ABSL_ENABLE_INSTALL ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(ABSL_ENABLE_INSTALL ON)
 
+option(BUILD_EXAMPLES "Build s2geography examples" OFF)
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
 
 FetchContent_Declare(
@@ -39,5 +39,14 @@ set_target_properties(s2geography PROPERTIES
 
 target_link_libraries(s2geography s2)
 
+if(BUILD_EXAMPLES)
+  add_executable(example-simple examples/example-simple/example-simple.cc)
+  target_link_libraries(example-simple PUBLIC s2geography s2)
+endif()
+
 install(TARGETS s2geography DESTINATION lib)
 install(DIRECTORY src/ DESTINATION include FILES_MATCHING PATTERN "*.h")
+
+if(BUILD_EXAMPLES)
+  install(TARGETS example-simple DESTINATION examples)
+endif()
