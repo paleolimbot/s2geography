@@ -85,3 +85,9 @@ cmake .. -DS2GEOGRAPHY_BUILD_TESTS=ON
 cmake --build .
 ctest -T test --output-on-failure .
 ```
+
+You can run specific tests using `ctest`'s `-R` flag:
+
+```bash
+ctest -T test . -R "Distance$"
+```
