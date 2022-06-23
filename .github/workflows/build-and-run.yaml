@@ -46,7 +46,7 @@ jobs:
           cd build/absl-src
           cmake . -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_CXX_STANDARD=11 -DABSL_ENABLE_INSTALL=ON
           cmake --build .
-          cmake --install absl-src --prefix ../dist
+          cmake --install . --prefix ../dist
 
       - name: Install Abseil
         run: |
