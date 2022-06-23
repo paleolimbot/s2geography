@@ -68,14 +68,20 @@ cmake --build abseil-cpp
 cmake --install abseil-cpp --prefix ../dist
 
 # build s2geography (also fetches and builds s2)
-cmake .. -Dabsl_DIR=`pwd`/../dist/lib/x86_64-linux-gnu/cmake/absl -DBUILD_EXAMPLES=ON
+cmake .. -Dabsl_DIR=`pwd`/../dist/lib/cmake/absl -DS2GEOGRAPHY_BUILD_TESTS=ON
 cmake --build .
 cmake --install . --prefix ../dist
 ```
 
 Locally (M1 mac), I have to add `-DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl@1.1` to `cmake ..` when building s2geography.
 
-## TODO
+## Development
 
-- [ ] Test using GTest. The original version in the s2 package for R has excellent test coverage, but the tests are written in R and should probably be ported here (original test folder: https://github.com/r-spatial/s2/tree/main/tests/testthat).
-- [ ] Improve the CMake to work for more use-cases than locally + GitHub actions
+The easiest way to get started with s2geography development is using VSCode with the C/C++ and CMake extensions. See the CMakeUserPresets.json.example file for a possible test/configuration preset that will build and run the tests and the examples. You can also invoke `ctest` directly to run tests:
+
+```bash
+cd build
+cmake .. -DS2GEOGRAPHY_BUILD_TESTS=ON
+cmake --build .
+ctest -T test --output-on-failure .
+```
