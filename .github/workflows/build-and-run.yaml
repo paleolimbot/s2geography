@@ -63,13 +63,12 @@ jobs:
       - name: Run tests
         run: |
           cd build
-          rm -rf cov || true
-          rm `find CMakeFiles/s2geography.dir/ -name "*.gcno"` || true
           ctest -T test --output-on-failure .
 
       - name: Calculate coverage
         run: |
           SOURCE_PREFIX=`pwd`
+          rm -rf build/cov || true
           mkdir build/cov
           cd build/cov
           gcov -abcfu --source-prefix=$SOURCE_PREFIX `find ../CMakeFiles/s2geography.dir/ -name "*.gcno"`
