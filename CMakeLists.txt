@@ -11,7 +11,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(ABSL_ENABLE_INSTALL ON)
 
-option(BUILD_EXAMPLES "Build s2geography examples" OFF)
+option(S2GEOGRAPHY_BUILD_TESTS "Build tests" OFF)
+
+option(S2GEOGRAPHY_CODE_COVERAGE "Enable coverage reporting" OFF)
+add_library(coverage_config INTERFACE)
+
+option(S2GEOGRAPHY_BUILD_EXAMPLES "Build s2geography examples" OFF)
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
 
 FetchContent_Declare(
@@ -48,6 +53,29 @@ endif()
 install(TARGETS s2geography DESTINATION lib)
 install(DIRECTORY src/ DESTINATION include FILES_MATCHING PATTERN "*.h")
 
-if(BUILD_EXAMPLES)
+if(S2GEOGRAPHY_BUILD_EXAMPLES)
   install(TARGETS example-simple DESTINATION examples)
+endif()
+
+if(S2GEOGRAPHY_BUILD_TESTS)
+  FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/release-1.11.0.zip
+  )
+  FetchContent_MakeAvailable(googletest)
+  enable_testing()
+
+  add_executable(distance_test src/s2geography/distance_test.cc)
+
+  if (S2GEOGRAPHY_CODE_COVERAGE)
+    target_compile_options(coverage_config INTERFACE -O0 -g --coverage)
+    target_link_options(coverage_config INTERFACE --coverage)
+    target_link_libraries(s2geography coverage_config)
+  endif()
+
+  target_link_libraries(distance_test s2geography gtest_main)
+
+  include(GoogleTest)
+  gtest_discover_tests(distance_test)
+
 endif()
