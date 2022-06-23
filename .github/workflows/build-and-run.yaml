@@ -1,15 +1,13 @@
-# Workflow derived from https://github.com/r-lib/actions/tree/master/examples
-# Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
 on:
   push:
     branches: [main, master]
   pull_request:
     branches: [main, master]
 
-name: Run Examples
+name: Build and Run
 
 jobs:
-  build-and-run-examples:
+  build-and-run:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -48,6 +46,7 @@ jobs:
           cd build/absl-src
           cmake . -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_CXX_STANDARD=11 -DABSL_ENABLE_INSTALL=ON
           cmake --build .
+          cmake --install absl-src --prefix ../dist
 
       - name: Install Abseil
         run: |
@@ -57,9 +56,26 @@ jobs:
       - name: Build s2geography
         run: |
           cd build
-          cmake .. -Dabsl_DIR=`pwd`/../dist/lib/x86_64-linux-gnu/cmake/absl -DBUILD_EXAMPLES=ON
+          cmake .. -Dabsl_DIR=`pwd`/../dist/lib/cmake/absl -DS2GEOGRAPHY_BUILD_EXAMPLES=ON -DS2GEOGRAPHY_BUILD_TESTS=ON -DS2GEOGRAPHY_CODE_COVERAGE=ON
           cmake --build .
           cmake --install . --prefix ../dist
+
+      - name: Run tests
+        run: |
+          cd build
+          ctest -T test --output-on-failure .
+
+      - name: Calculate coverage
+        run: |
+          SOURCE_PREFIX=`pwd`
+          mkdir build/cov
+          cd build/cov
+          gcov -abcfu --source-prefix=$SOURCE_PREFIX `find ../CMakeFiles/s2geography.dir/ -name "*.gcno"`
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v2
+        with:
+          directory: build/cov
 
       - name: Run example-simple
         run: |
