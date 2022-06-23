@@ -7,13 +7,24 @@
     },
     "configurePresets": [
         {
-            "name": "default",
-            "displayName": "Default Config",
-            "binaryDir": "${sourceDir}/build",
-            "installDir": "${sourceDir}/dist",
-            "cacheVariables": {
+          "name": "default",
+          "displayName": "Default Config",
+          "binaryDir": "${sourceDir}/build",
+          "installDir": "${sourceDir}/dist",
+          "cacheVariables": {
 
-            }
           }
+        },
+        {
+          "name": "default-with-tests",
+          "inherits": [
+              "default"
+          ],
+          "displayName": "Default with tests",
+          "cacheVariables": {
+              "CMAKE_BUILD_TYPE": "Debug",
+              "S2GEOGRAPHY_BUILD_TESTS": "ON"
+          }
+      }
     ]
 }

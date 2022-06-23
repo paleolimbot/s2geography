@@ -8,17 +8,28 @@
     "configurePresets": [
         {
             "name": "paleolimbot-local",
-            "inherits": ["default"],
+            "inherits": ["default-with-tests"],
             "displayName": "(paleolimbot) local build",
             "cacheVariables": {
                 "OPENSSL_ROOT_DIR": "/opt/homebrew/opt/openssl@1.1",
                 "BUILD_SHARED_LIBS": "OFF",
-                "BUILD_EXAMPLES": "ON",
-                "BUILD_TESTS": "ON",
+                "S2GEOGRAPHY_BUILD_EXAMPLES": "ON",
+                "S2GEOGRAPHY_BUILD_TESTS": "ON",
                 "absl_DIR": "${sourceDir}/build/abseil-dist/lib/cmake/absl",
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_CXX_FLAGS_DEBUG": "-g"
             }
           }
+    ],
+    "testPresets": [
+      {
+          "name": "paleolimbot-test-preset",
+          "description": "",
+          "displayName": "",
+          "configurePreset": "paleolimbot-local",
+          "environment": {
+            "CTEST_OUTPUT_ON_FAILURE": "1"
+          }
+      }
     ]
 }
