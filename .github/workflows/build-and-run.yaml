@@ -53,6 +53,12 @@ jobs:
           cd build
           cmake --install absl-src --prefix ../dist
 
+      - name: Clean previous coverage
+        run: |
+          rm `find . -name "*.gcno"` || true
+          rm `find . -name "*.gcda"` || true
+          rm -rf build/cov || true
+
       - name: Build s2geography
         run: |
           cd build
@@ -68,7 +74,6 @@ jobs:
       - name: Calculate coverage
         run: |
           SOURCE_PREFIX=`pwd`
-          rm -rf build/cov || true
           mkdir build/cov
           cd build/cov
           gcov -abcfu --source-prefix=$SOURCE_PREFIX `find ../CMakeFiles/s2geography.dir/ -name "*.gcno"`
