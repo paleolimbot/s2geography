@@ -1,7 +1,8 @@
 
 # s2geography
 
-[![Examples](https://github.com/paleolimbot/s2geography/actions/workflows/run-examples.yaml/badge.svg)](https://github.com/paleolimbot/s2geography/actions/workflows/run-examples.yaml)
+[![Run Tests](https://github.com/paleolimbot/s2geography/actions/workflows/build-and-run.yaml/badge.svg)](https://github.com/paleolimbot/s2geography/actions/workflows/build-and-run.yaml)
+[![Codecov test coverage](https://codecov.io/gh/paleolimbot/s2geography/branch/master/graph/badge.svg)](https://app.codecov.io/gh/paleolimbot/s2geography?branch=master)
 
 Google's [s2geometry](https://github.com/google/s2geometry) is a spherical geometry engine providing accurate and performant geometry operations for geometries on the sphere. This library provides a compatability layer on top of s2geometry for those more familiar with [simple features](https://en.wikipedia.org/wiki/Simple_Features), [GEOS](https://libgeos.org), and/or the [GEOS C API](https://libgeos.org/doxygen/geos__c_8h.html).
 
