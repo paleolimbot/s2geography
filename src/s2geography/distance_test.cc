@@ -5,7 +5,7 @@
 
 using namespace s2geography;
 
-TEST(DistanceTest, DistanceTestDistance) {
+TEST(Distance, PointDistance) {
   WKTReader reader;
   auto geog1 = reader.read_feature("POINT (0 0)");
   auto geog2 = reader.read_feature("POINT (90 0)");
