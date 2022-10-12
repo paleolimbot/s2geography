@@ -56,7 +56,7 @@ set_target_properties(s2geography PROPERTIES
 
 target_link_libraries(s2geography s2 absl::memory)
 
-if(BUILD_EXAMPLES)
+if(S2GEOGRAPHY_BUILD_EXAMPLES)
   add_executable(example-simple examples/example-simple/example-simple.cc)
   target_link_libraries(example-simple PUBLIC s2geography s2)
 endif()
