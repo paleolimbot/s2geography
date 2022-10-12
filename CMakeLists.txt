@@ -76,6 +76,9 @@ if(S2GEOGRAPHY_BUILD_TESTS)
       URL https://github.com/google/googletest/archive/release-1.11.0.zip
       )
     FetchContent_MakeAvailable(googletest)
+
+    # do not install googletest by default when running cmake --install
+    set_property(DIRECTORY ${googletest_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
   else()
     find_package(GTest REQUIRED)
   endif()
