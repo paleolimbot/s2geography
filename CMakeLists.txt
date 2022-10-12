@@ -15,6 +15,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/third_party/cmake")
 option(S2GEOGRAPHY_FETCH_S2GEOMETRY "Download and build s2geometry from source" OFF)
 
 option(S2GEOGRAPHY_BUILD_TESTS "Build tests" OFF)
+option(S2GEOGRAPHY_FETCH_GTEST "Download and build googletest from source" OFF)
 
 option(S2GEOGRAPHY_CODE_COVERAGE "Enable coverage reporting" OFF)
 add_library(coverage_config INTERFACE)
@@ -69,11 +70,16 @@ if(S2GEOGRAPHY_BUILD_EXAMPLES)
 endif()
 
 if(S2GEOGRAPHY_BUILD_TESTS)
-  FetchContent_Declare(
-    googletest
-    URL https://github.com/google/googletest/archive/release-1.11.0.zip
-  )
-  FetchContent_MakeAvailable(googletest)
+  if(S2GEOGRAPHY_FETCH_GTEST)
+    FetchContent_Declare(
+      googletest
+      URL https://github.com/google/googletest/archive/release-1.11.0.zip
+      )
+    FetchContent_MakeAvailable(googletest)
+  else()
+    find_package(GTest REQUIRED)
+  endif()
+
   enable_testing()
 
   add_executable(distance_test src/s2geography/distance_test.cc)
@@ -84,9 +90,8 @@ if(S2GEOGRAPHY_BUILD_TESTS)
     target_link_libraries(s2geography coverage_config)
   endif()
 
-  target_link_libraries(distance_test s2geography gtest_main)
+  target_link_libraries(distance_test s2geography GTest::gtest_main)
 
   include(GoogleTest)
   gtest_discover_tests(distance_test)
-
 endif()
