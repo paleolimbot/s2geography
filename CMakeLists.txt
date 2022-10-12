@@ -11,6 +11,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(ABSL_ENABLE_INSTALL ON)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/third_party/cmake")
+
+option(S2GEOGRAPHY_FETCH_S2GEOMETRY "Download and build s2geometry from source" OFF)
+
 option(S2GEOGRAPHY_BUILD_TESTS "Build tests" OFF)
 
 option(S2GEOGRAPHY_CODE_COVERAGE "Enable coverage reporting" OFF)
@@ -19,14 +23,23 @@ add_library(coverage_config INTERFACE)
 option(S2GEOGRAPHY_BUILD_EXAMPLES "Build s2geography examples" OFF)
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
 
-FetchContent_Declare(
-  s2
-  GIT_REPOSITORY https://github.com/google/s2geometry.git
-  GIT_TAG tags/v0.10.0
-  GIT_SHALLOW TRUE)
-FetchContent_MakeAvailable(s2)
+if(S2GEOGRAPHY_FETCH_S2GEOMETRY)
+  FetchContent_Declare(
+    s2
+    GIT_REPOSITORY https://github.com/google/s2geometry.git
+    GIT_TAG tags/v0.10.0
+    GIT_SHALLOW TRUE)
+  FetchContent_MakeAvailable(s2)
 
-include_directories(src ${OPENSSL_INCLUDE_DIR})
+  set_property(TARGET s2 PROPERTY CXX_STANDARD ${CMAKE_CXX_STANDARD})
+else()
+  find_package(s2 REQUIRED)
+endif()
+
+find_package(absl REQUIRED)
+
+include_directories(src)
+
 include_directories(src ${ABSL_INCLUDE_DIR})
 add_library(s2geography
     src/s2geography/accessors-geog.cc
