@@ -9,7 +9,6 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-set(ABSL_ENABLE_INSTALL ON)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/third_party/cmake")
 
@@ -40,7 +39,6 @@ find_package(absl REQUIRED)
 
 include_directories(src)
 
-include_directories(src ${ABSL_INCLUDE_DIR})
 add_library(s2geography
     src/s2geography/accessors-geog.cc
     src/s2geography/coverings.cc
@@ -56,7 +54,7 @@ add_library(s2geography
 set_target_properties(s2geography PROPERTIES
     POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
 
-target_link_libraries(s2geography s2)
+target_link_libraries(s2geography s2 absl::memory)
 
 if(BUILD_EXAMPLES)
   add_executable(example-simple examples/example-simple/example-simple.cc)
