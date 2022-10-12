@@ -5,8 +5,8 @@ message(STATUS "Building using CMake version: ${CMAKE_VERSION}")
 
 project(S2Geography)
 
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CXX_STANDARD 17 CACHE STRING "The C++ standard to build with")
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
