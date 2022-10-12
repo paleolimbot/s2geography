@@ -21,7 +21,7 @@ option(S2GEOGRAPHY_CODE_COVERAGE "Enable coverage reporting" OFF)
 add_library(coverage_config INTERFACE)
 
 option(S2GEOGRAPHY_BUILD_EXAMPLES "Build s2geography examples" OFF)
-option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
+option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 
 if(S2GEOGRAPHY_FETCH_S2GEOMETRY)
   FetchContent_Declare(
