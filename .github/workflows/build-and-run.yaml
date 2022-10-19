@@ -62,7 +62,7 @@ jobs:
       - name: Build s2geography
         run: |
           cd build
-          cmake .. -Dabsl_DIR=`pwd`/../dist/lib/cmake/absl -DS2GEOGRAPHY_BUILD_EXAMPLES=ON -DS2GEOGRAPHY_BUILD_TESTS=ON -DS2GEOGRAPHY_CODE_COVERAGE=ON -DS2GEOGRAPHY_FETCH_S2GEOMETRY=ON -DS2GEOGRAPHY_FETCH_GTEST=ON -DCMAKE_CXX_STANDARD=11 -DBUILD_SHARED_LIBS=OFF
+          cmake .. -Dabsl_DIR=`pwd`/../dist/lib/cmake/absl -DS2GEOGRAPHY_BUILD_EXAMPLES=ON -DS2GEOGRAPHY_BUILD_TESTS=ON -DS2GEOGRAPHY_CODE_COVERAGE=ON -DCMAKE_CXX_STANDARD=11 -DBUILD_SHARED_LIBS=OFF
           cmake --build .
           cmake --install . --prefix ../dist
 

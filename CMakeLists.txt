@@ -12,18 +12,31 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/third_party/cmake")
 
-option(S2GEOGRAPHY_FETCH_S2GEOMETRY "Download and build s2geometry from source" OFF)
-
 option(S2GEOGRAPHY_BUILD_TESTS "Build tests" OFF)
-option(S2GEOGRAPHY_FETCH_GTEST "Download and build googletest from source" OFF)
-
 option(S2GEOGRAPHY_CODE_COVERAGE "Enable coverage reporting" OFF)
-add_library(coverage_config INTERFACE)
-
 option(S2GEOGRAPHY_BUILD_EXAMPLES "Build s2geography examples" OFF)
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 
-if(S2GEOGRAPHY_FETCH_S2GEOMETRY)
+# Dependencies
+# ------------
+
+# s2geometry
+
+if(DEFINED ENV{CONDA_PREFIX})
+  set(S2GEOGRAPHY_S2_SOURCE_DEFAULT "CONDA")
+else()
+  set(S2GEOGRAPHY_S2_SOURCE_DEFAULT "AUTO")
+endif()
+
+set(S2GEOGRAPHY_S2_SOURCE
+  "${S2GEOGRAPHY_S2_SOURCE_DEFAULT}"
+  CACHE STRING "Method to use for acquiring the s2geometry dependency")
+
+message(STATUS "Using ${S2GEOGRAPHY_S2_SOURCE} approach to find s2geometry")
+
+macro(build_s2)
+  message(STATUS "Building s2geometry from source")
+
   FetchContent_Declare(
     s2
     GIT_REPOSITORY https://github.com/google/s2geometry.git
@@ -32,11 +45,54 @@ if(S2GEOGRAPHY_FETCH_S2GEOMETRY)
   FetchContent_MakeAvailable(s2)
 
   set_property(TARGET s2 PROPERTY CXX_STANDARD ${CMAKE_CXX_STANDARD})
+endmacro()
+
+if(${S2GEOGRAPHY_S2_SOURCE} STREQUAL "CONDA")
+  set(S2_ROOT "$ENV{CONDA_PREFIX}")
+  set(S2_SOURCE "SYSTEM")
 else()
-  find_package(s2 REQUIRED)
+  set(S2_SOURCE ${S2GEOGRAPHY_S2_SOURCE})
 endif()
 
+if(${S2_SOURCE} STREQUAL "AUTO")
+  find_package(s2 REQUIRED)
+  if(NOT ${s2_FOUND})
+    build_s2()
+  endif()
+elseif(${S2_SOURCE} STREQUAL "BUNDLED")
+  build_s2()
+elseif(${S2_SOURCE} STREQUAL "SYSTEM")
+  find_package(s2 REQUIRED)
+  if(NOT ${s2_FOUND})
+    message(FATAL_ERROR "Couldn't find s2geometry")
+  endif()
+endif()
+
+# Abseil (bundled build not supported)
+
 find_package(absl REQUIRED)
+
+# GTest (always bundled)
+
+if(S2GEOGRAPHY_BUILD_TESTS)
+  FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest
+    GIT_TAG tags/release-1.12.0
+    GIT_SHALLOW TRUE
+    )
+  FetchContent_MakeAvailable(googletest)
+
+  # do not install googletest by default when running cmake --install
+  set_property(DIRECTORY ${googletest_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
+
+  if(S2GEOGRAPHY_CODE_COVERAGE)
+    add_library(coverage_config INTERFACE)
+  endif()
+endif()
+
+# Build s2geography
+# -----------------
 
 include_directories(src)
 
@@ -57,32 +113,7 @@ set_target_properties(s2geography PROPERTIES
 
 target_link_libraries(s2geography s2 absl::memory)
 
-if(S2GEOGRAPHY_BUILD_EXAMPLES)
-  add_executable(example-simple examples/example-simple/example-simple.cc)
-  target_link_libraries(example-simple PUBLIC s2geography s2)
-endif()
-
-install(TARGETS s2geography DESTINATION lib)
-install(DIRECTORY src/ DESTINATION include FILES_MATCHING PATTERN "*.h")
-
-if(S2GEOGRAPHY_BUILD_EXAMPLES)
-  install(TARGETS example-simple DESTINATION examples)
-endif()
-
 if(S2GEOGRAPHY_BUILD_TESTS)
-  if(S2GEOGRAPHY_FETCH_GTEST)
-    FetchContent_Declare(
-      googletest
-      URL https://github.com/google/googletest/archive/release-1.11.0.zip
-      )
-    FetchContent_MakeAvailable(googletest)
-
-    # do not install googletest by default when running cmake --install
-    set_property(DIRECTORY ${googletest_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
-  else()
-    find_package(GTest REQUIRED)
-  endif()
-
   enable_testing()
 
   add_executable(distance_test src/s2geography/distance_test.cc)
@@ -98,3 +129,19 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   include(GoogleTest)
   gtest_discover_tests(distance_test)
 endif()
+
+if(S2GEOGRAPHY_BUILD_EXAMPLES)
+  add_executable(example-simple examples/example-simple/example-simple.cc)
+  target_link_libraries(example-simple PUBLIC s2geography s2)
+endif()
+
+# Install s2geography
+# -------------------
+
+install(TARGETS s2geography DESTINATION lib)
+install(DIRECTORY src/ DESTINATION include FILES_MATCHING PATTERN "*.h")
+
+if(S2GEOGRAPHY_BUILD_EXAMPLES)
+  install(TARGETS example-simple DESTINATION examples)
+endif()
+
