@@ -35,7 +35,7 @@ set(S2GEOGRAPHY_S2_SOURCE
 message(STATUS "Using ${S2GEOGRAPHY_S2_SOURCE} approach to find s2geometry")
 
 macro(build_s2)
-  message(STATUS "Building s2geometry from source")
+  message(STATUS "Building s2geometry from source (version 0.10.0)")
 
   FetchContent_Declare(
     s2
