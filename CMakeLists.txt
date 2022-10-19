@@ -55,7 +55,7 @@ else()
 endif()
 
 if(${S2_SOURCE} STREQUAL "AUTO")
-  find_package(s2 REQUIRED)
+  find_package(s2 QUIET)
   if(NOT ${s2_FOUND})
     build_s2()
   endif()
