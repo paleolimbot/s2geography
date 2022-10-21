@@ -76,7 +76,7 @@ macro(build_s2)
 endmacro()
 
 if(${S2GEOGRAPHY_S2_SOURCE} STREQUAL "CONDA")
-  set(S2_ROOT "$ENV{CONDA_PREFIX}")
+  set(S2_ROOT_DIR "$ENV{CONDA_PREFIX}")
   set(S2_SOURCE "SYSTEM")
 elseif(${S2GEOGRAPHY_S2_SOURCE} STREQUAL "BREW")
   # required for Homebrew installed s2geometry headers to find OpenSSL headers

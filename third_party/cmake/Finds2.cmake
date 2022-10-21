@@ -41,6 +41,7 @@ find_path(s2_INCLUDE_DIR s2cell.h
   HINTS
     ENV S2_ROOT
     ENV S2_DIR
+    ${S2_ROOT_DIR}
   PATH_SUFFIXES
     include/s2
   )
@@ -50,6 +51,7 @@ find_library(s2_LIBRARY
   HINTS
     ENV S2_ROOT
     ENV S2_DIR
+    ${S2_ROOT_DIR}
   PATH_SUFFIXES
     lib
     libs
