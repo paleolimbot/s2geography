@@ -25,15 +25,15 @@ option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 # (copyright The Apache Software Foundation, Apache License, Version 2.0)
 
 if(APPLE AND NOT OPENSSL_ROOT_DIR)
-  find_program(BREW brew)
-  if(BREW)
-    execute_process(COMMAND ${BREW} --prefix "openssl@1.1"
+  find_program(BREW_PROG brew)
+  if(BREW_PROG)
+    execute_process(COMMAND ${BREW_PROG} --prefix "openssl@1.1"
                     OUTPUT_VARIABLE OPENSSL11_BREW_PREFIX
                     OUTPUT_STRIP_TRAILING_WHITESPACE)
     if(OPENSSL11_BREW_PREFIX)
       set(OPENSSL_ROOT_DIR ${OPENSSL11_BREW_PREFIX})
     else()
-      execute_process(COMMAND ${BREW} --prefix "openssl"
+      execute_process(COMMAND ${BREW_PROG} --prefix "openssl"
                       OUTPUT_VARIABLE OPENSSL_BREW_PREFIX
                       OUTPUT_STRIP_TRAILING_WHITESPACE)
       if(OPENSSL_BREW_PREFIX)
