@@ -20,6 +20,29 @@ option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 # Dependencies
 # ------------
 
+# openssl on Apple / Homebrew (dpendency via s2geometry)
+# copied from Arrow
+# (copyright The Apache Software Foundation, Apache License, Version 2.0)
+
+if(APPLE AND NOT OPENSSL_ROOT_DIR)
+  find_program(BREW brew)
+  if(BREW)
+    execute_process(COMMAND ${BREW} --prefix "openssl@1.1"
+                    OUTPUT_VARIABLE OPENSSL11_BREW_PREFIX
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(OPENSSL11_BREW_PREFIX)
+      set(OPENSSL_ROOT_DIR ${OPENSSL11_BREW_PREFIX})
+    else()
+      execute_process(COMMAND ${BREW} --prefix "openssl"
+                      OUTPUT_VARIABLE OPENSSL_BREW_PREFIX
+                      OUTPUT_STRIP_TRAILING_WHITESPACE)
+      if(OPENSSL_BREW_PREFIX)
+        set(OPENSSL_ROOT_DIR ${OPENSSL_BREW_PREFIX})
+      endif()
+    endif()
+  endif()
+endif()
+
 # s2geometry
 
 if(DEFINED ENV{CONDA_PREFIX})
@@ -45,6 +68,11 @@ macro(build_s2)
   FetchContent_MakeAvailable(s2)
 
   set_property(TARGET s2 PROPERTY CXX_STANDARD ${CMAKE_CXX_STANDARD})
+
+  # this might be needed since s2geometry includes it in general
+  # but not for any target explicilty?
+  find_package(OpenSSL)
+  target_include_directories(s2 INTERFACE ${OPENSSL_INCLUDE_DIR})
 endmacro()
 
 if(${S2GEOGRAPHY_S2_SOURCE} STREQUAL "CONDA")
