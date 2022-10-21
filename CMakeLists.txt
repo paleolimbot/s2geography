@@ -152,7 +152,7 @@ add_library(s2geography
 set_target_properties(s2geography PROPERTIES
     POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
 
-target_link_libraries(s2geography s2 absl::memory)
+target_link_libraries(s2geography s2 absl::memory absl::str_format)
 
 if(S2GEOGRAPHY_BUILD_TESTS)
   enable_testing()
