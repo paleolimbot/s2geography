@@ -89,7 +89,9 @@ endif()
 
 if(${S2_SOURCE} STREQUAL "AUTO")
   find_package(s2 QUIET)
-  if(NOT ${s2_FOUND})
+  if(${s2_FOUND})
+    message(STATUS "Found s2: ${s2_INCLUDE_DIRS}")
+  else()
     build_s2()
   endif()
 elseif(${S2_SOURCE} STREQUAL "BUNDLED")
@@ -104,6 +106,12 @@ endif()
 # Abseil (bundled build not supported)
 
 find_package(absl REQUIRED)
+if(${absl_FOUND})
+  get_target_property(ABSL_INCLUDE_DIRS absl::memory INTERFACE_INCLUDE_DIRECTORIES)
+  message(STATUS "Found absl: ${ABSL_INCLUDE_DIRS}/absl")
+else()
+  message(FATAL_ERROR "Couldn't find absl")
+endif()
 
 # GTest (always bundled)
 
