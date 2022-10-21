@@ -20,7 +20,7 @@ option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 # Dependencies
 # ------------
 
-# openssl on Apple / Homebrew (dpendency via s2geometry)
+# openssl on Apple / Homebrew (dependency via s2geometry)
 # copied from Arrow
 # (copyright The Apache Software Foundation, Apache License, Version 2.0)
 
