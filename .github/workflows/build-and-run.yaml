@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main, master]
 
-name: Build and Run
+name: Build and Run (Linux)
 
 jobs:
   build-and-run:
