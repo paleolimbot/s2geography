@@ -49,46 +49,96 @@ Many operations in S2 require a `S2ShapeIndex` as input. This concept is similar
 
 The s2geography library sits on top of the s2geometry library, and you can and should use s2 directly!
 
-## Installation
+## Build and Installation (from source)
 
-s2geography depends on s2geometry, which depends on [Abseil](https://github.com/abseil/abseil-cpp) and OpenSSL. You will need to install Abseil from source and install it to the same place you install s2geography (e.g., the homebrew/distributed versions are unlikely to work). Configure with `cmake <src dir> -Dabsl_DIR=.../cmake/absl`, where `.../cmake/absl` contains the `abslConfig.cmake` file. You may also need to specify the location of OpenSSL using `-DOPENSSL_ROOT_DIR=/path/to/openssl@1.1`. The s2 library is fetched and built using CMake's FetchContent module, so you don't need to clone it separately.
-
-The project is structured such that the VSCode `cmake` integration is triggered when the folder is open (if the default build doesn't work, consider adding `CMakeUserPresets.json` to configure things like the install directory, absl_DIR, or the location of OpenSSL).
-
-For example, the GitHub Actions Ubuntu runner is configured like this:
+There is no s2geography package available yet. If you want to use it, you need to build it from source. You can download the source by cloning this repository:
 
 ```bash
-# clone this repo
 git clone https://github.com/paleolimbot/s2geography.git
+```
 
-# build abseil-cpp in the build/ directory, install to dist/
-mkdir s2geography/build && cd s2geography/build
-git clone https://github.com/abseil/abseil-cpp.git
-cmake abseil-cpp -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_CXX_STANDARD=11 -DABSL_ENABLE_INSTALL=ON
-cmake --build abseil-cpp
-cmake --install abseil-cpp --prefix ../dist
+### Requirements
 
-# build s2geography (also fetches and builds s2)
-cmake .. -Dabsl_DIR=`pwd`/../dist/lib/cmake/absl -DS2GEOGRAPHY_BUILD_TESTS=ON
+- [CMake](https://cmake.org/)
+- s2geometry
+- [Abseil](https://github.com/abseil/abseil-cpp)
+- OpenSSL (via s2geometry)
+
+### Conda
+
+All the required dependencies above are available on conda-forge. You can install them using conda (or mamba):
+
+```bash
+conda install cmake libabseil s2geometry openssl -c conda-forge
+```
+
+### Homebrew (MacOS)
+
+Alternatively, you can install the required dependencies on MacOS with Homebrew:
+
+``` bash
+brew install cmake abseil s2geometry openssl
+```
+
+### Build using CMake
+
+s2geography uses CMake to build the library. You first need to configure the build, e.g, using the following commands (from where the source has been downloaded or cloned):
+
+```bash
+mkdir build
+cd build
+cmake .. -DS2GEOGRAPHY_S2_SOURCE=AUTO -DCMAKE_CXX_STANDARD=17
 cmake --build .
+```
+
+The CMake option `S2GEOGRAPHY_S2_SOURCE` specifies the method to use for acquiring s2geometry:
+
+- `AUTO`: try to find s2geometry on the system default locations or download and build it from source if not found (default)
+- `BUNDLED`: download and build s2geometry automatically from source
+- `SYSTEM`: use s2geometry installed on one of the system default locations
+- `CONDA`: use s2geometry installed in a conda environment (automatically selected when the environment is active)
+- `BREW`: use s2geometry (and OpenSSL) installed with Homebrew
+
+Note: s2geography does not support automatically acquiring and building Abseil and OpenSSL from source. If you don't have installed those libraries with conda or Homebrew, you might need to manually specify their location using the CMake options`absl_DIR` and `OPENSSL_ROOT_DIR`.
+
+The CMake option `CMAKE_CXX_STANDARD` should be set according to the standard used to build Abseil and s2geometry (C++17 is set by default). 
+
+The project is structured such that the VSCode CMake integration is triggered when the folder is open (if the default build doesn't work, consider adding `CMakeUserPresets.json` to configure things like the install directory, absl_DIR, or the location of OpenSSL).
+
+### Install
+
+After building the library, you can install it using:
+
+```bash
 cmake --install . --prefix ../dist
 ```
 
-Locally (M1 mac), I have to add `-DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl@1.1` to `cmake ..` when building s2geography.
-
 ## Development
 
-The easiest way to get started with s2geography development is using VSCode with the C/C++ and CMake extensions. See the CMakeUserPresets.json.example file for a possible test/configuration preset that will build and run the tests and the examples. You can also invoke `ctest` directly to run tests:
+s2geography provides units tests that can be built and run using [GTest](https://github.com/google/googletest). To enable it, use the CMake option `S2GEOGRAPHY_BUILD_TESTS=ON` (GTest will be downloaded and built automatically):
 
 ```bash
-cd build
 cmake .. -DS2GEOGRAPHY_BUILD_TESTS=ON
 cmake --build .
+```
+
+You can then run the tests using `ctest`:
+
+```bash
 ctest -T test --output-on-failure .
 ```
 
-You can run specific tests using `ctest`'s `-R` flag:
+You can also run specific tests using `ctest`'s `-R` flag:
 
 ```bash
 ctest -T test . -R "Distance$"
 ```
+
+s2geography also provides some examples that can be build using:
+
+```bash
+cmake .. -DS2GEOGRAPHY_BUILD_EXAMPLES=ON
+cmake --build .
+```
+
+For VSCode users (with the C/C++ and CMake extensions), the CMakeUserPresets.json.example file shows a possible test/configuration preset that will build and run the tests and the examples.

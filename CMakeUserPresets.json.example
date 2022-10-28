@@ -15,6 +15,8 @@
                 "BUILD_SHARED_LIBS": "OFF",
                 "S2GEOGRAPHY_BUILD_EXAMPLES": "ON",
                 "S2GEOGRAPHY_BUILD_TESTS": "ON",
+                "S2GEOGRAPHY_FETCH_S2GEOMETRY": "ON",
+                "S2GEOGRAPHY_FETCH_GTEST": "ON",
                 "absl_DIR": "${sourceDir}/build/abseil-dist/lib/cmake/absl",
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_CXX_FLAGS_DEBUG": "-g"
