@@ -9,6 +9,7 @@
 #include <s2/s2region.h>
 #include <s2/s2region_union.h>
 #include <s2/s2shape.h>
+#include <s2/s2edge_clipping.h>
 #include <s2/s2shape_index_region.h>
 #include <s2/s2shapeutil_coding.h>
 
