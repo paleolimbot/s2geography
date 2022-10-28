@@ -103,6 +103,14 @@ elseif(${S2_SOURCE} STREQUAL "SYSTEM")
   endif()
 endif()
 
+if (MSVC AND NOT ${S2_SOURCE} STREQUAL "BUNDLED")
+  # used in s2geometry's CMakeLists.txt but not defined in target
+  # TODO: move this in FindS2.cmake?
+  target_compile_definitions(s2 INTERFACE _USE_MATH_DEFINES)
+  target_compile_definitions(s2 INTERFACE NOMINMAX)
+  target_compile_options(s2 INTERFACE /J)
+endif()
+
 # Abseil (bundled build not supported)
 
 find_package(absl REQUIRED)
@@ -164,9 +172,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
     add_definitions(-D_SILENCE_TR1_NAMESPACE_DEPRECATION_WARNING)
-    target_compile_definitions(s2 INTERFACE _USE_MATH_DEFINES)
-    target_compile_definitions(s2 INTERFACE NOMINMAX)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /MP /J")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /MP")
     set(CMAKE_EXE_LINKER_FLAGS /MANIFEST:NO)
   endif()
 
