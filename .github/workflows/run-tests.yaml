@@ -26,11 +26,11 @@ jobs:
           activate-environment: s2geography-dev
           use-mamba: true
 
-      - name: Set cache number
-        id: cache-number
+      - name: Get Date
+        id: get-date
         shell: bash -l {0}
-        # cache will last 3 days by default
-        run: echo CACHE_NUMBER=`expr $(date +'%d%m') / 3` >> $GITHUB_ENV
+        # cache will last one day
+        run: echo "::set-output name=today::$(/bin/date -u '+%Y%m%d')"
 
       - name: Set environment file
         id: env-file
@@ -40,14 +40,16 @@ jobs:
       - name: Check environment variables
         id: check-env
         run: |
-          echo "env.CACHE_NUMBER: ${{ env.CACHE_NUMBER }}"
           echo "env.env_file: ${{ env.env_file }}"
 
       - name: Cache environment
         uses: actions/cache@v2
         with:
-          path: /usr/share/miniconda3/envs/s2geography-dev
-          key: ${{ runner.os }}-conda-${{ hashFiles( env.env_file ) }}-${{ env.CACHE_NUMBER }}
+          path: ${{ env.CONDA }}/envs
+          key: ${{ runner.os }}-conda-${{ hashFiles( env.env_file ) }}-${{ steps.get-date.outputs.today }}-${{ env.CACHE_NUMBER }}
+        env:
+          # Increase this value to reset cache if ci/environment.yml has not changed
+          CACHE_NUMBER: 0
         id: conda-cache
 
       - name: Update environment
