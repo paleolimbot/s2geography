@@ -130,10 +130,11 @@ if(S2GEOGRAPHY_BUILD_TESTS)
     GIT_TAG tags/release-1.12.0
     GIT_SHALLOW TRUE
     )
-  FetchContent_MakeAvailable(googletest)
 
   # For Windows: Prevent overriding the parent project's compiler/linker settings
-  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+  set(gtest_force_shared_crt ON CACHE BOOL "Always use msvcrt.dll" FORCE)
+
+  FetchContent_MakeAvailable(googletest)
 
   # do not install googletest by default when running cmake --install
   set_property(DIRECTORY ${googletest_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
