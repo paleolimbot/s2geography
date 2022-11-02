@@ -42,7 +42,7 @@ jobs:
       - name: Build s2geography
         shell: bash -l {0}
         run: |
-          cmake -S . -B build -DS2GEOGRAPHY_BUILD_TESTS=ON -DS2GEOGRAPHY_S2_SOURCE=CONDA
+          cmake -S . -B build -DS2GEOGRAPHY_BUILD_TESTS=ON -DS2GEOGRAPHY_S2_SOURCE=CONDA -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE
           cmake --build build
 
       - name: Run tests
