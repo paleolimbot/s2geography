@@ -18,26 +18,45 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Install miniconda
+      - name: Setup mambaforge
         uses: conda-incubator/setup-miniconda@v2
         with:
-          mamba-version: "*"
-          channels: conda-forge
-          channel-priority: true
-          auto-activate-base: false
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          activate-environment: s2geography-dev
+          use-mamba: true
+
+      - name: Set cache number
+        id: cache-number
+        # cache will last 3 days by default
+        run: echo CACHE_NUMBER=`expr $(date +'%d%m') / 3` >> $GITHUB_ENV
+
+      - name: Set environment file
+        id: env-file
+        run: echo "env_file=ci/environment.yml" >> $GITHUB_ENV
+
+      - name: Check environment variables
+        id: check-env
+        run: |
+          echo "env.CACHE_NUMBER: ${{ env.CACHE_NUMBER }}"
+          echo "env.env_file: ${{ env.env_file }}"
+
+      - name: Cache environment
+        uses: actions/cache@v2
+        with:
+          path: /usr/share/miniconda3/envs/s2geography-dev
+          key: ${{ runner.os }}-conda-${{ matrix.python-version }}-${{ hashFiles( env.env_file ) }}-${{ env.CACHE_NUMBER }}
+        id: conda-cache
+
+      - name: Update environment
+        run: mamba env update -n s2geography-dev -f ${{ env.env_file }}
+        if: steps.conda-cache.outputs.cache-hit != 'true'
 
       - name: Conda info
         shell: bash -l {0}
         run: |
           conda info
           conda list
-          conda config --show-sources
-          conda config --show
-          printenv | sort
-
-      - name: Install dependencies
-        shell: bash -l {0}
-        run: mamba install cxx-compiler s2geometry libabseil cmake
 
       - name: Configure s2geography
         shell: bash -l {0}
