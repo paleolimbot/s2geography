@@ -45,6 +45,7 @@ jobs:
           cmake -S . -B build \
             -DCMAKE_CXX_STANDARD=17 \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE \
             -DS2GEOGRAPHY_BUILD_TESTS=ON \
             -DS2GEOGRAPHY_S2_SOURCE=CONDA
 
