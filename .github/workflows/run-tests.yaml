@@ -45,14 +45,14 @@ jobs:
           cmake -S . -B build \
             -DCMAKE_CXX_STANDARD=17 \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE \
+            -DBUILD_SHARED_LIBS=OFF \
             -DS2GEOGRAPHY_BUILD_TESTS=ON \
             -DS2GEOGRAPHY_S2_SOURCE=CONDA
 
       - name: Build s2geography
         shell: bash -l {0}
         run: |
-          cmake --build build
+          cmake --build build --config Release
 
       - name: Run tests
         shell: bash -l {0}
