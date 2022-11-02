@@ -132,6 +132,9 @@ if(S2GEOGRAPHY_BUILD_TESTS)
     )
   FetchContent_MakeAvailable(googletest)
 
+  # For Windows: Prevent overriding the parent project's compiler/linker settings
+  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+
   # do not install googletest by default when running cmake --install
   set_property(DIRECTORY ${googletest_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
 
