@@ -9,11 +9,13 @@
 
 namespace s2geography {
 
+using size_type = Geography::size_type;
+
 S2Point s2_centroid(const Geography& geog) {
   S2Point centroid(0, 0, 0);
 
   if (geog.dimension() == 0) {
-    for (int i = 0; i < geog.num_shapes(); i++) {
+    for (size_type i = 0; i < geog.num_shapes(); i++) {
       auto shape = geog.Shape(i);
       for (int j = 0; j < shape->num_edges(); j++) {
         centroid += shape->edge(j).v0;
@@ -71,7 +73,7 @@ std::unique_ptr<Geography> s2_boundary(const Geography& geog) {
         continue;
       }
 
-      endpoints.reserve(endpoints.size() + shape->num_chains() * 2);
+      endpoints.reserve(endpoints.size() + static_cast<std::size_t>(shape->num_chains()) * 2);
       for (int j = 0; j < shape->num_chains(); j++) {
         S2Shape::Chain chain = shape->chain(j);
         if (chain.length > 0) {
@@ -86,7 +88,7 @@ std::unique_ptr<Geography> s2_boundary(const Geography& geog) {
 
   if (dimension == 2) {
     std::vector<std::unique_ptr<S2Polyline>> polylines;
-    polylines.reserve(geog.num_shapes());
+    polylines.reserve(static_cast<std::size_t>(geog.num_shapes()));
 
     for (int i = 0; i < geog.num_shapes(); i++) {
       auto shape = geog.Shape(i);
@@ -97,11 +99,11 @@ std::unique_ptr<Geography> s2_boundary(const Geography& geog) {
       for (int j = 0; j < shape->num_chains(); j++) {
         S2Shape::Chain chain = shape->chain(j);
         if (chain.length > 0) {
-          std::vector<S2Point> points(chain.length + 1);
+          std::vector<S2Point> points(static_cast<std::size_t>(chain.length) + 1);
 
           points[0] = shape->edge(chain.start).v0;
           for (int k = 0; k < chain.length; k++) {
-            points[k + 1] = shape->edge(chain.start + k).v1;
+            points[static_cast<std::size_t>(k + 1)] = shape->edge(chain.start + k).v1;
           }
 
           auto polyline = absl::make_unique<S2Polyline>(std::move(points));
