@@ -104,7 +104,9 @@ void PointGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
   }
 }
 
-int PolylineGeography::num_shapes() const { return static_cast<int>(polylines_.size()); }
+int PolylineGeography::num_shapes() const {
+  return static_cast<int>(polylines_.size());
+}
 
 std::unique_ptr<S2Shape> PolylineGeography::Shape(int id) const {
   return absl::make_unique<S2Polyline::Shape>(polylines_[id].get());

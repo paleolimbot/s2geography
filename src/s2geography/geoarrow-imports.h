@@ -46,11 +46,13 @@ class Handler {
   }
   virtual Result feat_start() { return Result::CONTINUE; }
   virtual Result null_feat() { return Result::CONTINUE; }
-  virtual Result geom_start(util::GeometryType /*geometry_type*/, int64_t /*size*/) {
+  virtual Result geom_start(util::GeometryType /*geometry_type*/,
+                            int64_t /*size*/) {
     return Result::CONTINUE;
   }
   virtual Result ring_start(int64_t /*size*/) { return Result::CONTINUE; }
-  virtual Result coords(const double* /*coord*/, int64_t /*n*/, int32_t /*coord_size*/) {
+  virtual Result coords(const double* /*coord*/, int64_t /*n*/,
+                        int32_t /*coord_size*/) {
     return Result::CONTINUE;
   }
   virtual Result ring_end() { return Result::CONTINUE; }

@@ -39,10 +39,10 @@ std::unique_ptr<Geography> s2_boolean_operation(
     S2BooleanOperation::OpType op_type, const GlobalOptions& options);
 
 std::unique_ptr<Geography> s2_unary_union(const ShapeIndexGeography& geog,
-                                            const GlobalOptions& options);
+                                          const GlobalOptions& options);
 
 std::unique_ptr<Geography> s2_rebuild(const Geography& geog,
-                                        const GlobalOptions& options);
+                                      const GlobalOptions& options);
 
 std::unique_ptr<PointGeography> s2_build_point(const Geography& geog);
 

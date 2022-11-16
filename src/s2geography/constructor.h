@@ -301,8 +301,7 @@ class CollectionConstructor : public Constructor {
   }
 
   std::unique_ptr<Geography> finish() {
-    auto result =
-        absl::make_unique<GeographyCollection>(std::move(features_));
+    auto result = absl::make_unique<GeographyCollection>(std::move(features_));
     features_.clear();
     return std::unique_ptr<Geography>(result.release());
   }
