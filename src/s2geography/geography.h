@@ -24,8 +24,6 @@ class Exception : public std::runtime_error {
 // future abstractions where this is not the case.
 class Geography {
  public:
-  using size_type = int;
-
   virtual ~Geography() {}
 
   // Returns 0, 1, or 2 if all Shape()s that are returned will have
@@ -37,7 +35,7 @@ class Geography {
     }
 
     int dim = Shape(0)->dimension();
-    for (size_type i = 1; i < num_shapes(); i++) {
+    for (int i = 1; i < num_shapes(); i++) {
       if (dim != Shape(i)->dimension()) {
         return -1;
       }
@@ -47,13 +45,13 @@ class Geography {
   }
 
   // The number of S2Shape objects needed to represent this Geography
-  virtual size_type num_shapes() const = 0;
+  virtual int num_shapes() const = 0;
 
   // Returns the given S2Shape (where 0 <= id < num_shapes()). The
   // caller retains ownership of the S2Shape but the data pointed to
   // by the object requires that the underlying Geography outlives
   // the returned object.
-  virtual std::unique_ptr<S2Shape> Shape(size_type id) const = 0;
+  virtual std::unique_ptr<S2Shape> Shape(int id) const = 0;
 
   // Returns an S2Region that represents the object. The caller retains
   // ownership of the S2Region but the data pointed to by the object
@@ -77,8 +75,8 @@ class PointGeography : public Geography {
   PointGeography(std::vector<S2Point> points) : points_(std::move(points)) {}
 
   int dimension() const { return 0; }
-  size_type num_shapes() const { return 1; }
-  std::unique_ptr<S2Shape> Shape(size_type id) const;
+  int num_shapes() const { return 1; }
+  std::unique_ptr<S2Shape> Shape(int id) const;
   std::unique_ptr<S2Region> Region() const;
   void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const;
 
@@ -100,8 +98,8 @@ class PolylineGeography : public Geography {
       : polylines_(std::move(polylines)) {}
 
   int dimension() const { return 1; }
-  size_type num_shapes() const;
-  std::unique_ptr<S2Shape> Shape(size_type id) const;
+  int num_shapes() const;
+  std::unique_ptr<S2Shape> Shape(int id) const;
   std::unique_ptr<S2Region> Region() const;
   void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const;
 
@@ -124,8 +122,8 @@ class PolygonGeography : public Geography {
       : polygon_(std::move(polygon)) {}
 
   int dimension() const { return 2; }
-  size_type num_shapes() const { return 1; }
-  std::unique_ptr<S2Shape> Shape(size_type id) const;
+  int num_shapes() const { return 1; }
+  std::unique_ptr<S2Shape> Shape(int id) const;
   std::unique_ptr<S2Region> Region() const;
   void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const;
 
@@ -149,8 +147,8 @@ class GeographyCollection : public Geography {
     }
   }
 
-  size_type num_shapes() const;
-  std::unique_ptr<S2Shape> Shape(size_type id) const;
+  int num_shapes() const;
+  std::unique_ptr<S2Shape> Shape(int id) const;
   std::unique_ptr<S2Region> Region() const;
 
   const std::vector<std::unique_ptr<Geography>>& Features() const {
@@ -159,8 +157,8 @@ class GeographyCollection : public Geography {
 
  private:
   std::vector<std::unique_ptr<Geography>> features_;
-  std::vector<size_type> num_shapes_;
-  size_type total_shapes_;
+  std::vector<int> num_shapes_;
+  int total_shapes_;
 };
 
 // An Geography with a MutableS2ShapeIndex as the underlying data.
@@ -183,14 +181,14 @@ class ShapeIndexGeography : public Geography {
   // to the index.
   int Add(const Geography& geog) {
     int id = -1;
-    for (size_type i = 0; i < geog.num_shapes(); i++) {
+    for (int i = 0; i < geog.num_shapes(); i++) {
       id = shape_index_.Add(geog.Shape(i));
     }
     return id;
   }
 
-  size_type num_shapes() const;
-  std::unique_ptr<S2Shape> Shape(size_type id) const;
+  int num_shapes() const;
+  std::unique_ptr<S2Shape> Shape(int id) const;
   std::unique_ptr<S2Region> Region() const;
 
   const MutableS2ShapeIndex& ShapeIndex() const { return shape_index_; }

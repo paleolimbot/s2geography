@@ -6,8 +6,6 @@
 
 namespace s2geography {
 
-using size_type = Geography::size_type;
-
 bool s2_is_collection(const PolygonGeography& geog) {
   int num_outer_loops = 0;
   for (int i = 0; i < geog.Polygon()->num_loops(); i++) {
@@ -34,7 +32,7 @@ bool s2_is_collection(const Geography& geog) {
 
   if (dimension == 1) {
     int num_chains = 0;
-    for (size_type i = 0; i < geog.num_shapes(); i++) {
+    for (int i = 0; i < geog.num_shapes(); i++) {
       std::unique_ptr<S2Shape> shape = geog.Shape(i);
       num_chains += shape->num_chains();
       if (num_chains > 1) {
@@ -60,7 +58,7 @@ int s2_dimension(const Geography& geog) {
     return dimension;
   }
 
-  for (size_type i = 0; i < geog.num_shapes(); i++) {
+  for (int i = 0; i < geog.num_shapes(); i++) {
     std::unique_ptr<S2Shape> shape = geog.Shape(i);
     if (shape->dimension() > dimension) {
       dimension = shape->dimension();
@@ -72,7 +70,7 @@ int s2_dimension(const Geography& geog) {
 
 int s2_num_points(const Geography& geog) {
   int num_points = 0;
-  for (size_type i = 0; i < geog.num_shapes(); i++) {
+  for (int i = 0; i < geog.num_shapes(); i++) {
     std::unique_ptr<S2Shape> shape = geog.Shape(i);
     switch (shape->dimension()) {
       case 0:
@@ -89,7 +87,7 @@ int s2_num_points(const Geography& geog) {
 }
 
 bool s2_is_empty(const Geography& geog) {
-  for (size_type i = 0; i < geog.num_shapes(); i++) {
+  for (int i = 0; i < geog.num_shapes(); i++) {
     std::unique_ptr<S2Shape> shape = geog.Shape(i);
     if (!shape->is_empty()) {
       return false;
@@ -134,7 +132,7 @@ double s2_length(const Geography& geog) {
   double length = 0;
 
   if (s2_dimension(geog) == 1) {
-    for (size_type i = 0; i < geog.num_shapes(); i++) {
+    for (int i = 0; i < geog.num_shapes(); i++) {
       std::unique_ptr<S2Shape> shape = geog.Shape(i);
       for (int j = 0; j < shape->num_edges(); j++) {
         S2Shape::Edge e = shape->edge(j);
@@ -151,7 +149,7 @@ double s2_perimeter(const Geography& geog) {
   double length = 0;
 
   if (s2_dimension(geog) == 2) {
-    for (size_type i = 0; i < geog.num_shapes(); i++) {
+    for (int i = 0; i < geog.num_shapes(); i++) {
       std::unique_ptr<S2Shape> shape = geog.Shape(i);
       for (int j = 0; j < shape->num_edges(); j++) {
         S2Shape::Edge e = shape->edge(j);
@@ -166,7 +164,7 @@ double s2_perimeter(const Geography& geog) {
 
 double s2_x(const Geography& geog) {
   double out = NAN;
-  for (size_type i = 0; i < geog.num_shapes(); i++) {
+  for (int i = 0; i < geog.num_shapes(); i++) {
     std::unique_ptr<S2Shape> shape = geog.Shape(i);
     if (shape->dimension() == 0 && shape->num_edges() == 1 && std::isnan(out)) {
       S2LatLng pt(shape->edge(0).v0);
@@ -181,7 +179,7 @@ double s2_x(const Geography& geog) {
 
 double s2_y(const Geography& geog) {
   double out = NAN;
-  for (size_type i = 0; i < geog.num_shapes(); i++) {
+  for (int i = 0; i < geog.num_shapes(); i++) {
     std::unique_ptr<S2Shape> shape = geog.Shape(i);
     if (shape->dimension() == 0 && shape->num_edges() == 1 && std::isnan(out)) {
       S2LatLng pt(shape->edge(0).v0);

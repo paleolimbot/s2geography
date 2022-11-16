@@ -23,8 +23,6 @@ using namespace s2geography;
 // s2/s2shapeutil_coding.cc.
 class S2ShapeWrapper : public S2Shape {
  public:
-  using size_type = Geography::size_type;
-
   S2ShapeWrapper(S2Shape* shape) : shape_(shape) {}
   int num_edges() const { return shape_->num_edges(); }
   Edge edge(int edge_id) const { return shape_->edge(edge_id); }
@@ -73,7 +71,7 @@ class S2RegionWrapper : public S2Region {
 
 void Geography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
   MutableS2ShapeIndex index;
-  for (size_type i = 0; i < num_shapes(); i++) {
+  for (int i = 0; i < num_shapes(); i++) {
     index.Add(Shape(i));
   }
 
@@ -81,7 +79,7 @@ void Geography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
       cell_ids);
 }
 
-std::unique_ptr<S2Shape> PointGeography::Shape(size_type /*id*/) const {
+std::unique_ptr<S2Shape> PointGeography::Shape(int id) const {
   return absl::make_unique<S2PointVectorShape>(points_);
 }
 
@@ -106,11 +104,10 @@ void PointGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
   }
 }
 
-auto PolylineGeography::num_shapes() const -> size_type { return static_cast<size_type>(polylines_.size()); }
+int PolylineGeography::num_shapes() const { return polylines_.size(); }
 
-std::unique_ptr<S2Shape> PolylineGeography::Shape(size_type id) const {
-  auto id_ = static_cast<std::size_t>(id);
-  return absl::make_unique<S2Polyline::Shape>(polylines_[id_].get());
+std::unique_ptr<S2Shape> PolylineGeography::Shape(int id) const {
+  return absl::make_unique<S2Polyline::Shape>(polylines_[id].get());
 }
 
 std::unique_ptr<S2Region> PolylineGeography::Region() const {
@@ -130,7 +127,7 @@ void PolylineGeography::GetCellUnionBound(
   }
 }
 
-std::unique_ptr<S2Shape> PolygonGeography::Shape(size_type /*id*/) const {
+std::unique_ptr<S2Shape> PolygonGeography::Shape(int id) const {
   return absl::make_unique<S2Polygon::Shape>(polygon_.get());
 }
 
@@ -143,15 +140,14 @@ void PolygonGeography::GetCellUnionBound(
   polygon_->GetCellUnionBound(cell_ids);
 }
 
-auto GeographyCollection::num_shapes() const -> size_type { return total_shapes_; }
+int GeographyCollection::num_shapes() const { return total_shapes_; }
 
-std::unique_ptr<S2Shape> GeographyCollection::Shape(size_type id) const {
-  size_type sum_shapes_ = 0;
-  for (size_type i = 0; i < static_cast<size_type>(features_.size()); i++) {
-    auto i_ = static_cast<std::size_t>(i);
-    sum_shapes_ += num_shapes_[i_];
+std::unique_ptr<S2Shape> GeographyCollection::Shape(int id) const {
+  int sum_shapes_ = 0;
+  for (int i = 0; i < features_.size(); i++) {
+    sum_shapes_ += num_shapes_[i];
     if (id < sum_shapes_) {
-      return features_[i_]->Shape(id - sum_shapes_ + num_shapes_[i_]);
+      return features_[i]->Shape(id - sum_shapes_ + num_shapes_[i]);
     }
   }
 
@@ -168,12 +164,12 @@ std::unique_ptr<S2Region> GeographyCollection::Region() const {
   return std::unique_ptr<S2Region>(region.release());
 }
 
-auto ShapeIndexGeography::num_shapes() const -> size_type {
-  return static_cast<size_type>(shape_index_.num_shape_ids());
+int ShapeIndexGeography::num_shapes() const {
+  return shape_index_.num_shape_ids();
 }
 
-std::unique_ptr<S2Shape> ShapeIndexGeography::Shape(size_type id) const {
-  S2Shape* shape = shape_index_.shape(static_cast<int>(id));
+std::unique_ptr<S2Shape> ShapeIndexGeography::Shape(int id) const {
+  S2Shape* shape = shape_index_.shape(id);
   return std::unique_ptr<S2Shape>(new S2ShapeWrapper(shape));
 }
 
