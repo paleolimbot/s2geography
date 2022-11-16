@@ -93,7 +93,7 @@ class Parser {
 
   int64_t charsLeftInBuffer() { return this->length - this->offset; }
 
-  bool checkBuffer(int n_chars) {
+  bool checkBuffer(int64_t n_chars) {
     return (this->charsLeftInBuffer() - n_chars) >= 0;
   }
 

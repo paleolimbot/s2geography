@@ -104,7 +104,7 @@ class WKTStreamWriter : public Handler {
     return Result::CONTINUE;
   }
 
-  Result ring_start(int64_t size) {
+  Result ring_start(int64_t /*size*/) {
     if (!is_first_ring_) {
       write_string(", ");
     } else {
