@@ -3,3 +3,7 @@ dist/
 CMakeUserPresets.json
 .DS_Store
 .vscode
+.dir-locals.el
+.ccls
+.ccls-cache/
+compile_commands.json

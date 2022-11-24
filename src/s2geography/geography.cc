@@ -79,7 +79,7 @@ void Geography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
       cell_ids);
 }
 
-std::unique_ptr<S2Shape> PointGeography::Shape(int id) const {
+std::unique_ptr<S2Shape> PointGeography::Shape(int /*id*/) const {
   return absl::make_unique<S2PointVectorShape>(points_);
 }
 
@@ -104,7 +104,9 @@ void PointGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
   }
 }
 
-int PolylineGeography::num_shapes() const { return polylines_.size(); }
+int PolylineGeography::num_shapes() const {
+  return static_cast<int>(polylines_.size());
+}
 
 std::unique_ptr<S2Shape> PolylineGeography::Shape(int id) const {
   return absl::make_unique<S2Polyline::Shape>(polylines_[id].get());
@@ -127,7 +129,7 @@ void PolylineGeography::GetCellUnionBound(
   }
 }
 
-std::unique_ptr<S2Shape> PolygonGeography::Shape(int id) const {
+std::unique_ptr<S2Shape> PolygonGeography::Shape(int /*id*/) const {
   return absl::make_unique<S2Polygon::Shape>(polygon_.get());
 }
 
@@ -144,7 +146,7 @@ int GeographyCollection::num_shapes() const { return total_shapes_; }
 
 std::unique_ptr<S2Shape> GeographyCollection::Shape(int id) const {
   int sum_shapes_ = 0;
-  for (int i = 0; i < features_.size(); i++) {
+  for (int i = 0; i < static_cast<int>(features_.size()); i++) {
     sum_shapes_ += num_shapes_[i];
     if (id < sum_shapes_) {
       return features_[i]->Shape(id - sum_shapes_ + num_shapes_[i]);

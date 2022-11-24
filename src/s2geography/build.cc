@@ -178,10 +178,9 @@ std::unique_ptr<PolygonGeography> s2_unary_union(const PolygonGeography& geog,
     // the outside followed by holes such that the below strategy should work
     // (since we are just iterating along the original loop structure)
     if ((geog.Polygon()->loop(i)->depth() % 2) == 0) {
-      polygon_result->InitToUnion(accumulated_polygon.get(), loops[i].get());
+      polygon_result->InitToUnion(*accumulated_polygon, *loops[i]);
     } else {
-      polygon_result->InitToDifference(accumulated_polygon.get(),
-                                       loops[i].get());
+      polygon_result->InitToDifference(*accumulated_polygon, *loops[i]);
     }
 
     accumulated_polygon.swap(polygon_result);
@@ -191,7 +190,7 @@ std::unique_ptr<PolygonGeography> s2_unary_union(const PolygonGeography& geog,
 }
 
 std::unique_ptr<Geography> s2_unary_union(const ShapeIndexGeography& geog,
-                                            const GlobalOptions& options) {
+                                          const GlobalOptions& options) {
   // complex union only needed when a polygon is involved
   bool simple_union_ok = s2_is_empty(geog) || s2_dimension(geog) < 2;
 
@@ -227,9 +226,9 @@ std::unique_ptr<Geography> s2_unary_union(const ShapeIndexGeography& geog,
 
 std::unique_ptr<Geography> s2_rebuild(
     const Geography& geog, const GlobalOptions& options,
-    GlobalOptions::OutputAction point_layer_action,
-    GlobalOptions::OutputAction polyline_layer_action,
-    GlobalOptions::OutputAction polygon_layer_action) {
+    GlobalOptions::OutputAction /*point_layer_action*/,
+    GlobalOptions::OutputAction /*polyline_layer_action*/,
+    GlobalOptions::OutputAction /*polygon_layer_action*/) {
   // create the builder
   S2Builder builder(options.builder);
 
@@ -280,7 +279,7 @@ std::unique_ptr<Geography> s2_rebuild(
 }
 
 std::unique_ptr<Geography> s2_rebuild(const Geography& geog,
-                                        const GlobalOptions& options) {
+                                      const GlobalOptions& options) {
   return s2_rebuild(geog, options, options.point_layer_action,
                     options.polyline_layer_action,
                     options.polygon_layer_action);
@@ -322,9 +321,7 @@ std::unique_ptr<Geography> RebuildAggregator::Finalize() {
   return s2_rebuild(index_, options_);
 }
 
-void S2CoverageUnionAggregator::Add(const Geography& geog) {
-  index_.Add(geog);
-}
+void S2CoverageUnionAggregator::Add(const Geography& geog) { index_.Add(geog); }
 
 std::unique_ptr<Geography> S2CoverageUnionAggregator::Finalize() {
   ShapeIndexGeography empty_index_;

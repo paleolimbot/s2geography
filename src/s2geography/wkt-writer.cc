@@ -104,7 +104,7 @@ class WKTStreamWriter : public Handler {
     return Result::CONTINUE;
   }
 
-  Result ring_start(int64_t size) {
+  Result ring_start(int64_t /*size*/) {
     if (!is_first_ring_) {
       write_string(", ");
     } else {
@@ -456,8 +456,7 @@ Handler::Result WKTWriter::handle_feature(const Geography& geog,
       if (child_polygon != nullptr) {
         HANDLE_OR_RETURN(handle_polygon(*child_polygon, handler));
       } else {
-        auto child_collection =
-            dynamic_cast<const GeographyCollection*>(&geog);
+        auto child_collection = dynamic_cast<const GeographyCollection*>(&geog);
         if (child_collection != nullptr) {
           HANDLE_OR_RETURN(handle_collection(*child_collection, handler));
         } else {
