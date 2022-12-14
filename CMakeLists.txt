@@ -1,6 +1,9 @@
 
 cmake_minimum_required(VERSION 3.11)
+
 include(FetchContent)
+include(GNUInstallDirs)
+
 message(STATUS "Building using CMake version: ${CMAKE_VERSION}")
 
 project(S2Geography)
@@ -204,7 +207,11 @@ endif()
 # Install s2geography
 # -------------------
 
-install(TARGETS s2geography DESTINATION lib)
+install(TARGETS s2geography
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+  LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+
 install(DIRECTORY src/ DESTINATION include FILES_MATCHING PATTERN "*.h")
 
 if(S2GEOGRAPHY_BUILD_EXAMPLES)
