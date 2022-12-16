@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
 
 ## Overview
 
-The basic unit in s2geography is the `Geography` class. The three main subclasses of this wrap `std::vector<S2Point>`, `std::vector<std::unique_ptr<S2Polyline>>`,, `std::unique_ptr<S2Polygon>`, and `std::vector<std::unique_ptr<Geography>>`; however, the `Geography` class is parameterized as zero or more `S2Shape` objects that also define an `S2Region`. This allows a flexible storage model (although only the four main subclasses have been tested).
+The basic unit in s2geography is the `Geography` class. The three main subclasses of this wrap `std::vector<S2Point>`, `std::vector<std::unique_ptr<S2Polyline>>`, `std::unique_ptr<S2Polygon>`, and `std::vector<std::unique_ptr<Geography>>`; however, the `Geography` class is parameterized as zero or more `S2Shape` objects that also define an `S2Region`. This allows a flexible storage model (although only the four main subclasses have been tested).
 
 Many operations in S2 require a `S2ShapeIndex` as input. This concept is similar to the GEOS prepared geometry and maps to the `ShapeIndexGeography` in this library. For indexing a vector of features, use the `GeographyIndex` (similar to the GEOS STRTree object).
 
@@ -64,7 +64,7 @@ git clone https://github.com/paleolimbot/s2geography.git
 - [Abseil](https://github.com/abseil/abseil-cpp)
 - OpenSSL (via s2geometry)
 
-### Conda
+#### Conda
 
 All the required dependencies above are available on conda-forge. You can install them using conda (or mamba):
 
@@ -72,7 +72,7 @@ All the required dependencies above are available on conda-forge. You can instal
 conda install cmake libabseil s2geometry openssl -c conda-forge
 ```
 
-### Homebrew (MacOS)
+#### Homebrew (MacOS)
 
 Alternatively, you can install the required dependencies on MacOS with Homebrew:
 
@@ -112,6 +112,14 @@ After building the library, you can install it using:
 ```bash
 cmake --install . --prefix ../dist
 ```
+
+When building and installing in a conda environment, you can specify the conda environment's prefix location:
+
+```bash
+cmake --install . --prefix $CONDA_PREFIX
+```
+
+Or alternatively configure this by passing `-DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX` when invoking cmake to configure the project.
 
 ## Development
 
