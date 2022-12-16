@@ -186,6 +186,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   enable_testing()
 
   add_executable(distance_test src/s2geography/distance_test.cc)
+  add_executable(wkt_writer_test src/s2geography/wkt-writer_test.cc)
 
   if (S2GEOGRAPHY_CODE_COVERAGE)
     target_compile_options(coverage_config INTERFACE -O0 -g --coverage)
@@ -194,9 +195,11 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   endif()
 
   target_link_libraries(distance_test s2geography GTest::gtest_main)
+  target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
 
   include(GoogleTest)
   gtest_discover_tests(distance_test)
+  gtest_discover_tests(wkt_writer_test)
 endif()
 
 if(S2GEOGRAPHY_BUILD_EXAMPLES)
