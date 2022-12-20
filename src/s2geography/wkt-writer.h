@@ -12,6 +12,8 @@ namespace s2geography {
 class WKTWriter {
  public:
   WKTWriter();
+  WKTWriter(int significant_digits);
+
   std::string write_feature(const Geography& geog);
 
  private:

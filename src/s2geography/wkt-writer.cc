@@ -17,8 +17,8 @@ namespace s2geography {
 
 class WKTStreamWriter : public Handler {
  public:
-  WKTStreamWriter(std::ostream& stream)
-      : significant_digits_(16),
+  WKTStreamWriter(std::ostream& stream, int significant_digits = 16)
+      : significant_digits_(significant_digits),
         is_first_ring_(true),
         is_first_coord_(true),
         dimensions_(util::Dimensions::XY),
@@ -182,9 +182,12 @@ class WKTStreamWriter : public Handler {
   void write_char(char value) { stream_ << std::string(&value, 1); }
 };
 
-WKTWriter::WKTWriter()
+WKTWriter::WKTWriter() : WKTWriter(16) {}
+
+WKTWriter::WKTWriter(int significant_digits)
     : geometry_type_(util::GeometryType::GEOMETRY_TYPE_UNKNOWN) {
-  this->exporter_ = absl::make_unique<WKTStreamWriter>(stream_);
+  this->exporter_ =
+      absl::make_unique<WKTStreamWriter>(stream_, significant_digits);
   exporter_->new_dimensions(util::Dimensions::XY);
   exporter_->new_geometry_type(util::GeometryType::GEOMETRY_TYPE_UNKNOWN);
 }
