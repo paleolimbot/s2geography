@@ -3,6 +3,14 @@
 
 #include <unordered_set>
 
+// S2ShapeIndex::CellRelation was renamed to S2CellRelation
+// in S2 version 0.11
+#if defined(S2_VERSION_MAJOR) && (S2_VERSION_MAJOR > 0 || S2_VERSION_MINOR >= 11) 
+#include "s2/s2cell_id.h"
+#else
+#define S2CellRelation S2ShapeIndex::CellRelation
+#endif
+
 #include "s2geography/geography.h"
 
 namespace s2geography {
@@ -46,9 +54,9 @@ class GeographyIndex {
     }
 
     void Query(const S2CellId& cell_id, std::unordered_set<int>* indices) {
-      S2ShapeIndex::CellRelation relation = iterator_.Locate(cell_id);
+      S2CellRelation relation = iterator_.Locate(cell_id);
 
-      if (relation == S2ShapeIndex::CellRelation::INDEXED) {
+      if (relation == S2CellRelation::INDEXED) {
         // We're in luck! these indexes have this cell in common
         // add all the shapes it contains as possible intersectors
         const S2ShapeIndexCell& index_cell = iterator_.cell();
@@ -56,7 +64,7 @@ class GeographyIndex {
           int shape_id = index_cell.clipped(k).shape_id();
           indices->insert(index_->value(shape_id));
         }
-      } else if (relation == S2ShapeIndex::CellRelation::SUBDIVIDED) {
+      } else if (relation == S2CellRelation::SUBDIVIDED) {
         // Promising! the index has a child cell of iterator_.id()
         // (at which iterator_ is now positioned). Keep iterating until the
         // iterator is done OR we're no longer at a child cell of
@@ -76,7 +84,7 @@ class GeographyIndex {
         }
       }
 
-      // else: relation == S2ShapeIndex::CellRelation::DISJOINT (do nothing)
+      // else: relation == S2ShapeIndex::S2CellRelation::DISJOINT (do nothing)
     }
 
    private:
