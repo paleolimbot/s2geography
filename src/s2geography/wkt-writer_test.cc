@@ -23,7 +23,7 @@ static std::string
 wktRoundTrip(const std::string &wktIn) {
   WKTReader reader;
   WKTWriter writer;
-  auto geog = reader.read_feature(wktIn.c_str());
+  auto geog = reader.read_feature(wktIn);
   return writer.write_feature(*geog);
 }
 
