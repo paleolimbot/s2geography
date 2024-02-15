@@ -3,7 +3,13 @@
 
 #include <unordered_set>
 
+// S2ShapeIndex::CellRelation was renamed to S2CellRelation
+// in S2 version 0.11
+#if defined(S2_VERSION_MAJOR) && (S2_VERSION_MAJOR > 0 || S2_VERSION_MINOR >= 11) 
 #include "s2/s2cell_id.h"
+#else
+#define S2CellRelation S2ShapeIndex::CellRelation
+#endif
 
 #include "s2geography/geography.h"
 
@@ -78,7 +84,7 @@ class GeographyIndex {
         }
       }
 
-      // else: relation == S2CellRelation::DISJOINT (do nothing)
+      // else: relation == S2ShapeIndex::S2CellRelation::DISJOINT (do nothing)
     }
 
    private:
