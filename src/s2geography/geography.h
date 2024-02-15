@@ -8,6 +8,9 @@
 #include <stdexcept>
 #include <string>
 
+#define S2_VERSION_MAJOR 0
+#define S2_VERSION_MINOR 11
+
 namespace s2geography {
 
 class Exception : public std::runtime_error {

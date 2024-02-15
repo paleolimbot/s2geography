@@ -3,6 +3,8 @@
 
 #include <unordered_set>
 
+#include "s2geography/geography.h"
+
 // S2ShapeIndex::CellRelation was renamed to S2CellRelation
 // in S2 version 0.11
 #if defined(S2_VERSION_MAJOR) && (S2_VERSION_MAJOR > 0 || S2_VERSION_MINOR >= 11) 
@@ -10,8 +12,6 @@
 #else
 #define S2CellRelation S2ShapeIndex::CellRelation
 #endif
-
-#include "s2geography/geography.h"
 
 namespace s2geography {
 
