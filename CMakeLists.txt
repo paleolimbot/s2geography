@@ -246,7 +246,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   if (S2GEOGRAPHY_CODE_COVERAGE)
     target_compile_options(coverage_config INTERFACE -O0 -g --coverage)
     target_link_options(coverage_config INTERFACE --coverage)
-    target_link_libraries(s2geography coverage_config)
+    target_link_libraries(s2geography PUBLIC coverage_config)
   endif()
 
   target_link_libraries(distance_test s2geography GTest::gtest_main)
