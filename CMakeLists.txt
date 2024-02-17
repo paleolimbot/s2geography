@@ -192,6 +192,15 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   endif()
 endif()
 
+# Build geoarrow
+# --------------
+add_library(geoarrow STATIC
+    src/geoarrow/geoarrow.c
+    src/geoarrow/d2s.c
+    src/geoarrow/double_parse_fast_float.cc)
+
+target_include_directories(geoarrow PRIVATE src/geoarrow)
+
 # Build s2geography
 # -----------------
 
@@ -206,6 +215,7 @@ add_library(s2geography
     src/s2geography/predicates.cc
     src/s2geography/build.cc
     src/s2geography/geography.cc
+    src/s2geography/geoarrow.cc
     src/s2geography/wkt-reader.cc
     src/s2geography/wkt-writer.cc)
 
@@ -230,6 +240,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   enable_testing()
 
   add_executable(distance_test src/s2geography/distance_test.cc)
+  add_executable(geoarrow_test src/s2geography/geoarrow_test.cc)
   add_executable(wkt_writer_test src/s2geography/wkt-writer_test.cc)
 
   if (S2GEOGRAPHY_CODE_COVERAGE)
@@ -239,10 +250,12 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   endif()
 
   target_link_libraries(distance_test s2geography GTest::gtest_main)
+  target_link_libraries(geoarrow_test s2geography GTest::gtest_main)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
 
   include(GoogleTest)
   gtest_discover_tests(distance_test)
+  gtest_discover_tests(geoarrow_test)
   gtest_discover_tests(wkt_writer_test)
 endif()
 
