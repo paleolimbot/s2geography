@@ -177,8 +177,7 @@ add_library(s2geography
 set_target_properties(s2geography PROPERTIES
     POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
 
-target_link_libraries(s2geography PUBLIC s2 absl::memory absl::str_format)
-target_link_libraries(s2geography PRIVATE geoarrow)
+target_link_libraries(s2geography PUBLIC s2 absl::memory absl::str_format PRIVATE geoarrow)
 
 if(S2GEOGRAPHY_BUILD_TESTS)
 
