@@ -736,6 +736,11 @@ std::unique_ptr<Geography> WKTReader::read_feature(const char* text) {
   return read_feature(text, strlen(text));
 }
 
+std::unique_ptr<Geography> WKTReader::read_feature(const std::string& str) {
+  return read_feature(str.data(), str.size());
+}
+
+
 }  // namespace s2geography
 
 #undef _GEOARROW_FROM_CHARS

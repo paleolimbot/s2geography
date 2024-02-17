@@ -1,4 +1,5 @@
 build/
+_build/
 dist/
 CMakeUserPresets.json
 .DS_Store
