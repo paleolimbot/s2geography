@@ -5,6 +5,7 @@
 
 #include "s2/s1angle.h"
 #include "s2/s2projections.h"
+#include "s2geography/geography.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -107,6 +108,9 @@ namespace s2geography {
 
 namespace geoarrow {
 
+/// \brief Inspect the underlying GeoArrow implementation version
+const char* version();
+
 /// \brief Options used to build Geography objects from GeoArrow arrays
 class ImportOptions {
  public:
@@ -132,7 +136,23 @@ class ImportOptions {
   S1Angle tessellate_tolerance_;
 };
 
-const char* version();
+class ReaderImpl;
+
+class Reader {
+ public:
+  Reader();
+  ~Reader();
+
+  void Init(const ArrowSchema* schema) { Init(schema, ImportOptions()); }
+
+  void Init(const ArrowSchema* schema, const ImportOptions& options);
+
+  void ReadGeography(ArrowArray* array, int64_t offset, int64_t length,
+                     std::vector<std::unique_ptr<Geography>>* out);
+
+ private:
+  std::unique_ptr<ReaderImpl> impl_;
+};
 
 }  // namespace geoarrow
 

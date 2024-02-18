@@ -102,43 +102,84 @@ class Constructor {
 
  private:
   static int CFeatStart(GeoArrowVisitor* v) {
-    auto constructor = reinterpret_cast<Constructor*>(v->private_data);
-    return constructor->feat_start();
+    try {
+      auto constructor = reinterpret_cast<Constructor*>(v->private_data);
+      return constructor->feat_start();
+    } catch (std::exception& e) {
+      GeoArrowErrorSet(v->error, "%s", e.what());
+      return EINVAL;
+    }
   }
 
   static int CFeatEnd(GeoArrowVisitor* v) {
-    auto constructor = reinterpret_cast<Constructor*>(v->private_data);
-    return constructor->feat_end();
+    try {
+      auto constructor = reinterpret_cast<Constructor*>(v->private_data);
+      return constructor->feat_end();
+    } catch (std::exception& e) {
+      GeoArrowErrorSet(v->error, "%s", e.what());
+      return EINVAL;
+    }
   }
 
   static int CNullFeat(GeoArrowVisitor* v) {
-    auto constructor = reinterpret_cast<Constructor*>(v->private_data);
-    return constructor->null_feat();
+    try {
+      auto constructor = reinterpret_cast<Constructor*>(v->private_data);
+      return constructor->null_feat();
+    } catch (std::exception& e) {
+      GeoArrowErrorSet(v->error, "%s", e.what());
+      return EINVAL;
+    }
   }
 
   static int CGeomStart(GeoArrowVisitor* v, GeoArrowGeometryType geometry_type,
                         GeoArrowDimensions dimensions) {
-    auto constructor = reinterpret_cast<Constructor*>(v->private_data);
-    return constructor->geom_start(geometry_type, -1);
+    try {
+      auto constructor = reinterpret_cast<Constructor*>(v->private_data);
+      return constructor->geom_start(geometry_type, -1);
+    } catch (std::exception& e) {
+      GeoArrowErrorSet(v->error, "%s", e.what());
+      return EINVAL;
+    }
   }
 
   static int CGeomEnd(GeoArrowVisitor* v) {
-    auto constructor = reinterpret_cast<Constructor*>(v->private_data);
-    return constructor->geom_end();
+    try {
+      auto constructor = reinterpret_cast<Constructor*>(v->private_data);
+      return constructor->geom_end();
+    } catch (std::exception& e) {
+      GeoArrowErrorSet(v->error, "%s", e.what());
+      return EINVAL;
+    }
   }
 
   static int CRingStart(GeoArrowVisitor* v) {
-    auto constructor = reinterpret_cast<Constructor*>(v->private_data);
-    return constructor->ring_start(-1);
+    try {
+      auto constructor = reinterpret_cast<Constructor*>(v->private_data);
+      return constructor->ring_start(-1);
+    } catch (std::exception& e) {
+      GeoArrowErrorSet(v->error, "%s", e.what());
+      return EINVAL;
+    }
   }
 
   static int CRingEnd(GeoArrowVisitor* v) {
-    auto constructor = reinterpret_cast<Constructor*>(v->private_data);
-    return constructor->ring_end();
+    try {
+      auto constructor = reinterpret_cast<Constructor*>(v->private_data);
+      return constructor->ring_end();
+    } catch (std::exception& e) {
+      GeoArrowErrorSet(v->error, "%s", e.what());
+      return EINVAL;
+    }
   }
 
   static int CCoords(GeoArrowVisitor* v, const GeoArrowCoordView* coords) {
-    return EINVAL;
+    try {
+      auto constructor = reinterpret_cast<Constructor*>(v->private_data);
+      return constructor->coords(coords);
+    } catch (std::exception& e) {
+      GeoArrowErrorSet(v->error, "%s", e.what());
+      return EINVAL;
+    }
   }
 };
 
@@ -430,6 +471,98 @@ class CollectionConstructor : public Constructor {
   int level_;
   std::vector<std::unique_ptr<Geography>> features_;
 };
+
+class FeatureConstructor : public CollectionConstructor {
+ public:
+  FeatureConstructor(const ImportOptions& options)
+      : CollectionConstructor(options) {}
+
+  void SetOutput(std::vector<std::unique_ptr<Geography>>* out) { out_ = out; }
+
+  GeoArrowErrorCode feat_start() override {
+    active_constructor_ = nullptr;
+    level_ = 0;
+    features_.clear();
+    geom_start(GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION, 1);
+    return GEOARROW_OK;
+  }
+
+  GeoArrowErrorCode feat_end() override {
+    out_->push_back(finish_feature());
+    return GEOARROW_OK;
+  }
+
+ private:
+  std::vector<std::unique_ptr<Geography>>* out_;
+
+  std::unique_ptr<Geography> finish_feature() {
+    geom_end();
+
+    if (features_.empty()) {
+      return absl::make_unique<GeographyCollection>();
+    } else {
+      std::unique_ptr<Geography> feature = std::move(features_.back());
+      if (feature == nullptr) {
+        throw Exception("finish_feature() generated nullptr");
+      }
+
+      features_.pop_back();
+      return feature;
+    }
+  }
+};
+
+class ReaderImpl {
+ public:
+  ReaderImpl() { error_.message[0] = '\0'; }
+
+  void Init(const ArrowSchema* schema, const ImportOptions& options) {
+    options_ = options;
+
+    int code = GeoArrowArrayViewInitFromSchema(&array_view_, schema, &error_);
+    ThrowNotOk(code);
+
+    constructor_ = absl::make_unique<FeatureConstructor>(options_);
+    constructor_->InitVisitor(&visitor_);
+    visitor_.error = &error_;
+  }
+
+  void ReadGeography(ArrowArray* array, int64_t offset, int64_t length,
+                     std::vector<std::unique_ptr<Geography>>* out) {
+    int code = GeoArrowArrayViewSetArray(&array_view_, array, &error_);
+    ThrowNotOk(code);
+
+    constructor_->SetOutput(out);
+    code = GeoArrowArrayViewVisit(&array_view_, offset, length, &visitor_);
+    ThrowNotOk(code);
+  }
+
+ private:
+  ImportOptions options_;
+  std::unique_ptr<FeatureConstructor> constructor_;
+  GeoArrowArrayView array_view_;
+  GeoArrowVisitor visitor_;
+  GeoArrowError error_;
+
+  void ThrowNotOk(int code) {
+    if (code != GEOARROW_OK) {
+      throw Exception(error_.message);
+    }
+  }
+};
+
+Reader::Reader() : impl_(new ReaderImpl()) {}
+
+Reader::~Reader() { impl_.reset(); }
+
+void Reader::Init(const ArrowSchema* schema, const ImportOptions& options) {
+  impl_->Init(schema, options);
+}
+
+void Reader::ReadGeography(ArrowArray* array, int64_t offset, int64_t length,
+                           std::vector<std::unique_ptr<Geography>>* out) {
+  impl_->ReadGeography(array, offset, length, out);
+}
 
 }  // namespace geoarrow
 
