@@ -3,6 +3,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "s2/s1angle.h"
+#include "s2/s2projections.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -102,6 +105,35 @@ struct ArrowArrayStream {
 
 namespace s2geography {
 
-const char* s2_geoarrow_version();
+namespace geoarrow {
 
-}
+/// \brief Options used to build Geography objects from GeoArrow arrays
+class ImportOptions {
+ public:
+  ImportOptions()
+      : oriented_(false),
+        check_(true),
+        tessellate_tolerance_(S1Angle::Infinity()) {}
+  bool oriented() const { return oriented_; }
+  void set_oriented(bool oriented) { oriented_ = oriented; }
+  bool check() const { return check_; }
+  void set_check(bool check) { check_ = check; }
+  S2::Projection* projection() const { return projection_; }
+  void set_projection(S2::Projection* projection) { projection_ = projection; }
+  S1Angle tessellate_tolerance() const { return tessellate_tolerance_; }
+  void set_tessellate_tolerance(S1Angle tessellate_tolerance) {
+    tessellate_tolerance_ = tessellate_tolerance;
+  }
+
+ private:
+  bool oriented_;
+  bool check_;
+  S2::Projection* projection_;
+  S1Angle tessellate_tolerance_;
+};
+
+const char* version();
+
+}  // namespace geoarrow
+
+}  // namespace s2geography
