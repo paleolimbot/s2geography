@@ -14,7 +14,7 @@ namespace geoarrow {
 const char* version() { return GeoArrowVersion(); }
 
 S2::Projection* lnglat() {
-  static S2::PlateCarreeProjection projection;
+  static S2::PlateCarreeProjection projection(180);
   return &projection;
 }
 
