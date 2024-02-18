@@ -116,7 +116,7 @@ class PointConstructor : public Constructor {
   PointConstructor(const Options& options) : Constructor(options) {}
 
   GeoArrowErrorCode geom_start(GeoArrowGeometryType geometry_type,
-                               int64_t size) {
+                               int64_t size) override {
     if (size != 0 && geometry_type != GEOARROW_GEOMETRY_TYPE_POINT &&
         geometry_type != GEOARROW_GEOMETRY_TYPE_MULTIPOINT &&
         geometry_type != GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION) {
@@ -132,7 +132,8 @@ class PointConstructor : public Constructor {
     return GEOARROW_OK;
   }
 
-  GeoArrowErrorCode coords(const double* coord, int64_t n, int32_t coord_size) {
+  GeoArrowErrorCode coords(const double* coord, int64_t n,
+                           int32_t coord_size) override {
     for (int64_t i = 0; i < n; i++) {
       if (coord_empty(coord + (i * coord_size), coord_size)) {
         continue;
@@ -151,7 +152,7 @@ class PointConstructor : public Constructor {
     return GEOARROW_OK;
   }
 
-  std::unique_ptr<Geography> finish() {
+  std::unique_ptr<Geography> finish() override {
     auto result = absl::make_unique<PointGeography>(std::move(points_));
     points_.clear();
     return std::unique_ptr<Geography>(result.release());
@@ -174,7 +175,7 @@ class PolylineConstructor : public Constructor {
   PolylineConstructor(const Options& options) : Constructor(options) {}
 
   GeoArrowErrorCode geom_start(GeoArrowGeometryType geometry_type,
-                               int64_t size) {
+                               int64_t size) override {
     if (size != 0 && geometry_type != GEOARROW_GEOMETRY_TYPE_LINESTRING &&
         geometry_type != GEOARROW_GEOMETRY_TYPE_MULTILINESTRING &&
         geometry_type != GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION) {
@@ -190,7 +191,7 @@ class PolylineConstructor : public Constructor {
     return GEOARROW_OK;
   }
 
-  GeoArrowErrorCode geom_end() {
+  GeoArrowErrorCode geom_end() override {
     finish_points();
 
     if (!points_.empty()) {
@@ -211,7 +212,7 @@ class PolylineConstructor : public Constructor {
     return GEOARROW_OK;
   }
 
-  std::unique_ptr<Geography> finish() {
+  std::unique_ptr<Geography> finish() override {
     std::unique_ptr<PolylineGeography> result;
 
     if (polylines_.empty()) {
@@ -233,7 +234,7 @@ class PolygonConstructor : public Constructor {
  public:
   PolygonConstructor(const Options& options) : Constructor(options) {}
 
-  GeoArrowErrorCode ring_start(int64_t size) {
+  GeoArrowErrorCode ring_start(int64_t size) override {
     input_points_.clear();
     if (size > 0) {
       input_points_.reserve(size);
@@ -242,7 +243,7 @@ class PolygonConstructor : public Constructor {
     return GEOARROW_OK;
   }
 
-  GeoArrowErrorCode ring_end() {
+  GeoArrowErrorCode ring_end() override {
     finish_points();
 
     if (points_.empty()) {
@@ -271,7 +272,7 @@ class PolygonConstructor : public Constructor {
     return GEOARROW_OK;
   }
 
-  std::unique_ptr<Geography> finish() {
+  std::unique_ptr<Geography> finish() override {
     auto polygon = absl::make_unique<S2Polygon>();
     polygon->set_s2debug_override(S2Debug::DISABLE);
     if (options_.oriented()) {
@@ -307,7 +308,7 @@ class CollectionConstructor : public Constructor {
         level_(0) {}
 
   GeoArrowErrorCode geom_start(GeoArrowGeometryType geometry_type,
-                               int64_t size) {
+                               int64_t size) override {
     level_++;
     if (level_ == 1 &&
         geometry_type == GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION) {
@@ -346,22 +347,23 @@ class CollectionConstructor : public Constructor {
     return GEOARROW_OK;
   }
 
-  GeoArrowErrorCode ring_start(int64_t size) {
+  GeoArrowErrorCode ring_start(int64_t size) override {
     active_constructor_->ring_start(size);
     return GEOARROW_OK;
   }
 
-  GeoArrowErrorCode coords(const double* coord, int64_t n, int32_t coord_size) {
+  GeoArrowErrorCode coords(const double* coord, int64_t n,
+                           int32_t coord_size) override {
     active_constructor_->coords(coord, n, coord_size);
     return GEOARROW_OK;
   }
 
-  GeoArrowErrorCode ring_end() {
+  GeoArrowErrorCode ring_end() override {
     active_constructor_->ring_end();
     return GEOARROW_OK;
   }
 
-  GeoArrowErrorCode geom_end() {
+  GeoArrowErrorCode geom_end() override {
     level_--;
 
     if (level_ >= 1) {
@@ -377,7 +379,7 @@ class CollectionConstructor : public Constructor {
     return GEOARROW_OK;
   }
 
-  std::unique_ptr<Geography> finish() {
+  std::unique_ptr<Geography> finish() override {
     auto result = absl::make_unique<GeographyCollection>(std::move(features_));
     features_.clear();
     return std::unique_ptr<Geography>(result.release());
