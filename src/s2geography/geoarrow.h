@@ -111,12 +111,15 @@ namespace geoarrow {
 /// \brief Inspect the underlying GeoArrow implementation version
 const char* version();
 
+S2::Projection* lnglat();
+
 /// \brief Options used to build Geography objects from GeoArrow arrays
 class ImportOptions {
  public:
   ImportOptions()
       : oriented_(false),
         check_(true),
+        projection_(lnglat()),
         tessellate_tolerance_(S1Angle::Infinity()) {}
   bool oriented() const { return oriented_; }
   void set_oriented(bool oriented) { oriented_ = oriented; }
