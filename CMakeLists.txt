@@ -187,6 +187,15 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   # do not install googletest by default when running cmake --install
   set_property(DIRECTORY ${googletest_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
 
+  # For testing GeoArrow
+  FetchContent_Declare(
+    nanoarrow
+    URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.4.0.zip
+    URL_HASH
+      SHA256=ada98929c7ab90548618c238be925bfcb6ddaea6d3af4106ca1c6aeb7eefc3c2)
+
+  FetchContent_MakeAvailable(nanoarrow)
+
   if(S2GEOGRAPHY_CODE_COVERAGE)
     add_library(coverage_config INTERFACE)
   endif()
@@ -250,7 +259,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   endif()
 
   target_link_libraries(distance_test s2geography GTest::gtest_main)
-  target_link_libraries(geoarrow_test s2geography GTest::gtest_main)
+  target_link_libraries(geoarrow_test s2geography nanoarrow geoarrow GTest::gtest_main)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
 
   include(GoogleTest)

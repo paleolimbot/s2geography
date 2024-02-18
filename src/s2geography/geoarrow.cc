@@ -13,6 +13,11 @@ namespace geoarrow {
 
 const char* version() { return GeoArrowVersion(); }
 
+S2::Projection* lnglat() {
+  static S2::PlateCarreeProjection projection;
+  return &projection;
+}
+
 class Constructor {
  public:
   Constructor(const ImportOptions& options) : options_(options) {
@@ -514,7 +519,21 @@ class FeatureConstructor : public CollectionConstructor {
 
 class ReaderImpl {
  public:
-  ReaderImpl() { error_.message[0] = '\0'; }
+  ReaderImpl() {
+    error_.message[0] = '\0';
+    wkt_reader_.private_data = nullptr;
+    wkb_reader_.private_data = nullptr;
+  }
+
+  ~ReaderImpl() {
+    if (wkt_reader_.private_data != nullptr) {
+      GeoArrowWKTReaderReset(&wkt_reader_);
+    }
+
+    if (wkb_reader_.private_data != nullptr) {
+      GeoArrowWKBReaderReset(&wkb_reader_);
+    }
+  }
 
   void Init(const ArrowSchema* schema, const ImportOptions& options) {
     options_ = options;
@@ -525,6 +544,14 @@ class ReaderImpl {
     constructor_ = absl::make_unique<FeatureConstructor>(options_);
     constructor_->InitVisitor(&visitor_);
     visitor_.error = &error_;
+
+    if (array_view_.schema_view.type == GEOARROW_TYPE_WKT) {
+      GeoArrowWKTReaderInit(&wkt_reader_);
+    }
+
+    if (array_view_.schema_view.type == GEOARROW_TYPE_WKB) {
+      GeoArrowWKBReaderInit(&wkb_reader_);
+    }
   }
 
   void ReadGeography(ArrowArray* array, int64_t offset, int64_t length,
@@ -532,8 +559,24 @@ class ReaderImpl {
     int code = GeoArrowArrayViewSetArray(&array_view_, array, &error_);
     ThrowNotOk(code);
 
+    if (length == 0) {
+      return;
+    }
+
     constructor_->SetOutput(out);
-    code = GeoArrowArrayViewVisit(&array_view_, offset, length, &visitor_);
+
+    switch (array_view_.schema_view.type) {
+      case GEOARROW_TYPE_WKT:
+        code = VisitWKT(offset, length);
+        break;
+      case GEOARROW_TYPE_WKB:
+        code = ENOTSUP;
+        break;
+      default:
+        code = GeoArrowArrayViewVisit(&array_view_, offset, length, &visitor_);
+        break;
+    }
+
     ThrowNotOk(code);
   }
 
@@ -541,8 +584,31 @@ class ReaderImpl {
   ImportOptions options_;
   std::unique_ptr<FeatureConstructor> constructor_;
   GeoArrowArrayView array_view_;
+  GeoArrowWKTReader wkt_reader_;
+  GeoArrowWKBReader wkb_reader_;
   GeoArrowVisitor visitor_;
   GeoArrowError error_;
+
+  int VisitWKT(int64_t offset, int64_t length) {
+    offset += array_view_.offset[0];
+    const uint8_t* validity = array_view_.validity_bitmap;
+    const int32_t* offsets = array_view_.offsets[0];
+    const char* data = reinterpret_cast<const char*>(array_view_.data);
+    GeoArrowStringView item;
+
+    if (validity == nullptr) {
+      for (int64_t i = 0; i < length; i++) {
+        item.size_bytes = offsets[offset + i + 1] - offsets[offset + i];
+        item.data = data + offsets[offset + i];
+        GEOARROW_RETURN_NOT_OK(
+            GeoArrowWKTReaderVisit(&wkt_reader_, item, &visitor_));
+      }
+
+      return GEOARROW_OK;
+    } else {
+      return ENOTSUP;
+    }
+  }
 
   void ThrowNotOk(int code) {
     if (code != GEOARROW_OK) {
