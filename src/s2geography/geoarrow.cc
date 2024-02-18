@@ -4,41 +4,18 @@
 #include "s2/s1angle.h"
 #include "s2/s2edge_tessellator.h"
 #include "s2/s2projections.h"
+#include "s2geography/geoarrow.h"
 #include "s2geography/geography.h"
 
 namespace s2geography {
 
-namespace interinal {
+namespace geoarrow {
+
+const char* version() { return GeoArrowVersion(); }
 
 class Constructor {
  public:
-  class Options {
-   public:
-    Options()
-        : oriented_(false),
-          check_(true),
-          tessellate_tolerance_(S1Angle::Infinity()) {}
-    bool oriented() const { return oriented_; }
-    void set_oriented(bool oriented) { oriented_ = oriented; }
-    bool check() const { return check_; }
-    void set_check(bool check) { check_ = check; }
-    S2::Projection* projection() const { return projection_; }
-    void set_projection(S2::Projection* projection) {
-      projection_ = projection;
-    }
-    S1Angle tessellate_tolerance() const { return tessellate_tolerance_; }
-    void set_tessellate_tolerance(S1Angle tessellate_tolerance) {
-      tessellate_tolerance_ = tessellate_tolerance;
-    }
-
-   private:
-    bool oriented_;
-    bool check_;
-    S2::Projection* projection_;
-    S1Angle tessellate_tolerance_;
-  };
-
-  Constructor(const Options& options) : options_(options) {
+  Constructor(const ImportOptions& options) : options_(options) {
     if (options.projection() != nullptr) {
       this->tessellator_ = absl::make_unique<S2EdgeTessellator>(
           options.projection(), options.tessellate_tolerance());
@@ -95,7 +72,7 @@ class Constructor {
  protected:
   std::vector<S2Point> input_points_;
   std::vector<S2Point> points_;
-  Options options_;
+  ImportOptions options_;
   std::unique_ptr<S2EdgeTessellator> tessellator_;
 
   void finish_points() {
@@ -167,7 +144,7 @@ class Constructor {
 
 class PointConstructor : public Constructor {
  public:
-  PointConstructor(const Options& options) : Constructor(options) {}
+  PointConstructor(const ImportOptions& options) : Constructor(options) {}
 
   GeoArrowErrorCode geom_start(GeoArrowGeometryType geometry_type,
                                int64_t size) override {
@@ -230,7 +207,7 @@ class PointConstructor : public Constructor {
 
 class PolylineConstructor : public Constructor {
  public:
-  PolylineConstructor(const Options& options) : Constructor(options) {}
+  PolylineConstructor(const ImportOptions& options) : Constructor(options) {}
 
   GeoArrowErrorCode geom_start(GeoArrowGeometryType geometry_type,
                                int64_t size) override {
@@ -290,7 +267,7 @@ class PolylineConstructor : public Constructor {
 
 class PolygonConstructor : public Constructor {
  public:
-  PolygonConstructor(const Options& options) : Constructor(options) {}
+  PolygonConstructor(const ImportOptions& options) : Constructor(options) {}
 
   GeoArrowErrorCode ring_start(int64_t size) override {
     input_points_.clear();
@@ -357,7 +334,7 @@ class PolygonConstructor : public Constructor {
 
 class CollectionConstructor : public Constructor {
  public:
-  CollectionConstructor(const Options& options)
+  CollectionConstructor(const ImportOptions& options)
       : Constructor(options),
         point_constructor_(options),
         polyline_constructor_(options),
@@ -454,8 +431,6 @@ class CollectionConstructor : public Constructor {
   std::vector<std::unique_ptr<Geography>> features_;
 };
 
-}  // namespace interinal
-
-const char* s2_geoarrow_version() { return GeoArrowVersion(); }
+}  // namespace geoarrow
 
 }  // namespace s2geography
