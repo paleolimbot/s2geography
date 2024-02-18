@@ -47,6 +47,17 @@ class Constructor {
 
   virtual ~Constructor() {}
 
+  void InitVisitor(GeoArrowVisitor* v) {
+    v->feat_start = &CFeatStart;
+    v->feat_end = &CFeatEnd;
+    v->geom_start = &CGeomStart;
+    v->geom_end = &CGeomEnd;
+    v->ring_start = &CRingStart;
+    v->ring_end = &CRingEnd;
+    v->coords = &CCoords;
+    v->private_data = this;
+  }
+
   virtual GeoArrowErrorCode feat_start() { return GEOARROW_OK; }
   virtual GeoArrowErrorCode null_feat() { return GEOARROW_OK; }
   virtual GeoArrowErrorCode geom_start(GeoArrowGeometryType geometry_type,
@@ -57,20 +68,22 @@ class Constructor {
   virtual GeoArrowErrorCode ring_end() { return GEOARROW_OK; }
   virtual GeoArrowErrorCode geom_end() { return GEOARROW_OK; }
   virtual GeoArrowErrorCode feat_end() { return GEOARROW_OK; }
-  virtual GeoArrowErrorCode array_end() { return GEOARROW_OK; }
 
-  virtual GeoArrowErrorCode coords(const double* coord, int64_t n,
-                                   int32_t coord_size) {
+  virtual GeoArrowErrorCode coords(const GeoArrowCoordView* view) {
+    int coord_size = view->n_values;
+    int64_t n = view->n_coords;
+
     if (coord_size == 3) {
       for (int64_t i = 0; i < n; i++) {
-        input_points_.push_back(S2Point(coord[i * coord_size],
-                                        coord[i * coord_size + 1],
-                                        coord[i * coord_size + 2]));
+        input_points_.push_back(S2Point(GEOARROW_COORD_VIEW_VALUE(view, i, 0),
+                                        GEOARROW_COORD_VIEW_VALUE(view, i, 1),
+                                        GEOARROW_COORD_VIEW_VALUE(view, i, 2)));
       }
     } else {
       for (int64_t i = 0; i < n; i++) {
-        input_points_.push_back(
-            S2Point(coord[i * coord_size], coord[i * coord_size + 1], 0));
+        input_points_.push_back(S2Point(GEOARROW_COORD_VIEW_VALUE(view, i, 0),
+                                        GEOARROW_COORD_VIEW_VALUE(view, i, 1),
+                                        0));
       }
     }
 
@@ -109,6 +122,47 @@ class Constructor {
 
     input_points_.clear();
   }
+
+ private:
+  static int CFeatStart(GeoArrowVisitor* v) {
+    auto constructor = reinterpret_cast<Constructor*>(v->private_data);
+    return constructor->feat_start();
+  }
+
+  static int CFeatEnd(GeoArrowVisitor* v) {
+    auto constructor = reinterpret_cast<Constructor*>(v->private_data);
+    return constructor->feat_end();
+  }
+
+  static int CNullFeat(GeoArrowVisitor* v) {
+    auto constructor = reinterpret_cast<Constructor*>(v->private_data);
+    return constructor->null_feat();
+  }
+
+  static int CGeomStart(GeoArrowVisitor* v, GeoArrowGeometryType geometry_type,
+                        GeoArrowDimensions dimensions) {
+    auto constructor = reinterpret_cast<Constructor*>(v->private_data);
+    return constructor->geom_start(geometry_type, -1);
+  }
+
+  static int CGeomEnd(GeoArrowVisitor* v) {
+    auto constructor = reinterpret_cast<Constructor*>(v->private_data);
+    return constructor->geom_end();
+  }
+
+  static int CRingStart(GeoArrowVisitor* v) {
+    auto constructor = reinterpret_cast<Constructor*>(v->private_data);
+    return constructor->ring_start(-1);
+  }
+
+  static int CRingEnd(GeoArrowVisitor* v) {
+    auto constructor = reinterpret_cast<Constructor*>(v->private_data);
+    return constructor->ring_end();
+  }
+
+  static int CCoords(GeoArrowVisitor* v, const GeoArrowCoordView* coords) {
+    return EINVAL;
+  }
 };
 
 class PointConstructor : public Constructor {
@@ -132,19 +186,23 @@ class PointConstructor : public Constructor {
     return GEOARROW_OK;
   }
 
-  GeoArrowErrorCode coords(const double* coord, int64_t n,
-                           int32_t coord_size) override {
+  GeoArrowErrorCode coords(const GeoArrowCoordView* view) override {
+    int64_t n = view->n_coords;
+    int coord_size = view->n_values;
+
     for (int64_t i = 0; i < n; i++) {
-      if (coord_empty(coord + (i * coord_size), coord_size)) {
+      if (coord_empty(view, i)) {
         continue;
       }
 
       if (options_.projection() == nullptr) {
-        S2Point pt(coord[i * coord_size], coord[i * coord_size + 1],
-                   coord[i * coord_size + 2]);
+        S2Point pt(GEOARROW_COORD_VIEW_VALUE(view, i, 0),
+                   GEOARROW_COORD_VIEW_VALUE(view, i, 1),
+                   GEOARROW_COORD_VIEW_VALUE(view, i, 2));
         points_.push_back(pt);
       } else {
-        R2Point pt(coord[i * coord_size], coord[i * coord_size + 1]);
+        R2Point pt(GEOARROW_COORD_VIEW_VALUE(view, i, 0),
+                   GEOARROW_COORD_VIEW_VALUE(view, i, 1));
         points_.push_back(options_.projection()->Unproject(pt));
       }
     }
@@ -159,9 +217,9 @@ class PointConstructor : public Constructor {
   }
 
  private:
-  bool coord_empty(const double* coord, int32_t coord_size) {
-    for (int32_t i = 0; i < coord_size; i++) {
-      if (!std::isnan(coord[i])) {
+  bool coord_empty(const GeoArrowCoordView* view, int64_t i) {
+    for (int j = 0; j < view->n_values; j++) {
+      if (!std::isnan(GEOARROW_COORD_VIEW_VALUE(view, i, j))) {
         return false;
       }
     }
@@ -201,10 +259,10 @@ class PolylineConstructor : public Constructor {
       // Previous version of s2 didn't check for this, so in
       // this check is temporarily disabled to avoid mayhem in
       // reverse dependency checks.
-      // if (options_.check() && !polyline->IsValid()) {
-      //   polyline->FindValidationError(&error_);
-      //   throw Exception(error_.text());
-      // }
+      if (options_.check() && !polyline->IsValid()) {
+        polyline->FindValidationError(&error_);
+        throw Exception(error_.text());
+      }
 
       polylines_.push_back(std::move(polyline));
     }
@@ -352,9 +410,8 @@ class CollectionConstructor : public Constructor {
     return GEOARROW_OK;
   }
 
-  GeoArrowErrorCode coords(const double* coord, int64_t n,
-                           int32_t coord_size) override {
-    active_constructor_->coords(coord, n, coord_size);
+  GeoArrowErrorCode coords(const GeoArrowCoordView* view) override {
+    active_constructor_->coords(view);
     return GEOARROW_OK;
   }
 
