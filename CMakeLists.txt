@@ -142,10 +142,28 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   # do not install googletest by default when running cmake --install
   set_property(DIRECTORY ${googletest_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
 
+  # For testing GeoArrow
+  FetchContent_Declare(
+    nanoarrow
+    URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.4.0.zip
+    URL_HASH
+      SHA256=ada98929c7ab90548618c238be925bfcb6ddaea6d3af4106ca1c6aeb7eefc3c2)
+
+  FetchContent_MakeAvailable(nanoarrow)
+
   if(S2GEOGRAPHY_CODE_COVERAGE)
     add_library(coverage_config INTERFACE)
   endif()
 endif()
+
+# Build geoarrow
+# --------------
+add_library(geoarrow STATIC
+    src/geoarrow/geoarrow.c
+    src/geoarrow/d2s.c
+    src/geoarrow/double_parse_fast_float.cc)
+
+target_include_directories(geoarrow PRIVATE src/geoarrow)
 
 # Build s2geography
 # -----------------
@@ -161,32 +179,36 @@ add_library(s2geography
     src/s2geography/predicates.cc
     src/s2geography/build.cc
     src/s2geography/geography.cc
+    src/s2geography/geoarrow.cc
     src/s2geography/wkt-reader.cc
     src/s2geography/wkt-writer.cc)
 
 set_target_properties(s2geography PROPERTIES
     POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
 
-target_link_libraries(s2geography s2 absl::memory absl::str_format)
+target_link_libraries(s2geography PUBLIC s2 absl::memory absl::str_format PRIVATE geoarrow)
 
 if(S2GEOGRAPHY_BUILD_TESTS)
 
   enable_testing()
 
   add_executable(distance_test src/s2geography/distance_test.cc)
+  add_executable(geoarrow_test src/s2geography/geoarrow_test.cc)
   add_executable(wkt_writer_test src/s2geography/wkt-writer_test.cc)
 
   if (S2GEOGRAPHY_CODE_COVERAGE)
     target_compile_options(coverage_config INTERFACE -O0 -g --coverage)
     target_link_options(coverage_config INTERFACE --coverage)
-    target_link_libraries(s2geography coverage_config)
+    target_link_libraries(s2geography PUBLIC coverage_config)
   endif()
 
   target_link_libraries(distance_test s2geography GTest::gtest_main)
+  target_link_libraries(geoarrow_test s2geography nanoarrow geoarrow GTest::gtest_main)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
 
   include(GoogleTest)
   gtest_discover_tests(distance_test)
+  gtest_discover_tests(geoarrow_test)
   gtest_discover_tests(wkt_writer_test)
 endif()
 
