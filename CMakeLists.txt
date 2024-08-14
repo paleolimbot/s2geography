@@ -159,9 +159,9 @@ endif()
 
 if (MSVC AND NOT ${S2_SOURCE} STREQUAL "BUNDLED")
   # used in s2geometry's CMakeLists.txt but not defined in target
-  target_compile_definitions(s2 INTERFACE _USE_MATH_DEFINES)
-  target_compile_definitions(s2 INTERFACE NOMINMAX)
-  target_compile_options(s2 INTERFACE /J)
+  target_compile_definitions(s2::s2 INTERFACE _USE_MATH_DEFINES)
+  target_compile_definitions(s2::s2 INTERFACE NOMINMAX)
+  target_compile_options(s2::s2 INTERFACE /J)
 endif()
 
 # --- Abseil (bundled build not supported)
