@@ -1,11 +1,11 @@
 
 cmake_minimum_required(VERSION 3.14)
 
-project(S2Geography LANGUAGES CXX)
+project(s2geography
+  LANGUAGES CXX
+  VERSION 0.2.0)
 
 include(FetchContent)
-include(GNUInstallDirs)
-
 message(STATUS "Building using CMake version: ${CMAKE_VERSION}")
 
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "The C++ standard to build with")
@@ -13,7 +13,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/third_party/cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
 
 option(S2GEOGRAPHY_BUILD_TESTS "Build tests" OFF)
 option(S2GEOGRAPHY_CODE_COVERAGE "Enable coverage reporting" OFF)
@@ -23,7 +23,7 @@ option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 # Dependencies
 # ------------
 
-# openssl on Apple / Homebrew (dependency via s2geometry)
+# --- openssl on Apple / Homebrew (dependency via s2geometry)
 # copied from Arrow
 # (copyright The Apache Software Foundation, Apache License, Version 2.0)
 
@@ -46,7 +46,7 @@ if(APPLE AND NOT OPENSSL_ROOT_DIR)
   endif()
 endif()
 
-# s2geometry
+# --- s2geometry
 
 if(DEFINED ENV{CONDA_PREFIX})
   set(S2GEOGRAPHY_S2_SOURCE_DEFAULT "CONDA")
@@ -164,7 +164,7 @@ if (MSVC AND NOT ${S2_SOURCE} STREQUAL "BUNDLED")
   target_compile_options(s2 INTERFACE /J)
 endif()
 
-# Abseil (bundled build not supported)
+# --- Abseil (bundled build not supported)
 
 find_package(absl REQUIRED)
 if(${absl_FOUND})
@@ -174,7 +174,7 @@ else()
   message(FATAL_ERROR "Couldn't find absl")
 endif()
 
-# GTest (always bundled)
+# --- googletest (always bundled)
 
 if(S2GEOGRAPHY_BUILD_TESTS)
   FetchContent_Declare(
@@ -252,14 +252,48 @@ endif()
 # Install s2geography
 # -------------------
 
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+set(CMAKECONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}" CACHE
+    STRING "install path for s2geography cmake configuration files")
+
+message("-- Install prefix: " ${CMAKE_INSTALL_PREFIX})
+message("  -> libs: " ${CMAKE_INSTALL_LIBDIR})
+message("  -> includes: " ${CMAKE_INSTALL_INCLUDEDIR})
+message("  -> cmake config: " ${CMAKECONFIG_INSTALL_DIR})
+
 install(TARGETS s2geography
+  EXPORT ${PROJECT_NAME}-targets
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 
-install(DIRECTORY src/ DESTINATION include FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY src/
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+  FILES_MATCHING PATTERN "*.h")
 
 if(S2GEOGRAPHY_BUILD_EXAMPLES)
   install(TARGETS example-simple DESTINATION examples)
 endif()
 
+# --- Package config (makes the package importable using find_package in another project)
+
+configure_package_config_file(
+  cmake/${PROJECT_NAME}Config.cmake.in
+  "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+  INSTALL_DESTINATION ${CMAKECONFIG_INSTALL_DIR})
+
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
+  VERSION ${PROJECT_VERSION}
+  COMPATIBILITY AnyNewerVersion)
+
+install(
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
+  DESTINATION ${CMAKECONFIG_INSTALL_DIR})
+
+install(EXPORT ${PROJECT_NAME}-targets
+  FILE ${PROJECT_NAME}Targets.cmake
+  DESTINATION ${CMAKECONFIG_INSTALL_DIR})
