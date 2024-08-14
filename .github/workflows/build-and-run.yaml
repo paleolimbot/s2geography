@@ -44,7 +44,7 @@ jobs:
         if: steps.cache-build.outputs.cache-hit != 'true'
         run: |
           cd build/absl-src
-          cmake . -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_CXX_STANDARD=11 -DABSL_ENABLE_INSTALL=ON
+          cmake . -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_CXX_STANDARD=17 -DABSL_ENABLE_INSTALL=ON
           cmake --build .
           cmake --install . --prefix ../dist
 
@@ -62,7 +62,7 @@ jobs:
       - name: Build s2geography
         run: |
           cd build
-          cmake .. -Dabsl_DIR=`pwd`/../dist/lib/cmake/absl -DS2GEOGRAPHY_BUILD_EXAMPLES=ON -DS2GEOGRAPHY_BUILD_TESTS=ON -DS2GEOGRAPHY_CODE_COVERAGE=ON -DCMAKE_CXX_STANDARD=11 -DBUILD_SHARED_LIBS=OFF
+          cmake .. -Dabsl_DIR=`pwd`/../dist/lib/cmake/absl -DS2GEOGRAPHY_BUILD_EXAMPLES=ON -DS2GEOGRAPHY_BUILD_TESTS=ON -DS2GEOGRAPHY_CODE_COVERAGE=ON -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=OFF
           cmake --build .
           cmake --install . --prefix ../dist
 
