@@ -65,11 +65,6 @@ macro(extract_s2_version VERSION_STRING)
   list(GET VERSION_LIST 0 S2_VERSION_MAJOR)
   list(GET VERSION_LIST 1 S2_VERSION_MINOR)
   list(GET VERSION_LIST 2 S2_VERSION_PATCH)
-
-  add_compile_definitions(
-    S2_VERSION_MAJOR=${S2_VERSION_MAJOR}
-    S2_VERSION_MINOR=${S2_VERSION_MINOR}
-    S2_VERSION_PATCH=${S2_VERSION_PATCH})
 endmacro()
 
 macro(find_s2 ARG)
@@ -216,6 +211,13 @@ add_library(s2geography
 
 set_target_properties(s2geography PROPERTIES
     POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+
+target_compile_definitions(
+  s2geography
+  PUBLIC
+  S2_VERSION_MAJOR=${S2_VERSION_MAJOR}
+  S2_VERSION_MINOR=${S2_VERSION_MINOR}
+  S2_VERSION_PATCH=${S2_VERSION_PATCH})
 
 target_link_libraries(
   s2geography
