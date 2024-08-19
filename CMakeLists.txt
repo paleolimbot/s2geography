@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.14)
 
 project(s2geography
   LANGUAGES CXX
-  VERSION 0.2.0)
+  VERSION 0.1.2)
 
 include(FetchContent)
 message(STATUS "Building using CMake version: ${CMAKE_VERSION}")
