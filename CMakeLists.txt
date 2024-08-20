@@ -114,11 +114,6 @@ macro(build_s2)
 
   set_property(TARGET s2 PROPERTY CXX_STANDARD ${CMAKE_CXX_STANDARD})
 
-  # this might be needed since s2geometry includes it in general
-  # but not for any target explicilty?
-  find_package(OpenSSL)
-  target_include_directories(s2 INTERFACE ${OPENSSL_INCLUDE_DIR})
-
   get_target_property(S2_VERSION_STRING s2 VERSION)
   extract_s2_version(${S2_VERSION_STRING})
   add_library(s2::s2 ALIAS s2)
@@ -128,9 +123,6 @@ if(${S2GEOGRAPHY_S2_SOURCE} STREQUAL "CONDA")
   set(S2_ROOT_DIR "$ENV{CONDA_PREFIX}")
   set(S2_SOURCE "SYSTEM")
 elseif(${S2GEOGRAPHY_S2_SOURCE} STREQUAL "BREW")
-  # required for Homebrew installed s2geometry headers to find OpenSSL headers
-  find_package(OpenSSL)
-  include_directories(${OPENSSL_INCLUDE_DIR})
   set(S2_SOURCE "SYSTEM")
 else()
   set(S2_SOURCE ${S2GEOGRAPHY_S2_SOURCE})
@@ -158,6 +150,11 @@ if (MSVC AND NOT ${S2_SOURCE} STREQUAL "BUNDLED")
   target_compile_definitions(s2::s2 INTERFACE NOMINMAX)
   target_compile_options(s2::s2 INTERFACE /J)
 endif()
+
+# this might be needed since s2geometry includes it in general
+# but not for any target explicilty?
+find_package(OpenSSL REQUIRED)
+target_include_directories(s2::s2 INTERFACE ${OPENSSL_INCLUDE_DIR})
 
 # --- Abseil (bundled build not supported)
 
