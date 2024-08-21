@@ -24,14 +24,17 @@ std::unique_ptr<Geography> WKTReader::read_feature(const char* text,
   int32_t offsets[] = {0, static_cast<int32_t>(size)};
   const void* buffers[] = {nullptr, offsets, text};
   ArrowArray array{.length = 1,
-                   .offset = 0,
                    .null_count = 0,
+                   .offset = 0,
+
                    .n_buffers = 3,
-                   .buffers = buffers,
                    .n_children = 0,
+                   .buffers = buffers,
+
                    .children = nullptr,
                    .dictionary = nullptr,
-                   .release = [](ArrowArray*) -> void {}};
+                   .release = [](ArrowArray*) -> void {},
+                   .private_data = nullptr};
 
   out_.clear();
   reader_->ReadGeography(&array, 0, 1, &out_);
