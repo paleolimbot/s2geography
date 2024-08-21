@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.14)
 
 project(s2geography
-  LANGUAGES CXX
+  LANGUAGES CXX C
   VERSION 0.2.0)
 
 include(FetchContent)
@@ -190,9 +190,9 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   # For testing GeoArrow
   FetchContent_Declare(
     nanoarrow
-    URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.4.0.zip
+    URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.5.0.zip
     URL_HASH
-      SHA256=ada98929c7ab90548618c238be925bfcb6ddaea6d3af4106ca1c6aeb7eefc3c2)
+      SHA256=cadbca542806a7554830cbca0393cda3470bdca6d0ce29b5e115b168c6c0b435)
 
   FetchContent_MakeAvailable(nanoarrow)
 
@@ -240,9 +240,10 @@ target_compile_definitions(
 
 target_link_libraries(
   s2geography
+  PUBLIC
   s2::s2
   absl::memory
-  absl::str_format)
+  absl::str_format PRIVATE geoarrow)
 
 if(S2GEOGRAPHY_BUILD_TESTS)
 
