@@ -447,15 +447,15 @@ class CollectionConstructor : public Constructor {
     switch (geometry_type) {
       case GEOARROW_GEOMETRY_TYPE_POINT:
       case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
-        active_constructor_ = &point_constructor_;
+        this->active_constructor_ = &point_constructor_;
         break;
       case GEOARROW_GEOMETRY_TYPE_LINESTRING:
       case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
-        active_constructor_ = &polyline_constructor_;
+        this->active_constructor_ = &polyline_constructor_;
         break;
       case GEOARROW_GEOMETRY_TYPE_POLYGON:
       case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
-        active_constructor_ = &polygon_constructor_;
+        this->active_constructor_ = &polygon_constructor_;
         break;
       case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
         this->collection_constructor_ =
@@ -594,7 +594,18 @@ class ReaderImpl {
 
     int code = GeoArrowArrayViewInitFromSchema(&array_view_, schema, &error_);
     ThrowNotOk(code);
+    InitCommon();
+  }
 
+  void Init(GeoArrowType type, const ImportOptions& options) {
+    options_ = options;
+
+    int code = GeoArrowArrayViewInitFromType(&array_view_, type);
+    ThrowNotOk(code);
+    InitCommon();
+  }
+
+  void InitCommon() {
     constructor_ = absl::make_unique<FeatureConstructor>(options_);
     constructor_->InitVisitor(&visitor_);
     visitor_.error = &error_;
@@ -608,7 +619,7 @@ class ReaderImpl {
     }
   }
 
-  void ReadGeography(ArrowArray* array, int64_t offset, int64_t length,
+  void ReadGeography(const ArrowArray* array, int64_t offset, int64_t length,
                      std::vector<std::unique_ptr<Geography>>* out) {
     int code = GeoArrowArrayViewSetArray(&array_view_, array, &error_);
     ThrowNotOk(code);
@@ -710,7 +721,21 @@ void Reader::Init(const ArrowSchema* schema, const ImportOptions& options) {
   impl_->Init(schema, options);
 }
 
-void Reader::ReadGeography(ArrowArray* array, int64_t offset, int64_t length,
+void Reader::Init(InputType input_type, const ImportOptions& options) {
+  switch (input_type) {
+    case InputType::kWKT:
+      impl_->Init(GEOARROW_TYPE_WKT, options);
+      break;
+    case InputType::kWKB:
+      impl_->Init(GEOARROW_TYPE_WKB, options);
+      break;
+    default:
+      throw Exception("Input type not supported");
+  }
+}
+
+void Reader::ReadGeography(const ArrowArray* array, int64_t offset,
+                           int64_t length,
                            std::vector<std::unique_ptr<Geography>>* out) {
   impl_->ReadGeography(array, offset, length, out);
 }

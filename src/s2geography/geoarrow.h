@@ -1,4 +1,5 @@
 
+#pragma once
 
 #include <stddef.h>
 #include <stdint.h>
@@ -143,6 +144,7 @@ class ReaderImpl;
 
 class Reader {
  public:
+  enum class InputType { kWKT, kWKB };
   Reader();
   ~Reader();
 
@@ -150,7 +152,9 @@ class Reader {
 
   void Init(const ArrowSchema* schema, const ImportOptions& options);
 
-  void ReadGeography(ArrowArray* array, int64_t offset, int64_t length,
+  void Init(InputType input_type, const ImportOptions& options);
+
+  void ReadGeography(const ArrowArray* array, int64_t offset, int64_t length,
                      std::vector<std::unique_ptr<Geography>>* out);
 
  private:

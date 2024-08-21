@@ -1,27 +1,20 @@
 
-#include "s2geography/constructor.h"
+#include "s2geography/geoarrow.h"
 #include "s2geography/geography.h"
 
 namespace s2geography {
 
-namespace util {
-
-class WKTReaderInternal;
-
-}
-
 class WKTReader {
  public:
-  WKTReader() : WKTReader(util::Constructor::Options()) {}
-  WKTReader(const util::Constructor::Options& options);
+  WKTReader() : WKTReader(geoarrow::ImportOptions()) {}
+  WKTReader(const geoarrow::ImportOptions& options);
   std::unique_ptr<Geography> read_feature(const char* text, int64_t size);
   std::unique_ptr<Geography> read_feature(const char* text);
   std::unique_ptr<Geography> read_feature(const std::string& str);
 
  private:
-  util::Constructor::Options options_;
-  std::shared_ptr<util::WKTReaderInternal> reader_;
-  std::unique_ptr<util::FeatureConstructor> constructor_;
+  std::unique_ptr<geoarrow::Reader> reader_;
+  std::vector<std::unique_ptr<Geography>> out_;
 };
 
 }  // namespace s2geography
