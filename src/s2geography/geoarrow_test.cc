@@ -27,6 +27,27 @@ void InitArrayWKT(ArrowArray* array, std::vector<std::string> values) {
   NANOARROW_THROW_NOT_OK(ArrowArrayFinishBuildingDefault(array, nullptr));
 }
 
+void InitSchemaWKB(ArrowSchema* schema) {
+  NANOARROW_THROW_NOT_OK(
+      GeoArrowSchemaInitExtension(schema, GEOARROW_TYPE_WKB));
+}
+
+void InitArrayWKB(ArrowArray* array, std::vector<std::vector<uint8_t>> values) {
+  NANOARROW_THROW_NOT_OK(ArrowArrayInitFromType(array, NANOARROW_TYPE_BINARY));
+  NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(array));
+  for (const auto& value : values) {
+    if (value.size() == 0) {
+      NANOARROW_THROW_NOT_OK(ArrowArrayAppendNull(array, 1));
+    } else {
+      ArrowBufferView na_value{value.data(),
+                               static_cast<int64_t>(value.size())};
+      NANOARROW_THROW_NOT_OK(ArrowArrayAppendBytes(array, na_value));
+    }
+  }
+
+  NANOARROW_THROW_NOT_OK(ArrowArrayFinishBuildingDefault(array, nullptr));
+}
+
 using s2geography::geoarrow::Reader;
 
 TEST(GeoArrow, GeoArrowVersionTest) {
@@ -55,6 +76,25 @@ TEST(GeoArrow, GeoArrowReaderReadWKTPoint) {
   ASSERT_EQ(result.size(), 1);
   EXPECT_EQ(result[0]->Shape(0)->edge(0).v0,
             S2LatLng::FromDegrees(1, 0).ToPoint());
+}
+
+TEST(GeoArrow, GeoArrowReaderReadWKBPoint) {
+  Reader reader;
+  nanoarrow::UniqueSchema schema;
+  nanoarrow::UniqueArray array;
+  std::vector<std::unique_ptr<s2geography::Geography>> result;
+
+  InitSchemaWKB(schema.get());
+  InitArrayWKB(array.get(), {{0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+                              0x00, 0x00, 0x00, 0x00, 0x3e, 0x40, 0x00,
+                              0x00, 0x00, 0x00, 0x00, 0x00, 0x24, 0x40}});
+
+  reader.Init(schema.get());
+  reader.ReadGeography(array.get(), 0, array->length, &result);
+  EXPECT_EQ(result[0]->dimension(), 0);
+  ASSERT_EQ(result.size(), 1);
+  EXPECT_EQ(result[0]->Shape(0)->edge(0).v0,
+            S2LatLng::FromDegrees(10, 30).ToPoint());
 }
 
 TEST(GeoArrow, GeoArrowReaderReadWKTLinestring) {

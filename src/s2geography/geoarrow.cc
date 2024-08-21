@@ -570,7 +570,7 @@ class ReaderImpl {
         code = VisitWKT(offset, length);
         break;
       case GEOARROW_TYPE_WKB:
-        code = ENOTSUP;
+        code = VisitWKB(offset, length);
         break;
       default:
         code = GeoArrowArrayViewVisit(&array_view_, offset, length, &visitor_);
@@ -602,6 +602,27 @@ class ReaderImpl {
         item.data = data + offsets[offset + i];
         GEOARROW_RETURN_NOT_OK(
             GeoArrowWKTReaderVisit(&wkt_reader_, item, &visitor_));
+      }
+
+      return GEOARROW_OK;
+    } else {
+      return ENOTSUP;
+    }
+  }
+
+  int VisitWKB(int64_t offset, int64_t length) {
+    offset += array_view_.offset[0];
+    const uint8_t* validity = array_view_.validity_bitmap;
+    const int32_t* offsets = array_view_.offsets[0];
+    const uint8_t* data = array_view_.data;
+    GeoArrowBufferView item;
+
+    if (validity == nullptr) {
+      for (int64_t i = 0; i < length; i++) {
+        item.size_bytes = offsets[offset + i + 1] - offsets[offset + i];
+        item.data = data + offsets[offset + i];
+        GEOARROW_RETURN_NOT_OK(
+            GeoArrowWKBReaderVisit(&wkb_reader_, item, &visitor_));
       }
 
       return GEOARROW_OK;
