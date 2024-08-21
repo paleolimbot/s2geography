@@ -51,7 +51,50 @@ TEST(GeoArrow, GeoArrowReaderReadWKTPoint) {
 
   reader.Init(schema.get());
   reader.ReadGeography(array.get(), 0, array->length, &result);
-  EXPECT_EQ(result.size(), 1);
+  EXPECT_EQ(result[0]->dimension(), 0);
+  ASSERT_EQ(result.size(), 1);
   EXPECT_EQ(result[0]->Shape(0)->edge(0).v0,
             S2LatLng::FromDegrees(1, 0).ToPoint());
+}
+
+TEST(GeoArrow, GeoArrowReaderReadWKTLinestring) {
+  Reader reader;
+  nanoarrow::UniqueSchema schema;
+  nanoarrow::UniqueArray array;
+  std::vector<std::unique_ptr<s2geography::Geography>> result;
+
+  InitSchemaWKT(schema.get());
+  InitArrayWKT(array.get(), {"LINESTRING (0 1, 2 3)"});
+
+  reader.Init(schema.get());
+  reader.ReadGeography(array.get(), 0, array->length, &result);
+  EXPECT_EQ(result[0]->dimension(), 1);
+  ASSERT_EQ(result.size(), 1);
+  auto shape = result[0]->Shape(0);
+  ASSERT_EQ(shape->num_edges(), 1);
+  EXPECT_EQ(shape->edge(0).v0, S2LatLng::FromDegrees(1, 0).ToPoint());
+  EXPECT_EQ(shape->edge(0).v1, S2LatLng::FromDegrees(3, 2).ToPoint());
+}
+
+TEST(GeoArrow, GeoArrowReaderReadWKTPolygon) {
+  Reader reader;
+  nanoarrow::UniqueSchema schema;
+  nanoarrow::UniqueArray array;
+  std::vector<std::unique_ptr<s2geography::Geography>> result;
+
+  InitSchemaWKT(schema.get());
+  InitArrayWKT(array.get(), {"POLYGON ((0 0, 1 0, 0 1, 0 0))"});
+
+  reader.Init(schema.get());
+  reader.ReadGeography(array.get(), 0, array->length, &result);
+  EXPECT_EQ(result[0]->dimension(), 2);
+  ASSERT_EQ(result.size(), 1);
+  auto shape = result[0]->Shape(0);
+  ASSERT_EQ(shape->num_edges(), 3);
+  EXPECT_EQ(shape->edge(0).v0, S2LatLng::FromDegrees(0, 0).ToPoint());
+  EXPECT_EQ(shape->edge(0).v1, S2LatLng::FromDegrees(0, 1).ToPoint());
+  EXPECT_EQ(shape->edge(1).v0, S2LatLng::FromDegrees(0, 1).ToPoint());
+  EXPECT_EQ(shape->edge(1).v1, S2LatLng::FromDegrees(1, 0).ToPoint());
+  EXPECT_EQ(shape->edge(2).v0, S2LatLng::FromDegrees(1, 0).ToPoint());
+  EXPECT_EQ(shape->edge(2).v1, S2LatLng::FromDegrees(0, 0).ToPoint());
 }
