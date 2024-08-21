@@ -203,12 +203,12 @@ endif()
 
 # Build geoarrow
 # --------------
-add_library(geoarrow STATIC
+add_library(s2geography_geoarrow STATIC
     src/geoarrow/geoarrow.c
     src/geoarrow/d2s.c
     src/geoarrow/double_parse_fast_float.cc)
 
-target_include_directories(geoarrow PRIVATE src/geoarrow)
+target_include_directories(s2geography_geoarrow PRIVATE src/geoarrow)
 
 # Build s2geography
 # -----------------
@@ -243,7 +243,9 @@ target_link_libraries(
   PUBLIC
   s2::s2
   absl::memory
-  absl::str_format PRIVATE geoarrow)
+  absl::str_format
+  PRIVATE
+  s2geography_geoarrow)
 
 if(S2GEOGRAPHY_BUILD_TESTS)
 
@@ -260,7 +262,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   endif()
 
   target_link_libraries(distance_test s2geography GTest::gtest_main)
-  target_link_libraries(geoarrow_test s2geography nanoarrow geoarrow GTest::gtest_main)
+  target_link_libraries(geoarrow_test s2geography nanoarrow s2geography_geoarrow GTest::gtest_main)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
 
   include(GoogleTest)
@@ -288,7 +290,7 @@ message("  -> libs: " ${CMAKE_INSTALL_LIBDIR})
 message("  -> includes: " ${CMAKE_INSTALL_INCLUDEDIR})
 message("  -> cmake config: " ${CMAKECONFIG_INSTALL_DIR})
 
-install(TARGETS s2geography
+install(TARGETS s2geography s2geography_geoarrow
   EXPORT ${PROJECT_NAME}-targets
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
