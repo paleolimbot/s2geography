@@ -18,6 +18,47 @@ S2::Projection* lnglat() {
   return &projection;
 }
 
+// This should really be in nanoarrow or geoarrow
+// https://github.com/geoarrow/geoarrow-c-geos/blob/33ad0ba21c76c09e9d72fc4e4ae0b9ff9da61848/src/geoarrow_geos/geoarrow_geos.c#L323-L360
+struct GeoArrowBitmapReader {
+  const uint8_t* bits;
+  int64_t byte_i;
+  int bit_i;
+  uint8_t byte;
+};
+
+static inline void GeoArrowBitmapReaderInit(
+    struct GeoArrowBitmapReader* bitmap_reader, const uint8_t* bits,
+    int64_t offset) {
+  std::memset(bitmap_reader, 0, sizeof(struct GeoArrowBitmapReader));
+  bitmap_reader->bits = bits;
+
+  if (bits != NULL) {
+    bitmap_reader->byte_i = offset / 8;
+    bitmap_reader->bit_i = offset % 8;
+    if (bitmap_reader->bit_i == 0) {
+      bitmap_reader->bit_i = 7;
+      bitmap_reader->byte_i--;
+    } else {
+      bitmap_reader->bit_i--;
+    }
+  }
+}
+
+static inline int8_t GeoArrowBitmapReaderNextIsNull(
+    struct GeoArrowBitmapReader* bitmap_reader) {
+  if (bitmap_reader->bits == NULL) {
+    return 0;
+  }
+
+  if (++bitmap_reader->bit_i == 8) {
+    bitmap_reader->byte = bitmap_reader->bits[++bitmap_reader->byte_i];
+    bitmap_reader->bit_i = 0;
+  }
+
+  return (bitmap_reader->byte & (1 << bitmap_reader->bit_i)) == 0;
+}
+
 class Constructor {
  public:
   Constructor(const ImportOptions& options) : options_(options) {
@@ -32,6 +73,7 @@ class Constructor {
   void InitVisitor(GeoArrowVisitor* v) {
     v->feat_start = &CFeatStart;
     v->feat_end = &CFeatEnd;
+    v->null_feat = &CNullFeat;
     v->geom_start = &CGeomStart;
     v->geom_end = &CGeomEnd;
     v->ring_start = &CRingStart;
@@ -488,16 +530,28 @@ class FeatureConstructor : public CollectionConstructor {
     active_constructor_ = nullptr;
     level_ = 0;
     features_.clear();
+    feat_null_ = false;
     geom_start(GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION, 1);
     return GEOARROW_OK;
   }
 
+  GeoArrowErrorCode null_feat() override {
+    feat_null_ = true;
+    return GEOARROW_OK;
+  }
+
   GeoArrowErrorCode feat_end() override {
-    out_->push_back(finish_feature());
+    if (feat_null_) {
+      out_->push_back(std::unique_ptr<Geography>(nullptr));
+    } else {
+      out_->push_back(finish_feature());
+    }
+
     return GEOARROW_OK;
   }
 
  private:
+  bool feat_null_;
   std::vector<std::unique_ptr<Geography>>* out_;
 
   std::unique_ptr<Geography> finish_feature() {
@@ -596,18 +650,23 @@ class ReaderImpl {
     const char* data = reinterpret_cast<const char*>(array_view_.data);
     GeoArrowStringView item;
 
-    if (validity == nullptr) {
-      for (int64_t i = 0; i < length; i++) {
+    GeoArrowBitmapReader bitmap;
+    GeoArrowBitmapReaderInit(&bitmap, validity, offset);
+
+    for (int64_t i = 0; i < length; i++) {
+      if (GeoArrowBitmapReaderNextIsNull(&bitmap)) {
+        GEOARROW_RETURN_NOT_OK(visitor_.feat_start(&visitor_));
+        GEOARROW_RETURN_NOT_OK(visitor_.null_feat(&visitor_));
+        GEOARROW_RETURN_NOT_OK(visitor_.feat_end(&visitor_));
+      } else {
         item.size_bytes = offsets[offset + i + 1] - offsets[offset + i];
         item.data = data + offsets[offset + i];
         GEOARROW_RETURN_NOT_OK(
             GeoArrowWKTReaderVisit(&wkt_reader_, item, &visitor_));
       }
-
-      return GEOARROW_OK;
-    } else {
-      return ENOTSUP;
     }
+
+    return GEOARROW_OK;
   }
 
   int VisitWKB(int64_t offset, int64_t length) {
@@ -617,18 +676,23 @@ class ReaderImpl {
     const uint8_t* data = array_view_.data;
     GeoArrowBufferView item;
 
-    if (validity == nullptr) {
-      for (int64_t i = 0; i < length; i++) {
+    GeoArrowBitmapReader bitmap;
+    GeoArrowBitmapReaderInit(&bitmap, validity, offset);
+
+    for (int64_t i = 0; i < length; i++) {
+      if (GeoArrowBitmapReaderNextIsNull(&bitmap)) {
+        GEOARROW_RETURN_NOT_OK(visitor_.feat_start(&visitor_));
+        GEOARROW_RETURN_NOT_OK(visitor_.null_feat(&visitor_));
+        GEOARROW_RETURN_NOT_OK(visitor_.feat_end(&visitor_));
+      } else {
         item.size_bytes = offsets[offset + i + 1] - offsets[offset + i];
         item.data = data + offsets[offset + i];
         GEOARROW_RETURN_NOT_OK(
             GeoArrowWKBReaderVisit(&wkb_reader_, item, &visitor_));
       }
-
-      return GEOARROW_OK;
-    } else {
-      return ENOTSUP;
     }
+
+    return GEOARROW_OK;
   }
 
   void ThrowNotOk(int code) {

@@ -90,14 +90,15 @@ TEST(GeoArrow, GeoArrowReaderReadWKTPoint) {
   std::vector<std::unique_ptr<s2geography::Geography>> result;
 
   InitSchemaWKT(schema.get());
-  InitArrayWKT(array.get(), {"POINT (0 1)"});
+  InitArrayWKT(array.get(), {"POINT (0 1)", {}});
 
   reader.Init(schema.get());
   reader.ReadGeography(array.get(), 0, array->length, &result);
   EXPECT_EQ(result[0]->dimension(), 0);
-  ASSERT_EQ(result.size(), 1);
+  ASSERT_EQ(result.size(), 2);
   EXPECT_EQ(result[0]->Shape(0)->edge(0).v0,
             S2LatLng::FromDegrees(1, 0).ToPoint());
+  EXPECT_EQ(result[1].get(), nullptr);
 }
 
 TEST(GeoArrow, GeoArrowReaderReadWKBPoint) {
@@ -109,14 +110,16 @@ TEST(GeoArrow, GeoArrowReaderReadWKBPoint) {
   InitSchemaWKB(schema.get());
   InitArrayWKB(array.get(), {{0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
                               0x00, 0x00, 0x00, 0x00, 0x3e, 0x40, 0x00,
-                              0x00, 0x00, 0x00, 0x00, 0x00, 0x24, 0x40}});
+                              0x00, 0x00, 0x00, 0x00, 0x00, 0x24, 0x40},
+                             {}});
 
   reader.Init(schema.get());
   reader.ReadGeography(array.get(), 0, array->length, &result);
   EXPECT_EQ(result[0]->dimension(), 0);
-  ASSERT_EQ(result.size(), 1);
+  ASSERT_EQ(result.size(), 2);
   EXPECT_EQ(result[0]->Shape(0)->edge(0).v0,
             S2LatLng::FromDegrees(10, 30).ToPoint());
+  EXPECT_EQ(result[1].get(), nullptr);
 }
 
 TEST(GeoArrow, GeoArrowReaderReadGeoArrow) {
