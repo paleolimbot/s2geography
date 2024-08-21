@@ -23,18 +23,19 @@ std::unique_ptr<Geography> WKTReader::read_feature(const char* text,
 
   int32_t offsets[] = {0, static_cast<int32_t>(size)};
   const void* buffers[] = {nullptr, offsets, text};
-  ArrowArray array{.length = 1,
-                   .null_count = 0,
-                   .offset = 0,
+  ArrowArray array;
+  array.length = 1;
+  array.null_count = 0;
+  array.offset = 0;
 
-                   .n_buffers = 3,
-                   .n_children = 0,
-                   .buffers = buffers,
+  array.n_buffers = 3;
+  array.n_children = 0;
+  array.buffers = buffers;
 
-                   .children = nullptr,
-                   .dictionary = nullptr,
-                   .release = [](ArrowArray*) -> void {},
-                   .private_data = nullptr};
+  array.children = nullptr;
+  array.dictionary = nullptr;
+  array.release = [](ArrowArray*) -> void {};
+  array.private_data = nullptr;
 
   out_.clear();
   reader_->ReadGeography(&array, 0, 1, &out_);
