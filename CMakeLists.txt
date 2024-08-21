@@ -209,6 +209,12 @@ add_library(s2geography_geoarrow STATIC
     src/geoarrow/double_parse_fast_float.cc)
 
 target_include_directories(s2geography_geoarrow PRIVATE src/geoarrow)
+target_compile_definitions(
+  s2geography_geoarrow
+  PRIVATE
+  GEOARROW_USE_FAST_FLOAT=1
+  GEOARROW_USE_RYU=1
+  GEOARROW_NAMESPACE=S2Geography)
 
 # Build s2geography
 # -----------------
