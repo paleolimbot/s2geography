@@ -48,6 +48,28 @@ void InitArrayWKB(ArrowArray* array, std::vector<std::vector<uint8_t>> values) {
   NANOARROW_THROW_NOT_OK(ArrowArrayFinishBuildingDefault(array, nullptr));
 }
 
+void InitSchemaGeoArrowPoint(ArrowSchema* schema) {
+  NANOARROW_THROW_NOT_OK(
+      GeoArrowSchemaInitExtension(schema, GEOARROW_TYPE_POINT));
+}
+
+void InitArrayGeoArrowPoint(ArrowArray* array, std::vector<double> x,
+                            std::vector<double> y) {
+  NANOARROW_DCHECK(x.size() == y.size());
+  NANOARROW_THROW_NOT_OK(ArrowArrayInitFromType(array, NANOARROW_TYPE_STRUCT));
+  NANOARROW_THROW_NOT_OK(ArrowArrayAllocateChildren(array, 2));
+  NANOARROW_THROW_NOT_OK(
+      ArrowArrayInitFromType(array->children[0], NANOARROW_TYPE_DOUBLE));
+  NANOARROW_THROW_NOT_OK(
+      ArrowArrayInitFromType(array->children[1], NANOARROW_TYPE_DOUBLE));
+  nanoarrow::BufferInitSequence(ArrowArrayBuffer(array->children[0], 1), x);
+  nanoarrow::BufferInitSequence(ArrowArrayBuffer(array->children[1], 1), y);
+  array->length = x.size();
+  array->children[0]->length = y.size();
+  array->children[1]->length = y.size();
+  NANOARROW_THROW_NOT_OK(ArrowArrayFinishBuildingDefault(array, nullptr));
+}
+
 using s2geography::geoarrow::Reader;
 
 TEST(GeoArrow, GeoArrowVersionTest) {
@@ -95,6 +117,25 @@ TEST(GeoArrow, GeoArrowReaderReadWKBPoint) {
   ASSERT_EQ(result.size(), 1);
   EXPECT_EQ(result[0]->Shape(0)->edge(0).v0,
             S2LatLng::FromDegrees(10, 30).ToPoint());
+}
+
+TEST(GeoArrow, GeoArrowReaderReadGeoArrow) {
+  Reader reader;
+  nanoarrow::UniqueSchema schema;
+  nanoarrow::UniqueArray array;
+  std::vector<std::unique_ptr<s2geography::Geography>> result;
+
+  InitSchemaGeoArrowPoint(schema.get());
+  InitArrayGeoArrowPoint(array.get(), {30, 40}, {10, 20});
+
+  reader.Init(schema.get());
+  reader.ReadGeography(array.get(), 0, array->length, &result);
+  EXPECT_EQ(result[0]->dimension(), 0);
+  ASSERT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0]->Shape(0)->edge(0).v0,
+            S2LatLng::FromDegrees(10, 30).ToPoint());
+  EXPECT_EQ(result[1]->Shape(0)->edge(0).v0,
+            S2LatLng::FromDegrees(20, 40).ToPoint());
 }
 
 TEST(GeoArrow, GeoArrowReaderReadWKTLinestring) {
