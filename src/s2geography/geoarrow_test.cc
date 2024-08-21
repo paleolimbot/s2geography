@@ -98,3 +98,31 @@ TEST(GeoArrow, GeoArrowReaderReadWKTPolygon) {
   EXPECT_EQ(shape->edge(2).v0, S2LatLng::FromDegrees(1, 0).ToPoint());
   EXPECT_EQ(shape->edge(2).v1, S2LatLng::FromDegrees(0, 0).ToPoint());
 }
+
+TEST(GeoArrow, GeoArrowReaderReadWKTCollection) {
+  Reader reader;
+  nanoarrow::UniqueSchema schema;
+  nanoarrow::UniqueArray array;
+  std::vector<std::unique_ptr<s2geography::Geography>> result;
+
+  InitSchemaWKT(schema.get());
+  InitArrayWKT(array.get(),
+               {"GEOMETRYCOLLECTION (POINT (0 1), LINESTRING (0 1, 2 3))"});
+
+  reader.Init(schema.get());
+  reader.ReadGeography(array.get(), 0, array->length, &result);
+  EXPECT_EQ(result[0]->dimension(), -1);
+  ASSERT_EQ(result.size(), 1);
+  ASSERT_EQ(result[0]->num_shapes(), 2);
+
+  auto point = result[0]->Shape(0);
+  ASSERT_EQ(point->dimension(), 0);
+  ASSERT_EQ(point->num_edges(), 1);
+  EXPECT_EQ(point->edge(0).v0, S2LatLng::FromDegrees(1, 0).ToPoint());
+
+  auto linestring = result[0]->Shape(1);
+  ASSERT_EQ(linestring->dimension(), 1);
+  ASSERT_EQ(linestring->num_edges(), 1);
+  EXPECT_EQ(linestring->edge(0).v0, S2LatLng::FromDegrees(1, 0).ToPoint());
+  EXPECT_EQ(linestring->edge(0).v1, S2LatLng::FromDegrees(3, 2).ToPoint());
+}
