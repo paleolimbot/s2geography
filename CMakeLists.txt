@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.14)
 
 project(s2geography
-  LANGUAGES CXX
+  LANGUAGES CXX C
   VERSION 0.2.0)
 
 include(FetchContent)
@@ -187,10 +187,34 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   # do not install googletest by default when running cmake --install
   set_property(DIRECTORY ${googletest_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
 
+  # For testing GeoArrow
+  FetchContent_Declare(
+    nanoarrow
+    URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.5.0.zip
+    URL_HASH
+      SHA256=cadbca542806a7554830cbca0393cda3470bdca6d0ce29b5e115b168c6c0b435)
+
+  FetchContent_MakeAvailable(nanoarrow)
+
   if(S2GEOGRAPHY_CODE_COVERAGE)
     add_library(coverage_config INTERFACE)
   endif()
 endif()
+
+# Build geoarrow
+# --------------
+add_library(s2geography_geoarrow STATIC
+    src/vendored/geoarrow/geoarrow.c
+    src/vendored/ryu/d2s.c
+    src/vendored/geoarrow/double_parse_fast_float.cc)
+
+target_include_directories(s2geography_geoarrow PRIVATE src/vendored)
+target_compile_definitions(
+  s2geography_geoarrow
+  PRIVATE
+  GEOARROW_USE_FAST_FLOAT=1
+  GEOARROW_USE_RYU=1
+  GEOARROW_NAMESPACE=S2Geography)
 
 # Build s2geography
 # -----------------
@@ -206,11 +230,14 @@ add_library(s2geography
     src/s2geography/predicates.cc
     src/s2geography/build.cc
     src/s2geography/geography.cc
+    src/s2geography/geoarrow.cc
     src/s2geography/wkt-reader.cc
     src/s2geography/wkt-writer.cc)
 
 set_target_properties(s2geography PROPERTIES
     POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+
+target_include_directories(s2geography PRIVATE src/vendored)
 
 target_compile_definitions(
   s2geography
@@ -221,28 +248,34 @@ target_compile_definitions(
 
 target_link_libraries(
   s2geography
+  PUBLIC
   s2::s2
   absl::memory
-  absl::str_format)
+  absl::str_format
+  PRIVATE
+  s2geography_geoarrow)
 
 if(S2GEOGRAPHY_BUILD_TESTS)
 
   enable_testing()
 
   add_executable(distance_test src/s2geography/distance_test.cc)
+  add_executable(geoarrow_test src/s2geography/geoarrow_test.cc)
   add_executable(wkt_writer_test src/s2geography/wkt-writer_test.cc)
 
   if (S2GEOGRAPHY_CODE_COVERAGE)
     target_compile_options(coverage_config INTERFACE -O0 -g --coverage)
     target_link_options(coverage_config INTERFACE --coverage)
-    target_link_libraries(s2geography coverage_config)
+    target_link_libraries(s2geography PUBLIC coverage_config)
   endif()
 
   target_link_libraries(distance_test s2geography GTest::gtest_main)
+  target_link_libraries(geoarrow_test s2geography nanoarrow GTest::gtest_main)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
 
   include(GoogleTest)
   gtest_discover_tests(distance_test)
+  gtest_discover_tests(geoarrow_test)
   gtest_discover_tests(wkt_writer_test)
 endif()
 
@@ -265,7 +298,7 @@ message("  -> libs: " ${CMAKE_INSTALL_LIBDIR})
 message("  -> includes: " ${CMAKE_INSTALL_INCLUDEDIR})
 message("  -> cmake config: " ${CMAKECONFIG_INSTALL_DIR})
 
-install(TARGETS s2geography
+install(TARGETS s2geography s2geography_geoarrow
   EXPORT ${PROJECT_NAME}-targets
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"

@@ -8,6 +8,8 @@ Google's [s2geometry](https://github.com/google/s2geometry) is a spherical geome
 
 The s2geography library was refactored out of the [s2 package for R](https://github.com/r-spatial/s2), which has served as the backend for geometries with geographic coordinates in the popular [sf package for R](https://github.com/r-spatial/sf) since version 1.0.0. The library is currently under construction as it adapts to suit the needs of more than just a single R package. Suggestions to modify, replace, or completely rewrite this library are welcome!
 
+This library uses [geoarrow-c](https://github.com/geoarrow/geoarrow-c) for IO to/from WKT, WKB, and GeoArrow, [fast_float](https://github.com/fastfloat/fast_float) for text-to-double conversion, and [GEOS' modification](https://github.com/libgeos/geos/tree/e8028977055522fd103d06d75e1e2940ae52bfc3/src/deps/ryu) of [ryu](https://github.com/ulfjack/ryu/) for double-to-text conversion.
+
 ## Example
 
 A quick example (see also the `examples/` directory):
@@ -101,7 +103,7 @@ The CMake option `S2GEOGRAPHY_S2_SOURCE` specifies the method to use for acquiri
 
 Note: s2geography does not support automatically acquiring and building Abseil and OpenSSL from source. If you don't have installed those libraries with conda or Homebrew, you might need to manually specify their location using the CMake options`absl_DIR` and `OPENSSL_ROOT_DIR`.
 
-The CMake option `CMAKE_CXX_STANDARD` should be set according to the standard used to build Abseil and s2geometry (C++17 is set by default). 
+The CMake option `CMAKE_CXX_STANDARD` should be set according to the standard used to build Abseil and s2geometry (C++17 is set by default).
 
 The project is structured such that the VSCode CMake integration is triggered when the folder is open (if the default build doesn't work, consider adding `CMakeUserPresets.json` to configure things like the install directory, absl_DIR, or the location of OpenSSL).
 
