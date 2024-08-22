@@ -1,4 +1,6 @@
 
+#include <sstream>
+
 #include "geoarrow/geoarrow.h"
 
 #include "s2/s1angle.h"
