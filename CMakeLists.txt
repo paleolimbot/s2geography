@@ -204,11 +204,11 @@ endif()
 # Build geoarrow
 # --------------
 add_library(s2geography_geoarrow STATIC
-    src/geoarrow/geoarrow.c
-    src/geoarrow/d2s.c
-    src/geoarrow/double_parse_fast_float.cc)
+    src/vendored/geoarrow/geoarrow.c
+    src/vendored/geoarrow/d2s.c
+    src/vendored/geoarrow/double_parse_fast_float.cc)
 
-target_include_directories(s2geography_geoarrow PRIVATE src/geoarrow)
+target_include_directories(s2geography_geoarrow PRIVATE src/vendored)
 target_compile_definitions(
   s2geography_geoarrow
   PRIVATE
@@ -236,6 +236,8 @@ add_library(s2geography
 
 set_target_properties(s2geography PROPERTIES
     POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+
+target_include_directories(s2geography PRIVATE src/vendored)
 
 target_compile_definitions(
   s2geography
@@ -268,7 +270,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   endif()
 
   target_link_libraries(distance_test s2geography GTest::gtest_main)
-  target_link_libraries(geoarrow_test s2geography nanoarrow s2geography_geoarrow GTest::gtest_main)
+  target_link_libraries(geoarrow_test s2geography nanoarrow GTest::gtest_main)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
 
   include(GoogleTest)

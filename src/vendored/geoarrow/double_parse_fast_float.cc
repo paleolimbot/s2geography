@@ -3,7 +3,7 @@
 
 #if defined(GEOARROW_USE_FAST_FLOAT) && GEOARROW_USE_FAST_FLOAT
 
-#include "fast_float.h"
+#include "fast_float/fast_float.h"
 
 extern "C" GeoArrowErrorCode GeoArrowFromChars(const char* first, const char* last,
                                                double* out) {

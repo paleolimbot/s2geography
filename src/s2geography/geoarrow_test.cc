@@ -1,15 +1,8 @@
 
-#include "geoarrow/geoarrow.h"
-
 #include <gtest/gtest.h>
 
 #include "nanoarrow/nanoarrow.hpp"
 #include "s2geography.h"
-
-void InitSchemaWKT(ArrowSchema* schema) {
-  NANOARROW_THROW_NOT_OK(
-      GeoArrowSchemaInitExtension(schema, GEOARROW_TYPE_WKT));
-}
 
 void InitArrayWKT(ArrowArray* array, std::vector<std::string> values) {
   NANOARROW_THROW_NOT_OK(ArrowArrayInitFromType(array, NANOARROW_TYPE_STRING));
@@ -25,11 +18,6 @@ void InitArrayWKT(ArrowArray* array, std::vector<std::string> values) {
   }
 
   NANOARROW_THROW_NOT_OK(ArrowArrayFinishBuildingDefault(array, nullptr));
-}
-
-void InitSchemaWKB(ArrowSchema* schema) {
-  NANOARROW_THROW_NOT_OK(
-      GeoArrowSchemaInitExtension(schema, GEOARROW_TYPE_WKB));
 }
 
 void InitArrayWKB(ArrowArray* array, std::vector<std::vector<uint8_t>> values) {
@@ -49,8 +37,22 @@ void InitArrayWKB(ArrowArray* array, std::vector<std::vector<uint8_t>> values) {
 }
 
 void InitSchemaGeoArrowPoint(ArrowSchema* schema) {
+  ArrowSchemaInit(schema);
+  NANOARROW_THROW_NOT_OK(ArrowSchemaSetTypeStruct(schema, 2));
+  NANOARROW_THROW_NOT_OK(ArrowSchemaSetName(schema->children[0], "x"));
   NANOARROW_THROW_NOT_OK(
-      GeoArrowSchemaInitExtension(schema, GEOARROW_TYPE_POINT));
+      ArrowSchemaSetType(schema->children[0], NANOARROW_TYPE_DOUBLE));
+  NANOARROW_THROW_NOT_OK(ArrowSchemaSetName(schema->children[1], "y"));
+  NANOARROW_THROW_NOT_OK(
+      ArrowSchemaSetType(schema->children[1], NANOARROW_TYPE_DOUBLE));
+
+  nanoarrow::UniqueBuffer buffer;
+  NANOARROW_THROW_NOT_OK(ArrowMetadataBuilderInit(buffer.get(), nullptr));
+  NANOARROW_THROW_NOT_OK(ArrowMetadataBuilderAppend(
+      buffer.get(), ArrowCharView("ARROW:extension:name"),
+      ArrowCharView("geoarrow.point")));
+  NANOARROW_THROW_NOT_OK(ArrowSchemaSetMetadata(
+      schema, reinterpret_cast<const char*>(buffer->data)));
 }
 
 void InitArrayGeoArrowPoint(ArrowArray* array, std::vector<double> x,
@@ -85,14 +87,12 @@ TEST(GeoArrow, GeoArrowReaderErrorOnInit) {
 
 TEST(GeoArrow, GeoArrowReaderReadWKTPoint) {
   Reader reader;
-  nanoarrow::UniqueSchema schema;
   nanoarrow::UniqueArray array;
   std::vector<std::unique_ptr<s2geography::Geography>> result;
 
-  InitSchemaWKT(schema.get());
   InitArrayWKT(array.get(), {"POINT (0 1)", {}});
 
-  reader.Init(schema.get());
+  reader.Init(Reader::InputType::kWKT, s2geography::geoarrow::ImportOptions());
   reader.ReadGeography(array.get(), 0, array->length, &result);
   EXPECT_EQ(result[0]->dimension(), 0);
   ASSERT_EQ(result.size(), 2);
@@ -103,17 +103,15 @@ TEST(GeoArrow, GeoArrowReaderReadWKTPoint) {
 
 TEST(GeoArrow, GeoArrowReaderReadWKBPoint) {
   Reader reader;
-  nanoarrow::UniqueSchema schema;
   nanoarrow::UniqueArray array;
   std::vector<std::unique_ptr<s2geography::Geography>> result;
 
-  InitSchemaWKB(schema.get());
+  reader.Init(Reader::InputType::kWKB, s2geography::geoarrow::ImportOptions());
   InitArrayWKB(array.get(), {{0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
                               0x00, 0x00, 0x00, 0x00, 0x3e, 0x40, 0x00,
                               0x00, 0x00, 0x00, 0x00, 0x00, 0x24, 0x40},
                              {}});
 
-  reader.Init(schema.get());
   reader.ReadGeography(array.get(), 0, array->length, &result);
   EXPECT_EQ(result[0]->dimension(), 0);
   ASSERT_EQ(result.size(), 2);
@@ -143,14 +141,12 @@ TEST(GeoArrow, GeoArrowReaderReadGeoArrow) {
 
 TEST(GeoArrow, GeoArrowReaderReadWKTLinestring) {
   Reader reader;
-  nanoarrow::UniqueSchema schema;
   nanoarrow::UniqueArray array;
   std::vector<std::unique_ptr<s2geography::Geography>> result;
 
-  InitSchemaWKT(schema.get());
   InitArrayWKT(array.get(), {"LINESTRING (0 1, 2 3)"});
 
-  reader.Init(schema.get());
+  reader.Init(Reader::InputType::kWKT, s2geography::geoarrow::ImportOptions());
   reader.ReadGeography(array.get(), 0, array->length, &result);
   EXPECT_EQ(result[0]->dimension(), 1);
   ASSERT_EQ(result.size(), 1);
@@ -162,14 +158,12 @@ TEST(GeoArrow, GeoArrowReaderReadWKTLinestring) {
 
 TEST(GeoArrow, GeoArrowReaderReadWKTPolygon) {
   Reader reader;
-  nanoarrow::UniqueSchema schema;
   nanoarrow::UniqueArray array;
   std::vector<std::unique_ptr<s2geography::Geography>> result;
 
-  InitSchemaWKT(schema.get());
   InitArrayWKT(array.get(), {"POLYGON ((0 0, 1 0, 0 1, 0 0))"});
 
-  reader.Init(schema.get());
+  reader.Init(Reader::InputType::kWKT, s2geography::geoarrow::ImportOptions());
   reader.ReadGeography(array.get(), 0, array->length, &result);
   EXPECT_EQ(result[0]->dimension(), 2);
   ASSERT_EQ(result.size(), 1);
@@ -185,15 +179,13 @@ TEST(GeoArrow, GeoArrowReaderReadWKTPolygon) {
 
 TEST(GeoArrow, GeoArrowReaderReadWKTCollection) {
   Reader reader;
-  nanoarrow::UniqueSchema schema;
   nanoarrow::UniqueArray array;
   std::vector<std::unique_ptr<s2geography::Geography>> result;
 
-  InitSchemaWKT(schema.get());
   InitArrayWKT(array.get(),
                {"GEOMETRYCOLLECTION (POINT (0 1), LINESTRING (0 1, 2 3))"});
 
-  reader.Init(schema.get());
+  reader.Init(Reader::InputType::kWKT, s2geography::geoarrow::ImportOptions());
   reader.ReadGeography(array.get(), 0, array->length, &result);
   EXPECT_EQ(result[0]->dimension(), -1);
   ASSERT_EQ(result.size(), 1);
