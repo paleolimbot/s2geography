@@ -205,7 +205,7 @@ endif()
 # --------------
 add_library(s2geography_geoarrow STATIC
     src/vendored/geoarrow/geoarrow.c
-    src/vendored/geoarrow/d2s.c
+    src/vendored/ryu/d2s.c
     src/vendored/geoarrow/double_parse_fast_float.cc)
 
 target_include_directories(s2geography_geoarrow PRIVATE src/vendored)
