@@ -212,6 +212,10 @@ add_library(s2geography
 set_target_properties(s2geography PROPERTIES
     POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
 
+target_include_directories(s2geography PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:include>)
+
 target_compile_definitions(
   s2geography
   PUBLIC
