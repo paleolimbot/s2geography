@@ -73,6 +73,7 @@ macro(find_s2 ARG)
   # an older version of s2geometry.
   find_package(s2 CONFIG QUIET)
   if(${s2_FOUND})
+    set(s2_NOALIAS_TARGET "s2::s2")
     # FIXME: until s2geometry provides the version with its cmake configuration, let's
     # hard-code the version as an hugly workaround
     extract_s2_version("0.11.1")
@@ -82,6 +83,7 @@ macro(find_s2 ARG)
   else()
     find_package(s2 MODULE ${ARG})
     if(${s2_FOUND})
+      set(s2_NOALIAS_TARGET "s2")
       add_library(s2::s2 ALIAS s2)
       # no easy way to get the actual version number but at least make it work
       # with s2geography conditional definitions.
@@ -114,13 +116,9 @@ macro(build_s2)
 
   set_property(TARGET s2 PROPERTY CXX_STANDARD ${CMAKE_CXX_STANDARD})
 
-  # this might be needed since s2geometry includes it in general
-  # but not for any target explicilty?
-  find_package(OpenSSL)
-  target_include_directories(s2 INTERFACE ${OPENSSL_INCLUDE_DIR})
-
   get_target_property(S2_VERSION_STRING s2 VERSION)
   extract_s2_version(${S2_VERSION_STRING})
+  set(s2_NOALIAS_TARGET "s2")
   add_library(s2::s2 ALIAS s2)
 endmacro()
 
@@ -128,9 +126,6 @@ if(${S2GEOGRAPHY_S2_SOURCE} STREQUAL "CONDA")
   set(S2_ROOT_DIR "$ENV{CONDA_PREFIX}")
   set(S2_SOURCE "SYSTEM")
 elseif(${S2GEOGRAPHY_S2_SOURCE} STREQUAL "BREW")
-  # required for Homebrew installed s2geometry headers to find OpenSSL headers
-  find_package(OpenSSL)
-  include_directories(${OPENSSL_INCLUDE_DIR})
   set(S2_SOURCE "SYSTEM")
 else()
   set(S2_SOURCE ${S2GEOGRAPHY_S2_SOURCE})
@@ -158,6 +153,11 @@ if (MSVC AND NOT ${S2_SOURCE} STREQUAL "BUNDLED")
   target_compile_definitions(s2::s2 INTERFACE NOMINMAX)
   target_compile_options(s2::s2 INTERFACE /J)
 endif()
+
+# this might be needed since s2geometry includes it in general
+# but not for any target explicilty?
+find_package(OpenSSL REQUIRED)
+target_include_directories(${s2_NOALIAS_TARGET} INTERFACE ${OPENSSL_INCLUDE_DIR})
 
 # --- Abseil (bundled build not supported)
 
@@ -219,8 +219,6 @@ target_compile_definitions(
 # Build s2geography
 # -----------------
 
-include_directories(src)
-
 add_library(s2geography
     src/s2geography/accessors-geog.cc
     src/s2geography/coverings.cc
@@ -237,7 +235,13 @@ add_library(s2geography
 set_target_properties(s2geography PROPERTIES
     POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
 
-target_include_directories(s2geography PRIVATE src/vendored)
+target_include_directories(
+  s2geography
+  PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:include>
+  PRIVATE
+  src/vendored)
 
 target_compile_definitions(
   s2geography
