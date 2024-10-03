@@ -1,13 +1,13 @@
 
 #include <sstream>
 
-#include "geoarrow/geoarrow.h"
-
 #include "s2/s1angle.h"
 #include "s2/s2edge_tessellator.h"
 #include "s2/s2projections.h"
 #include "s2geography/geoarrow.h"
 #include "s2geography/geography.h"
+
+#include "vendored/geoarrow/geoarrow.h"
 
 namespace s2geography {
 
@@ -591,7 +591,7 @@ class ReaderImpl {
     }
   }
 
-  void Init(const ArrowSchema* schema, const ImportOptions& options) {
+  void Init(const struct ArrowSchema* schema, const ImportOptions& options) {
     options_ = options;
 
     int code = GeoArrowArrayViewInitFromSchema(&array_view_, schema, &error_);
@@ -621,7 +621,7 @@ class ReaderImpl {
     }
   }
 
-  void ReadGeography(const ArrowArray* array, int64_t offset, int64_t length,
+  void ReadGeography(const struct ArrowArray* array, int64_t offset, int64_t length,
                      std::vector<std::unique_ptr<Geography>>* out) {
     int code = GeoArrowArrayViewSetArray(&array_view_, array, &error_);
     ThrowNotOk(code);
@@ -719,8 +719,8 @@ Reader::Reader() : impl_(new ReaderImpl()) {}
 
 Reader::~Reader() { impl_.reset(); }
 
-void Reader::Init(const ArrowSchema* schema, const ImportOptions& options) {
-  impl_->Init(schema, options);
+void Reader::Init(const void* schema, const ImportOptions& options) {
+  impl_->Init(static_cast<const struct ArrowSchema*>(schema), options);
 }
 
 void Reader::Init(InputType input_type, const ImportOptions& options) {
@@ -736,10 +736,10 @@ void Reader::Init(InputType input_type, const ImportOptions& options) {
   }
 }
 
-void Reader::ReadGeography(const ArrowArray* array, int64_t offset,
+void Reader::ReadGeography(const void* array, int64_t offset,
                            int64_t length,
                            std::vector<std::unique_ptr<Geography>>* out) {
-  impl_->ReadGeography(array, offset, length, out);
+  impl_->ReadGeography(static_cast<const struct ArrowArray*>(array), offset, length, out);
 }
 
 }  // namespace geoarrow

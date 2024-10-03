@@ -8,6 +8,8 @@
 #include "s2geography/geoarrow.h"
 #include "s2geography/geography.h"
 
+#include "vendored/geoarrow/geoarrow.h"
+
 namespace s2geography {
 
 WKTReader::WKTReader(const geoarrow::ImportOptions& options) {
