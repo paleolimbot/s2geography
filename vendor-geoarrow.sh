@@ -17,7 +17,7 @@ cmake "../${CMAKE_DIR}" \
   -DGEOARROW_BUNDLE=ON -DGEOARROW_USE_RYU=ON -DGEOARROW_USE_FAST_FLOAT=ON \
   -DGEOARROW_NAMESPACE=S2GeographyGeoArrow
 cmake --build .
-cmake --install . --prefix=../src/vendored/geoarrow
+cmake --install . --prefix=../src/s2geography/vendored/geoarrow
 popd
 
 rm geoarrow.zip

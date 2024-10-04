@@ -204,11 +204,11 @@ endif()
 # Build geoarrow
 # --------------
 add_library(s2geography_geoarrow STATIC
-    src/vendored/geoarrow/geoarrow.c
-    src/vendored/ryu/d2s.c
-    src/vendored/geoarrow/double_parse_fast_float.cc)
+    src/s2geography/vendored/geoarrow/geoarrow.c
+    src/s2geography/vendored/ryu/d2s.c
+    src/s2geography/vendored/geoarrow/double_parse_fast_float.cc)
 
-target_include_directories(s2geography_geoarrow PRIVATE src/vendored)
+target_include_directories(s2geography_geoarrow PRIVATE src/s2geography/vendored)
 target_compile_definitions(
   s2geography_geoarrow
   PRIVATE
@@ -241,7 +241,7 @@ target_include_directories(
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:include>
   PRIVATE
-  src/vendored)
+  src/s2geography/vendored)
 
 target_compile_definitions(
   s2geography

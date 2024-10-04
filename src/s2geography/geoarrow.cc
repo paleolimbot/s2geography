@@ -1,7 +1,7 @@
 
 #include <sstream>
 
-#include "geoarrow/geoarrow.h"
+#include "s2geography/vendored/geoarrow/geoarrow.h"
 
 #include "s2/s1angle.h"
 #include "s2/s2edge_tessellator.h"
