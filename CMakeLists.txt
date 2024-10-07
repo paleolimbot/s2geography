@@ -201,21 +201,6 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   endif()
 endif()
 
-# Build geoarrow
-# --------------
-add_library(s2geography_geoarrow STATIC
-    src/vendored/geoarrow/geoarrow.c
-    src/vendored/ryu/d2s.c
-    src/vendored/geoarrow/double_parse_fast_float.cc)
-
-target_include_directories(s2geography_geoarrow PRIVATE src/vendored)
-target_compile_definitions(
-  s2geography_geoarrow
-  PRIVATE
-  GEOARROW_USE_FAST_FLOAT=1
-  GEOARROW_USE_RYU=1
-  GEOARROW_NAMESPACE=S2Geography)
-
 # Build s2geography
 # -----------------
 
@@ -230,7 +215,11 @@ add_library(s2geography
     src/s2geography/geography.cc
     src/s2geography/geoarrow.cc
     src/s2geography/wkt-reader.cc
-    src/s2geography/wkt-writer.cc)
+    src/s2geography/wkt-writer.cc
+    # geoarrow sources
+    src/vendored/geoarrow/geoarrow.c
+    src/vendored/ryu/d2s.c
+    src/vendored/geoarrow/double_parse_fast_float.cc)
 
 set_target_properties(s2geography PROPERTIES
     POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
@@ -248,16 +237,18 @@ target_compile_definitions(
   PUBLIC
   S2_VERSION_MAJOR=${S2_VERSION_MAJOR}
   S2_VERSION_MINOR=${S2_VERSION_MINOR}
-  S2_VERSION_PATCH=${S2_VERSION_PATCH})
+  S2_VERSION_PATCH=${S2_VERSION_PATCH}
+  PRIVATE
+  GEOARROW_USE_FAST_FLOAT=1
+  GEOARROW_USE_RYU=1
+  GEOARROW_NAMESPACE=S2Geography)
 
 target_link_libraries(
   s2geography
   PUBLIC
   s2::s2
   absl::memory
-  absl::str_format
-  PRIVATE
-  s2geography_geoarrow)
+  absl::str_format)
 
 if(S2GEOGRAPHY_BUILD_TESTS)
 
@@ -302,7 +293,7 @@ message("  -> libs: " ${CMAKE_INSTALL_LIBDIR})
 message("  -> includes: " ${CMAKE_INSTALL_INCLUDEDIR})
 message("  -> cmake config: " ${CMAKECONFIG_INSTALL_DIR})
 
-install(TARGETS s2geography s2geography_geoarrow
+install(TARGETS s2geography
   EXPORT ${PROJECT_NAME}-targets
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
