@@ -1,4 +1,6 @@
 
+#pragma once
+
 #include "s2geography/geoarrow.h"
 #include "s2geography/geography.h"
 
