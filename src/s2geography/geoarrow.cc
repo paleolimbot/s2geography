@@ -1,12 +1,12 @@
 
+#include "s2geography/geoarrow.h"
+
 #include <sstream>
 
 #include "geoarrow/geoarrow.h"
-
 #include "s2/s1angle.h"
 #include "s2/s2edge_tessellator.h"
 #include "s2/s2projections.h"
-#include "s2geography/geoarrow.h"
 #include "s2geography/geography.h"
 
 namespace s2geography {
