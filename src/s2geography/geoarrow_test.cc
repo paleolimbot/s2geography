@@ -92,7 +92,8 @@ TEST(GeoArrow, GeoArrowReaderReadWKTPoint) {
 
   InitArrayWKT(array.get(), {"POINT (0 1)", {}});
 
-  reader.Init(Reader::InputType::kWKT, s2geography::geoarrow::ImportOptions());
+  reader.Init(Reader::InputType::kWKT,
+              s2geography::geoarrow::ImportExportOptions());
   reader.ReadGeography(array.get(), 0, array->length, &result);
   EXPECT_EQ(result[0]->dimension(), 0);
   ASSERT_EQ(result.size(), 2);
@@ -106,7 +107,8 @@ TEST(GeoArrow, GeoArrowReaderReadWKBPoint) {
   nanoarrow::UniqueArray array;
   std::vector<std::unique_ptr<s2geography::Geography>> result;
 
-  reader.Init(Reader::InputType::kWKB, s2geography::geoarrow::ImportOptions());
+  reader.Init(Reader::InputType::kWKB,
+              s2geography::geoarrow::ImportExportOptions());
   InitArrayWKB(array.get(), {{0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
                               0x00, 0x00, 0x00, 0x00, 0x3e, 0x40, 0x00,
                               0x00, 0x00, 0x00, 0x00, 0x00, 0x24, 0x40},
@@ -146,7 +148,8 @@ TEST(GeoArrow, GeoArrowReaderReadWKTLinestring) {
 
   InitArrayWKT(array.get(), {"LINESTRING (0 1, 2 3)"});
 
-  reader.Init(Reader::InputType::kWKT, s2geography::geoarrow::ImportOptions());
+  reader.Init(Reader::InputType::kWKT,
+              s2geography::geoarrow::ImportExportOptions());
   reader.ReadGeography(array.get(), 0, array->length, &result);
   EXPECT_EQ(result[0]->dimension(), 1);
   ASSERT_EQ(result.size(), 1);
@@ -163,7 +166,8 @@ TEST(GeoArrow, GeoArrowReaderReadWKTPolygon) {
 
   InitArrayWKT(array.get(), {"POLYGON ((0 0, 1 0, 0 1, 0 0))"});
 
-  reader.Init(Reader::InputType::kWKT, s2geography::geoarrow::ImportOptions());
+  reader.Init(Reader::InputType::kWKT,
+              s2geography::geoarrow::ImportExportOptions());
   reader.ReadGeography(array.get(), 0, array->length, &result);
   EXPECT_EQ(result[0]->dimension(), 2);
   ASSERT_EQ(result.size(), 1);
@@ -185,7 +189,8 @@ TEST(GeoArrow, GeoArrowReaderReadWKTCollection) {
   InitArrayWKT(array.get(),
                {"GEOMETRYCOLLECTION (POINT (0 1), LINESTRING (0 1, 2 3))"});
 
-  reader.Init(Reader::InputType::kWKT, s2geography::geoarrow::ImportOptions());
+  reader.Init(Reader::InputType::kWKT,
+              s2geography::geoarrow::ImportExportOptions());
   reader.ReadGeography(array.get(), 0, array->length, &result);
   EXPECT_EQ(result[0]->dimension(), -1);
   ASSERT_EQ(result.size(), 1);
