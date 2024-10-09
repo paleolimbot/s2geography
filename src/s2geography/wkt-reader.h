@@ -8,8 +8,8 @@ namespace s2geography {
 
 class WKTReader {
  public:
-  WKTReader() : WKTReader(geoarrow::ImportOptions()) {}
-  WKTReader(const geoarrow::ImportOptions& options);
+  WKTReader() : WKTReader(geoarrow::ImportExportOptions()) {}
+  WKTReader(const geoarrow::ImportExportOptions& options);
   std::unique_ptr<Geography> read_feature(const char* text, int64_t size);
   std::unique_ptr<Geography> read_feature(const char* text);
   std::unique_ptr<Geography> read_feature(const std::string& str);

@@ -10,7 +10,7 @@
 
 namespace s2geography {
 
-WKTReader::WKTReader(const geoarrow::ImportOptions& options) {
+WKTReader::WKTReader(const geoarrow::ImportExportOptions& options) {
   reader_ = absl::make_unique<geoarrow::Reader>();
   reader_->Init(geoarrow::Reader::InputType::kWKT, options);
 }

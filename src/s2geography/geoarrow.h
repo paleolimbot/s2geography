@@ -18,10 +18,10 @@ const char* version();
 
 S2::Projection* lnglat();
 
-/// \brief Options used to build Geography objects from GeoArrow arrays
-class ImportOptions {
+/// \brief Options used to import/export Geography objects from/to GeoArrow arrays
+class ImportExportOptions {
  public:
-  ImportOptions()
+  ImportExportOptions()
       : oriented_(false),
         check_(true),
         projection_(lnglat()),
@@ -52,17 +52,32 @@ class Reader {
   Reader();
   ~Reader();
 
-  void Init(const ArrowSchema* schema) { Init(schema, ImportOptions()); }
+  void Init(const ArrowSchema* schema) { Init(schema, ImportExportOptions()); }
 
-  void Init(const ArrowSchema* schema, const ImportOptions& options);
+  void Init(const ArrowSchema* schema, const ImportExportOptions& options);
 
-  void Init(InputType input_type, const ImportOptions& options);
+  void Init(InputType input_type, const ImportExportOptions& options);
 
   void ReadGeography(const ArrowArray* array, int64_t offset, int64_t length,
                      std::vector<std::unique_ptr<Geography>>* out);
 
  private:
   std::unique_ptr<ReaderImpl> impl_;
+};
+
+class WriterImpl;
+
+class Writer {
+  public:
+  enum class OutputType { kWKT, kWKB };
+
+  Writer();
+  ~Writer();
+
+  void Init(const ArrowSchema* schema, const ImportExportOptions& options);
+
+ private:
+  std::unique_ptr<WriterImpl> impl_;
 };
 
 }  // namespace geoarrow

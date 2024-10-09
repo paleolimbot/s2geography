@@ -63,7 +63,7 @@ static inline int8_t GeoArrowBitmapReaderNextIsNull(
 
 class Constructor {
  public:
-  Constructor(const ImportOptions& options) : options_(options) {
+  Constructor(const ImportExportOptions& options) : options_(options) {
     if (options.projection() != nullptr) {
       this->tessellator_ = absl::make_unique<S2EdgeTessellator>(
           options.projection(), options.tessellate_tolerance());
@@ -121,7 +121,7 @@ class Constructor {
  protected:
   std::vector<S2Point> input_points_;
   std::vector<S2Point> points_;
-  ImportOptions options_;
+  ImportExportOptions options_;
   std::unique_ptr<S2EdgeTessellator> tessellator_;
 
   void finish_points() {
@@ -234,7 +234,7 @@ class Constructor {
 
 class PointConstructor : public Constructor {
  public:
-  PointConstructor(const ImportOptions& options) : Constructor(options) {}
+  PointConstructor(const ImportExportOptions& options) : Constructor(options) {}
 
   GeoArrowErrorCode geom_start(GeoArrowGeometryType geometry_type,
                                int64_t size) override {
@@ -297,7 +297,8 @@ class PointConstructor : public Constructor {
 
 class PolylineConstructor : public Constructor {
  public:
-  PolylineConstructor(const ImportOptions& options) : Constructor(options) {}
+  PolylineConstructor(const ImportExportOptions& options)
+      : Constructor(options) {}
 
   GeoArrowErrorCode geom_start(GeoArrowGeometryType geometry_type,
                                int64_t size) override {
@@ -357,7 +358,8 @@ class PolylineConstructor : public Constructor {
 
 class PolygonConstructor : public Constructor {
  public:
-  PolygonConstructor(const ImportOptions& options) : Constructor(options) {}
+  PolygonConstructor(const ImportExportOptions& options)
+      : Constructor(options) {}
 
   GeoArrowErrorCode ring_start(int64_t size) override {
     input_points_.clear();
@@ -424,7 +426,7 @@ class PolygonConstructor : public Constructor {
 
 class CollectionConstructor : public Constructor {
  public:
-  CollectionConstructor(const ImportOptions& options)
+  CollectionConstructor(const ImportExportOptions& options)
       : Constructor(options),
         point_constructor_(options),
         polyline_constructor_(options),
@@ -523,7 +525,7 @@ class CollectionConstructor : public Constructor {
 
 class FeatureConstructor : public CollectionConstructor {
  public:
-  FeatureConstructor(const ImportOptions& options)
+  FeatureConstructor(const ImportExportOptions& options)
       : CollectionConstructor(options) {}
 
   void SetOutput(std::vector<std::unique_ptr<Geography>>* out) { out_ = out; }
@@ -591,33 +593,35 @@ class ReaderImpl {
     }
   }
 
-  void Init(const ArrowSchema* schema, const ImportOptions& options) {
+  void Init(const ArrowSchema* schema, const ImportExportOptions& options) {
     options_ = options;
 
     int code = GeoArrowArrayViewInitFromSchema(&array_view_, schema, &error_);
     ThrowNotOk(code);
-    InitCommon();
+    code = InitCommon();
+    ThrowNotOk(code);
   }
 
-  void Init(GeoArrowType type, const ImportOptions& options) {
+  void Init(GeoArrowType type, const ImportExportOptions& options) {
     options_ = options;
 
     int code = GeoArrowArrayViewInitFromType(&array_view_, type);
     ThrowNotOk(code);
-    InitCommon();
+    code = InitCommon();
+    ThrowNotOk(code);
   }
 
-  void InitCommon() {
+  GeoArrowErrorCode InitCommon() {
     constructor_ = absl::make_unique<FeatureConstructor>(options_);
     constructor_->InitVisitor(&visitor_);
     visitor_.error = &error_;
 
     if (array_view_.schema_view.type == GEOARROW_TYPE_WKT) {
-      GeoArrowWKTReaderInit(&wkt_reader_);
-    }
-
-    if (array_view_.schema_view.type == GEOARROW_TYPE_WKB) {
-      GeoArrowWKBReaderInit(&wkb_reader_);
+      return GeoArrowWKTReaderInit(&wkt_reader_);
+    } else if (array_view_.schema_view.type == GEOARROW_TYPE_WKB) {
+      return GeoArrowWKBReaderInit(&wkb_reader_);
+    } else {
+      return GEOARROW_OK;
     }
   }
 
@@ -648,7 +652,7 @@ class ReaderImpl {
   }
 
  private:
-  ImportOptions options_;
+  ImportExportOptions options_;
   std::unique_ptr<FeatureConstructor> constructor_;
   GeoArrowArrayView array_view_;
   GeoArrowWKTReader wkt_reader_;
@@ -717,13 +721,14 @@ class ReaderImpl {
 
 Reader::Reader() : impl_(new ReaderImpl()) {}
 
-Reader::~Reader() { impl_.reset(); }
+Reader::~Reader() {}
 
-void Reader::Init(const ArrowSchema* schema, const ImportOptions& options) {
+void Reader::Init(const ArrowSchema* schema,
+                  const ImportExportOptions& options) {
   impl_->Init(schema, options);
 }
 
-void Reader::Init(InputType input_type, const ImportOptions& options) {
+void Reader::Init(InputType input_type, const ImportExportOptions& options) {
   switch (input_type) {
     case InputType::kWKT:
       impl_->Init(GEOARROW_TYPE_WKT, options);
@@ -742,6 +747,44 @@ void Reader::ReadGeography(const ArrowArray* array, int64_t offset,
   impl_->ReadGeography(array, offset, length, out);
 }
 
+class WriterImpl {
+ public:
+  WriterImpl() { builder_.private_data = nullptr; }
+
+  ~WriterImpl() {
+    if (builder_.private_data != nullptr) {
+      GeoArrowBuilderReset(&builder_);
+    }
+  }
+
+  GeoArrowErrorCode Init(const ArrowSchema* schema,
+                         const ImportExportOptions& options) {
+    options_ = options;
+
+    GEOARROW_RETURN_NOT_OK(
+        GeoArrowBuilderInitFromSchema(&builder_, schema, &error_));
+
+    return GEOARROW_OK;
+  }
+
+ private:
+  ImportExportOptions options_;
+  GeoArrowBuilder builder_;
+  GeoArrowError error_;
+
+  void ThrowNotOk(int code) {
+    if (code != GEOARROW_OK) {
+      throw Exception(error_.message);
+    }
+  }
+};
+
+Writer::Writer() : impl_(new WriterImpl()) {}
+
+Writer::~Writer() {}
+
+void Writer::Init(const ArrowSchema* schema,
+                  const ImportExportOptions& options) {}
 }  // namespace geoarrow
 
 }  // namespace s2geography
