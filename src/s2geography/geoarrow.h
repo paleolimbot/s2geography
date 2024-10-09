@@ -65,6 +65,35 @@ class Reader {
   std::unique_ptr<ReaderImpl> impl_;
 };
 
+class WriterImpl;
+
+/// \brief Array writer for any GeoArrow extension array
+///
+/// This class is used to convert a vector of Geography objects into an ArrowArray
+/// with geoarrow data (serialized or native).
+class Writer {
+ public:
+  enum class OutputType { kPoints, kWKT, kWKB };
+  Writer();
+  ~Writer();
+
+  void Init(const ArrowSchema* schema) { Init(schema, ImportOptions()); }
+
+  void Init(const ArrowSchema* schema, const ImportOptions& options);
+
+  void Init(OutputType output_type, struct ArrowSchema* out_schema) { Init(output_type, ImportOptions(), out_schema); }
+
+  void Init(OutputType output_type, const ImportOptions& options, struct ArrowSchema* out_schema);
+
+  // void WriteGeography(const Geography geographies, struct ArrowArray* out);
+
+  void WriteGeography(const Geography** geographies, size_t geographies_size,
+                      struct ArrowArray* out);
+
+ private:
+  std::unique_ptr<WriterImpl> impl_;
+};
+
 }  // namespace geoarrow
 
 }  // namespace s2geography
