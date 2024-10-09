@@ -46,6 +46,10 @@ class ImportOptions {
 
 class ReaderImpl;
 
+/// \brief Array reader for any GeoArrow extension array
+///
+/// This class is used to convert an ArrowArray with geoarrow data (serialized
+/// or native) into a vector of Geography objects.
 class Reader {
  public:
   enum class InputType { kWKT, kWKB };
