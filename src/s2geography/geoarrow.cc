@@ -672,6 +672,169 @@ void Reader::ReadGeography(const ArrowArray* array, int64_t offset,
   impl_->ReadGeography(array, offset, length, out);
 }
 
-}  // namespace geoarrow
+class WriterImpl {
+ public:
+  WriterImpl() {
+    error_.message[0] = '\0';
+    writer_.private_data = nullptr;
+  }
+
+  ~WriterImpl() {
+    if (writer_.private_data != nullptr) {
+      GeoArrowArrayWriterReset(&writer_);
+    }
+  }
+
+  void Init(const ArrowSchema* schema, const ImportOptions& options) {
+    options_ = options;
+
+    int code = GeoArrowArrayWriterInitFromSchema(&writer_, schema);
+    ThrowNotOk(code);
+
+    InitCommon();
+  }
+
+  void Init(GeoArrowType type, const ImportOptions& options,
+            struct ArrowSchema* out_schema) {
+    options_ = options;
+
+    int code = GeoArrowArrayWriterInitFromType(&writer_, type);
+    ThrowNotOk(code);
+    code = GeoArrowSchemaInitExtension(out_schema, type);
+    ThrowNotOk(code);
+
+    InitCommon();
+  }
+
+  void InitCommon() {
+    visitor_.error = &error_;
+    int code = GeoArrowArrayWriterInitVisitor(&writer_, &visitor_);
+    ThrowNotOk(code);
+  }
+
+  void WriteGeography(const Geography** geographies, size_t geographies_size,
+                      struct ArrowArray* out) {
+    for (size_t i = 0; i < geographies_size; i++) {
+      VisitFeature(*geographies[i]);
+    }
+    int code = GeoArrowArrayWriterFinish(&writer_, out, &error_);
+    ThrowNotOk(code);
+  }
+
+ private:
+  ImportOptions options_;
+  GeoArrowArrayWriter writer_;
+  GeoArrowVisitor visitor_;
+  GeoArrowCoordView coords_view_;
+  GeoArrowError error_;
+
+  int VisitPoints(const PointGeography& point) {
+    coords_view_.n_coords = 1;
+    coords_view_.n_values = 2;
+    coords_view_.coords_stride = 2;
+    double coords[2];
+
+    if (point.Points().size() == 0) {
+      GEOARROW_RETURN_NOT_OK(visitor_.geom_start(
+          &visitor_, GEOARROW_GEOMETRY_TYPE_POINT, GEOARROW_DIMENSIONS_XY));
+      GEOARROW_RETURN_NOT_OK(visitor_.geom_end(&visitor_));
+    } else if (point.Points().size() == 1) {
+      GEOARROW_RETURN_NOT_OK(visitor_.geom_start(
+          &visitor_, GEOARROW_GEOMETRY_TYPE_POINT, GEOARROW_DIMENSIONS_XY));
+      S2LatLng ll(point.Points()[0]);
+      coords[0] = ll.lng().degrees();
+      coords[1] = ll.lat().degrees();
+      coords_view_.values[0] = &coords[0];
+      coords_view_.values[1] = &coords[1];
+      // coords_view_.values = static_cast<const double*[4]>(coords);
+      // GEOARROW_COORD_VIEW_VALUE(&coords_view_, 0, 0) = ll.lng().degrees();
+      // GEOARROW_COORD_VIEW_VALUE(&coords_view_, 0, 1) = ll.lng().degrees();
+      GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
+      GEOARROW_RETURN_NOT_OK(visitor_.geom_end(&visitor_));
+    }
+    // TODO MultiPoint
+    // } else {
+    //   handler->new_geometry_type(util::GeometryType::MULTIPOINT);
+    //   HANDLE_OR_RETURN(handler->geom_start(util::GeometryType::MULTIPOINT,
+    //                                        geog.Points().size()));
+
+    //   for (const S2Point& pt : geog.Points()) {
+    //     handler->geom_start(util::GeometryType::POINT, 1);
+    //     S2LatLng ll(pt);
+    //     coords[0] = ll.lng().degrees();
+    //     coords[1] = ll.lat().degrees();
+    //     HANDLE_OR_RETURN(handler->coords(coords, 1, 2));
+    //     HANDLE_OR_RETURN(handler->geom_end());
+    //   }
+
+    //   handler->geom_end();
+    // }
+    return GEOARROW_OK;
+  }
+
+  int VisitFeature(const Geography& geog) {
+    GEOARROW_RETURN_NOT_OK(visitor_.feat_start(&visitor_));
+
+    auto child_point = dynamic_cast<const PointGeography*>(&geog);
+    if (child_point != nullptr) {
+      GEOARROW_RETURN_NOT_OK(VisitPoints(*child_point));
+    } else {
+      throw Exception("Unsupported Geography subclass");
+      // auto child_polyline = dynamic_cast<const PolylineGeography*>(&geog);
+      // if (child_polyline != nullptr) {
+      //   HANDLE_OR_RETURN(handle_polylines(*child_polyline, handler));
+      // } else {
+      //   auto child_polygon = dynamic_cast<const PolygonGeography*>(&geog);
+      //   if (child_polygon != nullptr) {
+      //     HANDLE_OR_RETURN(handle_polygon(*child_polygon, handler));
+      //   } else {
+      //     auto child_collection = dynamic_cast<const
+      //     GeographyCollection*>(&geog); if (child_collection != nullptr) {
+      //       HANDLE_OR_RETURN(handle_collection(*child_collection, handler));
+      //     } else {
+      //       throw Exception("Unsupported Geography subclass");
+      //     }
+      //   }
+      // }
+    }
+    return GEOARROW_OK;
+  }
+
+  void ThrowNotOk(int code) {
+    if (code != GEOARROW_OK) {
+      throw Exception(error_.message);
+    }
+  }
+};
+
+Writer::Writer() : impl_(new WriterImpl()) {}
+
+Writer::~Writer() { impl_.reset(); }
+
+void Writer::Init(const ArrowSchema* schema, const ImportOptions& options) {
+  impl_->Init(schema, options);
+}
+
+void Writer::Init(OutputType output_type, const ImportOptions& options,
+                  struct ArrowSchema* out_schema) {
+  switch (output_type) {
+    case OutputType::kPoints:
+      impl_->Init(GEOARROW_TYPE_INTERLEAVED_POINT, options, out_schema);
+      break;
+    case OutputType::kWKT:
+      impl_->Init(GEOARROW_TYPE_WKT, options, out_schema);
+      break;
+    case OutputType::kWKB:
+      impl_->Init(GEOARROW_TYPE_WKB, options, out_schema);
+      break;
+    default:
+      throw Exception("Output type not supported");
+  }
+}
+
+void Writer::WriteGeography(const Geography** geographies,
+                            size_t geographies_size, struct ArrowArray* out) {
+  impl_->WriteGeography(geographies, geographies_size, out);
+}
 
 }  // namespace s2geography
