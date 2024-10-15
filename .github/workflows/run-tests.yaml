@@ -21,7 +21,7 @@ jobs:
       - name: Setup mambaforge
         uses: conda-incubator/setup-miniconda@v3
         with:
-          miniforge-variant: Miniforge
+          miniforge-variant: Miniforge3
           miniforge-version: latest
           activate-environment: s2geography-dev
           use-mamba: true
