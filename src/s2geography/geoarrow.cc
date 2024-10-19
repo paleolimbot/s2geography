@@ -782,11 +782,9 @@ class WriterImpl {
     ThrowNotOk(code);
   }
 
-  void WriteGeography(const Geography** geographies, size_t geographies_size,
-                      struct ArrowArray* out) {
-    for (size_t i = 0; i < geographies_size; i++) {
-      VisitFeature(*geographies[i]);
-    }
+  void WriteGeography(const Geography& geog) { VisitFeature(geog); }
+
+  void Finish(struct ArrowArray* out) {
     int code = GeoArrowArrayWriterFinish(&writer_, out, &error_);
     ThrowNotOk(code);
   }
@@ -902,9 +900,12 @@ void Writer::Init(OutputType output_type, const ImportOptions& options,
   }
 }
 
-void Writer::WriteGeography(const Geography** geographies,
-                            size_t geographies_size, struct ArrowArray* out) {
-  impl_->WriteGeography(geographies, geographies_size, out);
+void Writer::WriteGeography(const Geography& geog) {
+  impl_->WriteGeography(geog);
 }
+
+void Writer::Finish(struct ArrowArray* out) { impl_->Finish(out); }
+
+}  // namespace geoarrow
 
 }  // namespace s2geography

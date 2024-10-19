@@ -85,10 +85,9 @@ class Writer {
 
   void Init(OutputType output_type, const ImportOptions& options, struct ArrowSchema* out_schema);
 
-  // void WriteGeography(const Geography geographies, struct ArrowArray* out);
+  void WriteGeography(const Geography& geog);
 
-  void WriteGeography(const Geography** geographies, size_t geographies_size,
-                      struct ArrowArray* out);
+  void Finish(struct ArrowArray* out);
 
  private:
   std::unique_ptr<WriterImpl> impl_;
