@@ -827,10 +827,14 @@ class WriterImpl {
                               GEOARROW_DIMENSIONS_XY));
 
       for (const S2Point& pt : point.Points()) {
+        GEOARROW_RETURN_NOT_OK(
+            visitor_.geom_start(&visitor_, GEOARROW_GEOMETRY_TYPE_POINT,
+                                GEOARROW_DIMENSIONS_XY));
         S2LatLng ll(pt);
         coords[0] = ll.lng().degrees();
         coords[1] = ll.lat().degrees();
         GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
+        GEOARROW_RETURN_NOT_OK(visitor_.geom_end(&visitor_));
       }
 
       GEOARROW_RETURN_NOT_OK(visitor_.geom_end(&visitor_));
