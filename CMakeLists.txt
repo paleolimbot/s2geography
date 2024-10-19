@@ -108,8 +108,8 @@ macro(build_s2)
 
   FetchContent_MakeAvailable(s2)
 
-  # silent warnings in s2 headers
-  # (note: the S2_USE_SYSTEM_INCLUDES=ON option doesn't seem to worl with FetchContent)
+  # silence warnings in s2 headers
+  # (note: the S2_USE_SYSTEM_INCLUDES=ON option doesn't seem to work with FetchContent)
   # (TODO: remove this and instead add SYSTEM in FetchContent_Declare - requires CMake >=3.25)
   get_target_property(S2_IID s2 INTERFACE_INCLUDE_DIRECTORIES)
   set_target_properties(s2 PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${S2_IID}")
@@ -153,11 +153,6 @@ if (MSVC AND NOT ${S2_SOURCE} STREQUAL "BUNDLED")
   target_compile_definitions(s2::s2 INTERFACE NOMINMAX)
   target_compile_options(s2::s2 INTERFACE /J)
 endif()
-
-# this might be needed since s2geometry includes it in general
-# but not for any target explicilty?
-find_package(OpenSSL REQUIRED)
-target_include_directories(${s2_NOALIAS_TARGET} INTERFACE ${OPENSSL_INCLUDE_DIR})
 
 # --- Abseil (bundled build not supported)
 
@@ -221,8 +216,9 @@ add_library(s2geography
     src/vendored/ryu/d2s.c
     src/vendored/geoarrow/double_parse_fast_float.cc)
 
-set_target_properties(s2geography PROPERTIES
-    POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+if(NOT BUILD_SHARED_LIBS)
+  set_target_properties(s2geography PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
 
 target_include_directories(
   s2geography
