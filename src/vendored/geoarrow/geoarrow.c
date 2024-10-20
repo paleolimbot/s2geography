@@ -8607,10 +8607,11 @@ GeoArrowErrorCode GeoArrowWKTWriterInit(struct GeoArrowWKTWriter* writer) {
   ArrowBitmapInit(&private->validity);
   ArrowBufferInit(&private->offsets);
   ArrowBufferInit(&private->values);
-  writer->precision = 16;
-  private->precision = 16;
-  writer->use_flat_multipoint = 1;
-  private->use_flat_multipoint = 1;
+  // TODO should be changed upstream to make this configurable
+  writer->precision = 6;
+  private->precision = 6;
+  writer->use_flat_multipoint = 0;
+  private->use_flat_multipoint = 0;
   writer->max_element_size_bytes = -1;
   private->max_element_size_bytes = -1;
   writer->private_data = private;
