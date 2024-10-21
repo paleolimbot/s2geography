@@ -149,13 +149,6 @@ elseif(${S2_SOURCE} STREQUAL "SYSTEM")
   endif()
 endif()
 
-if (MSVC AND NOT ${S2_SOURCE} STREQUAL "BUNDLED")
-  # used in s2geometry's CMakeLists.txt but not defined in target
-  target_compile_definitions(s2::s2 INTERFACE _USE_MATH_DEFINES)
-  target_compile_definitions(s2::s2 INTERFACE NOMINMAX)
-  target_compile_options(s2::s2 INTERFACE /J)
-endif()
-
 # --- Abseil (bundled build not supported)
 
 find_package(absl REQUIRED)
@@ -240,6 +233,13 @@ target_compile_definitions(
   GEOARROW_USE_FAST_FLOAT=1
   GEOARROW_USE_RYU=1
   GEOARROW_NAMESPACE=S2Geography)
+
+if (MSVC)
+  # used in s2geometry's CMakeLists.txt but not defined in target
+  target_compile_definitions(s2geography PUBLIC _USE_MATH_DEFINES)
+  target_compile_definitions(s2geography PUBLIC NOMINMAX)
+  target_compile_options(s2geography PUBLIC /J)
+endif()
 
 target_link_libraries(
   s2geography
