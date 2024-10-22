@@ -4,6 +4,23 @@ namespace s2geography {
 
 namespace op {
 
+/// \defgroup operator S2 Operators
+///
+/// S2 Operators are simplifications on top of the S2 library to
+/// reduce the amount of glue code required to bind operations in
+/// other runtimes. These abstractions intentionally do not include
+/// the s2 headers publicly.
+///
+/// The general workflow for using an Op class is to (1) create it
+/// with the appropriate options class, (2) call Init() to give
+/// the Op implementation an opportunity to error for invalid Options,
+/// and (3) loop and call ExecuteScalar() where appropriate. Future
+/// extensions to this framework may add an opportunity for operators
+/// to implement a fast path to loop over arrays (or ArrowArrays)
+/// of input.
+///
+/// @{
+
 struct EmptyOptions {};
 
 template <typename ReturnT, typename ArgType0, typename OptionsT = EmptyOptions>
@@ -28,6 +45,8 @@ class BinaryOp {
  protected:
   OptionsT options_;
 };
+
+/// @}
 
 }  // namespace op
 
