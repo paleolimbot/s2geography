@@ -2,7 +2,6 @@
 #include "s2geography/op/cell.h"
 
 #include <array>
-#include <cmath>
 #include <cstdint>
 #include <string_view>
 
