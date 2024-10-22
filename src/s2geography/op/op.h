@@ -1,5 +1,8 @@
+#pragma once
 
 namespace s2geography {
+
+namespace op {
 
 struct EmptyOptions {};
 
@@ -8,7 +11,7 @@ class UnaryOp {
  public:
   UnaryOp(const OptionsT& options = OptionsT()) : options_(options) {}
   virtual void Init() {}
-  ReturnT ExecuteScalar(const ArgType0& arg0) { return ReturnT(); }
+  virtual ReturnT ExecuteScalar(const ArgType0 arg0) { return ReturnT(); }
 
  protected:
   OptionsT options_;
@@ -20,10 +23,12 @@ class BinaryOp {
  public:
   BinaryOp(const OptionsT& options = OptionsT()) : options_(options) {}
   virtual void Init() {}
-  ReturnT ExecuteScalar(const ArgType0& arg0, const ArgType1& arg1) {}
+  virtual ReturnT ExecuteScalar(const ArgType0 arg0, const ArgType1 arg1) {}
 
  protected:
   OptionsT options_;
 };
+
+}  // namespace op
 
 }  // namespace s2geography

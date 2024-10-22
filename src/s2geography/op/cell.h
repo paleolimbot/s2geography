@@ -1,0 +1,42 @@
+#pragma once
+
+#include <array>
+#include <string_view>
+
+#include "s2geography/op/op.h"
+
+namespace s2geography {
+
+namespace op {
+
+namespace cell {
+
+using LngLat = std::array<double, 2>;
+using Point = std::array<double, 3>;
+
+static constexpr LngLat kInvalidLngLat{NAN, NAN};
+static constexpr Point kInvalidPoint{NAN, NAN, NAN};
+
+class FromToken : public UnaryOp<uint64_t, std::string_view> {
+ public:
+  uint64_t ExecuteScalar(const std::string_view cell_token) override;
+};
+
+class FromLngLat : public UnaryOp<uint64_t, std::pair<double, double>> {
+ public:
+  uint64_t ExecuteScalar(std::pair<double, double> lnglat) override;
+};
+
+class ToLngLat : public UnaryOp<LngLat, uint64_t> {
+  LngLat ExecuteScalar(const uint64_t cell_id) override;
+};
+
+class ToPoint : public UnaryOp<Point, uint64_t> {
+  Point ExecuteScalar(const uint64_t cell_id) override;
+};
+
+}  // namespace cell
+
+}  // namespace op
+
+}  // namespace s2geography
