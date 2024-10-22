@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <string>
 #include <string_view>
 
 #include "s2geography/op/op.h"
@@ -22,9 +23,19 @@ class FromToken : public UnaryOp<uint64_t, std::string_view> {
   uint64_t ExecuteScalar(const std::string_view cell_token) override;
 };
 
-class FromLngLat : public UnaryOp<uint64_t, std::pair<double, double>> {
+class FromDebugString : public UnaryOp<uint64_t, std::string_view> {
  public:
-  uint64_t ExecuteScalar(std::pair<double, double> lnglat) override;
+  uint64_t ExecuteScalar(const std::string_view debug_string) override;
+};
+
+class FromLngLat : public UnaryOp<uint64_t, LngLat> {
+ public:
+  uint64_t ExecuteScalar(LngLat lnglat) override;
+};
+
+class FromPoint : public UnaryOp<uint64_t, Point> {
+ public:
+  uint64_t ExecuteScalar(Point point) override;
 };
 
 class ToLngLat : public UnaryOp<LngLat, uint64_t> {
@@ -33,6 +44,20 @@ class ToLngLat : public UnaryOp<LngLat, uint64_t> {
 
 class ToPoint : public UnaryOp<Point, uint64_t> {
   Point ExecuteScalar(const uint64_t cell_id) override;
+};
+
+class ToToken : public UnaryOp<std::string_view, uint64_t> {
+  std::string_view ExecuteScalar(const uint64_t cell_id) override;
+
+ private:
+  std::string last_result_;
+};
+
+class ToDebugString : public UnaryOp<std::string_view, uint64_t> {
+  std::string_view ExecuteScalar(const uint64_t cell_id) override;
+
+ private:
+  std::string last_result_;
 };
 
 }  // namespace cell
