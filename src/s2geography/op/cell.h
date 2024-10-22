@@ -17,6 +17,8 @@ using Point = std::array<double, 3>;
 
 static constexpr LngLat kInvalidLngLat{NAN, NAN};
 static constexpr Point kInvalidPoint{NAN, NAN, NAN};
+static constexpr uint64_t kCellIdNone = 0;
+static constexpr uint64_t kCellIdSentinel = ~uint64_t{0};
 
 class FromToken : public UnaryOp<uint64_t, std::string_view> {
  public:
@@ -39,14 +41,17 @@ class FromPoint : public UnaryOp<uint64_t, Point> {
 };
 
 class ToLngLat : public UnaryOp<LngLat, uint64_t> {
+ public:
   LngLat ExecuteScalar(const uint64_t cell_id) override;
 };
 
 class ToPoint : public UnaryOp<Point, uint64_t> {
+ public:
   Point ExecuteScalar(const uint64_t cell_id) override;
 };
 
 class ToToken : public UnaryOp<std::string_view, uint64_t> {
+ public:
   std::string_view ExecuteScalar(const uint64_t cell_id) override;
 
  private:
@@ -54,6 +59,7 @@ class ToToken : public UnaryOp<std::string_view, uint64_t> {
 };
 
 class ToDebugString : public UnaryOp<std::string_view, uint64_t> {
+ public:
   std::string_view ExecuteScalar(const uint64_t cell_id) override;
 
  private:
