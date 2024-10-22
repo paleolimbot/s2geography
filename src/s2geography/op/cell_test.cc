@@ -1,6 +1,9 @@
+
 #include "s2geography/op/cell.h"
 
 #include <gtest/gtest.h>
+
+#include <cstring>
 
 namespace s2geography::op::cell {
 
