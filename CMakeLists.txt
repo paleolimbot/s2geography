@@ -207,6 +207,7 @@ add_library(s2geography
     src/s2geography/wkt-reader.cc
     src/s2geography/wkt-writer.cc
     src/s2geography/op/cell.cc
+    src/s2geography/op/point.cc
     # geoarrow sources
     src/vendored/geoarrow/geoarrow.c
     src/vendored/ryu/d2s.c

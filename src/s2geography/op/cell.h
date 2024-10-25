@@ -1,12 +1,12 @@
 #pragma once
 
 #include <array>
-#include <cmath>
 #include <cstdint>
 #include <string>
 #include <string_view>
 
 #include "s2geography/op/op.h"
+#include "s2geography/op/point.h"
 
 namespace s2geography {
 
@@ -14,17 +14,8 @@ namespace op {
 
 namespace cell {
 
-/// \brief Longitude/Latitude pair (degrees)
-using LngLat = std::array<double, 2>;
-
-/// \brief XYZ unit vector tuple
-using Point = std::array<double, 3>;
-
-/// \brief Sentinel LngLat returned for invalid cells
-static constexpr LngLat kInvalidLngLat{NAN, NAN};
-
-/// \brief Senintel Point returned for invalid cells
-static constexpr Point kInvalidPoint{NAN, NAN, NAN};
+using point::LngLat;
+using point::Point;
 
 /// \brief Cell identifier returned for invalid input
 static constexpr uint64_t kCellIdNone = 0;

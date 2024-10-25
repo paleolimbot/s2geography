@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <string_view>
+
 namespace s2geography {
 
 namespace op {
@@ -23,21 +26,30 @@ namespace op {
 
 struct EmptyOptions {};
 
-template <typename ReturnT, typename ArgType0, typename OptionsT = EmptyOptions>
+template <typename RetT, typename ArgT0, typename OptT = EmptyOptions>
 class UnaryOp {
  public:
-  UnaryOp(const OptionsT& options = OptionsT()) : options_(options) {}
+  using ReturnT = RetT;
+  using ArgType0 = ArgT0;
+  using OptionsT = OptT;
+
+  UnaryOp(const OptT& options = OptT()) : options_(options) {}
   virtual void Init() {}
   virtual ReturnT ExecuteScalar(const ArgType0 arg0) { return ReturnT(); }
 
  protected:
-  OptionsT options_;
+  OptT options_;
 };
 
-template <typename ReturnT, typename ArgType0, typename ArgType1,
-          typename OptionsT = EmptyOptions>
+template <typename RetT, typename ArgT0, typename ArgT1,
+          typename OptT = EmptyOptions>
 class BinaryOp {
  public:
+  using ReturnT = RetT;
+  using ArgType0 = ArgT0;
+  using ArgType1 = ArgT1;
+  using OptionsT = OptT;
+
   BinaryOp(const OptionsT& options = OptionsT()) : options_(options) {}
   virtual void Init() {}
   virtual ReturnT ExecuteScalar(const ArgType0 arg0, const ArgType1 arg1) {}
@@ -45,6 +57,22 @@ class BinaryOp {
  protected:
   OptionsT options_;
 };
+
+template <typename Op>
+typename Op::ReturnT Execute(typename Op::ArgType0 arg0) {
+  Op op;
+  op.Init();
+
+  return op.ExecuteScalar(arg0);
+}
+
+template <typename Op>
+std::string ExecuteString(typename Op::ArgType0 arg0) {
+  Op op;
+  op.Init();
+
+  return std::string(op.ExecuteScalar(arg0));
+}
 
 /// @}
 

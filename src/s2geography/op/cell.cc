@@ -23,7 +23,7 @@ uint64_t FromDebugString::ExecuteScalar(const std::string_view debug_string) {
 }
 
 uint64_t FromLngLat::ExecuteScalar(LngLat lnglat) {
-  S2LatLng ll = S2LatLng::FromDegrees(lnglat[0], lnglat[1]).Normalized();
+  S2LatLng ll = S2LatLng::FromDegrees(lnglat[1], lnglat[0]).Normalized();
   return S2CellId(ll.Normalized()).id();
 }
 
@@ -35,7 +35,7 @@ uint64_t FromPoint::ExecuteScalar(Point point) {
 LngLat ToLngLat::ExecuteScalar(const uint64_t cell_id) {
   S2CellId cell(cell_id);
   if (!cell.is_valid()) {
-    return kInvalidLngLat;
+    return point::kInvalidLngLat;
   } else {
     S2LatLng ll = S2CellId(cell_id).ToLatLng();
     return {ll.lng().degrees(), ll.lat().degrees()};
@@ -45,7 +45,7 @@ LngLat ToLngLat::ExecuteScalar(const uint64_t cell_id) {
 Point ToPoint::ExecuteScalar(const uint64_t cell_id) {
   S2CellId cell(cell_id);
   if (!cell.is_valid()) {
-    return kInvalidPoint;
+    return point::kInvalidPoint;
   } else {
     S2Point point = S2CellId(cell_id).ToPoint();
     return {point.x(), point.y(), point.z()};
@@ -74,7 +74,7 @@ Point CellCenter::ExecuteScalar(const uint64_t cell_id) {
 Point CellVertex::ExecuteScalar(const uint64_t cell_id,
                                 const int8_t vertex_id) {
   if (vertex_id < 0) {
-    return kInvalidPoint;
+    return point::kInvalidPoint;
   }
 
   S2Point pt = S2Cell(S2CellId(cell_id)).GetVertex(vertex_id);

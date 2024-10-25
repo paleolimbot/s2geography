@@ -9,50 +9,67 @@ namespace s2geography::op::cell {
 
 static constexpr LngLat kTestPoint{-64, 45};
 
-static uint64_t TestCellId() {
-  FromLngLat from_lng_lat;
-  return from_lng_lat.ExecuteScalar(kTestPoint);
-}
+static uint64_t TestCellId() { return Execute<FromLngLat>(kTestPoint); }
 
 TEST(Cell, Token) {
-  FromToken from_token;
-  ToToken to_token;
-
   uint64_t cell_id = TestCellId();
-  EXPECT_EQ(from_token.ExecuteScalar(to_token.ExecuteScalar(cell_id)), cell_id);
-  EXPECT_EQ(from_token.ExecuteScalar("not a valid token"), kCellIdNone);
+  EXPECT_EQ(Execute<FromToken>(ExecuteString<ToToken>(cell_id)), cell_id);
+  EXPECT_EQ(Execute<FromToken>("not a valid token"), kCellIdNone);
 }
 
 TEST(Cell, DebugString) {
-  FromDebugString from_debug;
-  ToDebugString to_debug;
-
   uint64_t cell_id = TestCellId();
-  EXPECT_EQ(from_debug.ExecuteScalar(to_debug.ExecuteScalar(cell_id)), cell_id);
-  EXPECT_EQ(from_debug.ExecuteScalar("not a valid debug"), kCellIdNone);
+  EXPECT_EQ(Execute<FromDebugString>(ExecuteString<ToDebugString>(cell_id)),
+            cell_id);
+  EXPECT_EQ(Execute<FromDebugString>("not a valid debug"), kCellIdNone);
 }
 
 TEST(Cell, Point) {
-  FromPoint from_point;
-  ToPoint to_point;
-
   uint64_t cell_id = TestCellId();
-  EXPECT_EQ(from_point.ExecuteScalar(to_point.ExecuteScalar(cell_id)), cell_id);
+  EXPECT_EQ(Execute<FromPoint>(Execute<ToPoint>(cell_id)), cell_id);
 
-  Point invalid_point = to_point.ExecuteScalar(kCellIdSentinel);
-  EXPECT_EQ(std::memcmp(&invalid_point, &kInvalidPoint, sizeof(Point)), 0);
+  Point invalid_point = Execute<ToPoint>(kCellIdSentinel);
+  EXPECT_EQ(std::memcmp(&invalid_point, &point::kInvalidPoint, sizeof(Point)),
+            0);
 }
 
 TEST(Cell, LngLat) {
-  FromPoint from_lnglat;
-  ToPoint to_lnglat;
-
   uint64_t cell_id = TestCellId();
-  EXPECT_EQ(from_lnglat.ExecuteScalar(to_lnglat.ExecuteScalar(cell_id)),
-            cell_id);
+  EXPECT_EQ(Execute<FromLngLat>(Execute<ToLngLat>(cell_id)), cell_id);
 
-  Point invalid_lnglat = to_lnglat.ExecuteScalar(kCellIdSentinel);
-  EXPECT_EQ(std::memcmp(&invalid_lnglat, &kInvalidLngLat, sizeof(LngLat)), 0);
+  LngLat invalid_lnglat = Execute<ToLngLat>(kCellIdSentinel);
+  EXPECT_EQ(
+      std::memcmp(&invalid_lnglat, &point::kInvalidLngLat, sizeof(LngLat)), 0);
 }
+
+TEST(Cell, IsValid) {
+  EXPECT_TRUE(Execute<IsValid>(TestCellId()));
+  EXPECT_FALSE(Execute<IsValid>(kCellIdSentinel));
+  EXPECT_FALSE(Execute<IsValid>(kCellIdNone));
+}
+
+TEST(Cell, CellCenter) {}
+
+TEST(Cell, CellVertex) {}
+
+TEST(Cell, Level) {}
+
+TEST(Cell, Area) {}
+
+TEST(Cell, AreaApprox) {}
+
+TEST(Cell, Parent) {}
+
+TEST(Cell, EdgeNeighbor) {}
+
+TEST(Cell, Contains) {}
+
+TEST(Cell, MayIntersect) {}
+
+TEST(Cell, Distance) {}
+
+TEST(Cell, MaxDistance) {}
+
+TEST(Cell, CommonAncestorLevel) {}
 
 }  // namespace s2geography::op::cell
