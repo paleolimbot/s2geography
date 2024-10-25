@@ -764,13 +764,10 @@ class WriterImpl {
     InitCommon();
   }
 
-  void Init(GeoArrowType type, const ExportOptions& options,
-            struct ArrowSchema* out_schema) {
+  void Init(GeoArrowType type, const ExportOptions& options) {
     options_ = options;
 
     int code = GeoArrowArrayWriterInitFromType(&writer_, type);
-    ThrowNotOk(code);
-    code = GeoArrowSchemaInitExtension(out_schema, type);
     ThrowNotOk(code);
 
     InitCommon();
@@ -1092,6 +1089,19 @@ Writer::~Writer() { impl_.reset(); }
 
 void Writer::Init(const ArrowSchema* schema, const ExportOptions& options) {
   impl_->Init(schema, options);
+}
+
+void Writer::Init(OutputType output_type, const ExportOptions& options) {
+  switch (output_type) {
+    case OutputType::kWKT:
+      impl_->Init(GEOARROW_TYPE_WKT, options);
+      break;
+    case OutputType::kWKB:
+      impl_->Init(GEOARROW_TYPE_WKB, options);
+      break;
+    default:
+      throw Exception("Output type not supported");
+  }
 }
 
 void Writer::WriteGeography(const Geography& geog) {

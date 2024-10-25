@@ -102,6 +102,8 @@ class Writer {
 
   void Init(const ArrowSchema* schema, const ExportOptions& options);
 
+  void Init(OutputType output_type, const ExportOptions& options);
+
   void WriteGeography(const Geography& geog);
 
   void Finish(struct ArrowArray* out);

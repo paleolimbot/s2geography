@@ -3,7 +3,6 @@
 
 #include "s2geography/accessors.h"
 #include "s2geography/geoarrow.h"
-#include "geoarrow/geoarrow.h"
 
 namespace s2geography {
 
@@ -14,16 +13,13 @@ WKTWriter::WKTWriter(int significant_digits) {
   options.set_significant_digits(significant_digits);
 
   writer_ = absl::make_unique<geoarrow::Writer>();
-  struct ArrowSchema schema;
-  GeoArrowSchemaInitExtension(&schema, GeoArrowType::GEOARROW_TYPE_WKT);
-  writer_->Init(&schema, options);
+  writer_->Init(geoarrow::Writer::OutputType::kWKT, options);
 }
 
 WKTWriter::WKTWriter(const geoarrow::ExportOptions& options) {
   writer_ = absl::make_unique<geoarrow::Writer>();
-  struct ArrowSchema schema;
-  GeoArrowSchemaInitExtension(&schema, GeoArrowType::GEOARROW_TYPE_WKT);
-  writer_->Init(&schema, options);
+  writer_->Init(geoarrow::Writer::OutputType::kWKT, options);
+
 }
 
 std::string WKTWriter::write_feature(const Geography& geog) {
