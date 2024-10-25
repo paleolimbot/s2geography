@@ -755,7 +755,7 @@ class WriterImpl {
     }
   }
 
-  void Init(const ArrowSchema* schema, const ImportOptions& options) {
+  void Init(const ArrowSchema* schema, const ExportOptions& options) {
     options_ = options;
 
     int code = GeoArrowArrayWriterInitFromSchema(&writer_, schema);
@@ -764,7 +764,7 @@ class WriterImpl {
     InitCommon();
   }
 
-  void Init(GeoArrowType type, const ImportOptions& options,
+  void Init(GeoArrowType type, const ExportOptions& options,
             struct ArrowSchema* out_schema) {
     options_ = options;
 
@@ -790,7 +790,7 @@ class WriterImpl {
   }
 
  private:
-  ImportOptions options_;
+  ExportOptions options_;
   GeoArrowArrayWriter writer_;
   GeoArrowVisitor visitor_;
   GeoArrowCoordView coords_view_;
@@ -1090,25 +1090,8 @@ Writer::Writer() : impl_(new WriterImpl()) {}
 
 Writer::~Writer() { impl_.reset(); }
 
-void Writer::Init(const ArrowSchema* schema, const ImportOptions& options) {
+void Writer::Init(const ArrowSchema* schema, const ExportOptions& options) {
   impl_->Init(schema, options);
-}
-
-void Writer::Init(OutputType output_type, const ImportOptions& options,
-                  struct ArrowSchema* out_schema) {
-  switch (output_type) {
-    case OutputType::kPoints:
-      impl_->Init(GEOARROW_TYPE_INTERLEAVED_POINT, options, out_schema);
-      break;
-    case OutputType::kWKT:
-      impl_->Init(GEOARROW_TYPE_WKT, options, out_schema);
-      break;
-    case OutputType::kWKB:
-      impl_->Init(GEOARROW_TYPE_WKB, options, out_schema);
-      break;
-    default:
-      throw Exception("Output type not supported");
-  }
 }
 
 void Writer::WriteGeography(const Geography& geog) {
