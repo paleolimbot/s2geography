@@ -52,17 +52,24 @@ bool IsValid::ExecuteScalar(const uint64_t cell_id) {
 }
 
 Point CellCenter::ExecuteScalar(const uint64_t cell_id) {
-  S2Point pt = S2Cell(S2CellId(cell_id)).GetCenter();
+  S2CellId cell(cell_id);
+  if (!cell.is_valid()) {
+    return point::kInvalidPoint;
+  }
+
+  S2Point pt = S2Cell(cell).GetCenter();
   return {pt.x(), pt.y(), pt.z()};
 }
 
 Point CellVertex::ExecuteScalar(const uint64_t cell_id,
                                 const int8_t vertex_id) {
-  if (vertex_id < 0) {
+  S2CellId cell(cell_id);
+
+  if (vertex_id < 0 || !cell.is_valid()) {
     return point::kInvalidPoint;
   }
 
-  S2Point pt = S2Cell(S2CellId(cell_id)).GetVertex(vertex_id);
+  S2Point pt = S2Cell(cell).GetVertex(vertex_id);
   return {pt.x(), pt.y(), pt.z()};
 }
 

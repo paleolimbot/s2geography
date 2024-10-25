@@ -42,7 +42,16 @@ TEST(Cell, IsValid) {
   EXPECT_FALSE(Execute<IsValid>(kCellIdNone));
 }
 
-TEST(Cell, CellCenter) {}
+TEST(Cell, CellCenter) {
+  Point center = Execute<CellCenter>(TestCellId());
+  LngLat center_pt = Execute<point::ToLngLat>(center);
+  EXPECT_LT(std::abs(-64 - center_pt[0]), 0.001);
+  EXPECT_LT(std::abs(45 - center_pt[1]), 0.001);
+
+  Point invalid_point = Execute<CellCenter>(kCellIdSentinel);
+  EXPECT_EQ(std::memcmp(&invalid_point, &point::kInvalidPoint, sizeof(Point)),
+            0);
+}
 
 TEST(Cell, CellVertex) {}
 

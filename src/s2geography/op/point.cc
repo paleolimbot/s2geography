@@ -17,7 +17,7 @@ LngLat ToLngLat::ExecuteScalar(const Point point) {
 }
 
 Point ToPoint::ExecuteScalar(const LngLat lnglat) {
-  S2LatLng ll = S2LatLng::FromDegrees(lnglat[0], lnglat[1]);
+  S2LatLng ll = S2LatLng::FromDegrees(lnglat[1], lnglat[0]);
   S2Point pt(ll.ToPoint());
   return {pt.x(), pt.y(), pt.z()};
 }
