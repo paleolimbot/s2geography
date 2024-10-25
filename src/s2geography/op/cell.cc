@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string_view>
 
+#include "s2/s2cell.h"
 #include "s2/s2cell_id.h"
 #include "s2/s2latlng.h"
 
@@ -59,6 +60,136 @@ std::string_view ToToken::ExecuteScalar(const uint64_t cell_id) {
 std::string_view ToDebugString::ExecuteScalar(const uint64_t cell_id) {
   last_result_ = S2CellId(cell_id).ToString();
   return last_result_;
+}
+
+bool IsValid::ExecuteScalar(const uint64_t cell_id) {
+  return S2CellId(cell_id).is_valid();
+}
+
+Point CellCenter::ExecuteScalar(const uint64_t cell_id) {
+  S2Point pt = S2Cell(S2CellId(cell_id)).GetCenter();
+  return {pt.x(), pt.y(), pt.z()};
+}
+
+Point CellVertex::ExecuteScalar(const uint64_t cell_id,
+                                const int8_t vertex_id) {
+  if (vertex_id < 0) {
+    return kInvalidPoint;
+  }
+
+  S2Point pt = S2Cell(S2CellId(cell_id)).GetVertex(vertex_id);
+  return {pt.x(), pt.y(), pt.z()};
+}
+
+int8_t Level::ExecuteScalar(const uint64_t cell_id) {
+  S2CellId cell(cell_id);
+  if (!cell.is_valid()) {
+    return -1;
+  }
+
+  return cell.level();
+}
+
+double Area::ExecuteScalar(const uint64_t cell_id) {
+  S2CellId cell(cell_id);
+  if (!cell.is_valid()) {
+    return NAN;
+  }
+
+  return S2Cell(cell).ExactArea();
+}
+
+double AreaApprox::ExecuteScalar(const uint64_t cell_id) {
+  S2CellId cell(cell_id);
+  if (!cell.is_valid()) {
+    return NAN;
+  }
+
+  return S2Cell(cell).ApproxArea();
+}
+
+uint64_t Parent::ExecuteScalar(const uint64_t cell_id, const int8_t level) {
+  // allow negative numbers to relate to current level
+  S2CellId cell(cell_id);
+  if (level < 0) {
+    return cell.parent(cell.level() + level).id();
+  } else {
+    return cell.parent(level).id();
+  }
+}
+
+uint64_t Child::ExecuteScalar(const uint64_t cell_id, const int8_t k) {
+  if (k < 0 || k > 3) {
+    return kCellIdSentinel;
+  }
+
+  return S2CellId(cell_id).child(k).id();
+}
+
+uint64_t EdgeNeighbor::ExecuteScalar(const uint64_t cell_id, const int8_t k) {
+  S2CellId cell(cell_id);
+  if (k < 0 || k > 3) {
+    return kCellIdSentinel;
+  }
+
+  S2CellId neighbours[4];
+  cell.GetEdgeNeighbors(neighbours);
+  return neighbours[k].id();
+}
+
+bool Contains::ExecuteScalar(const uint64_t cell_id,
+                             const uint64_t cell_id_test) {
+  S2CellId cell(cell_id);
+  S2CellId cell_test(cell_id_test);
+  if (!cell.is_valid() || !cell_test.is_valid()) {
+    return false;
+  }
+
+  return cell.contains(cell_test);
+}
+
+bool MayIntersect::ExecuteScalar(const uint64_t cell_id,
+                                 const uint64_t cell_id_test) {
+  S2CellId cell(cell_id);
+  S2CellId cell_test(cell_id_test);
+  if (!cell.is_valid() || !cell_test.is_valid()) {
+    return false;
+  }
+
+  return S2Cell(cell).MayIntersect(S2Cell(cell_test));
+}
+
+double Distance::ExecuteScalar(const uint64_t cell_id,
+                               const uint64_t cell_id_test) {
+  S2CellId cell(cell_id);
+  S2CellId cell_test(cell_id_test);
+  if (!cell.is_valid() || !cell_test.is_valid()) {
+    return NAN;
+  }
+
+  return S2Cell(cell).GetDistance(S2Cell(cell_test)).radians();
+}
+
+double MaxDistance::ExecuteScalar(const uint64_t cell_id,
+                                  const uint64_t cell_id_test) {
+  S2CellId cell(cell_id);
+  S2CellId cell_test(cell_id_test);
+  if (!cell.is_valid() || !cell_test.is_valid()) {
+    return NAN;
+  }
+
+  return S2Cell(cell).GetMaxDistance(S2Cell(cell_test)).radians();
+}
+
+int8_t CommonAncestorLevel::ExecuteScalar(const uint64_t cell_id,
+                                          const uint64_t cell_id_test) {
+  S2CellId cell(cell_id);
+  S2CellId cell_test(cell_id_test);
+  if (!cell.is_valid() || !cell_test.is_valid()) {
+    return -1;
+  }
+
+  return cell.GetCommonAncestorLevel(cell_test);
 }
 
 }  // namespace s2geography::op::cell
