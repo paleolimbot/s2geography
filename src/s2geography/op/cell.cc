@@ -22,24 +22,9 @@ uint64_t FromDebugString::ExecuteScalar(const std::string_view debug_string) {
       .id();
 }
 
-uint64_t FromLngLat::ExecuteScalar(LngLat lnglat) {
-  S2LatLng ll = S2LatLng::FromDegrees(lnglat[1], lnglat[0]).Normalized();
-  return S2CellId(ll.Normalized()).id();
-}
-
 uint64_t FromPoint::ExecuteScalar(Point point) {
   S2Point pt(point[0], point[1], point[2]);
   return S2CellId(pt).id();
-}
-
-LngLat ToLngLat::ExecuteScalar(const uint64_t cell_id) {
-  S2CellId cell(cell_id);
-  if (!cell.is_valid()) {
-    return point::kInvalidLngLat;
-  } else {
-    S2LatLng ll = S2CellId(cell_id).ToLatLng();
-    return {ll.lng().degrees(), ll.lat().degrees()};
-  }
 }
 
 Point ToPoint::ExecuteScalar(const uint64_t cell_id) {

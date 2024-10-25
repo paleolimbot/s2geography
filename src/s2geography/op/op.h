@@ -66,6 +66,8 @@ typename Op::ReturnT Execute(typename Op::ArgType0 arg0) {
   return op.ExecuteScalar(arg0);
 }
 
+// This overload allow executing functions that return std::string_view,
+// since the regular Execute() will return a view to deleted memory.
 template <typename Op>
 std::string ExecuteString(typename Op::ArgType0 arg0) {
   Op op;
