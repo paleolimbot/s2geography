@@ -190,7 +190,7 @@ int8_t CommonAncestorLevel::ExecuteScalar(const uint64_t cell_id,
   S2CellId cell(cell_id);
   S2CellId cell_test(cell_id_test);
   if (!cell.is_valid() || !cell_test.is_valid()) {
-    return -128;
+    return -1;
   }
 
   return cell.GetCommonAncestorLevel(cell_test);

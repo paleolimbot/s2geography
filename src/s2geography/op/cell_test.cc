@@ -102,15 +102,35 @@ TEST(Cell, MayIntersect) {
                                      Execute<EdgeNeighbor>(TestCellId(), 0)));
 }
 
-TEST(Cell, Distance) {}
+TEST(Cell, Distance) {
+  uint64_t null_island = Execute<FromPoint>(Execute<point::ToPoint>({0, 0}));
+  uint64_t anti_null_island =
+      Execute<FromPoint>(Execute<point::ToPoint>({180, 0}));
+  EXPECT_DOUBLE_EQ(Execute<Distance>(null_island, anti_null_island), M_PI);
 
-TEST(Cell, MaxDistance) {}
+  EXPECT_TRUE(std::isnan(Execute<Distance>(TestCellId(), kCellIdSentinel)));
+  EXPECT_TRUE(std::isnan(Execute<Distance>(kCellIdSentinel, TestCellId())));
+}
+
+TEST(Cell, MaxDistance) {
+  uint64_t null_island = Execute<FromPoint>(Execute<point::ToPoint>({0, 0}));
+  uint64_t anti_null_island =
+      Execute<FromPoint>(Execute<point::ToPoint>({180, 0}));
+  EXPECT_DOUBLE_EQ(Execute<MaxDistance>(null_island, anti_null_island), M_PI);
+
+  uint64_t big_cell = Execute<Parent>(TestCellId(), 5);
+  EXPECT_GT(Execute<MaxDistance>(big_cell, null_island),
+            Execute<Distance>(big_cell, null_island));
+
+  EXPECT_TRUE(std::isnan(Execute<MaxDistance>(TestCellId(), kCellIdSentinel)));
+  EXPECT_TRUE(std::isnan(Execute<MaxDistance>(kCellIdSentinel, TestCellId())));
+}
 
 TEST(Cell, CommonAncestorLevel) {
   EXPECT_EQ(Execute<CommonAncestorLevel>(Execute<Parent>(TestCellId(), 5),
                                          TestCellId()),
             5);
-  EXPECT_EQ(Execute<CommonAncestorLevel>(kCellIdSentinel, TestCellId()), -128);
+  EXPECT_EQ(Execute<CommonAncestorLevel>(kCellIdSentinel, TestCellId()), -1);
 }
 
 }  // namespace s2geography::op::cell
