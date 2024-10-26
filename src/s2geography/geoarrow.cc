@@ -777,6 +777,14 @@ class WriterImpl {
     visitor_.error = &error_;
     int code = GeoArrowArrayWriterInitVisitor(&writer_, &visitor_);
     ThrowNotOk(code);
+
+    // Currently we always visit single coordinate pairs one by one, so set
+    // up the appropiate view for that once, which is then reused
+    coords_view_.n_coords = 1;
+    coords_view_.n_values = 2;
+    coords_view_.coords_stride = 2;
+    coords_view_.values[0] = &coords_[0];
+    coords_view_.values[1] = &coords_[1];
   }
 
   void WriteGeography(const Geography& geog) { VisitFeature(geog); }
@@ -791,15 +799,10 @@ class WriterImpl {
   GeoArrowArrayWriter writer_;
   GeoArrowVisitor visitor_;
   GeoArrowCoordView coords_view_;
+  double coords_[2];
   GeoArrowError error_;
 
   int VisitPoints(const PointGeography& point) {
-    coords_view_.n_coords = 1;
-    coords_view_.n_values = 2;
-    coords_view_.coords_stride = 2;
-    double coords[2];
-    coords_view_.values[0] = &coords[0];
-    coords_view_.values[1] = &coords[1];
 
     if (point.Points().size() == 0) {
       // empty Point
@@ -812,8 +815,8 @@ class WriterImpl {
       GEOARROW_RETURN_NOT_OK(visitor_.geom_start(
           &visitor_, GEOARROW_GEOMETRY_TYPE_POINT, GEOARROW_DIMENSIONS_XY));
       S2LatLng ll(point.Points()[0]);
-      coords[0] = ll.lng().degrees();
-      coords[1] = ll.lat().degrees();
+      coords_[0] = ll.lng().degrees();
+      coords_[1] = ll.lat().degrees();
       GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
       GEOARROW_RETURN_NOT_OK(visitor_.geom_end(&visitor_));
 
@@ -827,8 +830,8 @@ class WriterImpl {
         GEOARROW_RETURN_NOT_OK(visitor_.geom_start(
             &visitor_, GEOARROW_GEOMETRY_TYPE_POINT, GEOARROW_DIMENSIONS_XY));
         S2LatLng ll(pt);
-        coords[0] = ll.lng().degrees();
-        coords[1] = ll.lat().degrees();
+        coords_[0] = ll.lng().degrees();
+        coords_[1] = ll.lat().degrees();
         GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
         GEOARROW_RETURN_NOT_OK(visitor_.geom_end(&visitor_));
       }
@@ -839,12 +842,6 @@ class WriterImpl {
   }
 
   int VisitPolylines(const PolylineGeography& geog) {
-    coords_view_.n_coords = 1;
-    coords_view_.n_values = 2;
-    coords_view_.coords_stride = 2;
-    double coords[2];
-    coords_view_.values[0] = &coords[0];
-    coords_view_.values[1] = &coords[1];
 
     if (geog.Polylines().size() == 0) {
       // empty LineString
@@ -863,8 +860,8 @@ class WriterImpl {
 
       for (int i = 0; i < poly->num_vertices(); i++) {
         S2LatLng ll(poly->vertex(i));
-        coords[0] = ll.lng().degrees();
-        coords[1] = ll.lat().degrees();
+        coords_[0] = ll.lng().degrees();
+        coords_[1] = ll.lat().degrees();
         GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
       }
 
@@ -883,8 +880,8 @@ class WriterImpl {
 
         for (int i = 0; i < poly->num_vertices(); i++) {
           S2LatLng ll(poly->vertex(i));
-          coords[0] = ll.lng().degrees();
-          coords[1] = ll.lat().degrees();
+          coords_[0] = ll.lng().degrees();
+          coords_[1] = ll.lat().degrees();
           GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
         }
 
@@ -898,12 +895,6 @@ class WriterImpl {
   }
 
   int VisitLoopShell(const S2Loop* loop) {
-    coords_view_.n_coords = 1;
-    coords_view_.n_values = 2;
-    coords_view_.coords_stride = 2;
-    double coords[2];
-    coords_view_.values[0] = &coords[0];
-    coords_view_.values[1] = &coords[1];
 
     if (loop->num_vertices() == 0) {
       throw Exception("Unexpected S2Loop with 0 verties");
@@ -913,8 +904,8 @@ class WriterImpl {
 
     for (int i = 0; i <= loop->num_vertices(); i++) {
       S2LatLng ll(loop->vertex(i));
-      coords[0] = ll.lng().degrees();
-      coords[1] = ll.lat().degrees();
+      coords_[0] = ll.lng().degrees();
+      coords_[1] = ll.lat().degrees();
       GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
     }
 
@@ -924,12 +915,6 @@ class WriterImpl {
   }
 
   int VisitLoopHole(const S2Loop* loop) {
-    coords_view_.n_coords = 1;
-    coords_view_.n_values = 2;
-    coords_view_.coords_stride = 2;
-    double coords[2];
-    coords_view_.values[0] = &coords[0];
-    coords_view_.values[1] = &coords[1];
 
     if (loop->num_vertices() == 0) {
       throw Exception("Unexpected S2Loop with 0 verties");
@@ -941,14 +926,14 @@ class WriterImpl {
     // have the opposite orientation of the shell
     for (int i = loop->num_vertices() - 1; i >= 0; i--) {
       S2LatLng ll(loop->vertex(i));
-      coords[0] = ll.lng().degrees();
-      coords[1] = ll.lat().degrees();
+      coords_[0] = ll.lng().degrees();
+      coords_[1] = ll.lat().degrees();
       GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
     }
 
     S2LatLng ll(loop->vertex(loop->num_vertices() - 1));
-    coords[0] = ll.lng().degrees();
-    coords[1] = ll.lat().degrees();
+    coords_[0] = ll.lng().degrees();
+    coords_[1] = ll.lat().degrees();
     GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
 
     GEOARROW_RETURN_NOT_OK(visitor_.ring_end(&visitor_));

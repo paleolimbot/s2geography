@@ -90,7 +90,7 @@ class WriterImpl;
 
 /// \brief Array writer for any GeoArrow extension array
 ///
-/// This class is used to convert a vector of Geography objects into an ArrowArray
+/// This class is used to convert Geography objects into an ArrowArray
 /// with geoarrow data (serialized or native).
 class Writer {
  public:
