@@ -103,10 +103,22 @@ double AreaApprox::ExecuteScalar(const uint64_t cell_id) {
 uint64_t Parent::ExecuteScalar(const uint64_t cell_id, const int8_t level) {
   // allow negative numbers to relate to current level
   S2CellId cell(cell_id);
+  if (!cell.is_valid()) {
+    return kCellIdSentinel;
+  }
+
+  int8_t level_final;
+  int8_t cell_level = cell.level();
   if (level < 0) {
-    return cell.parent(cell.level() + level).id();
+    level_final = cell.level() + level;
   } else {
-    return cell.parent(level).id();
+    level_final = level;
+  }
+
+  if (level_final > cell.level() || level_final < 0) {
+    return kCellIdSentinel;
+  } else {
+    return cell.parent(level_final).id();
   }
 }
 
@@ -178,7 +190,7 @@ int8_t CommonAncestorLevel::ExecuteScalar(const uint64_t cell_id,
   S2CellId cell(cell_id);
   S2CellId cell_test(cell_id_test);
   if (!cell.is_valid() || !cell_test.is_valid()) {
-    return -1;
+    return -128;
   }
 
   return cell.GetCommonAncestorLevel(cell_test);

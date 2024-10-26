@@ -52,7 +52,9 @@ class BinaryOp {
 
   BinaryOp(const OptionsT& options = OptionsT()) : options_(options) {}
   virtual void Init() {}
-  virtual ReturnT ExecuteScalar(const ArgType0 arg0, const ArgType1 arg1) {}
+  virtual ReturnT ExecuteScalar(const ArgType0 arg0, const ArgType1 arg1) {
+    return ReturnT{};
+  }
 
  protected:
   OptionsT options_;
@@ -64,6 +66,15 @@ typename Op::ReturnT Execute(typename Op::ArgType0 arg0) {
   op.Init();
 
   return op.ExecuteScalar(arg0);
+}
+
+template <typename Op>
+typename Op::ReturnT Execute(typename Op::ArgType0 arg0,
+                             typename Op::ArgType1 arg1) {
+  Op op;
+  op.Init();
+
+  return op.ExecuteScalar(arg0, arg1);
 }
 
 // This overload allow executing functions that return std::string_view,
