@@ -672,6 +672,11 @@ void Reader::ReadGeography(const ArrowArray* array, int64_t offset,
   impl_->ReadGeography(array, offset, length, out);
 }
 
+// Write Geography objects to a GeoArrow array.
+//
+// This class walks through the geographies and calls the visitor methods
+// provided by the geoarrow-c GeoArrowArrayWriter, which then builds up the
+// GeoArrow array.
 class WriterImpl {
  public:
   WriterImpl() {
