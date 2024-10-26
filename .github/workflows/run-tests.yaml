@@ -19,12 +19,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup mambaforge
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v3
         with:
-          miniforge-variant: Mambaforge
+          miniforge-variant: Miniforge3
           miniforge-version: latest
           activate-environment: s2geography-dev
           use-mamba: true
+          mamba-version: "*"
 
       - name: Get Date
         id: get-date

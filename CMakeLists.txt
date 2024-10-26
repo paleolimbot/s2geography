@@ -48,7 +48,9 @@ endif()
 
 # --- s2geometry
 
-if(DEFINED ENV{CONDA_PREFIX})
+if(TARGET s2::s2)
+  set(S2GEOGRAPHY_S2_SOURCE_DEFAULT "NONE")
+elseif(DEFINED ENV{CONDA_PREFIX})
   set(S2GEOGRAPHY_S2_SOURCE_DEFAULT "CONDA")
 else()
   set(S2GEOGRAPHY_S2_SOURCE_DEFAULT "AUTO")
@@ -108,8 +110,8 @@ macro(build_s2)
 
   FetchContent_MakeAvailable(s2)
 
-  # silent warnings in s2 headers
-  # (note: the S2_USE_SYSTEM_INCLUDES=ON option doesn't seem to worl with FetchContent)
+  # silence warnings in s2 headers
+  # (note: the S2_USE_SYSTEM_INCLUDES=ON option doesn't seem to work with FetchContent)
   # (TODO: remove this and instead add SYSTEM in FetchContent_Declare - requires CMake >=3.25)
   get_target_property(S2_IID s2 INTERFACE_INCLUDE_DIRECTORIES)
   set_target_properties(s2 PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${S2_IID}")
@@ -146,18 +148,6 @@ elseif(${S2_SOURCE} STREQUAL "SYSTEM")
     message(FATAL_ERROR "Couldn't find s2geometry")
   endif()
 endif()
-
-if (MSVC AND NOT ${S2_SOURCE} STREQUAL "BUNDLED")
-  # used in s2geometry's CMakeLists.txt but not defined in target
-  target_compile_definitions(s2::s2 INTERFACE _USE_MATH_DEFINES)
-  target_compile_definitions(s2::s2 INTERFACE NOMINMAX)
-  target_compile_options(s2::s2 INTERFACE /J)
-endif()
-
-# this might be needed since s2geometry includes it in general
-# but not for any target explicilty?
-find_package(OpenSSL REQUIRED)
-target_include_directories(${s2_NOALIAS_TARGET} INTERFACE ${OPENSSL_INCLUDE_DIR})
 
 # --- Abseil (bundled build not supported)
 
@@ -221,8 +211,9 @@ add_library(s2geography
     src/vendored/ryu/d2s.c
     src/vendored/geoarrow/double_parse_fast_float.cc)
 
-set_target_properties(s2geography PROPERTIES
-    POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+if(NOT BUILD_SHARED_LIBS)
+  set_target_properties(s2geography PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
 
 target_include_directories(
   s2geography
@@ -243,6 +234,13 @@ target_compile_definitions(
   GEOARROW_USE_RYU=1
   GEOARROW_NAMESPACE=S2Geography)
 
+if (MSVC)
+  # used in s2geometry's CMakeLists.txt but not defined in target
+  target_compile_definitions(s2geography PUBLIC _USE_MATH_DEFINES)
+  target_compile_definitions(s2geography PUBLIC NOMINMAX)
+  target_compile_options(s2geography PUBLIC /J)
+endif()
+
 target_link_libraries(
   s2geography
   PUBLIC
@@ -256,6 +254,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
 
   add_executable(distance_test src/s2geography/distance_test.cc)
   add_executable(geoarrow_test src/s2geography/geoarrow_test.cc)
+  add_executable(geography_test src/s2geography/geography_test.cc)
   add_executable(wkt_writer_test src/s2geography/wkt-writer_test.cc)
 
   if (S2GEOGRAPHY_CODE_COVERAGE)
@@ -266,11 +265,13 @@ if(S2GEOGRAPHY_BUILD_TESTS)
 
   target_link_libraries(distance_test s2geography GTest::gtest_main)
   target_link_libraries(geoarrow_test s2geography nanoarrow GTest::gtest_main)
+  target_link_libraries(geography_test s2geography nanoarrow GTest::gtest_main)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
 
   include(GoogleTest)
   gtest_discover_tests(distance_test)
   gtest_discover_tests(geoarrow_test)
+  gtest_discover_tests(geography_test)
   gtest_discover_tests(wkt_writer_test)
 endif()
 
