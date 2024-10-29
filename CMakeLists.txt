@@ -206,6 +206,8 @@ add_library(s2geography
     src/s2geography/geoarrow.cc
     src/s2geography/wkt-reader.cc
     src/s2geography/wkt-writer.cc
+    src/s2geography/op/cell.cc
+    src/s2geography/op/point.cc
     # geoarrow sources
     src/vendored/geoarrow/geoarrow.c
     src/vendored/ryu/d2s.c
@@ -256,6 +258,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   add_executable(geoarrow_test src/s2geography/geoarrow_test.cc)
   add_executable(geography_test src/s2geography/geography_test.cc)
   add_executable(wkt_writer_test src/s2geography/wkt-writer_test.cc)
+  add_executable(op_cell_test src/s2geography/op/cell_test.cc)
 
   if (S2GEOGRAPHY_CODE_COVERAGE)
     target_compile_options(coverage_config INTERFACE -O0 -g --coverage)
@@ -267,12 +270,14 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   target_link_libraries(geoarrow_test s2geography nanoarrow GTest::gtest_main)
   target_link_libraries(geography_test s2geography nanoarrow GTest::gtest_main)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
+  target_link_libraries(op_cell_test s2geography GTest::gtest_main)
 
   include(GoogleTest)
   gtest_discover_tests(distance_test)
   gtest_discover_tests(geoarrow_test)
   gtest_discover_tests(geography_test)
   gtest_discover_tests(wkt_writer_test)
+  gtest_discover_tests(op_cell_test)
 endif()
 
 if(S2GEOGRAPHY_BUILD_EXAMPLES)
