@@ -8972,7 +8972,7 @@ static int coords_wkt(struct GeoArrowVisitor* v, const struct GeoArrowCoordView*
 
   int64_t max_chars_needed = (n_coords * 2) +  // space + comma after coordinate
                              (n_coords * (n_dims - 1)) +  // spaces between ordinates
-                             ((private->precision + 1 + 5) * n_coords *
+                             ((private->precision + 1 + 10) * n_coords *
                               n_dims);  // significant digits + decimal + exponent
   if (private->max_element_size_bytes >= 0 &&
       max_chars_needed > private->max_element_size_bytes) {

@@ -17,6 +17,7 @@ namespace geoarrow {
 const char* version();
 
 S2::Projection* lnglat();
+S2::Projection* mercator();
 
 /// \brief Options used to build Geography objects from GeoArrow arrays
 
