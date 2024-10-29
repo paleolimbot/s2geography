@@ -8,9 +8,9 @@ namespace s2geography {
 
 WKTWriter::WKTWriter() : WKTWriter(16) {}
 
-WKTWriter::WKTWriter(int significant_digits) {
+WKTWriter::WKTWriter(int precision) {
   geoarrow::ExportOptions options;
-  options.set_significant_digits(significant_digits);
+  options.set_precision(precision);
 
   writer_ = absl::make_unique<geoarrow::Writer>();
   writer_->Init(geoarrow::Writer::OutputType::kWKT, options);

@@ -82,12 +82,13 @@ class ExportOptions : public TessellationOptions {
  public:
   ExportOptions()
       : TessellationOptions(),
-        significant_digits_(16) {}
-  int significant_digits() const { return significant_digits_; }
-  void set_significant_digits(int significant_digits) { significant_digits_ = significant_digits; }
+        precision_(16) {}
+  // The number of digits after the decimal to output in WKT (default 16)
+  int precision() const { return precision_; }
+  void set_precision(int precision) { precision_ = precision; }
 
  private:
-  int significant_digits_;
+  int precision_;
 };
 
 class WriterImpl;

@@ -718,7 +718,7 @@ class WriterImpl {
     int code;
 
     if (type_ == GEOARROW_TYPE_WKT || type_ == GEOARROW_TYPE_LARGE_WKT) {
-      code = GeoArrowArrayWriterSetPrecision(&writer_, options_.significant_digits());
+      code = GeoArrowArrayWriterSetPrecision(&writer_, options_.precision());
       ThrowNotOk(code);
       code = GeoArrowArrayWriterSetFlatMultipoint(&writer_, false);
       ThrowNotOk(code);

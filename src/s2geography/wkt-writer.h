@@ -12,7 +12,7 @@ namespace s2geography {
 class WKTWriter {
  public:
   WKTWriter();
-  WKTWriter(int significant_digits);
+  WKTWriter(int precision);
   WKTWriter(const geoarrow::ExportOptions& options);
 
   std::string write_feature(const Geography& geog);
