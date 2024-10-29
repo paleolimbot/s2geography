@@ -1,8 +1,11 @@
-
+#include <gmock/gmock-matchers.h>
 #include <gtest/gtest.h>
 
 #include "nanoarrow/nanoarrow.hpp"
 #include "s2geography.h"
+
+using testing::ElementsAre;
+using testing::DoubleEq;
 
 void InitArrayWKT(ArrowArray* array, std::vector<std::string> values) {
   NANOARROW_THROW_NOT_OK(ArrowArrayInitFromType(array, NANOARROW_TYPE_STRING));
@@ -201,4 +204,50 @@ TEST(GeoArrow, GeoArrowReaderReadWKTCollection) {
   ASSERT_EQ(linestring->num_edges(), 1);
   EXPECT_EQ(linestring->edge(0).v0, S2LatLng::FromDegrees(1, 0).ToPoint());
   EXPECT_EQ(linestring->edge(0).v1, S2LatLng::FromDegrees(3, 2).ToPoint());
+}
+
+using s2geography::geoarrow::Writer;
+
+TEST(GeoArrow, GeoArrowWriterPoint) {
+  s2geography::WKTReader reader;
+  auto geog1 = reader.read_feature("POINT (0 1)");
+  auto geog2 = reader.read_feature("POINT (1 3)");
+
+  Writer writer;
+  nanoarrow::UniqueSchema schema;
+  nanoarrow::UniqueArray array;
+
+  InitSchemaGeoArrowPoint(schema.get());
+  writer.Init(schema.get());
+
+  writer.WriteGeography(*geog1);
+  writer.WriteGeography(*geog2);
+  writer.Finish(array.get());
+
+  EXPECT_EQ(array->length, 2);
+  EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[0]), ElementsAre(0.0, 1.0));
+  EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[1]), ElementsAre(1.0, 2.0));
+}
+
+TEST(GeoArrow, GeoArrowWriterPointProjected) {
+  s2geography::WKTReader reader;
+  auto geog1 = reader.read_feature("POINT (0 1)");
+  auto geog2 = reader.read_feature("POINT (1 2)");
+
+  Writer writer;
+  nanoarrow::UniqueSchema schema;
+  nanoarrow::UniqueArray array;
+
+  s2geography::geoarrow::ExportOptions options;
+  options.set_projection(s2geography::geoarrow::mercator());
+  InitSchemaGeoArrowPoint(schema.get());
+  writer.Init(schema.get(), options);
+
+  writer.WriteGeography(*geog1);
+  writer.WriteGeography(*geog2);
+  writer.Finish(array.get());
+
+  EXPECT_EQ(array->length, 2);
+  // EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[0]), ElementsAre(0.0, 111325.14286638441));
+  // EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[1]), ElementsAre(1.0, 2.0));
 }

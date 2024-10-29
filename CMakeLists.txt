@@ -267,7 +267,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   endif()
 
   target_link_libraries(distance_test s2geography GTest::gtest_main)
-  target_link_libraries(geoarrow_test s2geography nanoarrow GTest::gtest_main)
+  target_link_libraries(geoarrow_test s2geography nanoarrow GTest::gtest_main GTest::gmock)
   target_link_libraries(geography_test s2geography nanoarrow GTest::gtest_main)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
   target_link_libraries(op_cell_test s2geography GTest::gtest_main)

@@ -765,6 +765,12 @@ class WriterImpl {
   std::unique_ptr<S2EdgeTessellator> tessellator_;
   std::vector<R2Point> points_;
 
+  void ProjectS2Point(const S2Point& pt) {
+    R2Point out = options_.projection()->Project(pt);
+    coords_[0] = out.x();
+    coords_[1] = out.y();
+  }
+
   int VisitPoints(const PointGeography& point) {
 
     if (point.Points().size() == 0) {
@@ -777,9 +783,7 @@ class WriterImpl {
       // Point
       GEOARROW_RETURN_NOT_OK(visitor_.geom_start(
           &visitor_, GEOARROW_GEOMETRY_TYPE_POINT, GEOARROW_DIMENSIONS_XY));
-      S2LatLng ll(point.Points()[0]);
-      coords_[0] = ll.lng().degrees();
-      coords_[1] = ll.lat().degrees();
+      ProjectS2Point(point.Points()[0]);
       GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
       GEOARROW_RETURN_NOT_OK(visitor_.geom_end(&visitor_));
 
@@ -792,9 +796,7 @@ class WriterImpl {
       for (const S2Point& pt : point.Points()) {
         GEOARROW_RETURN_NOT_OK(visitor_.geom_start(
             &visitor_, GEOARROW_GEOMETRY_TYPE_POINT, GEOARROW_DIMENSIONS_XY));
-        S2LatLng ll(pt);
-        coords_[0] = ll.lng().degrees();
-        coords_[1] = ll.lat().degrees();
+        ProjectS2Point(pt);
         GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
         GEOARROW_RETURN_NOT_OK(visitor_.geom_end(&visitor_));
       }
