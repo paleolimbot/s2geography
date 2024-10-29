@@ -19,17 +19,12 @@ const char* version();
 S2::Projection* lnglat();
 
 /// \brief Options used to build Geography objects from GeoArrow arrays
-class ImportOptions {
+
+class TessellationOptions {
  public:
-  ImportOptions()
-      : oriented_(false),
-        check_(true),
-        projection_(lnglat()),
+  TessellationOptions()
+      : projection_(lnglat()),
         tessellate_tolerance_(S1Angle::Infinity()) {}
-  bool oriented() const { return oriented_; }
-  void set_oriented(bool oriented) { oriented_ = oriented; }
-  bool check() const { return check_; }
-  void set_check(bool check) { check_ = check; }
   S2::Projection* projection() const { return projection_; }
   void set_projection(S2::Projection* projection) { projection_ = projection; }
   S1Angle tessellate_tolerance() const { return tessellate_tolerance_; }
@@ -37,11 +32,25 @@ class ImportOptions {
     tessellate_tolerance_ = tessellate_tolerance;
   }
 
+ protected:
+  S2::Projection* projection_;
+  S1Angle tessellate_tolerance_;
+};
+
+class ImportOptions : public TessellationOptions {
+ public:
+  ImportOptions()
+      : TessellationOptions(),
+        oriented_(false),
+        check_(true) {}
+  bool oriented() const { return oriented_; }
+  void set_oriented(bool oriented) { oriented_ = oriented; }
+  bool check() const { return check_; }
+  void set_check(bool check) { check_ = check; }
+
  private:
   bool oriented_;
   bool check_;
-  S2::Projection* projection_;
-  S1Angle tessellate_tolerance_;
 };
 
 class ReaderImpl;
@@ -67,6 +76,48 @@ class Reader {
 
  private:
   std::unique_ptr<ReaderImpl> impl_;
+};
+
+class ExportOptions : public TessellationOptions {
+ public:
+  ExportOptions()
+      : TessellationOptions(),
+        precision_(16) {}
+  // The number of digits after the decimal to output in WKT (default 16)
+  int precision() const { return precision_; }
+  void set_precision(int precision) { precision_ = precision; }
+
+ private:
+  int precision_;
+};
+
+class WriterImpl;
+
+/// \brief Array writer for any GeoArrow extension array
+///
+/// This class is used to convert Geography objects into an ArrowArray
+/// with geoarrow data (serialized or native).
+class Writer {
+ public:
+  enum class OutputType { kWKT, kWKB };
+  Writer();
+  ~Writer();
+
+  void Init(const ArrowSchema* schema) { Init(schema, ExportOptions()); }
+
+  void Init(const ArrowSchema* schema, const ExportOptions& options);
+
+  void Init(OutputType output_type, const ExportOptions& options);
+
+  void WriteGeography(const Geography& geog);
+
+  // TODO
+  // void WriteNull()
+
+  void Finish(struct ArrowArray* out);
+
+ private:
+  std::unique_ptr<WriterImpl> impl_;
 };
 
 }  // namespace geoarrow
