@@ -110,6 +110,9 @@ class Writer {
 
   void WriteGeography(const Geography& geog);
 
+  // TODO
+  // void WriteNull()
+
   void Finish(struct ArrowArray* out);
 
  private:
