@@ -696,11 +696,17 @@ class WriterImpl {
     int code = GeoArrowArrayWriterInitFromSchema(&writer_, schema);
     ThrowNotOk(code);
 
+    GeoArrowSchemaView schema_view;
+    code = GeoArrowSchemaViewInit(&schema_view, schema, &error_);
+    ThrowNotOk(code);
+    type_ = schema_view.type;
+
     InitCommon();
   }
 
   void Init(GeoArrowType type, const ExportOptions& options) {
     options_ = options;
+    type_ = type;
 
     int code = GeoArrowArrayWriterInitFromType(&writer_, type);
     ThrowNotOk(code);
@@ -709,8 +715,17 @@ class WriterImpl {
   }
 
   void InitCommon() {
+    int code;
+
+    if (type_ == GEOARROW_TYPE_WKT || type_ == GEOARROW_TYPE_LARGE_WKT) {
+      code = GeoArrowArrayWriterSetPrecision(&writer_, options_.significant_digits());
+      ThrowNotOk(code);
+      code = GeoArrowArrayWriterSetFlatMultipoint(&writer_, false);
+      ThrowNotOk(code);
+    }
+
     visitor_.error = &error_;
-    int code = GeoArrowArrayWriterInitVisitor(&writer_, &visitor_);
+    code = GeoArrowArrayWriterInitVisitor(&writer_, &visitor_);
     ThrowNotOk(code);
 
     // Currently we always visit single coordinate pairs one by one, so set
@@ -731,6 +746,7 @@ class WriterImpl {
 
  private:
   ExportOptions options_;
+  GeoArrowType type_;
   GeoArrowArrayWriter writer_;
   GeoArrowVisitor visitor_;
   GeoArrowCoordView coords_view_;

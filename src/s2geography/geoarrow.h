@@ -82,7 +82,7 @@ class ExportOptions : public TessellationOptions {
  public:
   ExportOptions()
       : TessellationOptions(),
-        significant_digits_(6) {}
+        significant_digits_(16) {}
   int significant_digits() const { return significant_digits_; }
   void set_significant_digits(int significant_digits) { significant_digits_ = significant_digits; }
 
