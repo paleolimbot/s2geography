@@ -924,6 +924,11 @@ GeoArrowErrorCode GeoArrowArrayViewVisit(const struct GeoArrowArrayView* array_v
 /// This struct also contains options for well-known text serialization.
 /// These options can be modified from the defaults after
 /// GeoArrowWKTWriterInit() and before GeoArrowWKTWriterInitVisitor().
+///
+/// Note that whether or not GeoArrow was compiled with ryu has a significant
+/// impact on the output: notably, ryu is locale-independent and much faster.
+/// GeoArrow can fall back on using snprintf(); however, this will result in
+/// invalid WKT for locales other than the C locale.
 struct GeoArrowWKTWriter {
   /// \brief The number of significant digits to include in the output (default: 16)
   int precision;

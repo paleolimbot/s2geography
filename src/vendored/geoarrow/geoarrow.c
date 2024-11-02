@@ -8864,6 +8864,9 @@ static inline int WKTWriterWrite(struct WKTWriterPrivate* private, const char* v
 
 static inline void WKTWriterWriteDoubleUnsafe(struct WKTWriterPrivate* private,
                                               double value) {
+  // Always ensure that we have at least 40 writable bytes remaining before calling
+  // GeoArrowPrintDouble()
+  NANOARROW_DCHECK((private->values.capacity_bytes - private->values.size_bytes) >= 40);
   private->values.size_bytes +=
       GeoArrowPrintDouble(value, private->precision,
                           ((char*)private->values.data) + private->values.size_bytes);
@@ -8970,20 +8973,29 @@ static int coords_wkt(struct GeoArrowVisitor* v, const struct GeoArrowCoordView*
   struct WKTWriterPrivate* private = (struct WKTWriterPrivate*)v->private_data;
   NANOARROW_RETURN_NOT_OK(WKTWriterCheckLevel(private));
 
-  int64_t max_chars_needed = (n_coords * 2) +  // space + comma after coordinate
-                             (n_coords * (n_dims - 1)) +  // spaces between ordinates
-                             ((private->precision + 1 + 5) * n_coords *
-                              n_dims);  // significant digits + decimal + exponent
-  if (private->max_element_size_bytes >= 0 &&
-      max_chars_needed > private->max_element_size_bytes) {
-    // Because we write a coordinate before actually checking
-    max_chars_needed = private->max_element_size_bytes + 1024;
-  }
+  int64_t max_chars_per_coord_theoretical =
+      // space + comma after coordinate
+      (n_coords * 2) +
+      // spaces between ordinates
+      (n_coords * (n_dims - 1)) +
+      // GeoArrowPrintDouble might require up to 40 accessible bytes per call
+      (40 * n_dims);
 
-  NANOARROW_RETURN_NOT_OK(ArrowBufferReserve(&private->values, max_chars_needed));
+  // Use a heuristic to estimate the number of characters we are about to write
+  // to avoid more then one allocation for this call. This is normally substantially
+  // less than the theoretical amount.
+  int64_t max_chars_estimated =
+      (n_coords * 2) +             // space + comma after coordinate
+      (n_coords * (n_dims - 1)) +  // spaces between ordinates
+      // precision + decimal + estimate of normal
+      // digits to the left of the decimal
+      ((private->precision + 1 + 8) * n_coords * n_dims) +
+      // Ensure that the last reserve() call doesn't trigger an allocation
+      max_chars_per_coord_theoretical;
+  NANOARROW_RETURN_NOT_OK(ArrowBufferReserve(&private->values, max_chars_estimated));
 
   // Write the first coordinate, possibly with a leading comma if there was
-  // a previous call to coords, or the opening ( if it wasn't. Special case
+  // a previous call to coords, or the opening (if it wasn't). Special case
   // for the flat multipoint output MULTIPOINT (1 2, 3 4, ...) which doesn't
   // have extra () for inner POINTs
   if (private->i[private->level] != 0) {
@@ -8994,25 +9006,34 @@ static int coords_wkt(struct GeoArrowVisitor* v, const struct GeoArrowCoordView*
     ArrowBufferAppendUnsafe(&private->values, "(", 1);
   }
 
-  WKTWriterWriteDoubleUnsafe(private, coords->values[0][0]);
+  // Actually write the first coordinate (no leading comma)
+  // Reserve the theoretical amount for each coordinate because we need this to guarantee
+  // that there won't be a segfault when writing a coordinate. This probably results in
+  // a few dozen bytes of of overallocation.
+  NANOARROW_RETURN_NOT_OK(
+      ArrowBufferReserve(&private->values, max_chars_per_coord_theoretical));
+  WKTWriterWriteDoubleUnsafe(private, GEOARROW_COORD_VIEW_VALUE(coords, 0, 0));
   for (int32_t j = 1; j < n_dims; j++) {
     ArrowBufferAppendUnsafe(&private->values, " ", 1);
-    WKTWriterWriteDoubleUnsafe(private, coords->values[j][0]);
+    WKTWriterWriteDoubleUnsafe(private, GEOARROW_COORD_VIEW_VALUE(coords, 0, j));
   }
 
   // Write the remaining coordinates (which all have leading commas)
   for (int64_t i = 1; i < n_coords; i++) {
+    // Check if we've hit our max number of bytes for this feature
     if (private->max_element_size_bytes >= 0 &&
         (private->values.size_bytes - private->values_feat_start) >=
             private->max_element_size_bytes) {
       return EAGAIN;
     }
 
+    NANOARROW_RETURN_NOT_OK(
+        ArrowBufferReserve(&private->values, max_chars_per_coord_theoretical));
     ArrowBufferAppendUnsafe(&private->values, ", ", 2);
-    WKTWriterWriteDoubleUnsafe(private, coords->values[0][i * coords->coords_stride]);
+    WKTWriterWriteDoubleUnsafe(private, GEOARROW_COORD_VIEW_VALUE(coords, i, 0));
     for (int32_t j = 1; j < n_dims; j++) {
       ArrowBufferAppendUnsafe(&private->values, " ", 1);
-      WKTWriterWriteDoubleUnsafe(private, coords->values[j][i * coords->coords_stride]);
+      WKTWriterWriteDoubleUnsafe(private, GEOARROW_COORD_VIEW_VALUE(coords, i, j));
     }
   }
 
@@ -9105,7 +9126,14 @@ void GeoArrowWKTWriterInitVisitor(struct GeoArrowWKTWriter* writer,
   GeoArrowVisitorInitVoid(v);
 
   struct WKTWriterPrivate* private = (struct WKTWriterPrivate*)writer->private_data;
-  private->precision = writer->precision;
+
+  // Clamp writer->precision to a specific range of valid values
+  if (writer->precision < 0 || writer->precision > 16) {
+    private->precision = 16;
+  } else {
+    private->precision = writer->precision;
+  }
+
   private->use_flat_multipoint = writer->use_flat_multipoint;
   private->max_element_size_bytes = writer->max_element_size_bytes;
 
@@ -13269,20 +13297,36 @@ ArrowErrorCode ArrowBasicArrayStreamValidate(const struct ArrowArrayStream* arra
 
 
 
+#include <stdio.h>
+
 #if defined(GEOARROW_USE_RYU) && GEOARROW_USE_RYU
 
 #include "ryu/ryu.h"
 
 int64_t GeoArrowPrintDouble(double f, uint32_t precision, char* result) {
-  return GeoArrowd2sfixed_buffered_n(f, precision, result);
+  // Use exponential to serialize very large numbers in scientific notation
+  // and ignore user precision for these cases.
+  if (f > 1.0e17 || f < -1.0e17) {
+    return GeoArrowd2sexp_buffered_n(f, 17, result);
+  } else {
+    // Note: d2sfixed_buffered_n() may write up to 310 characters into result
+    // for the case where f is the minimum possible double value.
+    return GeoArrowd2sfixed_buffered_n(f, precision, result);
+  }
 }
 
 #else
 
-#include <stdio.h>
-
 int64_t GeoArrowPrintDouble(double f, uint32_t precision, char* result) {
-  int64_t n_chars = snprintf(result, 128, "%0.*f", precision, f);
+  // For very large numbers, use scientific notation ignoring user precision
+  if (f > 1.0e17 || f < -1.0e17) {
+    return snprintf(result, 40, "%0.*e", 16, f);
+  }
+
+  int64_t n_chars = snprintf(result, 40, "%0.*f", precision, f);
+  if (n_chars > 39) {
+    n_chars = 39;
+  }
 
   // Strip trailing zeroes + decimal
   for (int64_t i = n_chars - 1; i >= 0; i--) {
