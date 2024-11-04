@@ -405,7 +405,7 @@ void EncodedShapeIndexGeography::Decode(Decoder* decoder,
   auto new_index = absl::make_unique<EncodedS2ShapeIndex>();
   S2Error error;
 
-#if defined(S2_VERSION_MAJOR) && S2_VERSION_MINOR > 11
+#if defined(S2_TAGGED_SHAPE_FACTORY_WITH_ERROR)
   shape_factory_ = absl::make_unique<s2shapeutil::TaggedShapeFactory>(
       s2shapeutil::LazyDecodeShape, decoder, error);
 #else
