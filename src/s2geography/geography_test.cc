@@ -41,10 +41,24 @@ TEST(Geography, EmptyCollection) {
   EXPECT_TRUE(geog.Features().empty());
 }
 
-TEST(Geography, ShapeIndex) {
+TEST(Geography, EmptyShapeIndex) {
   ShapeIndexGeography geog;
   EXPECT_EQ(geog.kind(), GeographyKind::SHAPE_INDEX);
   EXPECT_EQ(geog.num_shapes(), 0);
   EXPECT_EQ(geog.dimension(), -1);
   EXPECT_EQ(geog.ShapeIndex().num_shape_ids(), 0);
+}
+
+TEST(Geography, EncodedPoint) {
+  S2LatLng pt = S2LatLng::FromDegrees(45, -64);
+  Encoder encoder;
+
+  PointGeography geog(pt.ToPoint());
+  geog.EncodeTagged(&encoder);
+
+  Decoder decoder(encoder.base(), encoder.length());
+  auto roundtrip = Geography::DecodeTagged(&decoder);
+  ASSERT_EQ(roundtrip->kind(), GeographyKind::POINT);
+
+  auto roundtrip_typed = reinterpret_cast<PointGeography*>(roundtrip.get());
 }

@@ -35,9 +35,7 @@ enum class GeographyKind {
 
 struct EncodeOptions {
   static constexpr uint16_t kFlagCompact = 1;
-
-  GeographyKind kind{GeographyKind::OTHER};
-  uint16_t flags{};
+  uint16_t flags{kFlagCompact};
 };
 
 // An Geography is an abstraction of S2 types that is designed to closely
@@ -97,7 +95,8 @@ class Geography {
   // encapsulating information (e.g., which geography type or flags).
   virtual void Encode(Encoder* encoder, const EncodeOptions& options) const = 0;
 
-  void EncodeTagged(Encoder* encoder, const EncodeOptions& options) const;
+  void EncodeTagged(Encoder* encoder,
+                    const EncodeOptions& options = EncodeOptions()) const;
 
   static std::unique_ptr<Geography> DecodeTagged(Decoder* decoder);
 
