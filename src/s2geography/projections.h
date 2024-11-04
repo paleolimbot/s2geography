@@ -15,4 +15,9 @@ S2::Projection* lnglat();
 // coordinates, known as the "Web Mercator" projection.
 S2::Projection* mercator();
 
+// Constructs an orthographic projection with the given centre point. The
+// resulting coordinates depict a single hemisphere of the globe as it appears
+// from outer space, centred on the given point.
+S2::Projection* orthographic(const S2LatLng& centre);
+
 }  // namespace s2geography
