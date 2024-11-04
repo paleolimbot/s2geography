@@ -1,12 +1,19 @@
 
 #pragma once
 
+#include <s2/s2cell_id.h>
+#include <s2/s2latlng.h>
+#include <s2/s2point.h>
 #include <s2/s2polygon.h>
 #include <s2/s2polyline.h>
+#include <s2/s2region.h>
+#include <s2/s2shape.h>
+#include <s2/s2shape_index.h>
 #include <stdint.h>
 
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace s2geography {
 
@@ -22,6 +29,7 @@ enum class GeographyKind {
   POLYGON = 3,
   GEOGRAPHY_COLLECTION = 4,
   SHAPE_INDEX = 5,
+  ENCODED_SHAPE_INDEX = 6,
   OTHER = 9999
 };
 
@@ -143,20 +151,12 @@ class PolylineGeography : public Geography {
 // perspective).
 class PolygonGeography : public Geography {
  public:
-  PolygonGeography()
-      : Geography(GeographyKind::POLYGON),
-        polygon_(std::make_unique<S2Polygon>()) {}
+  PolygonGeography();
   PolygonGeography(std::unique_ptr<S2Polygon> polygon)
       : Geography(GeographyKind::POLYGON), polygon_(std::move(polygon)) {}
 
   int dimension() const { return 2; }
-  int num_shapes() const {
-    if (polygon_->is_empty()) {
-      return 0;
-    } else {
-      return 1;
-    }
-  }
+  int num_shapes() const;
   std::unique_ptr<S2Shape> Shape(int id) const;
   std::unique_ptr<S2Region> Region() const;
   void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const;
@@ -198,7 +198,7 @@ class GeographyCollection : public Geography {
   int total_shapes_;
 };
 
-// An Geography with a MutableS2ShapeIndex as the underlying data.
+// A Geography with a MutableS2ShapeIndex as the underlying data.
 // These are used as inputs for operations that are implemented in S2
 // using the S2ShapeIndex (e.g., boolean operations). If an Geography
 // instance will be used repeatedly, it will be faster to construct
@@ -207,11 +207,8 @@ class GeographyCollection : public Geography {
 // valid for the scope of those objects.
 class ShapeIndexGeography : public Geography {
  public:
-  ShapeIndexGeography(
-      MutableS2ShapeIndex::Options options = MutableS2ShapeIndex::Options())
-      : Geography(GeographyKind::SHAPE_INDEX) {
-        shape_index_ = absl::make_unique<MutableS2ShapeIndex>(options);
-      }
+  ShapeIndexGeography();
+  ShapeIndexGeography(int max_edges_per_cell);
 
   explicit ShapeIndexGeography(const Geography& geog)
       : Geography(GeographyKind::SHAPE_INDEX) {
@@ -222,6 +219,23 @@ class ShapeIndexGeography : public Geography {
   // that was added to the index or -1 if no shapes were added
   // to the index.
   int Add(const Geography& geog);
+
+  int num_shapes() const;
+  std::unique_ptr<S2Shape> Shape(int id) const;
+  std::unique_ptr<S2Region> Region() const;
+
+  const S2ShapeIndex& ShapeIndex() const { return *shape_index_; }
+
+ private:
+  std::unique_ptr<S2ShapeIndex> shape_index_;
+};
+
+// A Geography with a EncodedS2ShapeIndex as the underlying data.
+// This is to facilitate decoding, whereas a MutableS2ShapeIndex is
+// used to construct the S2ShapeIndex required for many S2 operations.
+class EncodedShapeIndexGeography : public Geography {
+ public:
+  EncodedShapeIndexGeography();
 
   int num_shapes() const;
   std::unique_ptr<S2Shape> Shape(int id) const;

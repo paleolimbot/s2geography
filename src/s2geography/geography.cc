@@ -1,6 +1,7 @@
 
 #include "s2geography/geography.h"
 
+#include <s2/encoded_s2shape_index.h>
 #include <s2/mutable_s2shape_index.h>
 #include <s2/s2point_region.h>
 #include <s2/s2point_vector_shape.h>
@@ -130,6 +131,18 @@ void PolylineGeography::GetCellUnionBound(
   }
 }
 
+PolygonGeography::PolygonGeography()
+    : Geography(GeographyKind::POLYGON),
+      polygon_(std::make_unique<S2Polygon>()) {}
+
+int PolygonGeography::num_shapes() const {
+  if (polygon_->is_empty()) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+
 std::unique_ptr<S2Shape> PolygonGeography::Shape(int /*id*/) const {
   return absl::make_unique<S2Polygon::Shape>(polygon_.get());
 }
@@ -144,6 +157,18 @@ void PolygonGeography::GetCellUnionBound(
 }
 
 int GeographyCollection::num_shapes() const { return total_shapes_; }
+
+ShapeIndexGeography::ShapeIndexGeography()
+    : Geography(GeographyKind::SHAPE_INDEX) {
+  shape_index_ = absl::make_unique<MutableS2ShapeIndex>();
+}
+
+ShapeIndexGeography::ShapeIndexGeography(int max_edges_per_cell)
+    : Geography(GeographyKind::SHAPE_INDEX) {
+  MutableS2ShapeIndex::Options options;
+  options.set_max_edges_per_cell(max_edges_per_cell);
+  shape_index_ = absl::make_unique<MutableS2ShapeIndex>(options);
+}
 
 std::unique_ptr<S2Shape> GeographyCollection::Shape(int id) const {
   int sum_shapes_ = 0;
@@ -191,4 +216,25 @@ int ShapeIndexGeography::Add(const Geography& geog) {
     id = mutable_index->Add(geog.Shape(i));
   }
   return id;
+}
+
+EncodedShapeIndexGeography::EncodedShapeIndexGeography()
+    : Geography(GeographyKind::ENCODED_SHAPE_INDEX) {
+  shape_index_ = absl::make_unique<EncodedS2ShapeIndex>();
+}
+
+int EncodedShapeIndexGeography::num_shapes() const {
+  return shape_index_->num_shape_ids();
+}
+
+std::unique_ptr<S2Shape> EncodedShapeIndexGeography::Shape(int id) const {
+  const S2Shape* shape = shape_index_->shape(id);
+  return std::unique_ptr<S2Shape>(new S2ShapeWrapper(shape));
+}
+
+std::unique_ptr<S2Region> EncodedShapeIndexGeography::Region() const {
+  auto mutable_index =
+      reinterpret_cast<EncodedS2ShapeIndex*>(shape_index_.get());
+  return absl::make_unique<S2ShapeIndexRegion<EncodedS2ShapeIndex>>(
+      mutable_index);
 }
