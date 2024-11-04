@@ -79,7 +79,8 @@ void Geography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
       cell_ids);
 }
 
-std::unique_ptr<S2Shape> PointGeography::Shape(int /*id*/) const {
+std::unique_ptr<S2Shape> PointGeography::Shape(int id) const {
+  DCHECK(id == 0);
   return absl::make_unique<S2PointVectorShape>(points_);
 }
 

@@ -15,6 +15,16 @@ class Exception : public std::runtime_error {
   Exception(std::string what) : std::runtime_error(what.c_str()) {}
 };
 
+// enum to tag concrete Geography implementations
+enum class GeographyKind {
+  POINT = 1,
+  POLYLINE = 2,
+  POLYGON = 3,
+  GEOGRAPHY_COLLECTION = 4,
+  SHAPE_INDEX = 5,
+  OTHER = 9999
+};
+
 // An Geography is an abstraction of S2 types that is designed to closely
 // match the scope of a GEOS Geometry. Its methods are limited to those needed
 // to implement C API functions. From an S2 perspective, an Geography is an
@@ -24,7 +34,10 @@ class Exception : public std::runtime_error {
 // future abstractions where this is not the case.
 class Geography {
  public:
+  Geography(GeographyKind kind) : kind_(kind) {}
   virtual ~Geography() {}
+
+  GeographyKind kind() const { return kind_; }
 
   // Returns 0, 1, or 2 if all Shape()s that are returned will have
   // the same dimension (i.e., they are all points, all lines, or
@@ -64,18 +77,30 @@ class Geography {
   // return a small number of cells that can be used to compute a possible
   // intersection quickly.
   virtual void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const;
+
+ private:
+  GeographyKind kind_;
 };
 
 // An Geography representing zero or more points using a std::vector<S2Point>
 // as the underlying representation.
 class PointGeography : public Geography {
  public:
-  PointGeography() {}
-  PointGeography(S2Point point) { points_.push_back(point); }
-  PointGeography(std::vector<S2Point> points) : points_(std::move(points)) {}
+  PointGeography() : Geography(GeographyKind::POINT) {}
+  PointGeography(S2Point point) : Geography(GeographyKind::POINT) {
+    points_.push_back(point);
+  }
+  PointGeography(std::vector<S2Point> points)
+      : Geography(GeographyKind::POINT), points_(std::move(points)) {}
 
   int dimension() const { return 0; }
-  int num_shapes() const { return 1; }
+  int num_shapes() const {
+    if (points_.empty()) {
+      return 0;
+    } else {
+      return 1;
+    }
+  }
   std::unique_ptr<S2Shape> Shape(int id) const;
   std::unique_ptr<S2Region> Region() const;
   void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const;
@@ -90,12 +115,13 @@ class PointGeography : public Geography {
 // as the underlying representation.
 class PolylineGeography : public Geography {
  public:
-  PolylineGeography() {}
-  PolylineGeography(std::unique_ptr<S2Polyline> polyline) {
+  PolylineGeography() : Geography(GeographyKind::POLYLINE) {}
+  PolylineGeography(std::unique_ptr<S2Polyline> polyline)
+      : Geography(GeographyKind::POLYLINE) {
     polylines_.push_back(std::move(polyline));
   }
   PolylineGeography(std::vector<std::unique_ptr<S2Polyline>> polylines)
-      : polylines_(std::move(polylines)) {}
+      : Geography(GeographyKind::POLYLINE), polylines_(std::move(polylines)) {}
 
   int dimension() const { return 1; }
   int num_shapes() const;
@@ -117,12 +143,20 @@ class PolylineGeography : public Geography {
 // perspective).
 class PolygonGeography : public Geography {
  public:
-  PolygonGeography() : polygon_(std::make_unique<S2Polygon>()) {}
+  PolygonGeography()
+      : Geography(GeographyKind::POLYGON),
+        polygon_(std::make_unique<S2Polygon>()) {}
   PolygonGeography(std::unique_ptr<S2Polygon> polygon)
-      : polygon_(std::move(polygon)) {}
+      : Geography(GeographyKind::POLYGON), polygon_(std::move(polygon)) {}
 
   int dimension() const { return 2; }
-  int num_shapes() const { return 1; }
+  int num_shapes() const {
+    if (polygon_->is_empty()) {
+      return 0;
+    } else {
+      return 1;
+    }
+  }
   std::unique_ptr<S2Shape> Shape(int id) const;
   std::unique_ptr<S2Region> Region() const;
   void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const;
@@ -137,10 +171,13 @@ class PolygonGeography : public Geography {
 // can be used to represent a simple features GEOMETRYCOLLECTION.
 class GeographyCollection : public Geography {
  public:
-  GeographyCollection() : total_shapes_(0) {}
+  GeographyCollection()
+      : Geography(GeographyKind::GEOGRAPHY_COLLECTION), total_shapes_(0) {}
 
   GeographyCollection(std::vector<std::unique_ptr<Geography>> features)
-      : features_(std::move(features)), total_shapes_(0) {
+      : Geography(GeographyKind::GEOGRAPHY_COLLECTION),
+        features_(std::move(features)),
+        total_shapes_(0) {
     for (const auto& feature : features_) {
       num_shapes_.push_back(feature->num_shapes());
       total_shapes_ += feature->num_shapes();
@@ -172,9 +209,12 @@ class ShapeIndexGeography : public Geography {
  public:
   ShapeIndexGeography(
       MutableS2ShapeIndex::Options options = MutableS2ShapeIndex::Options())
-      : shape_index_(options) {}
+      : Geography(GeographyKind::SHAPE_INDEX), shape_index_(options) {}
 
-  explicit ShapeIndexGeography(const Geography& geog) { Add(geog); }
+  explicit ShapeIndexGeography(const Geography& geog)
+      : Geography(GeographyKind::SHAPE_INDEX) {
+    Add(geog);
+  }
 
   // Add a Geography to the index, returning the last shape_id
   // that was added to the index or -1 if no shapes were added
