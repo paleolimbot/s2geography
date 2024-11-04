@@ -337,22 +337,20 @@ void ShapeIndexGeography::Encode(Encoder* encoder,
   } else {
     s2shapeutil::FastEncodeTaggedShapes(*shape_index_, encoder);
   }
+
+  shape_index_->Encode(encoder);
 }
 
 void EncodedShapeIndexGeography::Encode(Encoder* encoder,
                                         const EncodeOptions& options) const {
-  if (options.flags & EncodeOptions::kFlagCompact) {
-    s2shapeutil::CompactEncodeTaggedShapes(*shape_index_, encoder);
-  } else {
-    s2shapeutil::FastEncodeTaggedShapes(*shape_index_, encoder);
-  }
+  throw Exception("Encode() not implemented for EncodedShapeIndexGeography()");
 }
 
 void EncodedShapeIndexGeography::Decode(Decoder* decoder,
                                         const EncodeOptions& options) {
   auto new_index = absl::make_unique<EncodedS2ShapeIndex>();
   S2Error error;
-  bool success = success =
+  bool success =
       new_index->Init(decoder, s2shapeutil::LazyDecodeShapeFactory(decoder));
 
   if (!success || !error.ok()) {

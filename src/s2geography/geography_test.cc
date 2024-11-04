@@ -131,3 +131,20 @@ TEST(Geography, EncodedGeographyCollection) {
   ASSERT_EQ(roundtrip_child_typed->Points().size(), 1);
   EXPECT_EQ(roundtrip_child_typed->Points()[0], pt);
 }
+
+TEST(Geography, EncodedShapeIndex) {
+  S2Point pt = S2LatLng::FromDegrees(45, -64).ToPoint();
+  Encoder encoder;
+
+  PointGeography pt_geog(pt);
+  ShapeIndexGeography geog(pt_geog);
+  geog.EncodeTagged(&encoder);
+
+  Decoder decoder(encoder.base(), encoder.length());
+  auto roundtrip = Geography::DecodeTagged(&decoder);
+  ASSERT_EQ(roundtrip->kind(), GeographyKind::ENCODED_SHAPE_INDEX);
+  ASSERT_EQ(roundtrip->num_shapes(), 1);
+  auto shape = roundtrip->Shape(0);
+  ASSERT_EQ(shape->num_edges(), 1);
+  EXPECT_EQ(shape->edge(0).v0, pt);
+}
