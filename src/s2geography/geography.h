@@ -33,6 +33,13 @@ enum class GeographyKind {
   OTHER = 9999
 };
 
+struct EncodeOptions {
+  static constexpr uint16_t kFlagCompact = 1;
+
+  GeographyKind kind{GeographyKind::OTHER};
+  uint16_t flags{};
+};
+
 // An Geography is an abstraction of S2 types that is designed to closely
 // match the scope of a GEOS Geometry. Its methods are limited to those needed
 // to implement C API functions. From an S2 perspective, an Geography is an
@@ -86,6 +93,14 @@ class Geography {
   // intersection quickly.
   virtual void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const;
 
+  // Serialize this geography to an encoder. This does not include any
+  // encapsulating information (e.g., which geography type or flags).
+  virtual void Encode(Encoder* encoder, const EncodeOptions& options) const = 0;
+
+  void EncodeTagged(Encoder* encoder, const EncodeOptions& options) const;
+
+  static std::unique_ptr<Geography> DecodeTagged(Decoder* decoder);
+
  private:
   GeographyKind kind_;
 };
@@ -115,6 +130,10 @@ class PointGeography : public Geography {
 
   const std::vector<S2Point>& Points() const { return points_; }
 
+  void Encode(Encoder* encoder, const EncodeOptions& options) const;
+
+  void Decode(Decoder* decoder, const EncodeOptions& options);
+
  private:
   std::vector<S2Point> points_;
 };
@@ -141,6 +160,10 @@ class PolylineGeography : public Geography {
     return polylines_;
   }
 
+  void Encode(Encoder* encoder, const EncodeOptions& options) const;
+
+  void Decode(Decoder* decoder, const EncodeOptions& options);
+
  private:
   std::vector<std::unique_ptr<S2Polyline>> polylines_;
 };
@@ -162,6 +185,10 @@ class PolygonGeography : public Geography {
   void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const;
 
   const std::unique_ptr<S2Polygon>& Polygon() const { return polygon_; }
+
+  void Encode(Encoder* encoder, const EncodeOptions& options) const;
+
+  void Decode(Decoder* decoder, const EncodeOptions& options);
 
  private:
   std::unique_ptr<S2Polygon> polygon_;
@@ -191,6 +218,10 @@ class GeographyCollection : public Geography {
   const std::vector<std::unique_ptr<Geography>>& Features() const {
     return features_;
   }
+
+  void Encode(Encoder* encoder, const EncodeOptions& options) const;
+
+  void Decode(Decoder* decoder, const EncodeOptions& options);
 
  private:
   std::vector<std::unique_ptr<Geography>> features_;
@@ -226,6 +257,8 @@ class ShapeIndexGeography : public Geography {
 
   const S2ShapeIndex& ShapeIndex() const { return *shape_index_; }
 
+  void Encode(Encoder* encoder, const EncodeOptions& options) const;
+
  private:
   std::unique_ptr<S2ShapeIndex> shape_index_;
 };
@@ -242,6 +275,10 @@ class EncodedShapeIndexGeography : public Geography {
   std::unique_ptr<S2Region> Region() const;
 
   const S2ShapeIndex& ShapeIndex() const { return *shape_index_; }
+
+  void Encode(Encoder* encoder, const EncodeOptions& options) const;
+
+  void Decode(Decoder* decoder, const EncodeOptions& options);
 
  private:
   std::unique_ptr<S2ShapeIndex> shape_index_;

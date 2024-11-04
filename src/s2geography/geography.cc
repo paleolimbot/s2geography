@@ -238,3 +238,178 @@ std::unique_ptr<S2Region> EncodedShapeIndexGeography::Region() const {
   return absl::make_unique<S2ShapeIndexRegion<EncodedS2ShapeIndex>>(
       mutable_index);
 }
+
+void PointGeography::Encode(Encoder* encoder,
+                            const EncodeOptions& options) const {
+  s2coding::CodingHint hint;
+  if (options.flags & EncodeOptions::kFlagCompact) {
+    hint = s2coding::CodingHint::COMPACT;
+  } else {
+    hint = s2coding::CodingHint::FAST;
+  }
+
+  s2coding::EncodeS2PointVector(points_, hint, encoder);
+}
+
+void PointGeography::Decode(Decoder* decoder, const EncodeOptions& options) {
+  s2coding::EncodedS2PointVector encoded;
+  if (!encoded.Init(decoder)) {
+    throw Exception("PointGeography::Decode error");
+  }
+
+  points_ = encoded.Decode();
+}
+
+void PolylineGeography::Encode(Encoder* encoder,
+                               const EncodeOptions& options) const {
+  encoder->Ensure(sizeof(uint32_t));
+  encoder->put32(static_cast<uint32_t>(polylines_.size()));
+
+  s2coding::CodingHint hint;
+  if (options.flags & EncodeOptions::kFlagCompact) {
+    hint = s2coding::CodingHint::COMPACT;
+  } else {
+    hint = s2coding::CodingHint::FAST;
+  }
+
+  for (const auto& polyline : polylines_) {
+    polyline->Encode(encoder, hint);
+  }
+}
+
+void PolylineGeography::Decode(Decoder* decoder, const EncodeOptions& options) {
+  if (decoder->avail() < sizeof(uint32_t)) {
+    throw Exception(
+        "PolylineGeography::Decode error: insufficient header bytes");
+  }
+
+  uint32_t n_polylines = decoder->get32();
+  for (uint32_t i = 0; i < n_polylines; i++) {
+    auto polyline = absl::make_unique<S2Polyline>();
+    if (!polyline->Decode(decoder)) {
+      throw Exception("PolylineGeography::Decode error at item " +
+                      std::to_string(i));
+    }
+
+    polylines_.push_back(std::move(polyline));
+  }
+}
+
+void PolygonGeography::Encode(Encoder* encoder,
+                              const EncodeOptions& options) const {
+  s2coding::CodingHint hint;
+  if (options.flags & EncodeOptions::kFlagCompact) {
+    hint = s2coding::CodingHint::COMPACT;
+  } else {
+    hint = s2coding::CodingHint::FAST;
+  }
+
+  polygon_->Encode(encoder, hint);
+}
+
+void PolygonGeography::Decode(Decoder* decoder, const EncodeOptions& options) {
+  polygon_->Decode(decoder);
+}
+
+void GeographyCollection::Encode(Encoder* encoder,
+                                 const EncodeOptions& options) const {
+  encoder->Ensure(sizeof(uint32_t));
+  encoder->put32(static_cast<uint32_t>(features_.size()));
+  for (const auto& feature : features_) {
+    feature->Encode(encoder, options);
+  }
+}
+
+void GeographyCollection::Decode(Decoder* decoder,
+                                 const EncodeOptions& options) {
+  uint32_t n_features = decoder->get32();
+  for (uint32_t i = 0; i < n_features; i++) {
+    features_.push_back(Geography::DecodeTagged(decoder));
+  }
+}
+
+void ShapeIndexGeography::Encode(Encoder* encoder,
+                                 const EncodeOptions& options) const {
+  if (options.flags & EncodeOptions::kFlagCompact) {
+    s2shapeutil::CompactEncodeTaggedShapes(*shape_index_, encoder);
+  } else {
+    s2shapeutil::FastEncodeTaggedShapes(*shape_index_, encoder);
+  }
+}
+
+void EncodedShapeIndexGeography::Encode(Encoder* encoder,
+                                        const EncodeOptions& options) const {
+  if (options.flags & EncodeOptions::kFlagCompact) {
+    s2shapeutil::CompactEncodeTaggedShapes(*shape_index_, encoder);
+  } else {
+    s2shapeutil::FastEncodeTaggedShapes(*shape_index_, encoder);
+  }
+}
+
+void EncodedShapeIndexGeography::Decode(Decoder* decoder,
+                                        const EncodeOptions& options) {
+  auto new_index = absl::make_unique<EncodedS2ShapeIndex>();
+  S2Error error;
+  bool success = success =
+      new_index->Init(decoder, s2shapeutil::LazyDecodeShapeFactory(decoder));
+
+  if (!success || !error.ok()) {
+    throw Exception("EncodedShapeIndexGeography decoding error: " +
+                    error.text());
+  }
+
+  shape_index_ = std::move(new_index);
+}
+
+void Geography::EncodeTagged(Encoder* encoder,
+                             const EncodeOptions& options) const {
+  encoder->Ensure(sizeof(uint16_t) + sizeof(uint16_t));
+  encoder->put16(static_cast<uint16_t>(kind()));
+  encoder->put16(options.flags);
+  Encode(encoder, options);
+}
+
+std::unique_ptr<Geography> Geography::DecodeTagged(Decoder* decoder) {
+  if (decoder->avail() < (sizeof(uint16_t) + sizeof(uint16_t))) {
+    throw Exception(
+        "Geography::EncodeTagged(): insufficient tag bytes in decoder");
+  }
+
+  EncodeOptions options;
+  uint16_t geography_type = decoder->get16();
+  options.flags = decoder->get16();
+
+  if (options.flags != 0 && options.flags != EncodeOptions::kFlagCompact) {
+    throw Exception("Geography::EncodeTagged(): unknown flag");
+  }
+
+  if (geography_type == static_cast<uint16_t>(GeographyKind::POINT)) {
+    auto geog = std::make_unique<PointGeography>();
+    geog->Decode(decoder, options);
+    return geog;
+  } else if (geography_type == static_cast<uint16_t>(GeographyKind::POLYLINE)) {
+    auto geog = std::make_unique<PolylineGeography>();
+    geog->Decode(decoder, options);
+    return geog;
+  } else if (geography_type == static_cast<uint16_t>(GeographyKind::POLYGON)) {
+    auto geog = std::make_unique<PolygonGeography>();
+    geog->Decode(decoder, options);
+    return geog;
+  } else if (geography_type ==
+             static_cast<uint16_t>(GeographyKind::GEOGRAPHY_COLLECTION)) {
+    auto geog = std::make_unique<GeographyCollection>();
+    geog->Decode(decoder, options);
+    return geog;
+  } else if (geography_type ==
+                 static_cast<uint16_t>(GeographyKind::SHAPE_INDEX) ||
+             geography_type ==
+                 static_cast<uint16_t>(GeographyKind::SHAPE_INDEX)) {
+    auto geog = std::make_unique<EncodedShapeIndexGeography>();
+    geog->Decode(decoder, options);
+    return geog;
+  } else {
+    throw Exception(
+        "Geography::DecodeTagged(): Unknown geography type identifier " +
+        std::to_string(geography_type));
+  }
+}
