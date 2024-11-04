@@ -211,7 +211,7 @@ using s2geography::geoarrow::Writer;
 TEST(GeoArrow, GeoArrowWriterPoint) {
   s2geography::WKTReader reader;
   auto geog1 = reader.read_feature("POINT (0 1)");
-  auto geog2 = reader.read_feature("POINT (1 3)");
+  auto geog2 = reader.read_feature("POINT (2 3)");
 
   Writer writer;
   nanoarrow::UniqueSchema schema;
@@ -225,14 +225,14 @@ TEST(GeoArrow, GeoArrowWriterPoint) {
   writer.Finish(array.get());
 
   EXPECT_EQ(array->length, 2);
-  EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[0]), ElementsAre(0.0, 1.0));
-  EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[1]), ElementsAre(1.0, 2.0));
+  EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[0]), ElementsAre(0.0, 2.0));
+  EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[1]), ElementsAre(1.0, 3.0));
 }
 
 TEST(GeoArrow, GeoArrowWriterPointProjected) {
   s2geography::WKTReader reader;
   auto geog1 = reader.read_feature("POINT (0 1)");
-  auto geog2 = reader.read_feature("POINT (1 2)");
+  auto geog2 = reader.read_feature("POINT (2 3)");
 
   Writer writer;
   nanoarrow::UniqueSchema schema;
