@@ -8,6 +8,7 @@
 #include "s2/s2projections.h"
 #include "s2geography/arrow_abi.h"
 #include "s2geography/geography.h"
+#include "s2geography/projections.h"
 
 namespace s2geography {
 
@@ -15,8 +16,6 @@ namespace geoarrow {
 
 /// \brief Inspect the underlying GeoArrow implementation version
 const char* version();
-
-S2::Projection* lnglat();
 
 /// \brief Options used to build Geography objects from GeoArrow arrays
 
