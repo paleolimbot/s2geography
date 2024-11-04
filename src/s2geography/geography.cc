@@ -168,18 +168,27 @@ std::unique_ptr<S2Region> GeographyCollection::Region() const {
 }
 
 int ShapeIndexGeography::num_shapes() const {
-  return shape_index_.num_shape_ids();
+  return shape_index_->num_shape_ids();
 }
 
 std::unique_ptr<S2Shape> ShapeIndexGeography::Shape(int id) const {
-  const S2Shape* shape = shape_index_.shape(id);
+  const S2Shape* shape = shape_index_->shape(id);
   return std::unique_ptr<S2Shape>(new S2ShapeWrapper(shape));
 }
 
 std::unique_ptr<S2Region> ShapeIndexGeography::Region() const {
-  auto region =
-      absl::make_unique<S2ShapeIndexRegion<MutableS2ShapeIndex>>(&shape_index_);
-  // because Rtools for R 3.6 on Windows complains about a direct
-  // return region
-  return std::unique_ptr<S2Region>(region.release());
+  auto mutable_index =
+      reinterpret_cast<MutableS2ShapeIndex*>(shape_index_.get());
+  return absl::make_unique<S2ShapeIndexRegion<MutableS2ShapeIndex>>(
+      mutable_index);
+}
+
+int ShapeIndexGeography::Add(const Geography& geog) {
+  auto mutable_index =
+      reinterpret_cast<MutableS2ShapeIndex*>(shape_index_.get());
+  int id = -1;
+  for (int i = 0; i < geog.num_shapes(); i++) {
+    id = mutable_index->Add(geog.Shape(i));
+  }
+  return id;
 }

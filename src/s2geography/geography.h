@@ -209,7 +209,9 @@ class ShapeIndexGeography : public Geography {
  public:
   ShapeIndexGeography(
       MutableS2ShapeIndex::Options options = MutableS2ShapeIndex::Options())
-      : Geography(GeographyKind::SHAPE_INDEX), shape_index_(options) {}
+      : Geography(GeographyKind::SHAPE_INDEX) {
+        shape_index_ = absl::make_unique<MutableS2ShapeIndex>(options);
+      }
 
   explicit ShapeIndexGeography(const Geography& geog)
       : Geography(GeographyKind::SHAPE_INDEX) {
@@ -219,22 +221,16 @@ class ShapeIndexGeography : public Geography {
   // Add a Geography to the index, returning the last shape_id
   // that was added to the index or -1 if no shapes were added
   // to the index.
-  int Add(const Geography& geog) {
-    int id = -1;
-    for (int i = 0; i < geog.num_shapes(); i++) {
-      id = shape_index_.Add(geog.Shape(i));
-    }
-    return id;
-  }
+  int Add(const Geography& geog);
 
   int num_shapes() const;
   std::unique_ptr<S2Shape> Shape(int id) const;
   std::unique_ptr<S2Region> Region() const;
 
-  const MutableS2ShapeIndex& ShapeIndex() const { return shape_index_; }
+  const S2ShapeIndex& ShapeIndex() const { return *shape_index_; }
 
  private:
-  MutableS2ShapeIndex shape_index_;
+  std::unique_ptr<S2ShapeIndex> shape_index_;
 };
 
 }  // namespace s2geography
