@@ -158,18 +158,6 @@ void PolygonGeography::GetCellUnionBound(
 
 int GeographyCollection::num_shapes() const { return total_shapes_; }
 
-ShapeIndexGeography::ShapeIndexGeography()
-    : Geography(GeographyKind::SHAPE_INDEX) {
-  shape_index_ = absl::make_unique<MutableS2ShapeIndex>();
-}
-
-ShapeIndexGeography::ShapeIndexGeography(int max_edges_per_cell)
-    : Geography(GeographyKind::SHAPE_INDEX) {
-  MutableS2ShapeIndex::Options options;
-  options.set_max_edges_per_cell(max_edges_per_cell);
-  shape_index_ = absl::make_unique<MutableS2ShapeIndex>(options);
-}
-
 std::unique_ptr<S2Shape> GeographyCollection::Shape(int id) const {
   int sum_shapes_ = 0;
   for (int i = 0; i < static_cast<int>(features_.size()); i++) {
@@ -192,6 +180,24 @@ std::unique_ptr<S2Region> GeographyCollection::Region() const {
   return std::unique_ptr<S2Region>(region.release());
 }
 
+ShapeIndexGeography::ShapeIndexGeography(const Geography& geog)
+    : Geography(GeographyKind::SHAPE_INDEX) {
+  shape_index_ = absl::make_unique<MutableS2ShapeIndex>();
+  Add(geog);
+}
+
+ShapeIndexGeography::ShapeIndexGeography()
+    : Geography(GeographyKind::SHAPE_INDEX) {
+  shape_index_ = absl::make_unique<MutableS2ShapeIndex>();
+}
+
+ShapeIndexGeography::ShapeIndexGeography(int max_edges_per_cell)
+    : Geography(GeographyKind::SHAPE_INDEX) {
+  MutableS2ShapeIndex::Options options;
+  options.set_max_edges_per_cell(max_edges_per_cell);
+  shape_index_ = absl::make_unique<MutableS2ShapeIndex>(options);
+}
+
 int ShapeIndexGeography::num_shapes() const {
   return shape_index_->num_shape_ids();
 }
@@ -202,18 +208,14 @@ std::unique_ptr<S2Shape> ShapeIndexGeography::Shape(int id) const {
 }
 
 std::unique_ptr<S2Region> ShapeIndexGeography::Region() const {
-  auto mutable_index =
-      reinterpret_cast<MutableS2ShapeIndex*>(shape_index_.get());
   return absl::make_unique<S2ShapeIndexRegion<MutableS2ShapeIndex>>(
-      mutable_index);
+      shape_index_.get());
 }
 
 int ShapeIndexGeography::Add(const Geography& geog) {
-  auto mutable_index =
-      reinterpret_cast<MutableS2ShapeIndex*>(shape_index_.get());
   int id = -1;
   for (int i = 0; i < geog.num_shapes(); i++) {
-    id = mutable_index->Add(geog.Shape(i));
+    id = shape_index_->Add(geog.Shape(i));
   }
   return id;
 }

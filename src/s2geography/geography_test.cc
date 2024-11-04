@@ -61,4 +61,6 @@ TEST(Geography, EncodedPoint) {
   ASSERT_EQ(roundtrip->kind(), GeographyKind::POINT);
 
   auto roundtrip_typed = reinterpret_cast<PointGeography*>(roundtrip.get());
+  ASSERT_EQ(roundtrip_typed->Points().size(), 1);
+  ASSERT_EQ(roundtrip_typed->Points()[0], geog.Points()[0]);
 }

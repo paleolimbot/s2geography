@@ -240,10 +240,7 @@ class ShapeIndexGeography : public Geography {
   ShapeIndexGeography();
   ShapeIndexGeography(int max_edges_per_cell);
 
-  explicit ShapeIndexGeography(const Geography& geog)
-      : Geography(GeographyKind::SHAPE_INDEX) {
-    Add(geog);
-  }
+  explicit ShapeIndexGeography(const Geography& geog);
 
   // Add a Geography to the index, returning the last shape_id
   // that was added to the index or -1 if no shapes were added
@@ -259,7 +256,7 @@ class ShapeIndexGeography : public Geography {
   void Encode(Encoder* encoder, const EncodeOptions& options) const;
 
  private:
-  std::unique_ptr<S2ShapeIndex> shape_index_;
+  std::unique_ptr<MutableS2ShapeIndex> shape_index_;
 };
 
 // A Geography with a EncodedS2ShapeIndex as the underlying data.
