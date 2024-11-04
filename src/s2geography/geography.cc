@@ -332,6 +332,9 @@ void GeographyCollection::Decode(Decoder* decoder,
 
 void ShapeIndexGeography::Encode(Encoder* encoder,
                                  const EncodeOptions& options) const {
+  // TODO: preferentially transform S2PolygonShape into an S2LaxPolygonShape()
+  // and a S2PolylineShape() into a S2LaxPolylineShape() because these can be
+  // lazily decoded.
   if (options.flags & EncodeOptions::kFlagCompact) {
     s2shapeutil::CompactEncodeTaggedShapes(*shape_index_, encoder);
   } else {
