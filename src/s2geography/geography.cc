@@ -318,7 +318,7 @@ void GeographyCollection::Encode(Encoder* encoder,
   encoder->Ensure(sizeof(uint32_t));
   encoder->put32(static_cast<uint32_t>(features_.size()));
   for (const auto& feature : features_) {
-    feature->Encode(encoder, options);
+    feature->EncodeTagged(encoder, options);
   }
 }
 
