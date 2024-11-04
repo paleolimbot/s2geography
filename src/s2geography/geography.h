@@ -96,9 +96,12 @@ class Geography {
   // encapsulating information (e.g., which geography type or flags).
   virtual void Encode(Encoder* encoder, const EncodeOptions& options) const = 0;
 
+  // Serialize this geography to an encoder such that it can roundtrip
+  // with DecodeTagged(). EXPERIMENTAL.
   void EncodeTagged(Encoder* encoder,
                     const EncodeOptions& options = EncodeOptions()) const;
 
+  // Create a geography from output written with EncodeTagged. EXPERIMENTAL.
   static std::unique_ptr<Geography> DecodeTagged(Decoder* decoder);
 
  private:
