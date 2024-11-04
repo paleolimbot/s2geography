@@ -3,6 +3,8 @@
 
 #include <s2/encoded_s2shape_index.h>
 #include <s2/mutable_s2shape_index.h>
+#include <s2/s2lax_polygon_shape.h>
+#include <s2/s2lax_polyline_shape.h>
 #include <s2/s2point_region.h>
 #include <s2/s2point_vector_shape.h>
 #include <s2/s2polygon.h>
@@ -330,12 +332,40 @@ void GeographyCollection::Decode(Decoder* decoder,
   }
 }
 
+namespace {
+
+bool CustomCompactShapeEncoder(const S2Shape& shape, Encoder* encoder) {
+  if (shape.type_tag() == S2Polygon::Shape::kTypeTag) {
+    std::vector<std::vector<S2Point>> loops;
+    for (int i = 0; i < shape.num_chains(); i++) {
+      auto vertices = shape.vertices(i);
+      loops.emplace_back(vertices.begin(), vertices.end());
+    }
+
+    S2LaxPolygonShape new_shape(std::move(loops));
+    return s2shapeutil::CompactEncodeShape(new_shape, encoder);
+  } else if (shape.type_tag() == S2Polyline::Shape::kTypeTag &&
+             shape.num_chains() == 1) {
+    auto vertices = shape.vertices(0);
+    std::vector<S2Point> vertices_copy(vertices.begin(), vertices.end());
+    S2LaxPolylineShape new_shape(std::move(vertices_copy));
+    return s2shapeutil::CompactEncodeShape(new_shape, encoder);
+  }
+
+  return s2shapeutil::CompactEncodeShape(shape, encoder);
+}
+}  // namespace
+
 void ShapeIndexGeography::Encode(Encoder* encoder,
                                  const EncodeOptions& options) const {
-  // TODO: preferentially transform S2PolygonShape into an S2LaxPolygonShape()
-  // and a S2PolylineShape() into a S2LaxPolylineShape() because these can be
-  // lazily decoded.
   if (options.flags & EncodeOptions::kFlagCompact) {
+    if (!(options.flags & EncodeOptions::kFlagCompact)) {
+      throw Exception("Lazy output only supported with the compact option");
+    }
+
+    s2shapeutil::EncodeTaggedShapes(*shape_index_, CustomCompactShapeEncoder,
+                                    encoder);
+  } else if (options.flags & EncodeOptions::kFlagCompact) {
     s2shapeutil::CompactEncodeTaggedShapes(*shape_index_, encoder);
   } else {
     s2shapeutil::FastEncodeTaggedShapes(*shape_index_, encoder);
@@ -382,7 +412,9 @@ std::unique_ptr<Geography> Geography::DecodeTagged(Decoder* decoder) {
   uint16_t geography_type = decoder->get16();
   options.flags = decoder->get16();
 
-  if (options.flags != 0 && options.flags != EncodeOptions::kFlagCompact) {
+  uint16_t flags_check =
+      options.flags & ~EncodeOptions::kFlagCompact & ~EncodeOptions::kFlagLazy;
+  if (flags_check != 0) {
     throw Exception("Geography::EncodeTagged(): unknown flag");
   }
 

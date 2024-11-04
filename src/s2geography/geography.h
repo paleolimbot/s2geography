@@ -35,7 +35,8 @@ enum class GeographyKind {
 
 struct EncodeOptions {
   static constexpr uint16_t kFlagCompact = 1;
-  uint16_t flags{kFlagCompact};
+  static constexpr uint16_t kFlagLazy = 2;
+  uint16_t flags{kFlagCompact | kFlagLazy};
 };
 
 // An Geography is an abstraction of S2 types that is designed to closely
