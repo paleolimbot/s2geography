@@ -233,6 +233,10 @@ int EncodedShapeIndexGeography::num_shapes() const {
 
 std::unique_ptr<S2Shape> EncodedShapeIndexGeography::Shape(int id) const {
   const S2Shape* shape = shape_index_->shape(id);
+  if (shape == nullptr) {
+    throw Exception("Error decoding shape at with id " + std::to_string(id));
+  }
+
   return std::unique_ptr<S2Shape>(new S2ShapeWrapper(shape));
 }
 
@@ -334,8 +338,9 @@ void GeographyCollection::Decode(Decoder* decoder,
 
 namespace {
 
-bool CustomCompactShapeEncoder(const S2Shape& shape, Encoder* encoder) {
+bool CustomCompactTaggedShapeEncoder(const S2Shape& shape, Encoder* encoder) {
   if (shape.type_tag() == S2Polygon::Shape::kTypeTag) {
+    // There is probably a better way to go about this than copy all vertices
     std::vector<std::vector<S2Point>> loops;
     for (int i = 0; i < shape.num_chains(); i++) {
       auto vertices = shape.vertices(i);
@@ -343,16 +348,22 @@ bool CustomCompactShapeEncoder(const S2Shape& shape, Encoder* encoder) {
     }
 
     S2LaxPolygonShape new_shape(std::move(loops));
+
+    encoder->put_varint32(new_shape.type_tag());
     return s2shapeutil::CompactEncodeShape(new_shape, encoder);
   } else if (shape.type_tag() == S2Polyline::Shape::kTypeTag &&
              shape.num_chains() == 1) {
+    // There is probably a better way to go about this than copy all vertices
     auto vertices = shape.vertices(0);
     std::vector<S2Point> vertices_copy(vertices.begin(), vertices.end());
     S2LaxPolylineShape new_shape(std::move(vertices_copy));
-    return s2shapeutil::CompactEncodeShape(new_shape, encoder);
-  }
 
-  return s2shapeutil::CompactEncodeShape(shape, encoder);
+    encoder->put_varint32(new_shape.type_tag());
+    return s2shapeutil::CompactEncodeShape(new_shape, encoder);
+  } else {
+    encoder->put_varint32(shape.type_tag());
+    return s2shapeutil::CompactEncodeShape(shape, encoder);
+  }
 }
 }  // namespace
 
@@ -363,8 +374,18 @@ void ShapeIndexGeography::Encode(Encoder* encoder,
       throw Exception("Lazy output only supported with the compact option");
     }
 
-    s2shapeutil::EncodeTaggedShapes(*shape_index_, CustomCompactShapeEncoder,
-                                    encoder);
+    s2coding::StringVectorEncoder shape_vector;
+    for (S2Shape* shape : *shape_index_) {
+      Encoder* sub_encoder = shape_vector.AddViaEncoder();
+      if (shape == nullptr) continue;  // Encode as zero bytes.
+
+      sub_encoder->Ensure(Encoder::kVarintMax32);
+
+      if (!CustomCompactTaggedShapeEncoder(*shape, sub_encoder)) {
+        throw Exception("Error encoding shape");
+      }
+    }
+    shape_vector.Encode(encoder);
   } else if (options.flags & EncodeOptions::kFlagCompact) {
     s2shapeutil::CompactEncodeTaggedShapes(*shape_index_, encoder);
   } else {
@@ -383,9 +404,11 @@ void EncodedShapeIndexGeography::Decode(Decoder* decoder,
                                         const EncodeOptions& options) {
   auto new_index = absl::make_unique<EncodedS2ShapeIndex>();
   S2Error error;
-  bool success =
-      new_index->Init(decoder, s2shapeutil::LazyDecodeShapeFactory(decoder));
 
+  shape_factory_ = absl::make_unique<s2shapeutil::TaggedShapeFactory>(
+      s2shapeutil::LazyDecodeShape, decoder);
+
+  bool success = new_index->Init(decoder, *shape_factory_);
   if (!success || !error.ok()) {
     throw Exception("EncodedShapeIndexGeography decoding error: " +
                     error.text());

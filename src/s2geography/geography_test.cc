@@ -134,17 +134,48 @@ TEST(Geography, EncodedGeographyCollection) {
 
 TEST(Geography, EncodedShapeIndex) {
   S2Point pt = S2LatLng::FromDegrees(45, -64).ToPoint();
+  S2Point pt_mid = S2LatLng::FromDegrees(45, 0).ToPoint();
+  S2Point pt_end = S2LatLng::FromDegrees(0, 0).ToPoint();
   Encoder encoder;
 
   PointGeography pt_geog(pt);
-  ShapeIndexGeography geog(pt_geog);
+
+  auto polyline = absl::make_unique<S2Polyline>();
+  polyline->Init({pt, pt_end});
+  PolylineGeography line_geog(std::move(polyline));
+
+  auto loop = absl::make_unique<S2Loop>();
+  loop->Init({pt, pt_mid, pt_end});
+  auto polygon = absl::make_unique<S2Polygon>();
+  polygon->Init({std::move(loop)});
+  PolygonGeography polygon_geog(std::move(polygon));
+
+  ShapeIndexGeography geog;
+  geog.Add(pt_geog);
+  geog.Add(line_geog);
+  geog.Add(polygon_geog);
   geog.EncodeTagged(&encoder);
 
   Decoder decoder(encoder.base(), encoder.length());
   auto roundtrip = Geography::DecodeTagged(&decoder);
   ASSERT_EQ(roundtrip->kind(), GeographyKind::ENCODED_SHAPE_INDEX);
-  ASSERT_EQ(roundtrip->num_shapes(), 1);
-  auto shape = roundtrip->Shape(0);
-  ASSERT_EQ(shape->num_edges(), 1);
-  EXPECT_EQ(shape->edge(0).v0, pt);
+  ASSERT_EQ(roundtrip->num_shapes(), 3);
+
+  auto pt_shape = roundtrip->Shape(0);
+  ASSERT_EQ(pt_shape->num_edges(), 1);
+  EXPECT_EQ(pt_shape->edge(0).v0, pt);
+
+  auto line_shape = roundtrip->Shape(1);
+  ASSERT_EQ(line_shape->num_edges(), 1);
+  EXPECT_EQ(line_shape->edge(0).v0, pt);
+  EXPECT_EQ(line_shape->edge(0).v1, pt_end);
+
+  auto poly_shape = roundtrip->Shape(2);
+  ASSERT_EQ(poly_shape->num_edges(), 3);
+  EXPECT_EQ(poly_shape->edge(0).v0, pt);
+  EXPECT_EQ(poly_shape->edge(0).v1, pt_mid);
+  EXPECT_EQ(poly_shape->edge(1).v0, pt_mid);
+  EXPECT_EQ(poly_shape->edge(1).v1, pt_end);
+  EXPECT_EQ(poly_shape->edge(2).v0, pt_end);
+  EXPECT_EQ(poly_shape->edge(2).v1, pt);
 }

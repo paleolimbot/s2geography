@@ -279,6 +279,7 @@ class EncodedShapeIndexGeography : public Geography {
 
  private:
   std::unique_ptr<S2ShapeIndex> shape_index_;
+  std::unique_ptr<S2ShapeIndex::ShapeFactory> shape_factory_;
 };
 
 }  // namespace s2geography
