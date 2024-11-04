@@ -808,6 +808,15 @@ class WriterImpl {
 
   int VisitPolylineEdges(const S2Polyline& poly) {
 
+    if (poly.num_vertices() == 0) {
+      throw Exception("Unexpected S2Polyline with 0 vertices");
+    } else if (poly.num_vertices() == 1) {
+      // this is an invalid case, but we handle it for printing
+      ProjectS2Point(poly.vertex(0));
+      GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
+      return GEOARROW_OK;
+    }
+
     for (int i = 1; i < poly.num_vertices(); i++) {
         const S2Point& pt0(poly.vertex(i - 1));
         const S2Point& pt1(poly.vertex(i));
