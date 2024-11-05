@@ -6,7 +6,6 @@
 #include "geoarrow/geoarrow.h"
 #include "s2/s1angle.h"
 #include "s2/s2edge_tessellator.h"
-#include "s2/s2projections.h"
 #include "s2geography/geography.h"
 
 namespace s2geography {
@@ -15,10 +14,6 @@ namespace geoarrow {
 
 const char* version() { return GeoArrowVersion(); }
 
-S2::Projection* lnglat() {
-  static S2::PlateCarreeProjection projection(180);
-  return &projection;
-}
 
 // This should really be in nanoarrow or geoarrow
 // https://github.com/geoarrow/geoarrow-c-geos/blob/33ad0ba21c76c09e9d72fc4e4ae0b9ff9da61848/src/geoarrow_geos/geoarrow_geos.c#L323-L360

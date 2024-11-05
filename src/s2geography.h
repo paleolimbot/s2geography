@@ -15,5 +15,6 @@
 #include "s2geography/index.h"
 #include "s2geography/linear-referencing.h"
 #include "s2geography/predicates.h"
+#include "s2geography/projections.h"
 #include "s2geography/wkt-reader.h"
 #include "s2geography/wkt-writer.h"

@@ -8,6 +8,7 @@
 #include "s2/s2projections.h"
 #include "s2geography/arrow_abi.h"
 #include "s2geography/geography.h"
+#include "s2geography/projections.h"
 
 namespace s2geography {
 
@@ -16,24 +17,22 @@ namespace geoarrow {
 /// \brief Inspect the underlying GeoArrow implementation version
 const char* version();
 
-S2::Projection* lnglat();
-
 /// \brief Options used to build Geography objects from GeoArrow arrays
 
 class TessellationOptions {
  public:
   TessellationOptions()
-      : projection_(lnglat()),
+      : projection_(std::move(lnglat())),
         tessellate_tolerance_(S1Angle::Infinity()) {}
-  S2::Projection* projection() const { return projection_; }
-  void set_projection(S2::Projection* projection) { projection_ = projection; }
+  S2::Projection* projection() const { return projection_.get(); }
+  void set_projection(std::shared_ptr<S2::Projection> projection) { projection_ = std::move(projection); }
   S1Angle tessellate_tolerance() const { return tessellate_tolerance_; }
   void set_tessellate_tolerance(S1Angle tessellate_tolerance) {
     tessellate_tolerance_ = tessellate_tolerance;
   }
 
  protected:
-  S2::Projection* projection_;
+  std::shared_ptr<S2::Projection> projection_;
   S1Angle tessellate_tolerance_;
 };
 
