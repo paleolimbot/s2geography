@@ -83,7 +83,6 @@ void Geography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
 }
 
 std::unique_ptr<S2Shape> PointGeography::Shape(int id) const {
-  DCHECK(id == 0);
   return absl::make_unique<S2PointVectorShape>(points_);
 }
 
@@ -375,7 +374,7 @@ void ShapeIndexGeography::Encode(Encoder* encoder,
     }
 
     s2coding::StringVectorEncoder shape_vector;
-    for (S2Shape* shape : *shape_index_) {
+    for (const S2Shape* shape : *shape_index_) {
       Encoder* sub_encoder = shape_vector.AddViaEncoder();
       if (shape == nullptr) continue;  // Encode as zero bytes.
 
