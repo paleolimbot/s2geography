@@ -15,11 +15,6 @@ namespace geoarrow {
 const char* version() { return GeoArrowVersion(); }
 
 
-S2::Projection* mercator() {
-  static S2::MercatorProjection projection(20037508.3427892);
-  return &projection;
-}
-
 // This should really be in nanoarrow or geoarrow
 // https://github.com/geoarrow/geoarrow-c-geos/blob/33ad0ba21c76c09e9d72fc4e4ae0b9ff9da61848/src/geoarrow_geos/geoarrow_geos.c#L323-L360
 struct GeoArrowBitmapReader {

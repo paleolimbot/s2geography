@@ -246,7 +246,7 @@ TEST(GeoArrow, GeoArrowWriterPointProjected) {
   nanoarrow::UniqueArray array;
 
   s2geography::geoarrow::ExportOptions options;
-  options.set_projection(s2geography::geoarrow::mercator());
+  options.set_projection(s2geography::pseudo_mercator());
   InitSchemaGeoArrowPoint(schema.get());
   writer.Init(schema.get(), options);
 
