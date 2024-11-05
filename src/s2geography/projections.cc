@@ -10,14 +10,14 @@ namespace s2geography {
 
 std::shared_ptr<S2::Projection> lnglat() {
   std::shared_ptr<S2::Projection> projection = std::make_shared<S2::PlateCarreeProjection>(180);
-  return projection;
+  return std::move(projection);
 }
 
 std::shared_ptr<S2::Projection> pseudo_mercator() {
   // the semi-major axis of the WGS 84 ellipsoid is 6378137 meters
   // -> half of the circumference of the sphere is PI * 6378137 = 20037508.3427892
   std::shared_ptr<S2::Projection> projection = std::make_shared<S2::MercatorProjection>(20037508.3427892);
-  return projection;
+  return std::move(projection);
 }
 
 class OrthographicProjection: public S2::Projection {
@@ -64,7 +64,7 @@ private:
 
 std::shared_ptr<S2::Projection> orthographic(const S2LatLng& centre) {
   std::shared_ptr<S2::Projection> projection = std::make_shared<OrthographicProjection>(centre);
-  return projection;
+  return std::move(projection);
 }
 
 }  // namespace s2geography

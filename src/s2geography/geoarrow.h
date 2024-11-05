@@ -22,10 +22,10 @@ const char* version();
 class TessellationOptions {
  public:
   TessellationOptions()
-      : projection_(lnglat()),
+      : projection_(std::move(lnglat())),
         tessellate_tolerance_(S1Angle::Infinity()) {}
   S2::Projection* projection() const { return projection_.get(); }
-  void set_projection(std::shared_ptr<S2::Projection>& projection) { projection_ = std::move(projection); }
+  void set_projection(std::shared_ptr<S2::Projection> projection) { projection_ = std::move(projection); }
   S1Angle tessellate_tolerance() const { return tessellate_tolerance_; }
   void set_tessellate_tolerance(S1Angle tessellate_tolerance) {
     tessellate_tolerance_ = tessellate_tolerance;
