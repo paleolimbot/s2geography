@@ -12,8 +12,8 @@ namespace s2geography {
 std::shared_ptr<S2::Projection> lnglat();
 
 // Constructs the spherical Mercator projection. When used together with WGS84
-// coordinates, known as the "Web Mercator" projection.
-std::shared_ptr<S2::Projection> mercator();
+// coordinates, known as the "Web Mercator" or "WGS84/Pseudo-Mercator" projection.
+std::shared_ptr<S2::Projection> pseudo_mercator();
 
 // Constructs an orthographic projection with the given centre point. The
 // resulting coordinates depict a single hemisphere of the globe as it appears
