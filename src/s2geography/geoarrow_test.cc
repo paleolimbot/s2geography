@@ -225,8 +225,15 @@ TEST(GeoArrow, GeoArrowWriterPoint) {
   writer.Finish(array.get());
 
   EXPECT_EQ(array->length, 2);
-  EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[0]), ElementsAre(0.0, 2.0));
-  EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[1]), ElementsAre(1.0, 3.0));
+
+  // EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[0]), ElementsAre(DoubleEq(0.0), DoubleEq(2.0)));
+  auto xs = reinterpret_cast<const double*>(array->children[0]->buffers[1]);
+  EXPECT_DOUBLE_EQ(xs[0], 0.0);
+  EXPECT_DOUBLE_EQ(xs[1], 2.0);
+  // EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[1]), ElementsAre(DoubleEq(1.0), DoubleEq(3.0)));
+  auto ys = reinterpret_cast<const double*>(array->children[1]->buffers[1]);
+  EXPECT_DOUBLE_EQ(ys[0], 1.0);
+  EXPECT_DOUBLE_EQ(ys[1], 3.0);
 }
 
 TEST(GeoArrow, GeoArrowWriterPointProjected) {
@@ -248,6 +255,11 @@ TEST(GeoArrow, GeoArrowWriterPointProjected) {
   writer.Finish(array.get());
 
   EXPECT_EQ(array->length, 2);
-  // EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[0]), ElementsAre(0.0, 111325.14286638441));
-  // EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[1]), ElementsAre(1.0, 2.0));
+
+  auto xs = reinterpret_cast<const double*>(array->children[0]->buffers[1]);
+  EXPECT_DOUBLE_EQ(xs[0], 0.0);
+  EXPECT_DOUBLE_EQ(xs[1], 222638.98158654661);
+  auto ys = reinterpret_cast<const double*>(array->children[1]->buffers[1]);
+  EXPECT_DOUBLE_EQ(ys[0], 111325.14286638441);
+  EXPECT_DOUBLE_EQ(ys[1], 334111.17140195851);
 }
