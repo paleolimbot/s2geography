@@ -201,6 +201,7 @@ add_library(s2geography
     src/s2geography/accessors.cc
     src/s2geography/distance.cc
     src/s2geography/predicates.cc
+    src/s2geography/projections.cc
     src/s2geography/build.cc
     src/s2geography/geography.cc
     src/s2geography/geoarrow.cc
