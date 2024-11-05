@@ -24,15 +24,15 @@ class TessellationOptions {
   TessellationOptions()
       : projection_(lnglat()),
         tessellate_tolerance_(S1Angle::Infinity()) {}
-  S2::Projection* projection() const { return projection_; }
-  void set_projection(S2::Projection* projection) { projection_ = projection; }
+  S2::Projection* projection() const { return projection_.get(); }
+  void set_projection(std::shared_ptr<S2::Projection>& projection) { projection_ = std::move(projection); }
   S1Angle tessellate_tolerance() const { return tessellate_tolerance_; }
   void set_tessellate_tolerance(S1Angle tessellate_tolerance) {
     tessellate_tolerance_ = tessellate_tolerance;
   }
 
  protected:
-  S2::Projection* projection_;
+  std::shared_ptr<S2::Projection> projection_;
   S1Angle tessellate_tolerance_;
 };
 

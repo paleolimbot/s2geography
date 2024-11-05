@@ -8,14 +8,14 @@
 
 namespace s2geography {
 
-S2::Projection* lnglat() {
-  static S2::PlateCarreeProjection projection(180);
-  return &projection;
+std::shared_ptr<S2::Projection> lnglat() {
+  std::shared_ptr<S2::Projection> projection = std::make_shared<S2::PlateCarreeProjection>(180);
+  return projection;
 }
 
-S2::Projection* mercator() {
-  static S2::MercatorProjection projection(20037508.3427892);
-  return &projection;
+std::shared_ptr<S2::Projection> mercator() {
+  std::shared_ptr<S2::Projection> projection = std::make_shared<S2::MercatorProjection>(20037508.3427892);
+  return projection;
 }
 
 class OrthographicProjection: public S2::Projection {
@@ -60,9 +60,9 @@ private:
   S2Point y_axis_;
 };
 
-S2::Projection* orthographic(const S2LatLng& centre) {
-  static OrthographicProjection projection(centre);
-  return &projection;
+std::shared_ptr<S2::Projection> orthographic(const S2LatLng& centre) {
+  std::shared_ptr<S2::Projection> projection = std::make_shared<OrthographicProjection>(centre);
+  return projection;
 }
 
 }  // namespace s2geography

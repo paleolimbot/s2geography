@@ -9,15 +9,15 @@ namespace s2geography {
 // to (longitude, latitude) pairs.
 // The x coordinates (longitude) span [-180, 180] and the y coordinates (latitude)
 // span [-90, 90].
-S2::Projection* lnglat();
+std::shared_ptr<S2::Projection> lnglat();
 
 // Constructs the spherical Mercator projection. When used together with WGS84
 // coordinates, known as the "Web Mercator" projection.
-S2::Projection* mercator();
+std::shared_ptr<S2::Projection> mercator();
 
 // Constructs an orthographic projection with the given centre point. The
 // resulting coordinates depict a single hemisphere of the globe as it appears
 // from outer space, centred on the given point.
-S2::Projection* orthographic(const S2LatLng& centre);
+std::shared_ptr<S2::Projection> orthographic(const S2LatLng& centre);
 
 }  // namespace s2geography
