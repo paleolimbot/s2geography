@@ -281,6 +281,8 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
   target_link_libraries(op_cell_test s2geography GTest::gtest_main)
 
+  target_include_directories(geoarrow_test PRIVATE src/vendored)
+
   include(GoogleTest)
   gtest_discover_tests(distance_test)
   gtest_discover_tests(geoarrow_test)

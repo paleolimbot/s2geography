@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 
 #include "nanoarrow/nanoarrow.hpp"
-#include "vendored/geoarrow/geoarrow.h"
+#include "geoarrow/geoarrow.h"
 #include "s2geography.h"
 
 using testing::ElementsAre;
@@ -297,7 +297,7 @@ TEST(GeoArrow, GeoArrowWriterPolylineTessellated) {
   // first coordinate is still the same
   auto xs = reinterpret_cast<const double*>(array2->children[0]->children[0]->buffers[1]);
   EXPECT_DOUBLE_EQ(xs[0], -64);
-  EXPECT_DOUBLE_EQ(xs[9], 0);
+  EXPECT_DOUBLE_EQ(xs[8], 0);
   auto ys = reinterpret_cast<const double*>(array2->children[0]->children[1]->buffers[1]);
   EXPECT_DOUBLE_EQ(ys[0], 45);
   EXPECT_DOUBLE_EQ(ys[8], 45);
@@ -316,7 +316,7 @@ TEST(GeoArrow, GeoArrowWriterPolylineTessellated) {
 
   xs = reinterpret_cast<const double*>(array3->children[0]->children[0]->buffers[1]);
   EXPECT_NEAR(xs[0], -7124447.41, 0.01);
-  EXPECT_DOUBLE_EQ(xs[9], 0);
+  EXPECT_DOUBLE_EQ(xs[8], 0);
   ys = reinterpret_cast<const double*>(array3->children[0]->children[1]->buffers[1]);
   EXPECT_NEAR(ys[0], 5621521.48, 0.01);
   EXPECT_NEAR(ys[8], 5621521.48, 0.01);
