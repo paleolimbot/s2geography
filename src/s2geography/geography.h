@@ -279,27 +279,40 @@ class EncodedShapeIndexGeography : public Geography {
   std::unique_ptr<S2ShapeIndex::ShapeFactory> shape_factory_;
 };
 
+// Options for serializing geographies using Geography::EncodeTagged()
 class EncodeOptions {
  public:
-  static constexpr uint16_t kFlagCompact = 1;
-  static constexpr uint16_t kFlagLazy = 2;
-  static constexpr uint16_t kFlagCovering = 4;
-
+  // Create options with default values, which optimize for the
+  // scenario where a geography is getting serialized and hopefully
+  // not deserialized in full.
   EncodeOptions() = default;
 
+  // Control whether to optimize for speed (by writing vertices as
+  // doubles) or space (by writing cell identifiers for vertices that
+  // are snapped to a cell center). For vertices that are snapped to a
+  // cell center at a lower zoom level, the encoder can encode each
+  // vertex with 4 or fewer bytes.
   void set_coding_hint(s2coding::CodingHint hint) { hint_ = hint; }
   s2coding::CodingHint coding_hint() const { return hint_; }
 
+  // Control whether to spend extra effort converting shapes that
+  // aren't able to be lazily decoded (e.g., S2Polyline::Shape and
+  // S2Polygon::Shape to S2LaxPolylineShape and S2LaxPolygonShape,
+  // respectively).
   void set_enable_lazy_decode(bool enable_lazy_decode) {
     enable_lazy_decode_ = enable_lazy_decode;
   }
   bool enable_lazy_decode() const { return enable_lazy_decode_; }
 
+  // Control whether to prefix the serialized geography with a covering
+  // to more rapidy check for possible intersection. The covering that is
+  // written is currently the normalized result of GetCellUnionBound().
   void set_include_covering(bool include_covering) {
     include_covering_ = include_covering;
   }
   bool include_covering() const { return include_covering_; }
 
+  // Recreate options from serialized content
   explicit EncodeOptions(uint16_t flags) {
     if (flags & kFlagCompact) {
       hint_ = s2coding::CodingHint::COMPACT;
@@ -318,6 +331,7 @@ class EncodeOptions {
     }
   }
 
+  // Serialize these options for encoding
   uint16_t flags() const {
     uint16_t flags = 0;
     if (hint_ == s2coding::CodingHint::COMPACT) {
@@ -339,6 +353,10 @@ class EncodeOptions {
   s2coding::CodingHint hint_{s2coding::CodingHint::COMPACT};
   bool enable_lazy_decode_{true};
   bool include_covering_{true};
+
+  static constexpr uint16_t kFlagCompact = 1;
+  static constexpr uint16_t kFlagLazy = 2;
+  static constexpr uint16_t kFlagCovering = 4;
 };
 
 }  // namespace s2geography
