@@ -1,10 +1,48 @@
 #include "s2geography/geography.h"
 
+#include <gmock/gmock-matchers.h>
 #include <gtest/gtest.h>
 
 #include "s2geography.h"
 
+namespace s2geography {
+void PrintTo(const Geography& geog, std::ostream* os) {
+  WKTWriter writer(6);
+  *os << writer.write_feature(geog);
+}
+
+void PrintTo(const PointGeography& geog, std::ostream* os) {
+  WKTWriter writer;
+  *os << writer.write_feature(geog);
+}
+
+void PrintTo(const PolylineGeography& geog, std::ostream* os) {
+  WKTWriter writer(6);
+  *os << writer.write_feature(geog);
+}
+
+void PrintTo(const PolygonGeography& geog, std::ostream* os) {
+  WKTWriter writer(6);
+  *os << writer.write_feature(geog);
+}
+
+void PrintTo(const GeographyCollection& geog, std::ostream* os) {
+  WKTWriter writer(6);
+  *os << writer.write_feature(geog);
+}
+
+void PrintTo(const ShapeIndexGeography& geog, std::ostream* os) {
+  *os << "ShapeIndexGeography with " << geog.ShapeIndex().num_shape_ids()
+      << " shapes";
+}
+}  // namespace s2geography
+
 using namespace s2geography;
+
+MATCHER_P(WktEquals6, wkt, "") {
+  WKTWriter writer(6);
+  return writer.write_feature(arg) == wkt;
+}
 
 TEST(Geography, EmptyPoint) {
   PointGeography geog;
@@ -13,6 +51,7 @@ TEST(Geography, EmptyPoint) {
   EXPECT_EQ(geog.dimension(), 0);
 
   EXPECT_TRUE(geog.Points().empty());
+  ASSERT_THAT(geog, WktEquals6("POINT EMPTY"));
 }
 
 TEST(Geography, EmptyPolyline) {
@@ -22,6 +61,7 @@ TEST(Geography, EmptyPolyline) {
   EXPECT_EQ(geog.dimension(), 1);
 
   EXPECT_TRUE(geog.Polylines().empty());
+  ASSERT_THAT(geog, WktEquals6("LINESTRING EMPTY"));
 }
 
 TEST(Geography, EmptyPolygon) {
@@ -31,6 +71,7 @@ TEST(Geography, EmptyPolygon) {
   EXPECT_EQ(geog.dimension(), 2);
 
   EXPECT_TRUE(geog.Polygon()->is_empty());
+  ASSERT_THAT(geog, WktEquals6("POLYGON EMPTY"));
 }
 
 TEST(Geography, EmptyCollection) {
@@ -39,6 +80,7 @@ TEST(Geography, EmptyCollection) {
   EXPECT_EQ(geog.num_shapes(), 0);
   EXPECT_EQ(geog.dimension(), -1);
   EXPECT_TRUE(geog.Features().empty());
+  ASSERT_THAT(geog, WktEquals6("GEOGRAPHYCOLLECTION EMPTY"));
 }
 
 TEST(Geography, EmptyShapeIndex) {
@@ -59,6 +101,7 @@ TEST(Geography, EncodedPoint) {
   Decoder decoder(encoder.base(), encoder.length());
   auto roundtrip = Geography::DecodeTagged(&decoder);
   ASSERT_EQ(roundtrip->kind(), GeographyKind::POINT);
+  ASSERT_THAT(*roundtrip, WktEquals6("POINT (-64 45)"));
 
   auto roundtrip_typed = reinterpret_cast<PointGeography*>(roundtrip.get());
   ASSERT_EQ(roundtrip_typed->Points().size(), 1);
@@ -78,6 +121,7 @@ TEST(Geography, EncodedPolyline) {
   Decoder decoder(encoder.base(), encoder.length());
   auto roundtrip = Geography::DecodeTagged(&decoder);
   ASSERT_EQ(roundtrip->kind(), GeographyKind::POLYLINE);
+  ASSERT_THAT(*roundtrip, WktEquals6("LINESTRING (-64 45, 0 0)"));
 
   auto roundtrip_typed = reinterpret_cast<PolylineGeography*>(roundtrip.get());
   ASSERT_EQ(roundtrip_typed->Polylines().size(), 1);
@@ -101,6 +145,7 @@ TEST(Geography, EncodedPolygon) {
   Decoder decoder(encoder.base(), encoder.length());
   auto roundtrip = Geography::DecodeTagged(&decoder);
   ASSERT_EQ(roundtrip->kind(), GeographyKind::POLYGON);
+  ASSERT_THAT(*roundtrip, WktEquals6("POLYGON ((-64 45, 0 45, 0 0, -64 45))"));
 
   auto roundtrip_typed = reinterpret_cast<PolygonGeography*>(roundtrip.get());
   const auto& polygon_rountrip = roundtrip_typed->Polygon();
@@ -120,6 +165,7 @@ TEST(Geography, EncodedGeographyCollection) {
   Decoder decoder(encoder.base(), encoder.length());
   auto roundtrip = Geography::DecodeTagged(&decoder);
   ASSERT_EQ(roundtrip->kind(), GeographyKind::GEOGRAPHY_COLLECTION);
+  ASSERT_THAT(*roundtrip, WktEquals6("GEOMETRYCOLLECTION (POINT (-64 45))"));
 
   auto roundtrip_typed =
       reinterpret_cast<GeographyCollection*>(roundtrip.get());
