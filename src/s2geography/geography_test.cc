@@ -36,6 +36,19 @@ void PrintTo(const ShapeIndexGeography& geog, std::ostream* os) {
       << " shapes";
 }
 
+void PrintTo(const EncodeOptions& obj, std::ostream* os) {
+  *os << "EncodeOptions(";
+
+  if (obj.coding_hint() == s2coding::CodingHint::COMPACT) {
+    *os << "COMPACT, ";
+  } else {
+    *os << "FAST, ";
+  }
+
+  *os << "enable_lazy_decode: " << obj.enable_lazy_decode()
+      << ", include_covering: " << obj.include_covering() << ")";
+}
+
 MATCHER_P(WktEquals6, wkt, "") {
   WKTWriter writer(6);
   return writer.write_feature(arg) == wkt;
@@ -221,6 +234,52 @@ TEST(Geography, EncodedShapeIndex) {
   EXPECT_EQ(poly_shape->edge(1).v1, pt_end);
   EXPECT_EQ(poly_shape->edge(2).v0, pt_end);
   EXPECT_EQ(poly_shape->edge(2).v1, pt);
+}
+
+void TestEncodeWKTRoundtrip(const std::string& wkt,
+                            const EncodeOptions& options) {
+  SCOPED_TRACE(wkt + " / " + ::testing::PrintToString(options));
+  WKTReader reader;
+  std::unique_ptr<Geography> original_geog = reader.read_feature(wkt);
+  // Make sure the original geography matches the given WKT
+  ASSERT_THAT(*original_geog, WktEquals6(wkt));
+
+  Encoder encoder;
+  original_geog->EncodeTagged(&encoder, options);
+
+  Decoder decoder(encoder.base(), encoder.length());
+  std::unique_ptr<Geography> roundtrip_geog = Geography::DecodeTagged(&decoder);
+  EXPECT_THAT(*roundtrip_geog, WktEquals6(wkt));
+}
+
+TEST(Geography, EncodeRoundtrip) {
+  std::vector<s2coding::CodingHint> hints{s2coding::CodingHint::COMPACT, s2coding::CodingHint::FAST};
+  std::vector<bool> include_covering{true, false};
+  std::vector<bool> enable_lazy_decode{true, false};
+
+  std::vector<EncodeOptions> option_options;
+  for (const auto hint_opt : hints) {
+    for (const auto covering_opt : include_covering) {
+      for (const auto enable_lazy_decode_opt : enable_lazy_decode) {
+        EncodeOptions opt;
+        opt.set_coding_hint(hint_opt);
+        opt.set_include_covering(covering_opt);
+        opt.set_enable_lazy_decode(enable_lazy_decode_opt);
+        option_options.push_back(opt);
+      }
+    }
+  }
+
+  std::vector<std::string> wkt_options = {
+      // For better formatting
+      "POINT EMPTY", "LINESTRING EMPTY", "POLYGON EMPTY",
+      "GEOMETRYCOLLECTION EMPTY"};
+
+  for (const auto& options : option_options) {
+    for (const auto& wkt : wkt_options) {
+      ASSERT_NO_FATAL_FAILURE(TestEncodeWKTRoundtrip(wkt, options));
+    }
+  }
 }
 
 }  // namespace s2geography
