@@ -22,17 +22,22 @@ class Exception : public std::runtime_error {
   Exception(std::string what) : std::runtime_error(what.c_str()) {}
 };
 
-// enum to tag concrete Geography implementations
+// enum to tag concrete Geography implementations. Note that
+// CELL_CENTER does not currently represent a concrete subclass
+// but is used to mark a compact encoding method for small numbers of points.
 enum class GeographyKind {
+  UNINITIALIZED = 0,
   POINT = 1,
   POLYLINE = 2,
   POLYGON = 3,
   GEOGRAPHY_COLLECTION = 4,
   SHAPE_INDEX = 5,
   ENCODED_SHAPE_INDEX = 6,
+  CELL_CENTER = 7,
 };
 
 class EncodeOptions;
+class EncodeTag;
 
 // An Geography is an abstraction of S2 types that is designed to closely
 // match the scope of a GEOS Geometry. Its methods are limited to those needed
@@ -93,10 +98,16 @@ class Geography {
 
   // Serialize this geography to an encoder such that it can roundtrip
   // with DecodeTagged(). EXPERIMENTAL.
-  void EncodeTagged(Encoder* encoder, const EncodeOptions& options) const;
+  virtual void EncodeTagged(Encoder* encoder,
+                            const EncodeOptions& options) const;
 
   // Create a geography from output written with EncodeTagged. EXPERIMENTAL.
   static std::unique_ptr<Geography> DecodeTagged(Decoder* decoder);
+
+ protected:
+  // Helper for subclasses to write a covering. Subclasses must call this
+  // or encode their own covering when implementing Encode().
+  void EncodeCoveringDefault(Encoder* encoder);
 
  private:
   GeographyKind kind_;
@@ -127,9 +138,9 @@ class PointGeography : public Geography {
 
   const std::vector<S2Point>& Points() const { return points_; }
 
+  void EncodeTagged(Encoder* encoder, const EncodeOptions& options) const;
   void Encode(Encoder* encoder, const EncodeOptions& options) const;
-
-  void Decode(Decoder* decoder, const EncodeOptions& options);
+  void Decode(Decoder* decoder, const EncodeTag& tag);
 
  private:
   std::vector<S2Point> points_;
@@ -159,7 +170,7 @@ class PolylineGeography : public Geography {
 
   void Encode(Encoder* encoder, const EncodeOptions& options) const;
 
-  void Decode(Decoder* decoder, const EncodeOptions& options);
+  void Decode(Decoder* decoder, const EncodeTag& tag);
 
  private:
   std::vector<std::unique_ptr<S2Polyline>> polylines_;
@@ -185,7 +196,7 @@ class PolygonGeography : public Geography {
 
   void Encode(Encoder* encoder, const EncodeOptions& options) const;
 
-  void Decode(Decoder* decoder, const EncodeOptions& options);
+  void Decode(Decoder* decoder, const EncodeTag& tag);
 
  private:
   std::unique_ptr<S2Polygon> polygon_;
@@ -218,7 +229,7 @@ class GeographyCollection : public Geography {
 
   void Encode(Encoder* encoder, const EncodeOptions& options) const;
 
-  void Decode(Decoder* decoder, const EncodeOptions& options);
+  void Decode(Decoder* decoder, const EncodeTag& tag);
 
  private:
   std::vector<std::unique_ptr<Geography>> features_;
@@ -272,7 +283,7 @@ class EncodedShapeIndexGeography : public Geography {
 
   void Encode(Encoder* encoder, const EncodeOptions& options) const;
 
-  void Decode(Decoder* decoder, const EncodeOptions& options);
+  void Decode(Decoder* decoder, const EncodeTag& tag);
 
  private:
   std::unique_ptr<S2ShapeIndex> shape_index_;
@@ -312,51 +323,39 @@ class EncodeOptions {
   }
   bool include_covering() const { return include_covering_; }
 
-  // Recreate options from serialized content
-  explicit EncodeOptions(uint16_t flags) {
-    if (flags & kFlagCompact) {
-      hint_ = s2coding::CodingHint::COMPACT;
-    } else {
-      hint_ = s2coding::CodingHint::FAST;
-    }
-
-    enable_lazy_decode_ = flags & kFlagLazy;
-    include_covering_ = flags & kFlagCovering;
-
-    flags &= ~kFlagCompact;
-    flags &= ~kFlagLazy;
-    flags &= ~kFlagCovering;
-    if (flags != 0) {
-      throw Exception("Unknown flags encountered in decode");
-    }
-  }
-
-  // Serialize these options for encoding
-  uint16_t flags() const {
-    uint16_t flags = 0;
-    if (hint_ == s2coding::CodingHint::COMPACT) {
-      flags |= kFlagCompact;
-    }
-
-    if (enable_lazy_decode_) {
-      flags |= kFlagLazy;
-    }
-
-    if (include_covering_) {
-      flags |= kFlagCovering;
-    }
-
-    return flags;
-  }
-
  private:
   s2coding::CodingHint hint_{s2coding::CodingHint::COMPACT};
   bool enable_lazy_decode_{true};
   bool include_covering_{true};
+};
 
-  static constexpr uint16_t kFlagCompact = 1;
-  static constexpr uint16_t kFlagLazy = 2;
-  static constexpr uint16_t kFlagCovering = 4;
+// A 4 byte prefix for encoded geographies. 4 bytes is essential so that
+// German-style strings store these bytes in their prefix (i.e., don't have
+// to load any auxiliary buffers to inspect this information).
+struct EncodeTag {
+  // Geography subclass whose Decode() method will be called.
+  // Encoded as a uint8_t.
+  GeographyKind kind{GeographyKind::UNINITIALIZED};
+
+  // Flags. Currently supported are kFlagEmpty (set if and only if there
+  // are zero shapes in the geography).
+  uint8_t flags{};
+
+  // Number of cells identifiers that follow this tag. Note that zero cells
+  // (i.e., an empty covering) indicates that no covering was written and does
+  // NOT imply an empty geography.
+  uint8_t covering_size{};
+
+  // Reserved byte (must be 0)
+  uint8_t reserved{};
+
+  void Encode(Encoder* encoder) const;
+  void Decode(Decoder* decoder);
+  void DecodeCovering(Decoder* decoder, std::vector<S2CellId>* cell_ids) const;
+  void SkipCovering(Decoder* decoder) const;
+  void Validate();
+
+  static constexpr uint8_t kFlagEmpty = 1;
 };
 
 }  // namespace s2geography

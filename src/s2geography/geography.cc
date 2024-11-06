@@ -246,12 +246,66 @@ std::unique_ptr<S2Region> EncodedShapeIndexGeography::Region() const {
       mutable_index);
 }
 
+// ---- Encode/Decode implementations ----
+
+void PointGeography::EncodeTagged(Encoder* encoder,
+                                  const EncodeOptions& options) const {
+  // Special case encoding for exactly one point
+  if (points_.size() != 1) {
+    Geography::EncodeTagged(encoder, options);
+    return;
+  }
+
+  int face;
+  uint32 si, ti;
+  int level = S2::XYZtoFaceSiTi(points_[0], &face, &si, &ti);
+  if (level < 0) {
+    // Not exactly encodable as a cell center
+    Geography::EncodeTagged(encoder, options);
+    return;
+  }
+
+  // For a cell center, the covering *is* the representation and there is
+  // no additional encoding. If or when there is a true CellCenterGeography,
+  // we would need to do something different if there are more than 256 points.
+  EncodeTag tag;
+  tag.kind = GeographyKind::CELL_CENTER;
+  tag.covering_size = 1;
+  tag.Encode(encoder);
+
+  encoder->Ensure(sizeof(uint64_t));
+  encoder->put64(S2CellId(points_[0]).id());
+
+  s2coding::EncodeS2PointVector(points_, options.coding_hint(), encoder);
+}
+
 void PointGeography::Encode(Encoder* encoder,
                             const EncodeOptions& options) const {
   s2coding::EncodeS2PointVector(points_, options.coding_hint(), encoder);
 }
 
-void PointGeography::Decode(Decoder* decoder, const EncodeOptions& options) {
+void PointGeography::Decode(Decoder* decoder, const EncodeTag& tag) {
+  if (tag.flags & EncodeTag::kFlagEmpty) {
+    return;
+  }
+
+  // The snapped point encoding we currently route through the PointGeography
+  // because we have some hard-coded dynamic_cast<>s for some s2_xxxx()
+  // functions and introducing another subclass might cause unintended
+  // consequences.
+  if (tag.kind == GeographyKind::CELL_CENTER) {
+    std::vector<S2CellId> cell_ids;
+    tag.DecodeCovering(decoder, &cell_ids);
+    points_.reserve(cell_ids.size());
+    for (const auto cell_id : cell_ids) {
+      points_.push_back(cell_id.ToPoint());
+    }
+
+    return;
+  }
+
+  // Otherwise, this was encoded using an EncodedS2PointVector
+  tag.SkipCovering(decoder);
   s2coding::EncodedS2PointVector encoded;
   if (!encoded.Init(decoder)) {
     throw Exception("PointGeography::Decode error");
@@ -270,7 +324,13 @@ void PolylineGeography::Encode(Encoder* encoder,
   }
 }
 
-void PolylineGeography::Decode(Decoder* decoder, const EncodeOptions& options) {
+void PolylineGeography::Decode(Decoder* decoder, const EncodeTag& tag) {
+  if (tag.flags & EncodeTag::kFlagEmpty) {
+    return;
+  }
+
+  tag.SkipCovering(decoder);
+
   if (decoder->avail() < sizeof(uint32_t)) {
     throw Exception(
         "PolylineGeography::Decode error: insufficient header bytes");
@@ -293,12 +353,21 @@ void PolygonGeography::Encode(Encoder* encoder,
   polygon_->Encode(encoder, options.coding_hint());
 }
 
-void PolygonGeography::Decode(Decoder* decoder, const EncodeOptions& options) {
+void PolygonGeography::Decode(Decoder* decoder, const EncodeTag& tag) {
+  if (tag.flags & EncodeTag::kFlagEmpty) {
+    return;
+  }
+
+  tag.SkipCovering(decoder);
   polygon_->Decode(decoder);
 }
 
 void GeographyCollection::Encode(Encoder* encoder,
                                  const EncodeOptions& options) const {
+  // Never include coverings for children (only a top-level concept)
+  EncodeOptions child_options = options;
+  child_options.set_include_covering(false);
+
   encoder->Ensure(sizeof(uint32_t));
   encoder->put32(static_cast<uint32_t>(features_.size()));
   for (const auto& feature : features_) {
@@ -306,8 +375,12 @@ void GeographyCollection::Encode(Encoder* encoder,
   }
 }
 
-void GeographyCollection::Decode(Decoder* decoder,
-                                 const EncodeOptions& options) {
+void GeographyCollection::Decode(Decoder* decoder, const EncodeTag& tag) {
+  if (tag.flags & EncodeTag::kFlagEmpty) {
+    return;
+  }
+
+  tag.SkipCovering(decoder);
   uint32_t n_features = decoder->get32();
   for (uint32_t i = 0; i < n_features; i++) {
     features_.push_back(Geography::DecodeTagged(decoder));
@@ -379,7 +452,12 @@ void EncodedShapeIndexGeography::Encode(Encoder* encoder,
 }
 
 void EncodedShapeIndexGeography::Decode(Decoder* decoder,
-                                        const EncodeOptions& options) {
+                                        const EncodeTag& tag) {
+  if (tag.flags & EncodeTag::kFlagEmpty) {
+    return;
+  }
+
+  tag.SkipCovering(decoder);
   auto new_index = absl::make_unique<EncodedS2ShapeIndex>();
   S2Error error;
   shape_factory_ = absl::make_unique<s2shapeutil::TaggedShapeFactory>(
@@ -396,46 +474,151 @@ void EncodedShapeIndexGeography::Decode(Decoder* decoder,
 
 void Geography::EncodeTagged(Encoder* encoder,
                              const EncodeOptions& options) const {
-  encoder->Ensure(sizeof(uint16_t) + sizeof(uint16_t));
-  encoder->put16(static_cast<uint16_t>(kind()));
-  encoder->put16(options.flags());
+  EncodeTag tag;
+  std::vector<S2CellId> covering;
+  tag.kind = kind();
+
+  // For empty geographies, set the flag and don't call Encode()
+  if (num_shapes() == 0) {
+    tag.flags |= EncodeTag::kFlagEmpty;
+    tag.Encode(encoder);
+    return;
+  }
+
+  if (options.include_covering()) {
+    // Get the union and normalize it. A normalized union is slightly more
+    // expensive to compute but is faster to compare for possible intersection.
+
+    GetCellUnionBound(&covering);
+    S2CellUnion::Normalize(&covering);
+
+    // The serialization format can't handle more thn UINT8_MAX items
+    // (geographies usually return ~4 cells from GetCellUnionBound()).
+    if (covering.size() > 256) {
+      covering.clear();
+    }
+  }
+
+  // Encode the tag
+  tag.covering_size = static_cast<uint8_t>(covering.size());
+  tag.Encode(encoder);
+
+  // Encode the covering (1 byte for the number of cells, cells as little endian
+  // uint64_t).
+  encoder->Ensure(covering.size() * sizeof(uint64_t));
+  for (const auto cell_id : covering) {
+    encoder->put64(cell_id.id());
+  }
+
+  // Encode the geography
   Encode(encoder, options);
 }
 
 std::unique_ptr<Geography> Geography::DecodeTagged(Decoder* decoder) {
-  if (decoder->avail() < (sizeof(uint16_t) + sizeof(uint16_t))) {
+  EncodeTag tag;
+  tag.Decode(decoder);
+
+  switch (tag.kind) {
+    case GeographyKind::CELL_CENTER:
+    case GeographyKind::POINT: {
+      auto geog = std::make_unique<PointGeography>();
+      geog->Decode(decoder, tag);
+      return geog;
+    }
+    case GeographyKind::POLYLINE: {
+      auto geog = std::make_unique<PolylineGeography>();
+      geog->Decode(decoder, tag);
+      return geog;
+    }
+    case GeographyKind::POLYGON: {
+      auto geog = std::make_unique<PolygonGeography>();
+      geog->Decode(decoder, tag);
+      return geog;
+    }
+    case GeographyKind::GEOGRAPHY_COLLECTION: {
+      auto geog = std::make_unique<GeographyCollection>();
+      geog->Decode(decoder, tag);
+      return geog;
+    }
+    case GeographyKind::SHAPE_INDEX: {
+      auto geog = std::make_unique<EncodedShapeIndexGeography>();
+      geog->Decode(decoder, tag);
+      return geog;
+    }
+    default: {
+      throw Exception("DecodeTagged(): kind not implemented");
+    }
+  }
+}
+
+void EncodeTag::Encode(Encoder* encoder) const {
+  encoder->Ensure(4 * sizeof(uint8_t));
+  encoder->put8(static_cast<uint8_t>(kind));
+  encoder->put8(flags);
+  encoder->put8(covering_size);
+  encoder->put8(reserved);
+}
+
+void EncodeTag::Decode(Decoder* decoder) {
+  if (decoder->avail() < 4 * sizeof(uint8_t)) {
     throw Exception(
-        "Geography::EncodeTagged(): insufficient tag bytes in decoder");
+        "EncodeTag::Decode() fewer than 4 bytes available in decoder");
   }
 
-  uint16_t geography_type = decoder->get16();
-  EncodeOptions options(decoder->get16());
+  uint8_t geography_type = decoder->get8();
 
-  if (geography_type == static_cast<uint16_t>(GeographyKind::POINT)) {
-    auto geog = std::make_unique<PointGeography>();
-    geog->Decode(decoder, options);
-    return geog;
-  } else if (geography_type == static_cast<uint16_t>(GeographyKind::POLYLINE)) {
-    auto geog = std::make_unique<PolylineGeography>();
-    geog->Decode(decoder, options);
-    return geog;
-  } else if (geography_type == static_cast<uint16_t>(GeographyKind::POLYGON)) {
-    auto geog = std::make_unique<PolygonGeography>();
-    geog->Decode(decoder, options);
-    return geog;
+  if (geography_type == static_cast<uint8_t>(GeographyKind::POINT)) {
+    kind = GeographyKind::POINT;
+  } else if (geography_type == static_cast<uint8_t>(GeographyKind::POLYLINE)) {
+    kind = GeographyKind::POLYLINE;
+  } else if (geography_type == static_cast<uint8_t>(GeographyKind::POLYGON)) {
+    kind = GeographyKind::POLYGON;
   } else if (geography_type ==
-             static_cast<uint16_t>(GeographyKind::GEOGRAPHY_COLLECTION)) {
-    auto geog = std::make_unique<GeographyCollection>();
-    geog->Decode(decoder, options);
-    return geog;
+             static_cast<uint8_t>(GeographyKind::GEOGRAPHY_COLLECTION)) {
+    kind = GeographyKind::GEOGRAPHY_COLLECTION;
   } else if (geography_type ==
-             static_cast<uint16_t>(GeographyKind::SHAPE_INDEX)) {
-    auto geog = std::make_unique<EncodedShapeIndexGeography>();
-    geog->Decode(decoder, options);
-    return geog;
+             static_cast<uint8_t>(GeographyKind::SHAPE_INDEX)) {
+    kind = GeographyKind::SHAPE_INDEX;
   } else {
-    throw Exception(
-        "Geography::DecodeTagged(): Unknown geography type identifier " +
-        std::to_string(geography_type));
+    throw Exception("EncodeTag::Decode(): Unknown geography kind identifier " +
+                    std::to_string(geography_type));
+  }
+
+  flags = decoder->get8();
+  covering_size = decoder->get8();
+  reserved = decoder->get8();
+  Validate();
+}
+
+void EncodeTag::DecodeCovering(Decoder* decoder,
+                               std::vector<S2CellId>* cell_ids) const {
+  if (decoder->avail() < (covering_size * sizeof(uint64_t))) {
+    throw Exception("Insufficient size in decoder for " +
+                    std::to_string(covering_size) + " cell ids");
+  }
+
+  cell_ids->resize(covering_size);
+  for (uint8_t i = 0; i < covering_size; i++) {
+    cell_ids->at(i) = S2CellId(decoder->get64());
+  }
+}
+
+void s2geography::EncodeTag::SkipCovering(Decoder* decoder) const {
+  if (decoder->avail() < (covering_size * sizeof(uint64_t))) {
+    throw Exception("Insufficient size in decoder for " +
+                    std::to_string(covering_size) + " cell ids");
+  }
+
+  decoder->skip(covering_size * sizeof(uint64_t));
+}
+
+void EncodeTag::Validate() {
+  if (reserved != 0) {
+    throw Exception("EncodeTag: reserved byte must be zero");
+  }
+
+  uint8 flags_validate = flags & ~kFlagEmpty;
+  if (flags_validate != 0) {
+    throw Exception("EncodeTag: Unknown flag(s)");
   }
 }
