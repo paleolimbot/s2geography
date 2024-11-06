@@ -354,3 +354,110 @@ TEST(GeoArrow, GeoArrowWriterPolygonTessellated) {
   // dummy test to check that the WKT string length is larger with tesselation
   EXPECT_GT(length_with_tesselation, length_no_tesselation);
 }
+
+void TestGeoArrowRoundTrip(s2geography::Geography& geog, GeoArrowType type) {
+  // writing
+  Writer writer;
+  nanoarrow::UniqueSchema schema;
+  nanoarrow::UniqueArray array;
+
+  GeoArrowSchemaInitExtension(schema.get(), type);
+  writer.Init(schema.get());
+  writer.WriteGeography(geog);
+  writer.Finish(array.get());
+
+  EXPECT_EQ(array->length, 1);
+
+  // reading back
+  Reader reader;
+  std::vector<std::unique_ptr<s2geography::Geography>> result;
+
+  reader.Init(schema.get());
+  reader.ReadGeography(array.get(), 0, array->length, &result);
+
+  EXPECT_EQ(result[0]->dimension(), geog.dimension());
+  EXPECT_EQ(result[0]->num_shapes(), geog.num_shapes());
+  // TODO better assert equal for the geographies
+}
+
+TEST(GeoArrow, GeoArrowRoundtripPoint) {
+  s2geography::WKTReader reader;
+  auto geog = reader.read_feature("POINT (30 10)");
+
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_POINT);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_INTERLEAVED_POINT);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKT);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKB);
+}
+
+TEST(GeoArrow, GeoArrowRoundtripLinestring) {
+  s2geography::WKTReader reader;
+  auto geog = reader.read_feature("LINESTRING (30 10, 10 30, 40 40)");
+
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_LINESTRING);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_INTERLEAVED_LINESTRING);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKT);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKB);
+}
+
+TEST(GeoArrow, GeoArrowRoundtripPolygon) {
+  s2geography::WKTReader reader;
+  auto geog = reader.read_feature("POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))");
+
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_POLYGON);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_INTERLEAVED_POLYGON);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKT);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKB);
+
+  geog = reader.read_feature("POLYGON ((35 10, 45 45, 15 40, 10 20, 35 10), (20 30, 35 35, 30 20, 20 30))");
+
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_POLYGON);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_INTERLEAVED_POLYGON);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKT);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKB);
+}
+
+TEST(GeoArrow, GeoArrowRoundtripMultiPoint) {
+  s2geography::WKTReader reader;
+  auto geog = reader.read_feature("MULTIPOINT ((10 40), (40 30), (20 20), (30 10))");
+
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_MULTIPOINT);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_INTERLEAVED_MULTIPOINT);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKT);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKB);
+}
+
+TEST(GeoArrow, GeoArrowRoundtripMultiLinestring) {
+  s2geography::WKTReader reader;
+  auto geog = reader.read_feature("MULTILINESTRING ((10 10, 20 20, 10 40), (40 40, 30 30, 40 20, 30 10))");
+
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_MULTILINESTRING);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_INTERLEAVED_MULTILINESTRING);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKT);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKB);
+}
+
+TEST(GeoArrow, GeoArrowRoundtripMultiPolygon) {
+  s2geography::WKTReader reader;
+  auto geog = reader.read_feature("MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)), ((15 5, 40 10, 10 20, 5 10, 15 5)))");
+
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_MULTIPOLYGON);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_INTERLEAVED_MULTIPOLYGON);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKT);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKB);
+
+  geog = reader.read_feature("MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)), ((20 35, 10 30, 10 10, 30 5, 45 20, 20 35), (30 20, 20 15, 20 25, 30 20)))");
+
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_MULTIPOLYGON);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_INTERLEAVED_MULTIPOLYGON);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKT);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKB);
+}
+
+TEST(GeoArrow, GeoArrowRoundtripCollection) {
+  s2geography::WKTReader reader;
+  auto geog = reader.read_feature("GEOMETRYCOLLECTION (POINT (40 10), LINESTRING (10 10, 20 20, 10 40), POLYGON ((40 40, 20 45, 45 30, 40 40)))");
+
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKT);
+  TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKB);
+}

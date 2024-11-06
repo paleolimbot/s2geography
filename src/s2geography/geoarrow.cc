@@ -1038,6 +1038,7 @@ class WriterImpl {
         }
       }
     }
+    GEOARROW_RETURN_NOT_OK(visitor_.feat_end(&visitor_));
     return GEOARROW_OK;
   }
 
