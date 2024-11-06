@@ -248,14 +248,7 @@ std::unique_ptr<S2Region> EncodedShapeIndexGeography::Region() const {
 
 void PointGeography::Encode(Encoder* encoder,
                             const EncodeOptions& options) const {
-  s2coding::CodingHint hint;
-  if (options.flags & EncodeOptions::kFlagCompact) {
-    hint = s2coding::CodingHint::COMPACT;
-  } else {
-    hint = s2coding::CodingHint::FAST;
-  }
-
-  s2coding::EncodeS2PointVector(points_, hint, encoder);
+  s2coding::EncodeS2PointVector(points_, options.coding_hint(), encoder);
 }
 
 void PointGeography::Decode(Decoder* decoder, const EncodeOptions& options) {
@@ -272,15 +265,8 @@ void PolylineGeography::Encode(Encoder* encoder,
   encoder->Ensure(sizeof(uint32_t));
   encoder->put32(static_cast<uint32_t>(polylines_.size()));
 
-  s2coding::CodingHint hint;
-  if (options.flags & EncodeOptions::kFlagCompact) {
-    hint = s2coding::CodingHint::COMPACT;
-  } else {
-    hint = s2coding::CodingHint::FAST;
-  }
-
   for (const auto& polyline : polylines_) {
-    polyline->Encode(encoder, hint);
+    polyline->Encode(encoder, options.coding_hint());
   }
 }
 
@@ -304,14 +290,7 @@ void PolylineGeography::Decode(Decoder* decoder, const EncodeOptions& options) {
 
 void PolygonGeography::Encode(Encoder* encoder,
                               const EncodeOptions& options) const {
-  s2coding::CodingHint hint;
-  if (options.flags & EncodeOptions::kFlagCompact) {
-    hint = s2coding::CodingHint::COMPACT;
-  } else {
-    hint = s2coding::CodingHint::FAST;
-  }
-
-  polygon_->Encode(encoder, hint);
+  polygon_->Encode(encoder, options.coding_hint());
 }
 
 void PolygonGeography::Decode(Decoder* decoder, const EncodeOptions& options) {
@@ -368,8 +347,8 @@ bool CustomCompactTaggedShapeEncoder(const S2Shape& shape, Encoder* encoder) {
 
 void ShapeIndexGeography::Encode(Encoder* encoder,
                                  const EncodeOptions& options) const {
-  if (options.flags & EncodeOptions::kFlagCompact) {
-    if (!(options.flags & EncodeOptions::kFlagCompact)) {
+  if (options.enable_lazy_decode()) {
+    if (options.coding_hint() == s2coding::CodingHint::FAST) {
       throw Exception("Lazy output only supported with the compact option");
     }
 
@@ -385,7 +364,7 @@ void ShapeIndexGeography::Encode(Encoder* encoder,
       }
     }
     shape_vector.Encode(encoder);
-  } else if (options.flags & EncodeOptions::kFlagCompact) {
+  } else if (options.coding_hint() == s2coding::CodingHint::COMPACT) {
     s2shapeutil::CompactEncodeTaggedShapes(*shape_index_, encoder);
   } else {
     s2shapeutil::FastEncodeTaggedShapes(*shape_index_, encoder);
@@ -419,7 +398,7 @@ void Geography::EncodeTagged(Encoder* encoder,
                              const EncodeOptions& options) const {
   encoder->Ensure(sizeof(uint16_t) + sizeof(uint16_t));
   encoder->put16(static_cast<uint16_t>(kind()));
-  encoder->put16(options.flags);
+  encoder->put16(options.flags());
   Encode(encoder, options);
 }
 
@@ -429,15 +408,8 @@ std::unique_ptr<Geography> Geography::DecodeTagged(Decoder* decoder) {
         "Geography::EncodeTagged(): insufficient tag bytes in decoder");
   }
 
-  EncodeOptions options;
   uint16_t geography_type = decoder->get16();
-  options.flags = decoder->get16();
-
-  uint16_t flags_check =
-      options.flags & ~EncodeOptions::kFlagCompact & ~EncodeOptions::kFlagLazy;
-  if (flags_check != 0) {
-    throw Exception("Geography::EncodeTagged(): unknown flag");
-  }
+  EncodeOptions options(decoder->get16());
 
   if (geography_type == static_cast<uint16_t>(GeographyKind::POINT)) {
     auto geog = std::make_unique<PointGeography>();
@@ -457,9 +429,7 @@ std::unique_ptr<Geography> Geography::DecodeTagged(Decoder* decoder) {
     geog->Decode(decoder, options);
     return geog;
   } else if (geography_type ==
-                 static_cast<uint16_t>(GeographyKind::SHAPE_INDEX) ||
-             geography_type ==
-                 static_cast<uint16_t>(GeographyKind::SHAPE_INDEX)) {
+             static_cast<uint16_t>(GeographyKind::SHAPE_INDEX)) {
     auto geog = std::make_unique<EncodedShapeIndexGeography>();
     geog->Decode(decoder, options);
     return geog;

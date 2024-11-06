@@ -30,14 +30,9 @@ enum class GeographyKind {
   GEOGRAPHY_COLLECTION = 4,
   SHAPE_INDEX = 5,
   ENCODED_SHAPE_INDEX = 6,
-  OTHER = 9999
 };
 
-struct EncodeOptions {
-  static constexpr uint16_t kFlagCompact = 1;
-  static constexpr uint16_t kFlagLazy = 2;
-  uint16_t flags{kFlagCompact | kFlagLazy};
-};
+class EncodeOptions;
 
 // An Geography is an abstraction of S2 types that is designed to closely
 // match the scope of a GEOS Geometry. Its methods are limited to those needed
@@ -98,8 +93,7 @@ class Geography {
 
   // Serialize this geography to an encoder such that it can roundtrip
   // with DecodeTagged(). EXPERIMENTAL.
-  void EncodeTagged(Encoder* encoder,
-                    const EncodeOptions& options = EncodeOptions()) const;
+  void EncodeTagged(Encoder* encoder, const EncodeOptions& options) const;
 
   // Create a geography from output written with EncodeTagged. EXPERIMENTAL.
   static std::unique_ptr<Geography> DecodeTagged(Decoder* decoder);
@@ -283,6 +277,68 @@ class EncodedShapeIndexGeography : public Geography {
  private:
   std::unique_ptr<S2ShapeIndex> shape_index_;
   std::unique_ptr<S2ShapeIndex::ShapeFactory> shape_factory_;
+};
+
+class EncodeOptions {
+ public:
+  static constexpr uint16_t kFlagCompact = 1;
+  static constexpr uint16_t kFlagLazy = 2;
+  static constexpr uint16_t kFlagCovering = 4;
+
+  EncodeOptions() = default;
+
+  void set_coding_hint(s2coding::CodingHint hint) { hint_ = hint; }
+  s2coding::CodingHint coding_hint() const { return hint_; }
+
+  void set_enable_lazy_decode(bool enable_lazy_decode) {
+    enable_lazy_decode_ = enable_lazy_decode;
+  }
+  bool enable_lazy_decode() const { return enable_lazy_decode_; }
+
+  void set_include_covering(bool include_covering) {
+    include_covering_ = include_covering;
+  }
+  bool include_covering() const { return include_covering_; }
+
+  explicit EncodeOptions(uint16_t flags) {
+    if (flags & kFlagCompact) {
+      hint_ = s2coding::CodingHint::COMPACT;
+    } else {
+      hint_ = s2coding::CodingHint::FAST;
+    }
+
+    enable_lazy_decode_ = flags & kFlagLazy;
+    include_covering_ = flags & kFlagCovering;
+
+    flags &= ~kFlagCompact;
+    flags &= ~kFlagLazy;
+    flags &= ~kFlagCovering;
+    if (flags != 0) {
+      throw Exception("Unknown flags encountered in decode");
+    }
+  }
+
+  uint16_t flags() const {
+    uint16_t flags = 0;
+    if (hint_ == s2coding::CodingHint::COMPACT) {
+      flags |= kFlagCompact;
+    }
+
+    if (enable_lazy_decode_) {
+      flags |= kFlagLazy;
+    }
+
+    if (include_covering_) {
+      flags |= kFlagCovering;
+    }
+
+    return flags;
+  }
+
+ private:
+  s2coding::CodingHint hint_{s2coding::CodingHint::COMPACT};
+  bool enable_lazy_decode_{true};
+  bool include_covering_{true};
 };
 
 }  // namespace s2geography

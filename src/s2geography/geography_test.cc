@@ -54,7 +54,7 @@ TEST(Geography, EncodedPoint) {
   Encoder encoder;
 
   PointGeography geog(pt);
-  geog.EncodeTagged(&encoder);
+  geog.EncodeTagged(&encoder, EncodeOptions());
 
   Decoder decoder(encoder.base(), encoder.length());
   auto roundtrip = Geography::DecodeTagged(&decoder);
@@ -73,7 +73,7 @@ TEST(Geography, EncodedPolyline) {
   auto polyline = absl::make_unique<S2Polyline>();
   polyline->Init({pt, pt_end});
   PolylineGeography geog(std::move(polyline));
-  geog.EncodeTagged(&encoder);
+  geog.EncodeTagged(&encoder, EncodeOptions());
 
   Decoder decoder(encoder.base(), encoder.length());
   auto roundtrip = Geography::DecodeTagged(&decoder);
@@ -96,7 +96,7 @@ TEST(Geography, EncodedPolygon) {
   auto polygon = absl::make_unique<S2Polygon>();
   polygon->Init({std::move(loop)});
   PolygonGeography geog(std::move(polygon));
-  geog.EncodeTagged(&encoder);
+  geog.EncodeTagged(&encoder, EncodeOptions());
 
   Decoder decoder(encoder.base(), encoder.length());
   auto roundtrip = Geography::DecodeTagged(&decoder);
@@ -115,7 +115,7 @@ TEST(Geography, EncodedGeographyCollection) {
   std::vector<std::unique_ptr<Geography>> child_geogs;
   child_geogs.emplace_back(child_geog.release());
   GeographyCollection geog(std::move(child_geogs));
-  geog.EncodeTagged(&encoder);
+  geog.EncodeTagged(&encoder, EncodeOptions());
 
   Decoder decoder(encoder.base(), encoder.length());
   auto roundtrip = Geography::DecodeTagged(&decoder);
@@ -154,7 +154,7 @@ TEST(Geography, EncodedShapeIndex) {
   geog.Add(pt_geog);
   geog.Add(line_geog);
   geog.Add(polygon_geog);
-  geog.EncodeTagged(&encoder);
+  geog.EncodeTagged(&encoder, EncodeOptions());
 
   Decoder decoder(encoder.base(), encoder.length());
   auto roundtrip = Geography::DecodeTagged(&decoder);
