@@ -2,10 +2,13 @@
 #include <gtest/gtest.h>
 
 #include "nanoarrow/nanoarrow.hpp"
+#include "vendored/geoarrow/geoarrow.h"
 #include "s2geography.h"
 
 using testing::ElementsAre;
 using testing::DoubleEq;
+
+const double EARTH_RADIUS_METERS = 6371.01 * 1000;
 
 void InitArrayWKT(ArrowArray* array, std::vector<std::string> values) {
   NANOARROW_THROW_NOT_OK(ArrowArrayInitFromType(array, NANOARROW_TYPE_STRING));
@@ -262,4 +265,92 @@ TEST(GeoArrow, GeoArrowWriterPointProjected) {
   auto ys = reinterpret_cast<const double*>(array->children[1]->buffers[1]);
   EXPECT_DOUBLE_EQ(ys[0], 111325.14286638441);
   EXPECT_DOUBLE_EQ(ys[1], 334111.17140195851);
+}
+
+TEST(GeoArrow, GeoArrowWriterPolylineTessellated) {
+  s2geography::WKTReader reader;
+  auto geog = reader.read_feature("LINESTRING (-64 45, 0 45)");
+
+  Writer writer;
+  nanoarrow::UniqueSchema schema;
+  GeoArrowSchemaInitExtension(schema.get(), GEOARROW_TYPE_LINESTRING);
+
+  nanoarrow::UniqueArray array;
+  writer.Init(schema.get());
+  writer.WriteGeography(*geog);
+  writer.Finish(array.get());
+
+  EXPECT_EQ(array->length, 1);
+  EXPECT_EQ(array->children[0]->length, 2);
+
+  // with tessellation -> more coordinates
+  nanoarrow::UniqueArray array2;
+  s2geography::geoarrow::ExportOptions options;
+  options.set_tessellate_tolerance(S1Angle::Radians(10000 / EARTH_RADIUS_METERS));
+  writer.Init(schema.get(), options);
+  writer.WriteGeography(*geog);
+  writer.Finish(array2.get());
+
+  EXPECT_EQ(array2->length, 1);
+  EXPECT_GT(array2->children[0]->length, 2);
+  EXPECT_EQ(array2->children[0]->length, 9);
+  // first coordinate is still the same
+  auto xs = reinterpret_cast<const double*>(array2->children[0]->children[0]->buffers[1]);
+  EXPECT_DOUBLE_EQ(xs[0], -64);
+  EXPECT_DOUBLE_EQ(xs[9], 0);
+  auto ys = reinterpret_cast<const double*>(array2->children[0]->children[1]->buffers[1]);
+  EXPECT_DOUBLE_EQ(ys[0], 45);
+  EXPECT_DOUBLE_EQ(ys[8], 45);
+  EXPECT_GT(ys[4], 45);
+
+  // with tessellation and projection
+  nanoarrow::UniqueArray array3;
+  options.set_projection(s2geography::pseudo_mercator());
+  writer.Init(schema.get(), options);
+  writer.WriteGeography(*geog);
+  writer.Finish(array3.get());
+
+  EXPECT_EQ(array3->length, 1);
+  EXPECT_GT(array3->children[0]->length, 2);
+  EXPECT_EQ(array3->children[0]->length, 9);
+
+  xs = reinterpret_cast<const double*>(array3->children[0]->children[0]->buffers[1]);
+  EXPECT_NEAR(xs[0], -7124447.41, 0.01);
+  EXPECT_DOUBLE_EQ(xs[9], 0);
+  ys = reinterpret_cast<const double*>(array3->children[0]->children[1]->buffers[1]);
+  EXPECT_NEAR(ys[0], 5621521.48, 0.01);
+  EXPECT_NEAR(ys[8], 5621521.48, 0.01);
+  EXPECT_GT(ys[4], 5621521);
+}
+
+TEST(GeoArrow, GeoArrowWriterPolygonTessellated) {
+  s2geography::WKTReader reader;
+  auto geog = reader.read_feature("POLYGON ((-64 45, 0 45, 0 55, -64 55, -64 45))");
+
+  Writer writer;
+  nanoarrow::UniqueSchema schema;
+  GeoArrowSchemaInitExtension(schema.get(), GEOARROW_TYPE_WKT);
+
+  nanoarrow::UniqueArray array;
+  writer.Init(schema.get());
+  writer.WriteGeography(*geog);
+  writer.Finish(array.get());
+
+  EXPECT_EQ(array->length, 1);
+  auto length_no_tesselation = reinterpret_cast<const int32*>(array->buffers[1])[1];
+
+  // with tessellation -> more coordinates
+  nanoarrow::UniqueArray array2;
+  s2geography::geoarrow::ExportOptions options;
+  options.set_tessellate_tolerance(S1Angle::Radians(10000 / EARTH_RADIUS_METERS));
+
+  writer.Init(schema.get(), options);
+  writer.WriteGeography(*geog);
+  writer.Finish(array2.get());
+
+  EXPECT_EQ(array2->length, 1);
+  auto length_with_tesselation = reinterpret_cast<const int32*>(array2->buffers[1])[1];
+
+  // dummy test to check that the WKT string length is larger with tesselation
+  EXPECT_GT(length_with_tesselation, length_no_tesselation);
 }

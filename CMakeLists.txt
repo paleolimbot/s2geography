@@ -186,6 +186,14 @@ if(S2GEOGRAPHY_BUILD_TESTS)
 
   FetchContent_MakeAvailable(nanoarrow)
 
+  FetchContent_Declare(
+    geoarrow
+    URL https://github.com/geoarrow/geoarrow-c/archive/refs/tags/geoarrow-c-python-0.1.3.zip
+    URL_HASH
+      SHA256=67a6781e1767ad666a0bcec5dcbd86356256a1dfd8aae9a54f4aee146e358ce6)
+
+  FetchContent_MakeAvailable(geoarrow)
+
   if(S2GEOGRAPHY_CODE_COVERAGE)
     add_library(coverage_config INTERFACE)
   endif()
@@ -268,7 +276,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   endif()
 
   target_link_libraries(distance_test s2geography GTest::gtest_main)
-  target_link_libraries(geoarrow_test s2geography nanoarrow GTest::gtest_main GTest::gmock)
+  target_link_libraries(geoarrow_test s2geography nanoarrow geoarrow GTest::gtest_main GTest::gmock)
   target_link_libraries(geography_test s2geography nanoarrow GTest::gtest_main)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
   target_link_libraries(op_cell_test s2geography GTest::gtest_main)
