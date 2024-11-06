@@ -35,9 +35,6 @@ void PrintTo(const ShapeIndexGeography& geog, std::ostream* os) {
   *os << "ShapeIndexGeography with " << geog.ShapeIndex().num_shape_ids()
       << " shapes";
 }
-}  // namespace s2geography
-
-using namespace s2geography;
 
 MATCHER_P(WktEquals6, wkt, "") {
   WKTWriter writer(6);
@@ -80,7 +77,7 @@ TEST(Geography, EmptyCollection) {
   EXPECT_EQ(geog.num_shapes(), 0);
   EXPECT_EQ(geog.dimension(), -1);
   EXPECT_TRUE(geog.Features().empty());
-  ASSERT_THAT(geog, WktEquals6("GEOGRAPHYCOLLECTION EMPTY"));
+  ASSERT_THAT(geog, WktEquals6("GEOMETRYCOLLECTION EMPTY"));
 }
 
 TEST(Geography, EmptyShapeIndex) {
@@ -225,3 +222,5 @@ TEST(Geography, EncodedShapeIndex) {
   EXPECT_EQ(poly_shape->edge(2).v0, pt_end);
   EXPECT_EQ(poly_shape->edge(2).v1, pt);
 }
+
+}  // namespace s2geography
