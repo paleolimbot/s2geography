@@ -280,8 +280,6 @@ void PointGeography::EncodeTagged(Encoder* encoder,
 
   encoder->Ensure(sizeof(uint64_t));
   encoder->put64(S2CellId(points_[0]).id());
-
-  s2coding::EncodeS2PointVector(points_, options.coding_hint(), encoder);
 }
 
 void PointGeography::Encode(Encoder* encoder,

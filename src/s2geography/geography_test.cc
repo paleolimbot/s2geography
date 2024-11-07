@@ -81,6 +81,8 @@ TEST(Geography, EncodedSnappedPoint) {
   geog.EncodeTagged(&encoder, EncodeOptions());
 
   Decoder decoder(encoder.base(), encoder.length());
+  EXPECT_EQ(decoder.avail(), 12);
+
   EncodeTag tag;
   std::vector<S2CellId> covering;
   tag.Decode(&decoder);
