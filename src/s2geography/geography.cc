@@ -259,7 +259,12 @@ void PointGeography::EncodeTagged(Encoder* encoder,
   int face;
   uint32 si, ti;
   int level = S2::XYZtoFaceSiTi(points_[0], &face, &si, &ti);
-  if (level < 0) {
+
+  // Only encode this for very high levels: because the covering *is* the
+  // representation, we will have a very loose covering if the level is low.
+  // Level 23 has a cell size of ~1 meter
+  // (http://s2geometry.io/resources/s2cell_statistics)
+  if (level < 23) {
     // Not exactly encodable as a cell center
     Geography::EncodeTagged(encoder, options);
     return;

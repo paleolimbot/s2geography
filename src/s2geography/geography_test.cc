@@ -4,56 +4,9 @@
 #include <gtest/gtest.h>
 
 #include "s2geography.h"
-#include "test_wkt.h"
+#include "s2geography_gtest_util.h"
 
 namespace s2geography {
-void PrintTo(const Geography& geog, std::ostream* os) {
-  WKTWriter writer(6);
-  *os << writer.write_feature(geog);
-}
-
-void PrintTo(const PointGeography& geog, std::ostream* os) {
-  WKTWriter writer;
-  *os << writer.write_feature(geog);
-}
-
-void PrintTo(const PolylineGeography& geog, std::ostream* os) {
-  WKTWriter writer(6);
-  *os << writer.write_feature(geog);
-}
-
-void PrintTo(const PolygonGeography& geog, std::ostream* os) {
-  WKTWriter writer(6);
-  *os << writer.write_feature(geog);
-}
-
-void PrintTo(const GeographyCollection& geog, std::ostream* os) {
-  WKTWriter writer(6);
-  *os << writer.write_feature(geog);
-}
-
-void PrintTo(const ShapeIndexGeography& geog, std::ostream* os) {
-  *os << "ShapeIndexGeography with " << geog.ShapeIndex().num_shape_ids()
-      << " shapes";
-}
-
-void PrintTo(const EncodeOptions& obj, std::ostream* os) {
-  *os << "EncodeOptions(";
-
-  if (obj.coding_hint() == s2coding::CodingHint::COMPACT) {
-    *os << "COMPACT, ";
-  } else {
-    *os << "FAST, ";
-  }
-
-  *os << "enable_lazy_decode: " << obj.enable_lazy_decode()
-      << ", include_covering: " << obj.include_covering() << ")";
-}
-
-MATCHER_P(WktEquals6, wkt, "") {
-  WKTWriter writer(6);
-  return writer.write_feature(arg) == wkt;
-}
 
 TEST(Geography, EmptyPoint) {
   PointGeography geog;
@@ -315,6 +268,9 @@ TEST(Geography, EncodeRoundtrip) {
   }
 
   std::vector<std::string> wkt_options = TestWKT();
+  // Make sure we aren't silently testing nothing
+  ASSERT_GE(wkt_options.size(), 19);
+
   for (const auto& options : option_options) {
     for (const auto& wkt : wkt_options) {
       ASSERT_NO_FATAL_FAILURE(TestEncodeWKTRoundtrip(wkt, options));

@@ -1,5 +1,67 @@
+#pragma once
+
+#include <gmock/gmock-matchers.h>
+#include <gtest/gtest.h>
 
 #include <vector>
+
+#include "s2geography/geography.h"
+#include "s2geography/wkt-writer.h"
+
+// Define pretty printers for Geography. These seem to be required for
+// subclasses as well to get the desired output on failure.
+namespace s2geography {
+inline void PrintTo(const Geography& geog, std::ostream* os) {
+  WKTWriter writer(6);
+  *os << writer.write_feature(geog);
+}
+
+inline void PrintTo(const PointGeography& geog, std::ostream* os) {
+  WKTWriter writer;
+  *os << writer.write_feature(geog);
+}
+
+inline void PrintTo(const PolylineGeography& geog, std::ostream* os) {
+  WKTWriter writer(6);
+  *os << writer.write_feature(geog);
+}
+
+inline void PrintTo(const PolygonGeography& geog, std::ostream* os) {
+  WKTWriter writer(6);
+  *os << writer.write_feature(geog);
+}
+
+inline void PrintTo(const GeographyCollection& geog, std::ostream* os) {
+  WKTWriter writer(6);
+  *os << writer.write_feature(geog);
+}
+
+inline void PrintTo(const ShapeIndexGeography& geog, std::ostream* os) {
+  *os << "ShapeIndexGeography with " << geog.ShapeIndex().num_shape_ids()
+      << " shapes";
+}
+
+inline void PrintTo(const EncodeOptions& obj, std::ostream* os) {
+  *os << "EncodeOptions(";
+
+  if (obj.coding_hint() == s2coding::CodingHint::COMPACT) {
+    *os << "COMPACT, ";
+  } else {
+    *os << "FAST, ";
+  }
+
+  *os << "enable_lazy_decode: " << obj.enable_lazy_decode()
+      << ", include_covering: " << obj.include_covering() << ")";
+}
+
+// Define a custom matcher for a geography being equal to some WKT, rounded
+// to 6 decimal places. This is usually sufficient to ensure that integer
+// lon/lat coordinates are equal.
+MATCHER_P(WktEquals6, wkt, "") {
+  WKTWriter writer(6);
+  return writer.write_feature(arg) == wkt;
+}
+}  // namespace s2geography
 
 static const char* kRoundtrippableWkt[] = {
     "POINT (30 10)",
@@ -51,10 +113,13 @@ static const char* kNonRoundtrippableWktRoundtrip[] = {
     "MULTIPOLYGON EMPTY",
 };
 
-static inline std::vector<std::string> TestWKT() {
-  std::vector<std::string> out(kNumRoundtrippableWkt);
+static inline std::vector<std::string> TestWKT(const std::string& prefix = "") {
+  std::vector<std::string> out;
   for (int i = 0; i < kNumRoundtrippableWkt; i++) {
-    out[i] = kRoundtrippableWkt[i];
+    std::string item(kRoundtrippableWkt[i]);
+    if (item.find(prefix) != item.npos) {
+      out.push_back(item);
+    }
   }
   return out;
 }
