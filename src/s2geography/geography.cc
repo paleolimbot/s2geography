@@ -584,6 +584,10 @@ void EncodeTag::Decode(Decoder* decoder) {
   } else if (geography_type ==
              static_cast<uint8_t>(GeographyKind::SHAPE_INDEX)) {
     kind = GeographyKind::SHAPE_INDEX;
+  } else if (geography_type ==
+             static_cast<uint8_t>(GeographyKind::CELL_CENTER)) {
+    kind = GeographyKind::CELL_CENTER;
+
   } else {
     throw Exception("EncodeTag::Decode(): Unknown geography kind identifier " +
                     std::to_string(geography_type));

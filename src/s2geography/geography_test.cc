@@ -72,6 +72,32 @@ TEST(Geography, EncodedPoint) {
   EXPECT_EQ(roundtrip_typed->Points()[0], pt);
 }
 
+TEST(Geography, EncodedSnappedPoint) {
+  S2Point pt = S2LatLng::FromDegrees(45, -64).ToPoint();
+  S2Point pt_snapped = S2CellId(pt).ToPoint();
+  Encoder encoder;
+
+  PointGeography geog(pt_snapped);
+  geog.EncodeTagged(&encoder, EncodeOptions());
+
+  Decoder decoder(encoder.base(), encoder.length());
+  EncodeTag tag;
+  std::vector<S2CellId> covering;
+  tag.Decode(&decoder);
+  ASSERT_EQ(tag.kind, GeographyKind::CELL_CENTER);
+  ASSERT_EQ(tag.covering_size, 1);
+
+  tag.DecodeCovering(&decoder, &covering);
+  EXPECT_EQ(covering[0], S2CellId(pt));
+
+  decoder.reset(encoder.base(), encoder.length());
+  auto roundtrip = Geography::DecodeTagged(&decoder);
+  ASSERT_EQ(roundtrip->kind(), GeographyKind::POINT);
+  auto roundtrip_typed = reinterpret_cast<PointGeography*>(roundtrip.get());
+  ASSERT_EQ(roundtrip_typed->Points().size(), 1);
+  EXPECT_EQ(roundtrip_typed->Points()[0], pt_snapped);
+}
+
 TEST(Geography, EncodedPolyline) {
   S2Point pt = S2LatLng::FromDegrees(45, -64).ToPoint();
   S2Point pt_end = S2LatLng::FromDegrees(0, 0).ToPoint();
