@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "s2geography.h"
+#include "test_wkt.h"
 
 namespace s2geography {
 void PrintTo(const Geography& geog, std::ostream* os) {
@@ -238,7 +239,7 @@ TEST(Geography, EncodedShapeIndex) {
 
 void TestEncodeWKTRoundtrip(const std::string& wkt,
                             const EncodeOptions& options) {
-  SCOPED_TRACE(wkt + " / " + ::testing::PrintToString(options));
+  SCOPED_TRACE(wkt + " / " + ::testing::PrintToString(options) + " (WKT)");
   WKTReader reader;
   std::unique_ptr<Geography> original_geog = reader.read_feature(wkt);
   // Make sure the original geography matches the given WKT
@@ -252,32 +253,79 @@ void TestEncodeWKTRoundtrip(const std::string& wkt,
   EXPECT_THAT(*roundtrip_geog, WktEquals6(wkt));
 }
 
+void TestCoveringRoundtrip(const std::string& wkt,
+                           const EncodeOptions& options) {
+  SCOPED_TRACE(wkt + " / " + ::testing::PrintToString(options) + " (covering)");
+  WKTReader reader;
+  std::unique_ptr<Geography> original_geog = reader.read_feature(wkt);
+
+  // Calculate the initial bound in the same way as EncodeTagged()
+  std::vector<S2CellId> cell_ids;
+  original_geog->GetCellUnionBound(&cell_ids);
+  S2CellUnion::Normalize(&cell_ids);
+
+  Encoder encoder;
+  original_geog->EncodeTagged(&encoder, options);
+
+  Decoder decoder(encoder.base(), encoder.length());
+  EncodeTag tag;
+  tag.Decode(&decoder);
+
+  std::vector<S2CellId> cell_ids_roundtrip;
+  tag.DecodeCovering(&decoder, &cell_ids_roundtrip);
+  EXPECT_THAT(cell_ids_roundtrip,
+              ::testing::ElementsAreArray(cell_ids.begin(), cell_ids.end()));
+}
+
+void TestWKTShapeIndexRoundtrip(const std::string& wkt,
+                                const EncodeOptions& options) {
+  SCOPED_TRACE(wkt + " / " + ::testing::PrintToString(options) + " (index)");
+  WKTReader reader;
+  std::unique_ptr<Geography> original_geog = reader.read_feature(wkt);
+  ShapeIndexGeography original_index(*original_geog);
+
+  Encoder encoder;
+  original_index.EncodeTagged(&encoder, options);
+
+  Decoder decoder(encoder.base(), encoder.length());
+  std::unique_ptr<Geography> roundtrip_index =
+      Geography::DecodeTagged(&decoder);
+
+  EXPECT_EQ(roundtrip_index->kind(), GeographyKind::ENCODED_SHAPE_INDEX);
+  EXPECT_EQ(roundtrip_index->num_shapes(), original_index.num_shapes());
+}
+
 TEST(Geography, EncodeRoundtrip) {
-  std::vector<s2coding::CodingHint> hints{s2coding::CodingHint::COMPACT, s2coding::CodingHint::FAST};
+  std::vector<s2coding::CodingHint> hints{s2coding::CodingHint::COMPACT,
+                                          s2coding::CodingHint::FAST};
   std::vector<bool> include_covering{true, false};
-  std::vector<bool> enable_lazy_decode{true, false};
+  std::vector<bool> enable_lazy{true, false};
 
   std::vector<EncodeOptions> option_options;
   for (const auto hint_opt : hints) {
     for (const auto covering_opt : include_covering) {
-      for (const auto enable_lazy_decode_opt : enable_lazy_decode) {
+      for (const auto enable_lazy_opt : enable_lazy) {
         EncodeOptions opt;
         opt.set_coding_hint(hint_opt);
         opt.set_include_covering(covering_opt);
-        opt.set_enable_lazy_decode(enable_lazy_decode_opt);
+        opt.set_enable_lazy_decode(enable_lazy_opt);
         option_options.push_back(opt);
       }
     }
   }
 
-  std::vector<std::string> wkt_options = {
-      // For better formatting
-      "POINT EMPTY", "LINESTRING EMPTY", "POLYGON EMPTY",
-      "GEOMETRYCOLLECTION EMPTY"};
-
+  std::vector<std::string> wkt_options = TestWKT();
   for (const auto& options : option_options) {
     for (const auto& wkt : wkt_options) {
       ASSERT_NO_FATAL_FAILURE(TestEncodeWKTRoundtrip(wkt, options));
+      if (options.include_covering()) {
+        ASSERT_NO_FATAL_FAILURE(TestCoveringRoundtrip(wkt, options));
+      }
+
+      if (!options.enable_lazy_decode() ||
+          options.coding_hint() == s2coding::CodingHint::COMPACT) {
+        ASSERT_NO_FATAL_FAILURE(TestWKTShapeIndexRoundtrip(wkt, options));
+      }
     }
   }
 }
