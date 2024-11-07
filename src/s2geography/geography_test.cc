@@ -16,6 +16,16 @@ TEST(Geography, EmptyPoint) {
 
   EXPECT_TRUE(geog.Points().empty());
   ASSERT_THAT(geog, WktEquals6("POINT EMPTY"));
+
+  Encoder encoder;
+  geog.EncodeTagged(&encoder, EncodeOptions());
+  ASSERT_EQ(encoder.length(), 4);
+
+  Decoder decoder(encoder.base(), encoder.length());
+  EncodeTag tag;
+  tag.Decode(&decoder);
+  ASSERT_EQ(tag.kind, GeographyKind::POINT);
+  ASSERT_TRUE(tag.flags & EncodeTag::kFlagEmpty);
 }
 
 TEST(Geography, EmptyPolyline) {
@@ -26,6 +36,16 @@ TEST(Geography, EmptyPolyline) {
 
   EXPECT_TRUE(geog.Polylines().empty());
   ASSERT_THAT(geog, WktEquals6("LINESTRING EMPTY"));
+
+  Encoder encoder;
+  geog.EncodeTagged(&encoder, EncodeOptions());
+  ASSERT_EQ(encoder.length(), 4);
+
+  Decoder decoder(encoder.base(), encoder.length());
+  EncodeTag tag;
+  tag.Decode(&decoder);
+  ASSERT_EQ(tag.kind, GeographyKind::POLYLINE);
+  ASSERT_TRUE(tag.flags & EncodeTag::kFlagEmpty);
 }
 
 TEST(Geography, EmptyPolygon) {
@@ -36,6 +56,16 @@ TEST(Geography, EmptyPolygon) {
 
   EXPECT_TRUE(geog.Polygon()->is_empty());
   ASSERT_THAT(geog, WktEquals6("POLYGON EMPTY"));
+
+  Encoder encoder;
+  geog.EncodeTagged(&encoder, EncodeOptions());
+  ASSERT_EQ(encoder.length(), 4);
+
+  Decoder decoder(encoder.base(), encoder.length());
+  EncodeTag tag;
+  tag.Decode(&decoder);
+  ASSERT_EQ(tag.kind, GeographyKind::POLYGON);
+  ASSERT_TRUE(tag.flags & EncodeTag::kFlagEmpty);
 }
 
 TEST(Geography, EmptyCollection) {
@@ -45,6 +75,16 @@ TEST(Geography, EmptyCollection) {
   EXPECT_EQ(geog.dimension(), -1);
   EXPECT_TRUE(geog.Features().empty());
   ASSERT_THAT(geog, WktEquals6("GEOMETRYCOLLECTION EMPTY"));
+
+  Encoder encoder;
+  geog.EncodeTagged(&encoder, EncodeOptions());
+  ASSERT_EQ(encoder.length(), 4);
+
+  Decoder decoder(encoder.base(), encoder.length());
+  EncodeTag tag;
+  tag.Decode(&decoder);
+  ASSERT_EQ(tag.kind, GeographyKind::GEOGRAPHY_COLLECTION);
+  ASSERT_TRUE(tag.flags & EncodeTag::kFlagEmpty);
 }
 
 TEST(Geography, EmptyShapeIndex) {
@@ -53,6 +93,16 @@ TEST(Geography, EmptyShapeIndex) {
   EXPECT_EQ(geog.num_shapes(), 0);
   EXPECT_EQ(geog.dimension(), -1);
   EXPECT_EQ(geog.ShapeIndex().num_shape_ids(), 0);
+
+  Encoder encoder;
+  geog.EncodeTagged(&encoder, EncodeOptions());
+  ASSERT_EQ(encoder.length(), 4);
+
+  Decoder decoder(encoder.base(), encoder.length());
+  EncodeTag tag;
+  tag.Decode(&decoder);
+  ASSERT_EQ(tag.kind, GeographyKind::SHAPE_INDEX);
+  ASSERT_TRUE(tag.flags & EncodeTag::kFlagEmpty);
 }
 
 TEST(Geography, EncodedPoint) {
