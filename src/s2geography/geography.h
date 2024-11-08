@@ -294,8 +294,10 @@ class EncodedShapeIndexGeography : public Geography {
 class EncodeOptions {
  public:
   // Create options with default values, which optimize for the
-  // scenario where a geography is getting serialized and hopefully
-  // not deserialized in full.
+  // scenario where a geography is about to be fully deserialized
+  // in another process. Set the appropriate options for smaller
+  // encoded size and/or better query performance when running queries
+  // directly on encoded data.
   EncodeOptions() = default;
 
   // Control whether to optimize for speed (by writing vertices as
@@ -324,9 +326,9 @@ class EncodeOptions {
   bool include_covering() const { return include_covering_; }
 
  private:
-  s2coding::CodingHint hint_{s2coding::CodingHint::COMPACT};
-  bool enable_lazy_decode_{true};
-  bool include_covering_{true};
+  s2coding::CodingHint hint_{s2coding::CodingHint::FAST};
+  bool enable_lazy_decode_{false};
+  bool include_covering_{false};
 };
 
 // A 4 byte prefix for encoded geographies. 4 bytes is essential so that

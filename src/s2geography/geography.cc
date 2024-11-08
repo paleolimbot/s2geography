@@ -250,8 +250,9 @@ std::unique_ptr<S2Region> EncodedShapeIndexGeography::Region() const {
 
 void PointGeography::EncodeTagged(Encoder* encoder,
                                   const EncodeOptions& options) const {
-  // Special case encoding for exactly one point
-  if (points_.size() != 1) {
+  // Special case encoding for exactly one point in compact mode
+  if (points_.size() != 1 ||
+      options.coding_hint() != s2coding::CodingHint::COMPACT) {
     Geography::EncodeTagged(encoder, options);
     return;
   }

@@ -128,7 +128,9 @@ TEST(Geography, EncodedSnappedPoint) {
   Encoder encoder;
 
   PointGeography geog(pt_snapped);
-  geog.EncodeTagged(&encoder, EncodeOptions());
+  EncodeOptions options;
+  options.set_coding_hint(s2coding::CodingHint::COMPACT);
+  geog.EncodeTagged(&encoder, options);
 
   Decoder decoder(encoder.base(), encoder.length());
   EXPECT_EQ(decoder.avail(), 12);
