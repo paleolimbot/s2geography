@@ -201,6 +201,7 @@ add_library(s2geography
     src/s2geography/accessors.cc
     src/s2geography/distance.cc
     src/s2geography/predicates.cc
+    src/s2geography/projections.cc
     src/s2geography/build.cc
     src/s2geography/geography.cc
     src/s2geography/geoarrow.cc
@@ -267,10 +268,12 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   endif()
 
   target_link_libraries(distance_test s2geography GTest::gtest_main)
-  target_link_libraries(geoarrow_test s2geography nanoarrow GTest::gtest_main)
+  target_link_libraries(geoarrow_test s2geography nanoarrow GTest::gtest_main GTest::gmock)
   target_link_libraries(geography_test s2geography nanoarrow GTest::gtest_main GTest::gmock)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
   target_link_libraries(op_cell_test s2geography GTest::gtest_main)
+
+  target_include_directories(geoarrow_test PRIVATE src/vendored)
 
   include(GoogleTest)
   gtest_discover_tests(distance_test)

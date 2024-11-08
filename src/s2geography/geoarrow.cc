@@ -6,7 +6,6 @@
 #include "geoarrow/geoarrow.h"
 #include "s2/s1angle.h"
 #include "s2/s2edge_tessellator.h"
-#include "s2/s2projections.h"
 #include "s2geography/geography.h"
 
 namespace s2geography {
@@ -15,10 +14,6 @@ namespace geoarrow {
 
 const char* version() { return GeoArrowVersion(); }
 
-S2::Projection* lnglat() {
-  static S2::PlateCarreeProjection projection(180);
-  return &projection;
-}
 
 // This should really be in nanoarrow or geoarrow
 // https://github.com/geoarrow/geoarrow-c-geos/blob/33ad0ba21c76c09e9d72fc4e4ae0b9ff9da61848/src/geoarrow_geos/geoarrow_geos.c#L323-L360
@@ -728,6 +723,11 @@ class WriterImpl {
     code = GeoArrowArrayWriterInitVisitor(&writer_, &visitor_);
     ThrowNotOk(code);
 
+    if (options_.projection() != nullptr) {
+      this->tessellator_ = absl::make_unique<S2EdgeTessellator>(
+          options_.projection(), options_.tessellate_tolerance());
+    }
+
     // Currently we always visit single coordinate pairs one by one, so set
     // up the appropiate view for that once, which is then reused
     coords_view_.n_coords = 1;
@@ -752,6 +752,14 @@ class WriterImpl {
   GeoArrowCoordView coords_view_;
   double coords_[2];
   GeoArrowError error_;
+  std::unique_ptr<S2EdgeTessellator> tessellator_;
+  std::vector<R2Point> points_;
+
+  void ProjectS2Point(const S2Point& pt) {
+    R2Point out = options_.projection()->Project(pt);
+    coords_[0] = out.x();
+    coords_[1] = out.y();
+  }
 
   int VisitPoints(const PointGeography& point) {
 
@@ -765,9 +773,7 @@ class WriterImpl {
       // Point
       GEOARROW_RETURN_NOT_OK(visitor_.geom_start(
           &visitor_, GEOARROW_GEOMETRY_TYPE_POINT, GEOARROW_DIMENSIONS_XY));
-      S2LatLng ll(point.Points()[0]);
-      coords_[0] = ll.lng().degrees();
-      coords_[1] = ll.lat().degrees();
+      ProjectS2Point(point.Points()[0]);
       GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
       GEOARROW_RETURN_NOT_OK(visitor_.geom_end(&visitor_));
 
@@ -780,15 +786,40 @@ class WriterImpl {
       for (const S2Point& pt : point.Points()) {
         GEOARROW_RETURN_NOT_OK(visitor_.geom_start(
             &visitor_, GEOARROW_GEOMETRY_TYPE_POINT, GEOARROW_DIMENSIONS_XY));
-        S2LatLng ll(pt);
-        coords_[0] = ll.lng().degrees();
-        coords_[1] = ll.lat().degrees();
+        ProjectS2Point(pt);
         GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
         GEOARROW_RETURN_NOT_OK(visitor_.geom_end(&visitor_));
       }
 
       GEOARROW_RETURN_NOT_OK(visitor_.geom_end(&visitor_));
     }
+    return GEOARROW_OK;
+  }
+
+  int VisitPolylineEdges(const S2Polyline& poly) {
+
+    if (poly.num_vertices() == 0) {
+      throw Exception("Unexpected S2Polyline with 0 vertices");
+    } else if (poly.num_vertices() == 1) {
+      // this is an invalid case, but we handle it for printing
+      ProjectS2Point(poly.vertex(0));
+      GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
+      return GEOARROW_OK;
+    }
+
+    for (int i = 1; i < poly.num_vertices(); i++) {
+        const S2Point& pt0(poly.vertex(i - 1));
+        const S2Point& pt1(poly.vertex(i));
+        tessellator_->AppendProjected(pt0, pt1, &points_);
+    }
+
+    for (const auto& pt : points_) {
+      coords_[0] = pt.x();
+      coords_[1] = pt.y();
+      GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
+    }
+    points_.clear();
+
     return GEOARROW_OK;
   }
 
@@ -803,19 +834,11 @@ class WriterImpl {
 
     } else if (geog.Polylines().size() == 1) {
       // LineString
+      const auto& poly = geog.Polylines()[0];
       GEOARROW_RETURN_NOT_OK(
           visitor_.geom_start(&visitor_, GEOARROW_GEOMETRY_TYPE_LINESTRING,
                               GEOARROW_DIMENSIONS_XY));
-
-      const auto& poly = geog.Polylines()[0];
-
-      for (int i = 0; i < poly->num_vertices(); i++) {
-        S2LatLng ll(poly->vertex(i));
-        coords_[0] = ll.lng().degrees();
-        coords_[1] = ll.lat().degrees();
-        GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
-      }
-
+      GEOARROW_RETURN_NOT_OK(VisitPolylineEdges(*poly));
       GEOARROW_RETURN_NOT_OK(visitor_.geom_end(&visitor_));
 
     } else {
@@ -828,14 +851,7 @@ class WriterImpl {
         GEOARROW_RETURN_NOT_OK(
             visitor_.geom_start(&visitor_, GEOARROW_GEOMETRY_TYPE_LINESTRING,
                                 GEOARROW_DIMENSIONS_XY));
-
-        for (int i = 0; i < poly->num_vertices(); i++) {
-          S2LatLng ll(poly->vertex(i));
-          coords_[0] = ll.lng().degrees();
-          coords_[1] = ll.lat().degrees();
-          GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
-        }
-
+        GEOARROW_RETURN_NOT_OK(VisitPolylineEdges(*poly));
         GEOARROW_RETURN_NOT_OK(visitor_.geom_end(&visitor_));
       }
 
@@ -853,12 +869,20 @@ class WriterImpl {
 
     GEOARROW_RETURN_NOT_OK(visitor_.ring_start(&visitor_));
 
-    for (int i = 0; i <= loop->num_vertices(); i++) {
-      S2LatLng ll(loop->vertex(i));
-      coords_[0] = ll.lng().degrees();
-      coords_[1] = ll.lat().degrees();
+    // loop until `num_vertices()` instead of `num_vertices() - 1` to include
+    // the closing edge from the last vertex to the first vertex
+    for (int i = 1; i <= loop->num_vertices(); i++) {
+      const S2Point& pt0(loop->vertex(i - 1));
+      const S2Point& pt1(loop->vertex(i));
+      tessellator_->AppendProjected(pt0, pt1, &points_);
+    }
+
+    for (const auto& pt : points_) {
+      coords_[0] = pt.x();
+      coords_[1] = pt.y();
       GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
     }
+    points_.clear();
 
     GEOARROW_RETURN_NOT_OK(visitor_.ring_end(&visitor_));
 
@@ -875,17 +899,22 @@ class WriterImpl {
 
     // For the hole, we use the vertices in reverse order to ensure the holes
     // have the opposite orientation of the shell
-    for (int i = loop->num_vertices() - 1; i >= 0; i--) {
-      S2LatLng ll(loop->vertex(i));
-      coords_[0] = ll.lng().degrees();
-      coords_[1] = ll.lat().degrees();
-      GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
+    for (int i = loop->num_vertices() - 2; i >= 0; i--) {
+      const S2Point& pt0(loop->vertex(i + 1));
+      const S2Point& pt1(loop->vertex(i));
+      tessellator_->AppendProjected(pt0, pt1, &points_);
     }
 
-    S2LatLng ll(loop->vertex(loop->num_vertices() - 1));
-    coords_[0] = ll.lng().degrees();
-    coords_[1] = ll.lat().degrees();
-    GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
+    const S2Point& pt0(loop->vertex(0));
+    const S2Point& pt1(loop->vertex(loop->num_vertices() - 1));
+    tessellator_->AppendProjected(pt0, pt1, &points_);
+
+    for (const auto& pt : points_) {
+      coords_[0] = pt.x();
+      coords_[1] = pt.y();
+      GEOARROW_RETURN_NOT_OK(visitor_.coords(&visitor_, &coords_view_));
+    }
+    points_.clear();
 
     GEOARROW_RETURN_NOT_OK(visitor_.ring_end(&visitor_));
     return GEOARROW_OK;
@@ -1009,6 +1038,7 @@ class WriterImpl {
         }
       }
     }
+    GEOARROW_RETURN_NOT_OK(visitor_.feat_end(&visitor_));
     return GEOARROW_OK;
   }
 
