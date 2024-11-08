@@ -10,8 +10,8 @@ class WKBReader {
  public:
   WKBReader() : WKBReader(geoarrow::ImportOptions()) {}
   WKBReader(const geoarrow::ImportOptions& options);
-  std::unique_ptr<Geography> read_feature(const uint8_t* bytes, int64_t size);
-  std::unique_ptr<Geography> read_feature(const std::basic_string<uint8_t>& bytes);
+  std::unique_ptr<Geography> ReadFeature(const uint8_t* bytes, int64_t size);
+  std::unique_ptr<Geography> ReadFeature(const std::basic_string<uint8_t>& bytes);
 
  private:
   std::unique_ptr<geoarrow::Reader> reader_;
@@ -23,7 +23,7 @@ class WKBWriter {
   WKBWriter() : WKBWriter(geoarrow::ExportOptions()) {}
   WKBWriter(const geoarrow::ExportOptions& options);
 
-  std::basic_string<uint8_t> write_feature(const Geography& geog);
+  std::basic_string<uint8_t> WriteFeature(const Geography& geog);
 
  private:
   std::unique_ptr<geoarrow::Writer> writer_;

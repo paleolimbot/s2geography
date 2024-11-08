@@ -15,7 +15,7 @@ WKBReader::WKBReader(const geoarrow::ImportOptions& options) {
   reader_->Init(geoarrow::Reader::InputType::kWKB, options);
 }
 
-std::unique_ptr<Geography> WKBReader::read_feature(const uint8_t* bytes,
+std::unique_ptr<Geography> WKBReader::ReadFeature(const uint8_t* bytes,
                                                    int64_t size) {
   if (size > std::numeric_limits<int32_t>::max()) {
     throw Exception("Can't parse WKB greater than 2GB in size");
@@ -42,8 +42,8 @@ std::unique_ptr<Geography> WKBReader::read_feature(const uint8_t* bytes,
   return std::move(out_[0]);
 }
 
-std::unique_ptr<Geography> WKBReader::read_feature(const std::basic_string<uint8_t>& bytes) {
-  return read_feature(bytes.data(), bytes.size());
+std::unique_ptr<Geography> WKBReader::ReadFeature(const std::basic_string<uint8_t>& bytes) {
+  return ReadFeature(bytes.data(), bytes.size());
 }
 
 WKBWriter::WKBWriter(const geoarrow::ExportOptions& options) {
@@ -52,7 +52,7 @@ WKBWriter::WKBWriter(const geoarrow::ExportOptions& options) {
 
 }
 
-std::basic_string<uint8_t> WKBWriter::write_feature(const Geography& geog) {
+std::basic_string<uint8_t> WKBWriter::WriteFeature(const Geography& geog) {
   ArrowArray array;
   writer_->WriteGeography(geog);
   writer_->Finish(&array);

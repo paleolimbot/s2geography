@@ -11,9 +11,9 @@ void wkbRoundTrip(const std::string wktIn,
   WKBReader reader;
   WKBWriter writer;
 
-  auto geog = reader.read_feature(wkbIn);
-  auto wkbOut = writer.write_feature(*geog);
-  auto geogOut = reader.read_feature(wkbOut);
+  auto geog = reader.ReadFeature(wkbIn);
+  auto wkbOut = writer.WriteFeature(*geog);
+  auto geogOut = reader.ReadFeature(wkbOut);
   std::string wktOut = wkt_writer.write_feature(*geogOut);
   EXPECT_EQ(wktOut, wktIn);
 }
