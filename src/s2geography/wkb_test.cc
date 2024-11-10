@@ -58,3 +58,19 @@ TEST(WKBRoundtrip, Polygon) {
        0x00, 0x00, 0x00, 0x3e, 0x40});
   wkbRoundTrip(wkt, wkb);
 }
+
+TEST(WKBRoundtrip, ExportOptions) {
+  s2geography::WKTReader reader;
+  auto geog = reader.read_feature("LINESTRING (-64 45, 0 45)");
+
+  WKBWriter writer;
+  auto wkbOut = writer.WriteFeature(*geog);
+
+  // smoke test for passing through options: with tessellation -> more coordinates
+  s2geography::geoarrow::ExportOptions options;
+  options.set_tessellate_tolerance(S1Angle::Radians(0.001));
+  WKBWriter writer2(options);
+  auto wkbOut2 = writer2.WriteFeature(*geog);
+
+  EXPECT_GT(wkbOut2.size(), wkbOut.size());
+}
