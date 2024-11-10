@@ -11,7 +11,8 @@ class WKBReader {
   WKBReader() : WKBReader(geoarrow::ImportOptions()) {}
   WKBReader(const geoarrow::ImportOptions& options);
   std::unique_ptr<Geography> ReadFeature(const uint8_t* bytes, int64_t size);
-  std::unique_ptr<Geography> ReadFeature(const std::basic_string<uint8_t>& bytes);
+  std::unique_ptr<Geography> ReadFeature(const std::basic_string_view<uint8_t> bytes);
+  std::unique_ptr<Geography> ReadFeature(const std::string_view bytes);
 
  private:
   std::unique_ptr<geoarrow::Reader> reader_;
