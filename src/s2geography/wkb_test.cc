@@ -11,8 +11,7 @@ void wkbRoundTrip(const std::string wktIn,
   WKBReader reader;
   WKBWriter writer;
 
-  std::basic_string_view wkbIn_sv(wkbIn.data(), wkbIn.size());
-  auto geog = reader.ReadFeature(wkbIn_sv);
+  auto geog = reader.ReadFeature(wkbIn.data(), wkbIn.size());
   auto wkbOut = writer.WriteFeature(*geog);
   auto geogOut = reader.ReadFeature(wkbOut);
   std::string wktOut = wkt_writer.write_feature(*geogOut);

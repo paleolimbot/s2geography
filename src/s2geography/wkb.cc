@@ -42,10 +42,6 @@ std::unique_ptr<Geography> WKBReader::ReadFeature(const uint8_t* bytes,
   return std::move(out_[0]);
 }
 
-std::unique_ptr<Geography> WKBReader::ReadFeature(const std::basic_string_view<uint8_t> bytes) {
-  return ReadFeature(bytes.data(), bytes.size());
-}
-
 std::unique_ptr<Geography> WKBReader::ReadFeature(const std::string_view bytes) {
   return ReadFeature(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
 }
@@ -56,14 +52,14 @@ WKBWriter::WKBWriter(const geoarrow::ExportOptions& options) {
 
 }
 
-std::basic_string<uint8_t> WKBWriter::WriteFeature(const Geography& geog) {
+std::string WKBWriter::WriteFeature(const Geography& geog) {
   ArrowArray array;
   writer_->WriteGeography(geog);
   writer_->Finish(&array);
 
   const auto offsets = static_cast<const int32_t*>(array.buffers[1]);
   const auto data = static_cast<const uint8_t*>(array.buffers[2]);
-  std::basic_string<uint8_t> result(data, offsets[1]);
+  std::string result(reinterpret_cast<const char*>(data), offsets[1]);
 
   return result;
 }
