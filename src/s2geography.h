@@ -18,3 +18,4 @@
 #include "s2geography/projections.h"
 #include "s2geography/wkt-reader.h"
 #include "s2geography/wkt-writer.h"
+#include "s2geography/wkb.h"
