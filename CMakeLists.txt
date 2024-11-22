@@ -8,9 +8,9 @@ project(
 include(FetchContent)
 message(STATUS "Building using CMake version: ${CMAKE_VERSION}")
 
-# We need at least C++17 for recent s2 but if this value is already
-# set (e.g., to a higher standard) it should be respected.
-if (NOT DEFINED CMAKE_CXX_STANDARD)
+# We need at least C++17 for recent s2 but if this value is already set (e.g.,
+# to a higher standard) it should be respected.
+if(NOT DEFINED CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD
       17
       CACHE STRING "The C++ standard to build with")
@@ -267,26 +267,28 @@ target_link_libraries(s2geography PUBLIC s2::s2 absl::memory absl::str_format)
 
 # Set somewhat aggressive compiler warning flags
 if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
-  target_compile_options(s2geography
-                          PRIVATE $<$<CONFIG:Debug>:-Wall
-                                  -Werror
-                                  -Wextra
-                                  -Wpedantic
-                                  -Wno-type-limits
-                                  -Wmaybe-uninitialized
-                                  -Wunused-result
-                                  -Wconversion
-                                  -Wno-sign-conversion>)
-elseif(CMAKE_C_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID STREQUAL
-                                                    "Clang")
-  target_compile_options(s2geography
-                          PRIVATE $<$<CONFIG:Debug>:-Wall
-                                  -Werror
-                                  -Wextra
-                                  -Wpedantic
-                                  -Wdocumentation
-                                  -Wconversion
-                                  -Wno-sign-conversion>)
+  target_compile_options(
+    s2geography
+    PRIVATE $<$<CONFIG:Debug>:-Wall
+            -Werror
+            -Wextra
+            -Wpedantic
+            -Wno-type-limits
+            -Wmaybe-uninitialized
+            -Wunused-result
+            -Wconversion
+            -Wno-sign-conversion>)
+elseif(CMAKE_C_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID
+                                                    STREQUAL "Clang")
+  target_compile_options(
+    s2geography
+    PRIVATE $<$<CONFIG:Debug>:-Wall
+            -Werror
+            -Wextra
+            -Wpedantic
+            -Wdocumentation
+            -Wconversion
+            -Wno-sign-conversion>)
 endif()
 
 if(S2GEOGRAPHY_BUILD_TESTS)
