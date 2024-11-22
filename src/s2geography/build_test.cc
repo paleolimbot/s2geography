@@ -7,18 +7,24 @@ namespace s2geography {
 
 void TestUnaryUnionRoundtrip(const std::string& wkt_filter) {
   std::vector<std::string> test_wkt = TestWKT(wkt_filter);
+  ASSERT_GE(test_wkt.size(), 0);
+
   WKTReader reader;
   for (const auto& wkt : test_wkt) {
-    SCOPED_TRACE("With WKT " + wkt);
+    SCOPED_TRACE(wkt);
     auto geog = reader.read_feature(wkt);
     ShapeIndexGeography index(*geog);
     auto geog_unary = s2_unary_union(index, GlobalOptions());
     ASSERT_EQ(geog_unary->num_shapes(), geog->num_shapes());
-    if (geog_unary->num_shapes() > 0) {
-      ASSERT_EQ(geog_unary->kind(), geog->kind());
-    } else {
+    if (geog_unary->num_shapes() == 0) {
       ASSERT_EQ(geog_unary->kind(), GeographyKind::GEOGRAPHY_COLLECTION);
+      return;
     }
+
+    ASSERT_EQ(geog_unary->kind(), geog->kind());
+    EXPECT_EQ(s2_dimension(*geog_unary), s2_dimension(*geog));
+    EXPECT_EQ(s2_length(*geog_unary), s2_length(*geog));
+    EXPECT_EQ(s2_area(*geog_unary), s2_area(*geog));
   }
 }
 
