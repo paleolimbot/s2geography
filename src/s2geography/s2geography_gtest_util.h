@@ -91,7 +91,7 @@ inline void PrintTo(const EncodeOptions& obj, std::ostream* os) {
 // lon/lat coordinates are equal.
 MATCHER_P(WktEquals6, wkt, "") {
   WKTWriter writer(6);
-  return writer.write_feature(arg) == wkt;
+  return writer.write_feature(arg) == std::string(wkt);
 }
 }  // namespace s2geography
 
