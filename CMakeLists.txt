@@ -295,12 +295,14 @@ if(S2GEOGRAPHY_BUILD_TESTS)
 
   enable_testing()
 
+  add_executable(build_test src/s2geography/build_test.cc)
   add_executable(distance_test src/s2geography/distance_test.cc)
   add_executable(geoarrow_test src/s2geography/geoarrow_test.cc)
   add_executable(geography_test src/s2geography/geography_test.cc)
+  add_executable(op_cell_test src/s2geography/op/cell_test.cc)
   add_executable(wkt_writer_test src/s2geography/wkt-writer_test.cc)
   add_executable(wkb_test src/s2geography/wkb_test.cc)
-  add_executable(op_cell_test src/s2geography/op/cell_test.cc)
+
 
   if(S2GEOGRAPHY_CODE_COVERAGE)
     target_compile_options(coverage_config INTERFACE -O0 -g --coverage)
@@ -308,24 +310,26 @@ if(S2GEOGRAPHY_BUILD_TESTS)
     target_link_libraries(s2geography PUBLIC coverage_config)
   endif()
 
+  target_link_libraries(build_test s2geography GTest::gtest_main GTest::gmock)
   target_link_libraries(distance_test s2geography GTest::gtest_main)
   target_link_libraries(geoarrow_test s2geography nanoarrow GTest::gtest_main
                         GTest::gmock)
   target_link_libraries(geography_test s2geography nanoarrow GTest::gtest_main
                         GTest::gmock)
+  target_link_libraries(op_cell_test s2geography GTest::gtest_main)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
   target_link_libraries(wkb_test s2geography GTest::gtest_main)
-  target_link_libraries(op_cell_test s2geography GTest::gtest_main)
 
   target_include_directories(geoarrow_test PRIVATE src/vendored)
 
   include(GoogleTest)
+  gtest_discover_tests(build_test)
   gtest_discover_tests(distance_test)
   gtest_discover_tests(geoarrow_test)
+  gtest_discover_tests(op_cell_test)
   gtest_discover_tests(geography_test)
   gtest_discover_tests(wkt_writer_test)
   gtest_discover_tests(wkb_test)
-  gtest_discover_tests(op_cell_test)
 endif()
 
 if(S2GEOGRAPHY_BUILD_EXAMPLES)

@@ -117,7 +117,7 @@ static inline std::vector<std::string> TestWKT(const std::string& prefix = "") {
   std::vector<std::string> out;
   for (int i = 0; i < kNumRoundtrippableWkt; i++) {
     std::string item(kRoundtrippableWkt[i]);
-    if (item.find(prefix) != item.npos) {
+    if (item.find(prefix) == 0) {
       out.push_back(item);
     }
   }
