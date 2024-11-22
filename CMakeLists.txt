@@ -303,7 +303,6 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   add_executable(wkt_writer_test src/s2geography/wkt-writer_test.cc)
   add_executable(wkb_test src/s2geography/wkb_test.cc)
 
-
   if(S2GEOGRAPHY_CODE_COVERAGE)
     target_compile_options(coverage_config INTERFACE -O0 -g --coverage)
     target_link_options(coverage_config INTERFACE --coverage)
