@@ -35,7 +35,7 @@ class UnaryOp {
 
   UnaryOp(const OptT& options = OptT()) : options_(options) {}
   virtual void Init() {}
-  virtual ReturnT ExecuteScalar(const ArgType0 arg0) { return ReturnT(); }
+  virtual ReturnT ExecuteScalar(const ArgType0) { return ReturnT{}; }
 
  protected:
   OptT options_;
@@ -52,7 +52,7 @@ class BinaryOp {
 
   BinaryOp(const OptionsT& options = OptionsT()) : options_(options) {}
   virtual void Init() {}
-  virtual ReturnT ExecuteScalar(const ArgType0 arg0, const ArgType1 arg1) {
+  virtual ReturnT ExecuteScalar(const ArgType0, const ArgType1) {
     return ReturnT{};
   }
 

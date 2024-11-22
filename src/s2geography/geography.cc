@@ -15,6 +15,8 @@
 #include <s2/s2shape_index_region.h>
 #include <s2/s2shapeutil_coding.h>
 
+#include "s2geography/macros.h"
+
 using namespace s2geography;
 
 // This class is a shim to allow a class to return a std::unique_ptr<S2Shape>(),
@@ -83,6 +85,7 @@ void Geography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
 }
 
 std::unique_ptr<S2Shape> PointGeography::Shape(int id) const {
+  S2GEOGRAPHY_UNUSED(id);
   return absl::make_unique<S2PointVectorShape>(points_);
 }
 
@@ -452,6 +455,8 @@ void ShapeIndexGeography::Encode(Encoder* encoder,
 
 void EncodedShapeIndexGeography::Encode(Encoder* encoder,
                                         const EncodeOptions& options) const {
+  S2GEOGRAPHY_UNUSED(encoder);
+  S2GEOGRAPHY_UNUSED(options);
   throw Exception("Encode() not implemented for EncodedShapeIndexGeography()");
 }
 

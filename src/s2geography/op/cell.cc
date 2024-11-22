@@ -79,7 +79,7 @@ int8_t Level::ExecuteScalar(const uint64_t cell_id) {
     return -1;
   }
 
-  return cell.level();
+  return static_cast<int8_t>(cell.level());
 }
 
 double Area::ExecuteScalar(const uint64_t cell_id) {
@@ -108,9 +108,9 @@ uint64_t Parent::ExecuteScalar(const uint64_t cell_id, const int8_t level) {
   }
 
   int8_t level_final;
-  int8_t cell_level = cell.level();
+  int8_t cell_level = static_cast<int8_t>(cell.level());
   if (level < 0) {
-    level_final = cell.level() + level;
+    level_final = cell_level + level;
   } else {
     level_final = level;
   }
@@ -193,7 +193,7 @@ int8_t CommonAncestorLevel::ExecuteScalar(const uint64_t cell_id,
     return -1;
   }
 
-  return cell.GetCommonAncestorLevel(cell_test);
+  return static_cast<int8_t>(cell.GetCommonAncestorLevel(cell_test));
 }
 
 }  // namespace s2geography::op::cell
