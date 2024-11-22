@@ -13,6 +13,12 @@ void TestUnaryUnionRoundtrip(const std::string& wkt_filter) {
     auto geog = reader.read_feature(wkt);
     ShapeIndexGeography index(*geog);
     auto geog_unary = s2_unary_union(index, GlobalOptions());
+    ASSERT_EQ(geog_unary->num_shapes(), geog->num_shapes());
+    if (geog_unary->num_shapes() > 0) {
+      ASSERT_EQ(geog_unary->kind(), geog->kind());
+    } else {
+      ASSERT_EQ(geog_unary->kind(), GeographyKind::GEOGRAPHY_COLLECTION);
+    }
   }
 }
 

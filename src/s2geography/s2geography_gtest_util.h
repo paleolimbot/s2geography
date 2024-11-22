@@ -11,6 +11,38 @@
 // Define pretty printers for Geography. These seem to be required for
 // subclasses as well to get the desired output on failure.
 namespace s2geography {
+inline void PrintTo(GeographyKind kind, std::ostream* os) {
+  switch (kind) {
+    case GeographyKind::UNINITIALIZED:
+      *os << "GeographyKind::UNINITIALIZED";
+      break;
+    case GeographyKind::POINT:
+      *os << "GeographyKind::POINT";
+      break;
+    case GeographyKind::POLYLINE:
+      *os << "GeographyKind::POLYLINE";
+      break;
+    case GeographyKind::POLYGON:
+      *os << "GeographyKind::POLYGON";
+      break;
+    case GeographyKind::GEOGRAPHY_COLLECTION:
+      *os << "GeographyKind::GEOGRAPHY_COLLECTION";
+      break;
+    case GeographyKind::SHAPE_INDEX:
+      *os << "GeographyKind::SHAPE_INDEX";
+      break;
+    case GeographyKind::ENCODED_SHAPE_INDEX:
+      *os << "GeographyKind::ENCODED_SHAPE_INDEX";
+      break;
+    case GeographyKind::CELL_CENTER:
+      *os << "GeographyKind::CELL_CENTER";
+      break;
+    default:
+      *os << "Unknown GeographyKind <" << static_cast<int>(kind) << ">";
+      break;
+  }
+}
+
 inline void PrintTo(const Geography& geog, std::ostream* os) {
   WKTWriter writer(6);
   *os << writer.write_feature(geog);
