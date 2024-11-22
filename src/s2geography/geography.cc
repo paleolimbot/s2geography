@@ -496,7 +496,7 @@ void Geography::EncodeTagged(Encoder* encoder,
     GetCellUnionBound(&covering);
     S2CellUnion::Normalize(&covering);
 
-    // The serialization format can't handle more thn UINT8_MAX items
+    // The serialization format can't handle more than UINT8_MAX items
     // (geographies usually return ~4 cells from GetCellUnionBound()).
     if (covering.size() > 256) {
       covering.clear();

@@ -34,7 +34,7 @@ bool s2_contains(const ShapeIndexGeography& geog1,
   }
 }
 
-// Note that 'touches' can be implemeted using:
+// Note that 'touches' can be implemented using:
 //
 // S2BooleanOperation::Options closedOptions = options;
 // closedOptions.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);

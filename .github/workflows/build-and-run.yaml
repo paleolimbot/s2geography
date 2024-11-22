@@ -6,6 +6,9 @@ on:
 
 name: Build and Run (Linux)
 
+permissions:
+  contents: read
+
 jobs:
   build-and-run:
     runs-on: ubuntu-latest

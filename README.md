@@ -4,7 +4,7 @@
 [![Run Tests](https://github.com/paleolimbot/s2geography/actions/workflows/build-and-run.yaml/badge.svg)](https://github.com/paleolimbot/s2geography/actions/workflows/build-and-run.yaml)
 [![Codecov test coverage](https://codecov.io/gh/paleolimbot/s2geography/branch/master/graph/badge.svg)](https://app.codecov.io/gh/paleolimbot/s2geography?branch=master)
 
-Google's [s2geometry](https://github.com/google/s2geometry) is a spherical geometry engine providing accurate and performant geometry operations for geometries on the sphere. This library provides a compatability layer on top of s2geometry for those more familiar with [simple features](https://en.wikipedia.org/wiki/Simple_Features), [GEOS](https://libgeos.org), and/or the [GEOS C API](https://libgeos.org/doxygen/geos__c_8h.html).
+Google's [s2geometry](https://github.com/google/s2geometry) is a spherical geometry engine providing accurate and performant geometry operations for geometries on the sphere. This library provides a compatibility layer on top of s2geometry for those more familiar with [simple features](https://en.wikipedia.org/wiki/Simple_Features), [GEOS](https://libgeos.org), and/or the [GEOS C API](https://libgeos.org/doxygen/geos__c_8h.html).
 
 The s2geography library was refactored out of the [s2 package for R](https://github.com/r-spatial/s2), which has served as the backend for geometries with geographic coordinates in the popular [sf package for R](https://github.com/r-spatial/sf) since version 1.0.0. The library is currently under construction as it adapts to suit the needs of more than just a single R package. Suggestions to modify, replace, or completely rewrite this library are welcome!
 
