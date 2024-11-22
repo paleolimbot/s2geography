@@ -25,7 +25,9 @@ class TessellationOptions {
       : projection_(std::move(lnglat())),
         tessellate_tolerance_(S1Angle::Infinity()) {}
   S2::Projection* projection() const { return projection_.get(); }
-  void set_projection(std::shared_ptr<S2::Projection> projection) { projection_ = std::move(projection); }
+  void set_projection(std::shared_ptr<S2::Projection> projection) {
+    projection_ = std::move(projection);
+  }
   S1Angle tessellate_tolerance() const { return tessellate_tolerance_; }
   void set_tessellate_tolerance(S1Angle tessellate_tolerance) {
     tessellate_tolerance_ = tessellate_tolerance;
@@ -38,10 +40,7 @@ class TessellationOptions {
 
 class ImportOptions : public TessellationOptions {
  public:
-  ImportOptions()
-      : TessellationOptions(),
-        oriented_(false),
-        check_(true) {}
+  ImportOptions() : TessellationOptions(), oriented_(false), check_(true) {}
   bool oriented() const { return oriented_; }
   void set_oriented(bool oriented) { oriented_ = oriented; }
   bool check() const { return check_; }
@@ -79,9 +78,7 @@ class Reader {
 
 class ExportOptions : public TessellationOptions {
  public:
-  ExportOptions()
-      : TessellationOptions(),
-        precision_(16) {}
+  ExportOptions() : TessellationOptions(), precision_(16) {}
   // The number of digits after the decimal to output in WKT (default 16)
   int precision() const { return precision_; }
   void set_precision(int precision) { precision_ = precision; }
