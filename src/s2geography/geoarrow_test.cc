@@ -366,16 +366,14 @@ TEST(GeoArrow, GeoArrowWriterPolygonTessellated) {
 }
 
 TEST(GeoArrow, GeoArrowTesselatePolygonOrthographic) {
-  // Problematic real-world polygon identified in early testing
-  // https://github.com/paleolimbot/s2geography/issues/43
-  std::string poygon_wkt(
-      "POLYGON ((-59.5721 -80.0402, -60.6101 -79.6287, -61.139 -79.9814, "
-      "-61.8832 -80.3929, -64.0377 -80.2949, -66.29 -80.2558, -65.7417 "
-      "-80.5497, -65.7417 -80.5888, -64.4881 -80.9219, -62.2554 -80.8632, "
-      "-60.1597 -81.0003, -59.8658 -80.5497, -59.5721 -80.0402))");
+  // Ensure that attemtping to tesssellate an edge in an unstable projection
+  // fails (in this case: an orthographic projection where the edge is >90
+  // degrees from the centre).
+  std::string wkt("LINESTRING (-59.5721 -80.0402, -60.6101 -79.6287)");
+  S2LatLng centre = S2LatLng::FromDegrees(44.78515, -35.8273);
 
   nanoarrow::UniqueArray array;
-  InitArrayWKT(array.get(), {poygon_wkt});
+  InitArrayWKT(array.get(), {wkt});
 
   Reader reader;
   reader.Init(Reader::InputType::kWKT, ImportOptions());
@@ -383,13 +381,12 @@ TEST(GeoArrow, GeoArrowTesselatePolygonOrthographic) {
   reader.ReadGeography(array.get(), 0, 1, &result);
 
   ExportOptions options;
-  options.set_projection(
-      s2geography::orthographic(S2LatLng::FromDegrees(44.78515, -35.8273)));
+  options.set_projection(s2geography::orthographic(centre));
   options.set_tessellate_tolerance(S1Angle::Radians(1));
   Writer writer;
   writer.Init(Writer::OutputType::kWKT, options);
 
-  writer.WriteGeography(*result[0]);
+  EXPECT_THROW(writer.WriteGeography(*result[0]), s2geography::Exception);
 }
 
 void TestGeoArrowRoundTrip(s2geography::Geography& geog, GeoArrowType type) {

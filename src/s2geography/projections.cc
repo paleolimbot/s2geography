@@ -1,11 +1,12 @@
 
 #include <s2/r2.h>
+#include <s2/s1chord_angle.h>
 #include <s2/s2latlng.h>
 #include <s2/s2point.h>
 #include <s2/s2pointutil.h>
+#include <s2/s2projections.h>
 
-#include "s2/s1chord_angle.h"
-#include "s2/s2projections.h"
+#include "s2geography/geography.h"
 
 namespace s2geography {
 
@@ -35,11 +36,19 @@ class OrthographicProjection : public S2::Projection {
   R2Point Project(const S2Point& p) const {
     S2Point out = S2::Rotate(p, z_axis_, -centre_.lng());
     out = S2::Rotate(out, y_axis_, centre_.lat());
-    return R2Point(out.y(), out.z());
+    if (out.x() >= 0) {
+      return R2Point(out.y(), out.z());
+    } else {
+      return R2Point(NAN, NAN);
+    }
   }
 
   // Converts a projected 2D point to a point on the sphere.
   S2Point Unproject(const R2Point& p) const {
+    if (std::isnan(p.x()) || std::isnan(p.y())) {
+      throw Exception("Can't unproject orthographic for non-finite point");
+    }
+
     double y = p.x();
     double z = p.y();
     double x = sqrt(1.0 - y * y - z * z);
