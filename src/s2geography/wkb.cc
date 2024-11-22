@@ -42,14 +42,15 @@ std::unique_ptr<Geography> WKBReader::ReadFeature(const uint8_t* bytes,
   return std::move(out_[0]);
 }
 
-std::unique_ptr<Geography> WKBReader::ReadFeature(const std::string_view bytes) {
-  return ReadFeature(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
+std::unique_ptr<Geography> WKBReader::ReadFeature(
+    const std::string_view bytes) {
+  return ReadFeature(reinterpret_cast<const uint8_t*>(bytes.data()),
+                     bytes.size());
 }
 
 WKBWriter::WKBWriter(const geoarrow::ExportOptions& options) {
   writer_ = absl::make_unique<geoarrow::Writer>();
   writer_->Init(geoarrow::Writer::OutputType::kWKB, options);
-
 }
 
 std::string WKBWriter::WriteFeature(const Geography& geog) {

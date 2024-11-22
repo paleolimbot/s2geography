@@ -361,12 +361,12 @@ TEST(GeoArrow, GeoArrowWriterPolygonTessellated) {
   auto length_with_tesselation =
       reinterpret_cast<const int32*>(array2->buffers[1])[1];
 
-  // dummy test to check that the WKT string length is larger with tesselation
+  // dummy test to check that the WKT string length is larger with tessellation
   EXPECT_GT(length_with_tesselation, length_no_tesselation);
 }
 
 TEST(GeoArrow, GeoArrowTesselatePolygonOrthographic) {
-  // Ensure that attemtping to tesssellate an edge in an unstable projection
+  // Ensure that attempting to tesssellate an edge in an unstable projection
   // fails (in this case: an orthographic projection where the edge is >90
   // degrees from the centre).
   std::string wkt("LINESTRING (-59.5721 -80.0402, -60.6101 -79.6287)");

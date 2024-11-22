@@ -729,7 +729,7 @@ class WriterImpl {
     }
 
     // Currently we always visit single coordinate pairs one by one, so set
-    // up the appropiate view for that once, which is then reused
+    // up the appropriate view for that once, which is then reused
     coords_view_.n_coords = 1;
     coords_view_.n_values = 2;
     coords_view_.coords_stride = 2;

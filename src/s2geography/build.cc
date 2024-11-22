@@ -25,7 +25,7 @@ std::unique_ptr<Geography> s2_geography_from_layers(
   bool has_polylines = polylines.size() > 0;
   bool has_points = points.size() > 0;
 
-  // use the requstested dimensions to produce the right kind of EMTPY
+  // use the requstested dimensions to produce the right kind of EMPTY
   bool include_polygon =
       polygon_layer_action == GlobalOptions::OUTPUT_ACTION_INCLUDE;
   bool include_polylines =
@@ -137,7 +137,7 @@ std::unique_ptr<PolygonGeography> s2_unary_union(const PolygonGeography& geog,
   // splitting crossed edges along the way.
 
   // Not exposing these options as an argument (except snap function)
-  // because a particular combiation of them is required for this to work
+  // because a particular combination of them is required for this to work
   S2Builder::Options builder_options;
   builder_options.set_split_crossing_edges(true);
   builder_options.set_snap_function(options.boolean_operation.snap_function());

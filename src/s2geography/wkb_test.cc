@@ -5,8 +5,7 @@
 
 using namespace s2geography;
 
-void wkbRoundTrip(const std::string wktIn,
-                  const std::vector<uint8_t> &wkbIn) {
+void wkbRoundTrip(const std::string wktIn, const std::vector<uint8_t> &wkbIn) {
   WKTWriter wkt_writer(2);
   WKBReader reader;
   WKBWriter writer;
@@ -65,7 +64,8 @@ TEST(WKBRoundtrip, ExportOptions) {
   WKBWriter writer;
   auto wkbOut = writer.WriteFeature(*geog);
 
-  // smoke test for passing through options: with tessellation -> more coordinates
+  // smoke test for passing through options: with tessellation -> more
+  // coordinates
   s2geography::geoarrow::ExportOptions options;
   options.set_tessellate_tolerance(S1Angle::Radians(0.001));
   WKBWriter writer2(options);

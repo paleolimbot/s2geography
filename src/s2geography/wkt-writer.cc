@@ -19,7 +19,6 @@ WKTWriter::WKTWriter(int precision) {
 WKTWriter::WKTWriter(const geoarrow::ExportOptions& options) {
   writer_ = absl::make_unique<geoarrow::Writer>();
   writer_->Init(geoarrow::Writer::OutputType::kWKT, options);
-
 }
 
 std::string WKTWriter::write_feature(const Geography& geog) {
