@@ -6,6 +6,9 @@ on:
 
 name: Run tests
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Run tests (${{ matrix.os }})
