@@ -8,10 +8,15 @@ project(
 include(FetchContent)
 message(STATUS "Building using CMake version: ${CMAKE_VERSION}")
 
-set(CMAKE_CXX_STANDARD
-    17
-    CACHE STRING "The C++ standard to build with")
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# We need at least C++17 for recent s2 but if this value is already set (e.g.,
+# to a higher standard) it should be respected.
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD
+      17
+      CACHE STRING "The C++ standard to build with")
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+endif()
+
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -259,6 +264,32 @@ if(MSVC)
 endif()
 
 target_link_libraries(s2geography PUBLIC s2::s2 absl::memory absl::str_format)
+
+# Set somewhat aggressive compiler warning flags
+if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+  target_compile_options(
+    s2geography
+    PRIVATE $<$<CONFIG:Debug>:-Wall
+            -Werror
+            -Wextra
+            -Wpedantic
+            -Wno-type-limits
+            -Wmaybe-uninitialized
+            -Wunused-result
+            -Wconversion
+            -Wno-sign-conversion>)
+elseif(CMAKE_C_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID
+                                                    STREQUAL "Clang")
+  target_compile_options(
+    s2geography
+    PRIVATE $<$<CONFIG:Debug>:-Wall
+            -Werror
+            -Wextra
+            -Wpedantic
+            -Wdocumentation
+            -Wconversion
+            -Wno-sign-conversion>)
+endif()
 
 if(S2GEOGRAPHY_BUILD_TESTS)
 

@@ -1,59 +1,20 @@
 
 #include "s2geography/geoarrow.h"
 
+#include <s2/s1angle.h>
+#include <s2/s2edge_tessellator.h>
+
 #include <sstream>
 
 #include "geoarrow/geoarrow.h"
-#include "s2/s1angle.h"
-#include "s2/s2edge_tessellator.h"
 #include "s2geography/geography.h"
+#include "s2geography/macros.h"
 
 namespace s2geography {
 
 namespace geoarrow {
 
 const char* version() { return GeoArrowVersion(); }
-
-// This should really be in nanoarrow or geoarrow
-// https://github.com/geoarrow/geoarrow-c-geos/blob/33ad0ba21c76c09e9d72fc4e4ae0b9ff9da61848/src/geoarrow_geos/geoarrow_geos.c#L323-L360
-struct GeoArrowBitmapReader {
-  const uint8_t* bits;
-  int64_t byte_i;
-  int bit_i;
-  uint8_t byte;
-};
-
-static inline void GeoArrowBitmapReaderInit(
-    struct GeoArrowBitmapReader* bitmap_reader, const uint8_t* bits,
-    int64_t offset) {
-  std::memset(bitmap_reader, 0, sizeof(struct GeoArrowBitmapReader));
-  bitmap_reader->bits = bits;
-
-  if (bits != NULL) {
-    bitmap_reader->byte_i = offset / 8;
-    bitmap_reader->bit_i = offset % 8;
-    if (bitmap_reader->bit_i == 0) {
-      bitmap_reader->bit_i = 7;
-      bitmap_reader->byte_i--;
-    } else {
-      bitmap_reader->bit_i--;
-    }
-  }
-}
-
-static inline int8_t GeoArrowBitmapReaderNextIsNull(
-    struct GeoArrowBitmapReader* bitmap_reader) {
-  if (bitmap_reader->bits == NULL) {
-    return 0;
-  }
-
-  if (++bitmap_reader->bit_i == 8) {
-    bitmap_reader->byte = bitmap_reader->bits[++bitmap_reader->byte_i];
-    bitmap_reader->bit_i = 0;
-  }
-
-  return (bitmap_reader->byte & (1 << bitmap_reader->bit_i)) == 0;
-}
 
 /// \brief Construct Geography objects while visiting a GeoArrow array.
 ///
@@ -88,9 +49,14 @@ class Constructor {
   virtual GeoArrowErrorCode null_feat() { return GEOARROW_OK; }
   virtual GeoArrowErrorCode geom_start(GeoArrowGeometryType geometry_type,
                                        int64_t size) {
+    S2GEOGRAPHY_UNUSED(geometry_type);
+    S2GEOGRAPHY_UNUSED(size);
     return GEOARROW_OK;
   }
-  virtual GeoArrowErrorCode ring_start(int64_t size) { return GEOARROW_OK; }
+  virtual GeoArrowErrorCode ring_start(int64_t size) {
+    S2GEOGRAPHY_UNUSED(size);
+    return GEOARROW_OK;
+  }
   virtual GeoArrowErrorCode ring_end() { return GEOARROW_OK; }
   virtual GeoArrowErrorCode geom_end() { return GEOARROW_OK; }
   virtual GeoArrowErrorCode feat_end() { return GEOARROW_OK; }
@@ -182,6 +148,7 @@ class Constructor {
 
   static int CGeomStart(GeoArrowVisitor* v, GeoArrowGeometryType geometry_type,
                         GeoArrowDimensions dimensions) {
+    S2GEOGRAPHY_UNUSED(dimensions);
     try {
       auto constructor = reinterpret_cast<Constructor*>(v->private_data);
       return constructor->geom_start(geometry_type, -1);
@@ -255,7 +222,6 @@ class PointConstructor : public Constructor {
 
   GeoArrowErrorCode coords(const GeoArrowCoordView* view) override {
     int64_t n = view->n_coords;
-    int coord_size = view->n_values;
 
     for (int64_t i = 0; i < n; i++) {
       if (coord_empty(view, i)) {
