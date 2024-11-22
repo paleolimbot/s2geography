@@ -1,14 +1,17 @@
+#include "geoarrow/geoarrow.h"
+
 #include <gmock/gmock-matchers.h>
 #include <gtest/gtest.h>
 
 #include "nanoarrow/nanoarrow.hpp"
-#include "geoarrow/geoarrow.h"
 #include "s2geography.h"
 
-using testing::ElementsAre;
-using testing::DoubleEq;
-
 const double EARTH_RADIUS_METERS = 6371.01 * 1000;
+
+using s2geography::geoarrow::ExportOptions;
+using s2geography::geoarrow::ImportOptions;
+using s2geography::geoarrow::Reader;
+using s2geography::geoarrow::Writer;
 
 void InitArrayWKT(ArrowArray* array, std::vector<std::string> values) {
   NANOARROW_THROW_NOT_OK(ArrowArrayInitFromType(array, NANOARROW_TYPE_STRING));
@@ -77,8 +80,6 @@ void InitArrayGeoArrowPoint(ArrowArray* array, std::vector<double> x,
   array->children[1]->length = y.size();
   NANOARROW_THROW_NOT_OK(ArrowArrayFinishBuildingDefault(array, nullptr));
 }
-
-using s2geography::geoarrow::Reader;
 
 TEST(GeoArrow, GeoArrowVersionTest) {
   EXPECT_STREQ(s2geography::geoarrow::version(), "0.2.0-SNAPSHOT");
@@ -209,8 +210,6 @@ TEST(GeoArrow, GeoArrowReaderReadWKTCollection) {
   EXPECT_EQ(linestring->edge(0).v1, S2LatLng::FromDegrees(3, 2).ToPoint());
 }
 
-using s2geography::geoarrow::Writer;
-
 TEST(GeoArrow, GeoArrowWriterPoint) {
   s2geography::WKTReader reader;
   auto geog1 = reader.read_feature("POINT (0 1)");
@@ -229,11 +228,13 @@ TEST(GeoArrow, GeoArrowWriterPoint) {
 
   EXPECT_EQ(array->length, 2);
 
-  // EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[0]), ElementsAre(DoubleEq(0.0), DoubleEq(2.0)));
+  // EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[0]),
+  // ElementsAre(DoubleEq(0.0), DoubleEq(2.0)));
   auto xs = reinterpret_cast<const double*>(array->children[0]->buffers[1]);
   EXPECT_DOUBLE_EQ(xs[0], 0.0);
   EXPECT_DOUBLE_EQ(xs[1], 2.0);
-  // EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[1]), ElementsAre(DoubleEq(1.0), DoubleEq(3.0)));
+  // EXPECT_THAT(nanoarrow::ViewArrayAs<double_t>(array->children[1]),
+  // ElementsAre(DoubleEq(1.0), DoubleEq(3.0)));
   auto ys = reinterpret_cast<const double*>(array->children[1]->buffers[1]);
   EXPECT_DOUBLE_EQ(ys[0], 1.0);
   EXPECT_DOUBLE_EQ(ys[1], 3.0);
@@ -286,7 +287,8 @@ TEST(GeoArrow, GeoArrowWriterPolylineTessellated) {
   // with tessellation -> more coordinates
   nanoarrow::UniqueArray array2;
   s2geography::geoarrow::ExportOptions options;
-  options.set_tessellate_tolerance(S1Angle::Radians(10000 / EARTH_RADIUS_METERS));
+  options.set_tessellate_tolerance(
+      S1Angle::Radians(10000 / EARTH_RADIUS_METERS));
   writer.Init(schema.get(), options);
   writer.WriteGeography(*geog);
   writer.Finish(array2.get());
@@ -295,10 +297,12 @@ TEST(GeoArrow, GeoArrowWriterPolylineTessellated) {
   EXPECT_GT(array2->children[0]->length, 2);
   EXPECT_EQ(array2->children[0]->length, 9);
   // first coordinate is still the same
-  auto xs = reinterpret_cast<const double*>(array2->children[0]->children[0]->buffers[1]);
+  auto xs = reinterpret_cast<const double*>(
+      array2->children[0]->children[0]->buffers[1]);
   EXPECT_DOUBLE_EQ(xs[0], -64);
   EXPECT_DOUBLE_EQ(xs[8], 0);
-  auto ys = reinterpret_cast<const double*>(array2->children[0]->children[1]->buffers[1]);
+  auto ys = reinterpret_cast<const double*>(
+      array2->children[0]->children[1]->buffers[1]);
   EXPECT_DOUBLE_EQ(ys[0], 45);
   EXPECT_DOUBLE_EQ(ys[8], 45);
   EXPECT_GT(ys[4], 45);
@@ -314,10 +318,12 @@ TEST(GeoArrow, GeoArrowWriterPolylineTessellated) {
   EXPECT_GT(array3->children[0]->length, 2);
   EXPECT_EQ(array3->children[0]->length, 9);
 
-  xs = reinterpret_cast<const double*>(array3->children[0]->children[0]->buffers[1]);
+  xs = reinterpret_cast<const double*>(
+      array3->children[0]->children[0]->buffers[1]);
   EXPECT_NEAR(xs[0], -7124447.41, 0.01);
   EXPECT_DOUBLE_EQ(xs[8], 0);
-  ys = reinterpret_cast<const double*>(array3->children[0]->children[1]->buffers[1]);
+  ys = reinterpret_cast<const double*>(
+      array3->children[0]->children[1]->buffers[1]);
   EXPECT_NEAR(ys[0], 5621521.48, 0.01);
   EXPECT_NEAR(ys[8], 5621521.48, 0.01);
   EXPECT_GT(ys[4], 5621521);
@@ -325,7 +331,8 @@ TEST(GeoArrow, GeoArrowWriterPolylineTessellated) {
 
 TEST(GeoArrow, GeoArrowWriterPolygonTessellated) {
   s2geography::WKTReader reader;
-  auto geog = reader.read_feature("POLYGON ((-64 45, 0 45, 0 55, -64 55, -64 45))");
+  auto geog =
+      reader.read_feature("POLYGON ((-64 45, 0 45, 0 55, -64 55, -64 45))");
 
   Writer writer;
   nanoarrow::UniqueSchema schema;
@@ -337,22 +344,49 @@ TEST(GeoArrow, GeoArrowWriterPolygonTessellated) {
   writer.Finish(array.get());
 
   EXPECT_EQ(array->length, 1);
-  auto length_no_tesselation = reinterpret_cast<const int32*>(array->buffers[1])[1];
+  auto length_no_tesselation =
+      reinterpret_cast<const int32*>(array->buffers[1])[1];
 
   // with tessellation -> more coordinates
   nanoarrow::UniqueArray array2;
   s2geography::geoarrow::ExportOptions options;
-  options.set_tessellate_tolerance(S1Angle::Radians(10000 / EARTH_RADIUS_METERS));
+  options.set_tessellate_tolerance(
+      S1Angle::Radians(10000 / EARTH_RADIUS_METERS));
 
   writer.Init(schema.get(), options);
   writer.WriteGeography(*geog);
   writer.Finish(array2.get());
 
   EXPECT_EQ(array2->length, 1);
-  auto length_with_tesselation = reinterpret_cast<const int32*>(array2->buffers[1])[1];
+  auto length_with_tesselation =
+      reinterpret_cast<const int32*>(array2->buffers[1])[1];
 
   // dummy test to check that the WKT string length is larger with tesselation
   EXPECT_GT(length_with_tesselation, length_no_tesselation);
+}
+
+TEST(GeoArrow, GeoArrowTesselatePolygonOrthographic) {
+  // Ensure that attemtping to tesssellate an edge in an unstable projection
+  // fails (in this case: an orthographic projection where the edge is >90
+  // degrees from the centre).
+  std::string wkt("LINESTRING (-59.5721 -80.0402, -60.6101 -79.6287)");
+  S2LatLng centre = S2LatLng::FromDegrees(44.78515, -35.8273);
+
+  nanoarrow::UniqueArray array;
+  InitArrayWKT(array.get(), {wkt});
+
+  Reader reader;
+  reader.Init(Reader::InputType::kWKT, ImportOptions());
+  std::vector<std::unique_ptr<s2geography::Geography>> result;
+  reader.ReadGeography(array.get(), 0, 1, &result);
+
+  ExportOptions options;
+  options.set_projection(s2geography::orthographic(centre));
+  options.set_tessellate_tolerance(S1Angle::Radians(1));
+  Writer writer;
+  writer.Init(Writer::OutputType::kWKT, options);
+
+  EXPECT_THROW(writer.WriteGeography(*result[0]), s2geography::Exception);
 }
 
 void TestGeoArrowRoundTrip(s2geography::Geography& geog, GeoArrowType type) {
@@ -402,14 +436,17 @@ TEST(GeoArrow, GeoArrowRoundtripLinestring) {
 
 TEST(GeoArrow, GeoArrowRoundtripPolygon) {
   s2geography::WKTReader reader;
-  auto geog = reader.read_feature("POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))");
+  auto geog =
+      reader.read_feature("POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))");
 
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_POLYGON);
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_INTERLEAVED_POLYGON);
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKT);
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKB);
 
-  geog = reader.read_feature("POLYGON ((35 10, 45 45, 15 40, 10 20, 35 10), (20 30, 35 35, 30 20, 20 30))");
+  geog = reader.read_feature(
+      "POLYGON ((35 10, 45 45, 15 40, 10 20, 35 10), (20 30, 35 35, 30 20, 20 "
+      "30))");
 
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_POLYGON);
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_INTERLEAVED_POLYGON);
@@ -419,7 +456,8 @@ TEST(GeoArrow, GeoArrowRoundtripPolygon) {
 
 TEST(GeoArrow, GeoArrowRoundtripMultiPoint) {
   s2geography::WKTReader reader;
-  auto geog = reader.read_feature("MULTIPOINT ((10 40), (40 30), (20 20), (30 10))");
+  auto geog =
+      reader.read_feature("MULTIPOINT ((10 40), (40 30), (20 20), (30 10))");
 
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_MULTIPOINT);
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_INTERLEAVED_MULTIPOINT);
@@ -429,7 +467,8 @@ TEST(GeoArrow, GeoArrowRoundtripMultiPoint) {
 
 TEST(GeoArrow, GeoArrowRoundtripMultiLinestring) {
   s2geography::WKTReader reader;
-  auto geog = reader.read_feature("MULTILINESTRING ((10 10, 20 20, 10 40), (40 40, 30 30, 40 20, 30 10))");
+  auto geog = reader.read_feature(
+      "MULTILINESTRING ((10 10, 20 20, 10 40), (40 40, 30 30, 40 20, 30 10))");
 
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_MULTILINESTRING);
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_INTERLEAVED_MULTILINESTRING);
@@ -439,14 +478,18 @@ TEST(GeoArrow, GeoArrowRoundtripMultiLinestring) {
 
 TEST(GeoArrow, GeoArrowRoundtripMultiPolygon) {
   s2geography::WKTReader reader;
-  auto geog = reader.read_feature("MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)), ((15 5, 40 10, 10 20, 5 10, 15 5)))");
+  auto geog = reader.read_feature(
+      "MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)), ((15 5, 40 10, 10 20, 5 "
+      "10, 15 5)))");
 
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_MULTIPOLYGON);
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_INTERLEAVED_MULTIPOLYGON);
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKT);
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKB);
 
-  geog = reader.read_feature("MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)), ((20 35, 10 30, 10 10, 30 5, 45 20, 20 35), (30 20, 20 15, 20 25, 30 20)))");
+  geog = reader.read_feature(
+      "MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)), ((20 35, 10 30, 10 10, 30 "
+      "5, 45 20, 20 35), (30 20, 20 15, 20 25, 30 20)))");
 
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_MULTIPOLYGON);
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_INTERLEAVED_MULTIPOLYGON);
@@ -456,7 +499,9 @@ TEST(GeoArrow, GeoArrowRoundtripMultiPolygon) {
 
 TEST(GeoArrow, GeoArrowRoundtripCollection) {
   s2geography::WKTReader reader;
-  auto geog = reader.read_feature("GEOMETRYCOLLECTION (POINT (40 10), LINESTRING (10 10, 20 20, 10 40), POLYGON ((40 40, 20 45, 45 30, 40 40)))");
+  auto geog = reader.read_feature(
+      "GEOMETRYCOLLECTION (POINT (40 10), LINESTRING (10 10, 20 20, 10 40), "
+      "POLYGON ((40 40, 20 45, 45 30, 40 40)))");
 
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKT);
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKB);

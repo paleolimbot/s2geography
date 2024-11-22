@@ -14,7 +14,6 @@ namespace geoarrow {
 
 const char* version() { return GeoArrowVersion(); }
 
-
 // This should really be in nanoarrow or geoarrow
 // https://github.com/geoarrow/geoarrow-c-geos/blob/33ad0ba21c76c09e9d72fc4e4ae0b9ff9da61848/src/geoarrow_geos/geoarrow_geos.c#L323-L360
 struct GeoArrowBitmapReader {
@@ -621,7 +620,8 @@ class ReaderImpl {
     }
 
     constructor_->SetOutput(out);
-    code = GeoArrowArrayReaderVisit(&reader_, &array_view_, offset, length, &visitor_);
+    code = GeoArrowArrayReaderVisit(&reader_, &array_view_, offset, length,
+                                    &visitor_);
     ThrowNotOk(code);
   }
 
@@ -762,7 +762,6 @@ class WriterImpl {
   }
 
   int VisitPoints(const PointGeography& point) {
-
     if (point.Points().size() == 0) {
       // empty Point
       GEOARROW_RETURN_NOT_OK(visitor_.geom_start(
@@ -797,7 +796,6 @@ class WriterImpl {
   }
 
   int VisitPolylineEdges(const S2Polyline& poly) {
-
     if (poly.num_vertices() == 0) {
       throw Exception("Unexpected S2Polyline with 0 vertices");
     } else if (poly.num_vertices() == 1) {
@@ -808,9 +806,9 @@ class WriterImpl {
     }
 
     for (int i = 1; i < poly.num_vertices(); i++) {
-        const S2Point& pt0(poly.vertex(i - 1));
-        const S2Point& pt1(poly.vertex(i));
-        tessellator_->AppendProjected(pt0, pt1, &points_);
+      const S2Point& pt0(poly.vertex(i - 1));
+      const S2Point& pt1(poly.vertex(i));
+      tessellator_->AppendProjected(pt0, pt1, &points_);
     }
 
     for (const auto& pt : points_) {
@@ -824,7 +822,6 @@ class WriterImpl {
   }
 
   int VisitPolylines(const PolylineGeography& geog) {
-
     if (geog.Polylines().size() == 0) {
       // empty LineString
       GEOARROW_RETURN_NOT_OK(
@@ -862,7 +859,6 @@ class WriterImpl {
   }
 
   int VisitLoopShell(const S2Loop* loop) {
-
     if (loop->num_vertices() == 0) {
       throw Exception("Unexpected S2Loop with 0 verties");
     }
@@ -890,7 +886,6 @@ class WriterImpl {
   }
 
   int VisitLoopHole(const S2Loop* loop) {
-
     if (loop->num_vertices() == 0) {
       throw Exception("Unexpected S2Loop with 0 verties");
     }

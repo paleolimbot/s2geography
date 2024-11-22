@@ -37,7 +37,7 @@ enum class GeographyKind {
 };
 
 class EncodeOptions;
-class EncodeTag;
+struct EncodeTag;
 
 // An Geography is an abstraction of S2 types that is designed to closely
 // match the scope of a GEOS Geometry. Its methods are limited to those needed
