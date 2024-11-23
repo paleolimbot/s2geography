@@ -95,7 +95,7 @@ std::unique_ptr<Geography> s2_geography_from_layers(
 }
 
 static std::unique_ptr<Geography> s2_boolean_operation(
-    const ShapeIndexGeography& geog1, const ShapeIndexGeography& geog2,
+    const S2ShapeIndex& geog1, const S2ShapeIndex& geog2,
     S2BooleanOperation::OpType op_type, const GlobalOptions& options,
     GlobalOptions::OutputAction point_layer_action,
     GlobalOptions::OutputAction polyline_layer_action,
@@ -122,7 +122,7 @@ static std::unique_ptr<Geography> s2_boolean_operation(
 
   // do the boolean operation, build layers, and check for errors
   S2Error error;
-  if (!op.Build(geog1.ShapeIndex(), geog2.ShapeIndex(), &error)) {
+  if (!op.Build(geog1, geog2, &error)) {
     throw Exception(error.text());
   }
 
@@ -133,7 +133,7 @@ static std::unique_ptr<Geography> s2_boolean_operation(
 }
 
 std::unique_ptr<Geography> s2_boolean_operation(
-    const ShapeIndexGeography& geog1, const ShapeIndexGeography& geog2,
+    const S2ShapeIndex& geog1, const S2ShapeIndex& geog2,
     S2BooleanOperation::OpType op_type, const GlobalOptions& options) {
   return s2_boolean_operation(
       geog1, geog2, op_type, options, options.point_layer_action,
