@@ -24,9 +24,10 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
 
 option(S2GEOGRAPHY_BUILD_TESTS "Build tests" OFF)
 # These are opt-in because it's hard for all users to control the warnings from
-# s2 and Abseil on all platforms. Even when turned on, the extra warnings are only
-# added in debug mode.
-option(S2GEOGRAPHY_EXTRA_WARNINGS "Enable extra compiler warnings in debug mode" OFF)
+# s2 and Abseil on all platforms. Even when turned on, the extra warnings are
+# only added in debug mode.
+option(S2GEOGRAPHY_EXTRA_WARNINGS
+       "Enable extra compiler warnings in debug mode" OFF)
 option(S2GEOGRAPHY_CODE_COVERAGE "Enable coverage reporting" OFF)
 option(S2GEOGRAPHY_BUILD_EXAMPLES "Build s2geography examples" OFF)
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
@@ -270,31 +271,31 @@ endif()
 target_link_libraries(s2geography PUBLIC s2::s2 absl::memory absl::str_format)
 
 # Set somewhat aggressive compiler warning flags
-if (S2GEOGRAPHY_EXTRA_WARNINGS)
-if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
-  target_compile_options(
-    s2geography
-    PRIVATE $<$<CONFIG:Debug>:-Wall
-            -Werror
-            -Wextra
-            -Wpedantic
-            -Wno-type-limits
-            -Wmaybe-uninitialized
-            -Wunused-result
-            -Wconversion
-            -Wno-sign-conversion>)
-elseif(CMAKE_C_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID
-                                                    STREQUAL "Clang")
-  target_compile_options(
-    s2geography
-    PRIVATE $<$<CONFIG:Debug>:-Wall
-            -Werror
-            -Wextra
-            -Wpedantic
-            -Wdocumentation
-            -Wconversion
-            -Wno-sign-conversion>)
-endif()
+if(S2GEOGRAPHY_EXTRA_WARNINGS)
+  if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(
+      s2geography
+      PRIVATE $<$<CONFIG:Debug>:-Wall
+              -Werror
+              -Wextra
+              -Wpedantic
+              -Wno-type-limits
+              -Wmaybe-uninitialized
+              -Wunused-result
+              -Wconversion
+              -Wno-sign-conversion>)
+  elseif(CMAKE_C_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID
+                                                      STREQUAL "Clang")
+    target_compile_options(
+      s2geography
+      PRIVATE $<$<CONFIG:Debug>:-Wall
+              -Werror
+              -Wextra
+              -Wpedantic
+              -Wdocumentation
+              -Wconversion
+              -Wno-sign-conversion>)
+  endif()
 endif()
 
 if(S2GEOGRAPHY_BUILD_TESTS)
