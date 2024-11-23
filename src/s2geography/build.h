@@ -35,8 +35,16 @@ class GlobalOptions {
 };
 
 std::unique_ptr<Geography> s2_boolean_operation(
-    const ShapeIndexGeography& geog1, const ShapeIndexGeography& geog2,
+    const S2ShapeIndex& geog1, const S2ShapeIndex& geog2,
     S2BooleanOperation::OpType op_type, const GlobalOptions& options);
+
+template <typename IndexGeogLHS, typename IndexGeogRHS>
+std::unique_ptr<Geography> s2_boolean_operation(
+    const IndexGeogLHS& geog1, const IndexGeogRHS& geog2,
+    S2BooleanOperation::OpType op_type, const GlobalOptions& options) {
+  return s2_boolean_operation(geog1.ShapeIndex(), geog2.ShapeIndex(), op_type,
+                              options);
+}
 
 std::unique_ptr<Geography> s2_unary_union(const ShapeIndexGeography& geog,
                                           const GlobalOptions& options);

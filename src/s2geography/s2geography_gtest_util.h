@@ -3,6 +3,7 @@
 #include <gmock/gmock-matchers.h>
 #include <gtest/gtest.h>
 
+#include <ostream>
 #include <vector>
 
 #include "s2geography/geography.h"
