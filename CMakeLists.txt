@@ -213,6 +213,9 @@ if(S2GEOGRAPHY_BUILD_TESTS)
 
   FetchContent_MakeAvailable(nanoarrow)
 
+  # do not install nanoarrow by default when running cmake --install
+  set_property(DIRECTORY ${nanoarrow_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
+
   if(S2GEOGRAPHY_CODE_COVERAGE)
     add_library(coverage_config INTERFACE)
   endif()
