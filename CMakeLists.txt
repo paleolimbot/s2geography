@@ -173,10 +173,11 @@ elseif(${S2_SOURCE} STREQUAL "SYSTEM")
   endif()
 endif()
 
-# this might be needed since s2geometry includes it in general
-# but not for any target explicilty?
+# this might be needed since s2geometry includes it in general but not for any
+# target explicilty?
 find_package(OpenSSL REQUIRED)
-target_include_directories(${s2_NOALIAS_TARGET} INTERFACE ${OPENSSL_INCLUDE_DIR})
+target_include_directories(${s2_NOALIAS_TARGET}
+                           INTERFACE ${OPENSSL_INCLUDE_DIR})
 
 # --- Abseil (bundled build not supported)
 
