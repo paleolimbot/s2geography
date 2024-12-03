@@ -173,9 +173,9 @@ elseif(${S2_SOURCE} STREQUAL "SYSTEM")
   endif()
 endif()
 
-# This is needed so the openssl header files included via s2geometry
-# are found even when s2geometry is installed in another prefix path
-# (e.g., current CI builds of spherely python wheels).
+# This is needed so the openssl header files included via s2geometry are found
+# even when s2geometry is installed in another prefix path (e.g., current CI
+# builds of spherely python wheels).
 find_package(OpenSSL REQUIRED)
 target_include_directories(${s2_NOALIAS_TARGET}
                            INTERFACE ${OPENSSL_INCLUDE_DIR})
