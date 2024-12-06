@@ -393,7 +393,7 @@ void GeographyCollection::Decode(Decoder* decoder, const EncodeTag& tag) {
     features_.push_back(Geography::DecodeTagged(decoder));
   }
 
-  UpdateShapes();
+  CountShapes();
 }
 
 namespace {

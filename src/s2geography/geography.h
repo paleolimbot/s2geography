@@ -213,7 +213,7 @@ class GeographyCollection : public Geography {
       : Geography(GeographyKind::GEOGRAPHY_COLLECTION),
         features_(std::move(features)),
         total_shapes_(0) {
-    UpdateShapes();
+    CountShapes();
   }
 
   int num_shapes() const;
@@ -233,7 +233,7 @@ class GeographyCollection : public Geography {
   std::vector<int> num_shapes_;
   int total_shapes_;
 
-  inline void UpdateShapes() {
+  inline void CountShapes() {
     for (const auto& feature : features_) {
       num_shapes_.push_back(feature->num_shapes());
       total_shapes_ += feature->num_shapes();
