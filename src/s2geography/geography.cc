@@ -392,6 +392,8 @@ void GeographyCollection::Decode(Decoder* decoder, const EncodeTag& tag) {
   for (uint32_t i = 0; i < n_features; i++) {
     features_.push_back(Geography::DecodeTagged(decoder));
   }
+
+  UpdateShapes();
 }
 
 namespace {
