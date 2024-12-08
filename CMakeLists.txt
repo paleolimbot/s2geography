@@ -257,10 +257,6 @@ target_include_directories(
   s2geography
   PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
          $<INSTALL_INTERFACE:include>
-         # This is needed so the openssl header files included via s2geometry
-         # are found even when s2geometry is installed in another prefix path
-         # (e.g., current CI builds of spherely python wheels).
-         $<INSTALL_INTERFACE:${OPENSSL_INCLUDE_DIR}>
   PRIVATE src/vendored)
 
 target_compile_definitions(
@@ -278,7 +274,8 @@ if(MSVC)
   target_compile_options(s2geography PUBLIC /J)
 endif()
 
-target_link_libraries(s2geography PUBLIC s2::s2 absl::memory absl::str_format)
+target_link_libraries(s2geography PUBLIC s2::s2 absl::memory absl::str_format
+                                         OpenSSL::SSL OpenSSL::Crypto)
 
 # Set somewhat aggressive compiler warning flags
 if(S2GEOGRAPHY_EXTRA_WARNINGS)
