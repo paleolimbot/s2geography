@@ -204,12 +204,16 @@ TEST(Geography, EncodedGeographyCollection) {
   std::vector<std::unique_ptr<Geography>> child_geogs;
   child_geogs.emplace_back(child_geog.release());
   GeographyCollection geog(std::move(child_geogs));
+  ASSERT_EQ(geog.num_shapes(), 1);
+  ASSERT_EQ(geog.dimension(), 0);
   geog.EncodeTagged(&encoder, EncodeOptions());
 
   Decoder decoder(encoder.base(), encoder.length());
   auto roundtrip = Geography::DecodeTagged(&decoder);
   ASSERT_EQ(roundtrip->kind(), GeographyKind::GEOGRAPHY_COLLECTION);
   ASSERT_THAT(*roundtrip, WktEquals6("GEOMETRYCOLLECTION (POINT (-64 45))"));
+  ASSERT_EQ(roundtrip->num_shapes(), 1);
+  ASSERT_EQ(roundtrip->dimension(), 0);
 
   auto roundtrip_typed =
       reinterpret_cast<GeographyCollection*>(roundtrip.get());
