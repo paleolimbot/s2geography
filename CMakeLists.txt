@@ -173,12 +173,8 @@ elseif(${S2_SOURCE} STREQUAL "SYSTEM")
   endif()
 endif()
 
-# This is needed so the openssl header files included via s2geometry are found
-# even when s2geometry is installed in another prefix path (e.g., current CI
-# builds of spherely python wheels).
+# --- OpenSSL
 find_package(OpenSSL REQUIRED)
-target_include_directories(${s2_NOALIAS_TARGET}
-                           INTERFACE ${OPENSSL_INCLUDE_DIR})
 
 # --- Abseil (bundled build not supported)
 
@@ -278,7 +274,8 @@ if(MSVC)
   target_compile_options(s2geography PUBLIC /J)
 endif()
 
-target_link_libraries(s2geography PUBLIC s2::s2 absl::memory absl::str_format)
+target_link_libraries(s2geography PUBLIC s2::s2 absl::memory absl::str_format
+                                         OpenSSL::SSL OpenSSL::Crypto)
 
 # Set somewhat aggressive compiler warning flags
 if(S2GEOGRAPHY_EXTRA_WARNINGS)
