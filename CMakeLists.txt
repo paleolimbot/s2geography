@@ -173,12 +173,8 @@ elseif(${S2_SOURCE} STREQUAL "SYSTEM")
   endif()
 endif()
 
-# This is needed so the openssl header files included via s2geometry are found
-# even when s2geometry is installed in another prefix path (e.g., current CI
-# builds of spherely python wheels).
+# --- OpenSSL
 find_package(OpenSSL REQUIRED)
-target_include_directories(${s2_NOALIAS_TARGET}
-                           INTERFACE ${OPENSSL_INCLUDE_DIR})
 
 # --- Abseil (bundled build not supported)
 
@@ -261,6 +257,10 @@ target_include_directories(
   s2geography
   PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
          $<INSTALL_INTERFACE:include>
+         # This is needed so the openssl header files included via s2geometry
+         # are found even when s2geometry is installed in another prefix path
+         # (e.g., current CI builds of spherely python wheels).
+         $<INSTALL_INTERFACE:${OPENSSL_INCLUDE_DIR}>
   PRIVATE src/vendored)
 
 target_compile_definitions(
