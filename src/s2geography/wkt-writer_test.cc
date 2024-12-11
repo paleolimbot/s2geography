@@ -96,6 +96,15 @@ TEST(WKTWriter, MixedCollection) {
   EXPECT_EQ(wktRoundTrip(wkt), wkt);
 }
 
+TEST(WKTWriter, InvalidPolyline) {
+  WKTReader reader;
+  try {
+    auto geog = reader.read_feature("LINESTRING (0 0, 0 0, 1 1)");
+  } catch (std::exception &e) {
+    EXPECT_EQ(std::string(e.what()), "Vertices 0 and 1 are identical");
+  }
+}
+
 TEST(WKTWriter, InvalidPolygon) {
   WKTReader reader;
   try {

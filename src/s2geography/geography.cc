@@ -346,6 +346,7 @@ void PolylineGeography::Decode(Decoder* decoder, const EncodeTag& tag) {
   uint32_t n_polylines = decoder->get32();
   for (uint32_t i = 0; i < n_polylines; i++) {
     auto polyline = absl::make_unique<S2Polyline>();
+    polyline->set_s2debug_override(S2Debug::DISABLE);
     if (!polyline->Decode(decoder)) {
       throw Exception("PolylineGeography::Decode error at item " +
                       std::to_string(i));
@@ -366,6 +367,7 @@ void PolygonGeography::Decode(Decoder* decoder, const EncodeTag& tag) {
   }
 
   tag.SkipCovering(decoder);
+  polygon_->set_s2debug_override(S2Debug::DISABLE);
   polygon_->Decode(decoder);
 }
 
