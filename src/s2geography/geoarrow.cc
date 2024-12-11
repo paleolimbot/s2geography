@@ -287,11 +287,9 @@ class PolylineConstructor : public Constructor {
 
     if (!points_.empty()) {
       auto polyline = absl::make_unique<S2Polyline>();
+      polyline->set_s2debug_override(S2Debug::DISABLE);
       polyline->Init(std::move(points_));
 
-      // Previous version of s2 didn't check for this, so in
-      // this check is temporarily disabled to avoid mayhem in
-      // reverse dependency checks.
       if (options_.check() && !polyline->IsValid()) {
         polyline->FindValidationError(&error_);
         throw Exception(error_.text());
