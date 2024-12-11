@@ -277,7 +277,9 @@ TEST(Geography, EncodedShapeIndex) {
 void TestEncodeWKTRoundtrip(const std::string& wkt,
                             const EncodeOptions& options) {
   SCOPED_TRACE(wkt + " / " + ::testing::PrintToString(options) + " (WKT)");
-  WKTReader reader;
+  geoarrow::ImportOptions import_options;
+  import_options.set_check(false);
+  WKTReader reader(import_options);
   std::unique_ptr<Geography> original_geog = reader.read_feature(wkt);
   // Make sure the original geography matches the given WKT
   ASSERT_THAT(*original_geog, WktEquals6(wkt));
@@ -368,6 +370,13 @@ TEST(Geography, EncodeRoundtrip) {
       }
     }
   }
+}
+
+TEST(Geography, EncodeRoundtripInvalid) {
+  EncodeOptions opt;
+  ASSERT_NO_FATAL_FAILURE(
+      TestEncodeWKTRoundtrip("LINESTRING (0 0, 0 0, 1 1)", opt));
+  ASSERT_NO_FATAL_FAILURE(TestEncodeWKTRoundtrip("POLYGON ((0 0, 0 0))", opt));
 }
 
 }  // namespace s2geography
