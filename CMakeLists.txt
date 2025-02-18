@@ -206,6 +206,18 @@ endif()
 if(NOT TARGET geoarrow)
   set(GEOARROW_SOURCES src/vendored/geoarrow/geoarrow.c src/vendored/ryu/d2s.c
                        src/vendored/geoarrow/double_parse_fast_float.cc)
+  set(GEOARROW_INCLUDE_DIRECTORY src/vendored)
+
+  if(GEOARROW_NAMESPACE)
+
+    set(GEOARROW_COMPILE_DEFINITIONS
+        GEOARROW_USE_FAST_FLOAT=1 GEOARROW_USE_RYU=1
+        GEOARROW_NAMESPACE=${GEOARROW_NAMESPACE})
+  else()
+    set(GEOARROW_COMPILE_DEFINITIONS
+        GEOARROW_USE_FAST_FLOAT=1 GEOARROW_USE_RYU=1
+        GEOARROW_NAMESPACE=S2Geography)
+  endif()
 endif()
 
 # --- googletest (always bundled)
@@ -263,15 +275,14 @@ target_include_directories(
   s2geography
   PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
          $<INSTALL_INTERFACE:include>
-  PRIVATE src/vendored)
+  PRIVATE ${GEOARROW_INCLUDE_DIRECTORY})
 
 target_compile_definitions(
   s2geography
   PUBLIC S2_VERSION_MAJOR=${S2_VERSION_MAJOR}
          S2_VERSION_MINOR=${S2_VERSION_MINOR}
          S2_VERSION_PATCH=${S2_VERSION_PATCH}
-  PRIVATE GEOARROW_USE_FAST_FLOAT=1 GEOARROW_USE_RYU=1
-          GEOARROW_NAMESPACE=S2Geography)
+  PRIVATE ${GEOARROW_COMPILE_DEFINITIONS})
 
 if(MSVC)
   # used in s2geometry's CMakeLists.txt but not defined in target
