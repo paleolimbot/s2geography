@@ -553,7 +553,7 @@ class ReaderImpl {
   void Init(const ArrowSchema* schema, const ImportOptions& options) {
     options_ = options;
 
-    int code = GeoArrowArrayViewInitFromSchema(&array_view_, schema, &error_);
+    int code = GeoArrowArrayReaderInitFromSchema(&reader_, schema, &error_);
     ThrowNotOk(code);
     InitCommon();
   }
@@ -561,7 +561,7 @@ class ReaderImpl {
   void Init(GeoArrowType type, const ImportOptions& options) {
     options_ = options;
 
-    int code = GeoArrowArrayViewInitFromType(&array_view_, type);
+    int code = GeoArrowArrayReaderInitFromType(&reader_, type);
     ThrowNotOk(code);
     InitCommon();
   }
@@ -570,13 +570,11 @@ class ReaderImpl {
     constructor_ = absl::make_unique<FeatureConstructor>(options_);
     constructor_->InitVisitor(&visitor_);
     visitor_.error = &error_;
-
-    GeoArrowArrayReaderInit(&reader_);
   }
 
   void ReadGeography(const ArrowArray* array, int64_t offset, int64_t length,
                      std::vector<std::unique_ptr<Geography>>* out) {
-    int code = GeoArrowArrayViewSetArray(&array_view_, array, &error_);
+    int code = GeoArrowArrayReaderSetArray(&reader_, array, &error_);
     ThrowNotOk(code);
 
     if (length == 0) {
@@ -584,8 +582,7 @@ class ReaderImpl {
     }
 
     constructor_->SetOutput(out);
-    code = GeoArrowArrayReaderVisit(&reader_, &array_view_, offset, length,
-                                    &visitor_);
+    code = GeoArrowArrayReaderVisit(&reader_, offset, length, &visitor_);
     ThrowNotOk(code);
   }
 

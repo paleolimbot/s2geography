@@ -187,6 +187,21 @@ else()
   message(FATAL_ERROR "Couldn't find absl")
 endif()
 
+# --- nanoarrow (no longer bundled with geoarrow...could be bundled here,
+# or bundled as a fallback)
+if (NOT TARGET nanoarrow)
+  FetchContent_Declare(
+    nanoarrow
+    URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.5.0.zip
+    URL_HASH
+      SHA256=cadbca542806a7554830cbca0393cda3470bdca6d0ce29b5e115b168c6c0b435)
+
+  FetchContent_MakeAvailable(nanoarrow)
+
+  # do not install nanoarrow by default when running cmake --install
+  set_property(DIRECTORY ${nanoarrow_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
+endif()
+
 # --- googletest (always bundled)
 
 if(S2GEOGRAPHY_BUILD_TESTS)
@@ -206,18 +221,6 @@ if(S2GEOGRAPHY_BUILD_TESTS)
 
   # do not install googletest by default when running cmake --install
   set_property(DIRECTORY ${googletest_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
-
-  # For testing GeoArrow
-  FetchContent_Declare(
-    nanoarrow
-    URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.5.0.zip
-    URL_HASH
-      SHA256=cadbca542806a7554830cbca0393cda3470bdca6d0ce29b5e115b168c6c0b435)
-
-  FetchContent_MakeAvailable(nanoarrow)
-
-  # do not install nanoarrow by default when running cmake --install
-  set_property(DIRECTORY ${nanoarrow_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
 
   if(S2GEOGRAPHY_CODE_COVERAGE)
     add_library(coverage_config INTERFACE)
@@ -274,7 +277,7 @@ if(MSVC)
   target_compile_options(s2geography PUBLIC /J)
 endif()
 
-target_link_libraries(s2geography PUBLIC s2::s2 absl::memory absl::str_format
+target_link_libraries(s2geography PUBLIC s2::s2 nanoarrow::nanoarrow absl::memory absl::str_format
                                          OpenSSL::SSL OpenSSL::Crypto)
 
 # Set somewhat aggressive compiler warning flags
