@@ -218,6 +218,8 @@ if(NOT TARGET geoarrow)
         GEOARROW_USE_FAST_FLOAT=1 GEOARROW_USE_RYU=1
         GEOARROW_NAMESPACE=S2Geography)
   endif()
+else()
+  set(S2GEOGRAPHY_GEOARROW_TARGET geoarrow::geoarrow)
 endif()
 
 # --- googletest (always bundled)
@@ -294,7 +296,7 @@ endif()
 target_link_libraries(
   s2geography
   PUBLIC s2::s2 absl::memory absl::str_format OpenSSL::SSL OpenSSL::Crypto
-  PRIVATE nanoarrow::nanoarrow)
+  PRIVATE nanoarrow::nanoarrow ${S2GEOGRAPHY_GEOARROW_TARGET})
 
 # Set somewhat aggressive compiler warning flags
 if(S2GEOGRAPHY_EXTRA_WARNINGS)
