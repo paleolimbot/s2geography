@@ -187,6 +187,40 @@ else()
   message(FATAL_ERROR "Couldn't find absl")
 endif()
 
+# --- nanoarrow (no longer bundled with geoarrow...could be bundled here, or
+# bundled as a fallback)
+if(NOT TARGET nanoarrow)
+  FetchContent_Declare(
+    nanoarrow
+    URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.6.0.zip
+    URL_HASH
+      SHA256=73b3235453902c9e92b5e942683d02d764a2aea1f999c03bf4a747c90df2f505)
+
+  FetchContent_MakeAvailable(nanoarrow)
+
+  # do not install nanoarrow by default when running cmake --install
+  set_property(DIRECTORY ${nanoarrow_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
+endif()
+
+# --- geoarrow (vendored, but we can use an external version of it)
+if(NOT TARGET geoarrow)
+  set(GEOARROW_SOURCES src/vendored/geoarrow/geoarrow.c src/vendored/ryu/d2s.c
+                       src/vendored/geoarrow/double_parse_fast_float.cc)
+  set(GEOARROW_INCLUDE_DIRECTORY src/vendored)
+
+  if(GEOARROW_NAMESPACE)
+    set(GEOARROW_COMPILE_DEFINITIONS
+        GEOARROW_USE_FAST_FLOAT=1 GEOARROW_USE_RYU=1
+        GEOARROW_NAMESPACE=${GEOARROW_NAMESPACE})
+  else()
+    set(GEOARROW_COMPILE_DEFINITIONS
+        GEOARROW_USE_FAST_FLOAT=1 GEOARROW_USE_RYU=1
+        GEOARROW_NAMESPACE=S2Geography)
+  endif()
+else()
+  set(S2GEOGRAPHY_GEOARROW_TARGET geoarrow::geoarrow)
+endif()
+
 # --- googletest (always bundled)
 
 if(S2GEOGRAPHY_BUILD_TESTS)
@@ -206,18 +240,6 @@ if(S2GEOGRAPHY_BUILD_TESTS)
 
   # do not install googletest by default when running cmake --install
   set_property(DIRECTORY ${googletest_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
-
-  # For testing GeoArrow
-  FetchContent_Declare(
-    nanoarrow
-    URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.5.0.zip
-    URL_HASH
-      SHA256=cadbca542806a7554830cbca0393cda3470bdca6d0ce29b5e115b168c6c0b435)
-
-  FetchContent_MakeAvailable(nanoarrow)
-
-  # do not install nanoarrow by default when running cmake --install
-  set_property(DIRECTORY ${nanoarrow_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
 
   if(S2GEOGRAPHY_CODE_COVERAGE)
     add_library(coverage_config INTERFACE)
@@ -244,10 +266,7 @@ add_library(
   src/s2geography/wkb.cc
   src/s2geography/op/cell.cc
   src/s2geography/op/point.cc
-  # geoarrow sources
-  src/vendored/geoarrow/geoarrow.c
-  src/vendored/ryu/d2s.c
-  src/vendored/geoarrow/double_parse_fast_float.cc)
+  ${GEOARROW_SOURCES})
 
 if(NOT BUILD_SHARED_LIBS)
   set_target_properties(s2geography PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -257,15 +276,14 @@ target_include_directories(
   s2geography
   PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
          $<INSTALL_INTERFACE:include>
-  PRIVATE src/vendored)
+  PRIVATE ${GEOARROW_INCLUDE_DIRECTORY})
 
 target_compile_definitions(
   s2geography
   PUBLIC S2_VERSION_MAJOR=${S2_VERSION_MAJOR}
          S2_VERSION_MINOR=${S2_VERSION_MINOR}
          S2_VERSION_PATCH=${S2_VERSION_PATCH}
-  PRIVATE GEOARROW_USE_FAST_FLOAT=1 GEOARROW_USE_RYU=1
-          GEOARROW_NAMESPACE=S2Geography)
+  PRIVATE ${GEOARROW_COMPILE_DEFINITIONS})
 
 if(MSVC)
   # used in s2geometry's CMakeLists.txt but not defined in target
@@ -274,8 +292,10 @@ if(MSVC)
   target_compile_options(s2geography PUBLIC /J)
 endif()
 
-target_link_libraries(s2geography PUBLIC s2::s2 absl::memory absl::str_format
-                                         OpenSSL::SSL OpenSSL::Crypto)
+target_link_libraries(
+  s2geography
+  PUBLIC s2::s2 absl::memory absl::str_format OpenSSL::SSL OpenSSL::Crypto
+  PRIVATE nanoarrow::nanoarrow ${S2GEOGRAPHY_GEOARROW_TARGET})
 
 # Set somewhat aggressive compiler warning flags
 if(S2GEOGRAPHY_EXTRA_WARNINGS)

@@ -47,7 +47,7 @@ jobs:
           echo "env.env_file: ${{ env.env_file }}"
 
       - name: Cache environment
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ${{ env.CONDA }}/envs
           key: ${{ runner.os }}-conda-${{ hashFiles( env.env_file ) }}-${{ steps.get-date.outputs.today }}-${{ env.CACHE_NUMBER }}
