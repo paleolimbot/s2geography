@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <s2/s2edge_tessellator.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -114,6 +115,27 @@ class Writer {
  private:
   std::unique_ptr<WriterImpl> impl_;
 };
+
+using GeographyVisitor = std::function<void(const Geography*)>;
+
+class NewReaderImpl {
+ public:
+  virtual ~NewReaderImpl() = default;
+  virtual void VisitConst(const struct ArrowArray* array,
+                          GeographyVisitor& visitor) = 0;
+  virtual void ReadGeography(const struct ArrowArray* array, int64_t offset,
+                             int64_t length,
+                             std::vector<std::unique_ptr<Geography>>* out) = 0;
+
+ protected:
+  ImportOptions options_;
+  S2::Projection* projection_;
+  std::unique_ptr<S2EdgeTessellator> tessellator_;
+
+  NewReaderImpl(const ImportOptions& options);
+};
+
+std::unique_ptr<NewReaderImpl> GetWKBReader(const ImportOptions& options);
 
 }  // namespace geoarrow
 
