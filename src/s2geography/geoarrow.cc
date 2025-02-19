@@ -589,7 +589,6 @@ class ReaderImpl {
  private:
   ImportOptions options_;
   std::unique_ptr<FeatureConstructor> constructor_;
-  GeoArrowArrayView array_view_;
   GeoArrowArrayReader reader_;
   GeoArrowVisitor visitor_;
   GeoArrowError error_;
