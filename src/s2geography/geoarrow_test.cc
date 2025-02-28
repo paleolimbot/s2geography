@@ -508,7 +508,8 @@ TEST(GeoArrow, GeoArrowRoundtripCollection) {
 }
 
 TEST(GeoArrow, GeoArrowReader2ReadWKBPoint) {
-  auto reader = s2geography::geoarrow::GetWKBReader(ImportOptions());
+  auto reader = s2geography::geoarrow::MakeNewReader(
+      s2geography::geoarrow::Reader::InputType::kWKB, ImportOptions());
 
   nanoarrow::UniqueArray array;
   std::vector<std::unique_ptr<s2geography::Geography>> result;

@@ -135,7 +135,11 @@ class NewReaderImpl {
   NewReaderImpl(const ImportOptions& options);
 };
 
-std::unique_ptr<NewReaderImpl> GetWKBReader(const ImportOptions& options);
+std::unique_ptr<NewReaderImpl> MakeNewReader(struct ArrowSchema* schema,
+                                             const ImportOptions& options);
+
+std::unique_ptr<NewReaderImpl> MakeNewReader(Reader::InputType input_type,
+                                             const ImportOptions& options);
 
 }  // namespace geoarrow
 

@@ -8,6 +8,8 @@
 
 using XY = geoarrow::array_util::XY<double>;
 using XYZ = geoarrow::array_util::XYZ<double>;
+using XYM = geoarrow::array_util::XY<double>;
+using XYZM = geoarrow::array_util::XYZ<double>;
 using XYSequence = geoarrow::array_util::CoordSequence<XY>;
 using XYZSequence = geoarrow::array_util::CoordSequence<XYZ>;
 using WKBArray = geoarrow::wkb_util::WKBArray<int32_t>;
@@ -30,7 +32,8 @@ bool CoordIsEmpty(T pt) {
   return nan_count == pt.size();
 }
 
-}  // namespace
+/// \brief Constants to identify the coordinate translation strategy
+enum class Translator { kLiteral, kProjected, kTessellated };
 
 /// \brief Import/export points as literal XYZ values
 ///
@@ -116,6 +119,30 @@ struct TessellatedTranslator {
   }
 };
 
+Translator GetTranslator(const ImportOptions& options) {
+  if (options.projection() == nullptr) {
+    return Translator::kLiteral;
+  } else if (options.tessellate_tolerance() == S1Angle::Infinity()) {
+    return Translator::kProjected;
+  } else {
+    return Translator::kTessellated;
+  }
+}
+
+template <typename T>
+void SetArrayGeneric(T& array, const ArrowArray* arrow_array,
+                     struct GeoArrowArrayView* array_view) {
+  struct GeoArrowError error {};
+  if (GeoArrowArrayViewSetArray(array_view, arrow_array, &error) !=
+      GEOARROW_OK) {
+    throw Exception(error.message);
+  }
+
+  array.Init(array_view);
+}
+
+}  // namespace
+
 NewReaderImpl::NewReaderImpl(const ImportOptions& options)
     : options_(options), projection_(options_.projection()) {
   if (options_.projection()) {
@@ -166,13 +193,13 @@ class WKBReaderImpl : public NewReaderImpl {
                      std::vector<std::unique_ptr<Geography>>* out) {
     SetArray(array);
 
-    for (int64_t i = 0; i < wkb_array_.value.length; i++) {
-      if (wkb_array_.is_null(i)) {
+    for (int64_t i = 0; i < length; i++) {
+      if (wkb_array_.is_null(offset + i)) {
         out->push_back(nullptr);
         continue;
       }
 
-      Parse(i);
+      Parse(offset + i);
       out->push_back(ReadGeometryUniquePtrDispatch(geometry_));
     }
   }
@@ -192,12 +219,7 @@ class WKBReaderImpl : public NewReaderImpl {
   std::unique_ptr<GeographyCollection> collection_;
 
   void SetArray(const ArrowArray* array) {
-    struct GeoArrowError error {};
-    if (GeoArrowArrayViewSetArray(&array_view_, array, &error) != GEOARROW_OK) {
-      throw Exception(error.message);
-    }
-
-    wkb_array_.Init(&array_view_);
+    SetArrayGeneric(wkb_array_, array, &array_view_);
   }
 
   void Parse(int64_t i) {
@@ -397,8 +419,138 @@ class WKBReaderImpl : public NewReaderImpl {
   bool IsTopLevel(const WKBGeometry& geom) { return &geom == &geometry_; }
 };
 
-std::unique_ptr<NewReaderImpl> GetWKBReader(const ImportOptions& options) {
-  return absl::make_unique<WKBReaderImpl>(options);
+class GeoArrowPointReader : public NewReaderImpl {
+ public:
+  explicit GeoArrowPointReader(const ImportOptions& options,
+                               enum GeoArrowType type)
+      : NewReaderImpl(options) {
+    GeoArrowArrayViewInitFromType(&array_view_, type);
+  }
+
+  void VisitConst(const struct ArrowArray* array, GeographyVisitor& visitor) {
+    SetArray(array);
+
+    switch (GetTranslator(options_)) {
+      case Translator::kLiteral:
+        VisitConstGeneric<ProjectedTranslator<XYZ>>(array_xyz_, array, visitor);
+        break;
+      default:
+        VisitConstGeneric<ProjectedTranslator<XY>>(array_xy_, array, visitor);
+        break;
+    }
+  }
+
+  void ReadGeography(const struct ArrowArray* array, int64_t offset,
+                     int64_t length,
+                     std::vector<std::unique_ptr<Geography>>* out) {
+    SetArray(array);
+
+    switch (GetTranslator(options_)) {
+      case Translator::kLiteral:
+        ReadGeographyGeneric<ProjectedTranslator<XYZ>>(array_xyz_, array,
+                                                       offset, length, out);
+        break;
+      default:
+        ReadGeographyGeneric<ProjectedTranslator<XY>>(array_xy_, array, offset,
+                                                      length, out);
+        break;
+    }
+  }
+
+ private:
+  ::geoarrow::array_util::PointArray<XY> array_xy_;
+  ::geoarrow::array_util::PointArray<XYZ> array_xyz_;
+  struct GeoArrowArrayView array_view_ {};
+
+  void SetArray(const ArrowArray* array) {
+    switch (GetTranslator(options_)) {
+      case Translator::kLiteral:
+        SetArrayGeneric(array_xyz_, array, &array_view_);
+        break;
+      default:
+        SetArrayGeneric(array_xy_, array, &array_view_);
+        break;
+    }
+  }
+
+  template <typename Translator, typename T>
+  void VisitConstGeneric(T& typed_array, const struct ArrowArray* array,
+                         GeographyVisitor& visitor) {
+    PointGeography geog;
+    std::vector<S2Point>* pts = geog.mutable_points();
+
+    if (!typed_array.validity) {
+      for (auto coord : typed_array.Coords()) {
+        pts->clear();
+        Translator::ImportPoints(coord, pts, options_.projection());
+        visitor(&geog);
+      }
+    } else {
+      for (int64_t i = 0; i < typed_array.value.length; i++) {
+        if (typed_array.is_null(i)) {
+          visitor(nullptr);
+          continue;
+        }
+
+        pts->clear();
+        Translator::ImportPoints(typed_array.value.coord(i), pts,
+                                 options_.projection());
+      }
+    }
+  }
+
+  template <typename Translator, typename T>
+  void ReadGeographyGeneric(T& typed_array, const struct ArrowArray* array,
+                            int64_t offset, int64_t length,
+                            std::vector<std::unique_ptr<Geography>>* out) {
+    for (int64_t i = 0; i < length; i++) {
+      if (typed_array.is_null(offset + i)) {
+        out->push_back(nullptr);
+        continue;
+      }
+
+      std::vector<S2Point> pts;
+      Translator::ImportPoints(typed_array.value.coord(offset + i), &pts,
+                               options_.projection());
+      out->push_back(absl::make_unique<PointGeography>(pts));
+    }
+  }
+};
+
+namespace {
+std::unique_ptr<NewReaderImpl> MakeNewReader(
+    const ::geoarrow::GeometryDataType& data_type,
+    const ImportOptions& options) {
+  switch (data_type.id()) {
+    case GEOARROW_TYPE_WKB:
+      return absl::make_unique<WKBReaderImpl>(options);
+    default:
+      switch (data_type.geometry_type()) {
+        case GEOARROW_GEOMETRY_TYPE_POINT:
+          return absl::make_unique<GeoArrowPointReader>(options,
+                                                        data_type.id());
+        default:
+          throw Exception("GeoArrow type " + data_type.ToString() +
+                          " not yet implemented");
+      }
+  }
+}
+}  // namespace
+
+std::unique_ptr<NewReaderImpl> MakeNewReader(struct ArrowSchema* schema,
+                                             const ImportOptions& options) {
+  auto data_type = ::geoarrow::GeometryDataType::Make(schema);
+  return MakeNewReader(data_type, options);
+}
+
+std::unique_ptr<NewReaderImpl> MakeNewReader(Reader::InputType input_type,
+                                             const ImportOptions& options) {
+  switch (input_type) {
+    case Reader::InputType::kWKT:
+      return MakeNewReader(::geoarrow::Wkt(), options);
+    case Reader::InputType::kWKB:
+      return MakeNewReader(::geoarrow::Wkb(), options);
+  }
 }
 
 }  // namespace geoarrow
