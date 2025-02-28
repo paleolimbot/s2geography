@@ -506,3 +506,23 @@ TEST(GeoArrow, GeoArrowRoundtripCollection) {
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKT);
   TestGeoArrowRoundTrip(*geog, GEOARROW_TYPE_WKB);
 }
+
+TEST(GeoArrow, GeoArrowReader2ReadWKBPoint) {
+  auto reader = s2geography::geoarrow::MakeNewReader(
+      s2geography::geoarrow::Reader::InputType::kWKB, ImportOptions());
+
+  nanoarrow::UniqueArray array;
+  std::vector<std::unique_ptr<s2geography::Geography>> result;
+
+  InitArrayWKB(array.get(), {{0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+                              0x00, 0x00, 0x00, 0x00, 0x3e, 0x40, 0x00,
+                              0x00, 0x00, 0x00, 0x00, 0x00, 0x24, 0x40},
+                             {}});
+
+  reader->ReadGeography(array.get(), 0, array->length, &result);
+  EXPECT_EQ(result[0]->dimension(), 0);
+  ASSERT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0]->Shape(0)->edge(0).v0,
+            S2LatLng::FromDegrees(10, 30).ToPoint());
+  EXPECT_EQ(result[1].get(), nullptr);
+}

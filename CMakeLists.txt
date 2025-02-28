@@ -261,6 +261,7 @@ add_library(
   src/s2geography/build.cc
   src/s2geography/geography.cc
   src/s2geography/geoarrow.cc
+  src/s2geography/geoarrow2.cc
   src/s2geography/wkt-reader.cc
   src/s2geography/wkt-writer.cc
   src/s2geography/wkb.cc

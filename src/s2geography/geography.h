@@ -137,6 +137,7 @@ class PointGeography : public Geography {
   void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const;
 
   const std::vector<S2Point>& Points() const { return points_; }
+  std::vector<S2Point>* mutable_points() { return &points_; }
 
   void EncodeTagged(Encoder* encoder, const EncodeOptions& options) const;
   void Encode(Encoder* encoder, const EncodeOptions& options) const;
