@@ -1,0 +1,139 @@
+
+#include "s2geography/arrow_udf/arrow_udf.h"
+
+#include <cerrno>
+#include <optional>
+#include <string_view>
+#include <unordered_map>
+
+#include "geoarrow/geoarrow.hpp"
+#include "nanoarrow/nanoarrow.hpp"
+#include "s2geography.h"
+
+namespace s2geography {
+
+namespace arrow_udf {
+
+class InternalUDF : public ArrowUDF {
+ public:
+  int Init(struct ArrowSchema *arg_schema, std::string_view options,
+           struct ArrowSchema *out) override {
+    last_error_.clear();
+    try {
+      if (arg_schema == nullptr || arg_schema->release == nullptr) {
+        last_error_ = "Invalid or released arg_schema";
+        return EINVAL;
+      }
+
+      for (int64_t i = 0; i < arg_schema->n_children; i++) {
+        arg_types_.emplace_back(arg_schema->children[i]);
+      }
+
+      auto return_type = ReturnType();
+      if (return_type) {
+        ArrowSchemaMove(return_type->get(), out);
+      } else {
+        out->release = nullptr;
+      }
+
+      return GEOARROW_OK;
+    } catch (std::exception &e) {
+      last_error_ = e.what();
+      return EINVAL;
+    }
+  }
+
+  int Execute(struct ArrowArray **args, int64_t n_args,
+              struct ArrowArray *out) override {
+    last_error_.clear();
+    try {
+      std::vector<nanoarrow::UniqueArray> args;
+      for (int64_t i = 0; i < n_args; i++) {
+        arg_types_.emplace_back(args[i]);
+      }
+
+      auto result = ExecuteImpl(args);
+      ArrowArrayMove(result.get(), out);
+
+      return GEOARROW_OK;
+    } catch (std::exception &e) {
+      last_error_ = e.what();
+      return EINVAL;
+    }
+  }
+
+  const char *GetLastError() override { return last_error_.c_str(); }
+
+ protected:
+  std::vector<nanoarrow::UniqueSchema> arg_types_;
+  std::unordered_map<std::string, std::string> options_;
+
+  virtual std::optional<nanoarrow::UniqueSchema> ReturnType() = 0;
+
+  virtual nanoarrow::UniqueArray ExecuteImpl(
+      const std::vector<nanoarrow::UniqueArray> &args) = 0;
+
+ private:
+  std::string last_error_;
+};
+
+namespace {
+
+std::vector<struct ArrowSchemaView> SchemaViews(
+    const std::vector<nanoarrow::UniqueSchema> &schemas) {
+  std::vector<struct ArrowSchemaView> out;
+  for (const auto &schema : schemas) {
+    struct ArrowSchemaView view;
+    NANOARROW_THROW_NOT_OK(ArrowSchemaViewInit(&view, schema.get(), nullptr));
+    out.push_back(view);
+  }
+  return out;
+}
+
+}  // namespace
+
+class S2Length : public InternalUDF {
+ protected:
+  std::optional<nanoarrow::UniqueSchema> ReturnType() override {
+    if (arg_types_.size() != 1) {
+      throw Exception("Expected one argument in S2Length");
+    }
+
+    auto geometry = ::geoarrow::GeometryDataType::Make(arg_types_[0].get());
+    if (geometry.edge_type() != GEOARROW_EDGE_TYPE_SPHERICAL) {
+      return std::nullopt;
+    } else {
+      nanoarrow::UniqueSchema out;
+      NANOARROW_THROW_NOT_OK(
+          ArrowSchemaInitFromType(out.get(), NANOARROW_TYPE_DOUBLE));
+      return out;
+    }
+  }
+
+  nanoarrow::UniqueArray ExecuteImpl(
+      const std::vector<nanoarrow::UniqueArray> &args) override {
+    auto reader = geoarrow::Reader();
+    reader.Init(arg_types_[0].get());
+
+    nanoarrow::UniqueArray out;
+    NANOARROW_THROW_NOT_OK(
+        ArrowArrayInitFromType(out.get(), NANOARROW_TYPE_DOUBLE));
+
+    std::vector<std::unique_ptr<Geography>> geogs;
+    for (int64_t i = 0; i < args[0]->length; i++) {
+      reader.ReadGeography(args[0].get(), i, 1, &geogs);
+      if (geogs[0]) {
+        double value = s2_length(*geogs[0]);
+        NANOARROW_THROW_NOT_OK(ArrowArrayAppendDouble(out.get(), value));
+      } else {
+        NANOARROW_THROW_NOT_OK(ArrowArrayAppendNull(out.get(), 1));
+      }
+    }
+
+    return out;
+  }
+};
+
+}  // namespace arrow_udf
+
+}  // namespace s2geography
