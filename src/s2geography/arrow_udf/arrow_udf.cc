@@ -8,6 +8,7 @@
 
 #include "geoarrow/geoarrow.hpp"
 #include "nanoarrow/nanoarrow.hpp"
+#include "s2/s2earth.h"
 #include "s2geography.h"
 
 namespace s2geography {
@@ -47,12 +48,12 @@ class InternalUDF : public ArrowUDF {
               struct ArrowArray *out) override {
     last_error_.clear();
     try {
-      std::vector<nanoarrow::UniqueArray> args;
+      std::vector<nanoarrow::UniqueArray> arg_vec;
       for (int64_t i = 0; i < n_args; i++) {
-        arg_types_.emplace_back(args[i]);
+        arg_vec.emplace_back(args[i]);
       }
 
-      auto result = ExecuteImpl(args);
+      auto result = ExecuteImpl(arg_vec);
       ArrowArrayMove(result.get(), out);
 
       return GEOARROW_OK;
@@ -76,21 +77,6 @@ class InternalUDF : public ArrowUDF {
  private:
   std::string last_error_;
 };
-
-namespace {
-
-std::vector<struct ArrowSchemaView> SchemaViews(
-    const std::vector<nanoarrow::UniqueSchema> &schemas) {
-  std::vector<struct ArrowSchemaView> out;
-  for (const auto &schema : schemas) {
-    struct ArrowSchemaView view;
-    NANOARROW_THROW_NOT_OK(ArrowSchemaViewInit(&view, schema.get(), nullptr));
-    out.push_back(view);
-  }
-  return out;
-}
-
-}  // namespace
 
 class S2Length : public InternalUDF {
  protected:
@@ -118,21 +104,25 @@ class S2Length : public InternalUDF {
     nanoarrow::UniqueArray out;
     NANOARROW_THROW_NOT_OK(
         ArrowArrayInitFromType(out.get(), NANOARROW_TYPE_DOUBLE));
-
+    NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(out.get()));
     std::vector<std::unique_ptr<Geography>> geogs;
     for (int64_t i = 0; i < args[0]->length; i++) {
+      geogs.clear();
       reader.ReadGeography(args[0].get(), i, 1, &geogs);
       if (geogs[0]) {
-        double value = s2_length(*geogs[0]);
+        double value = s2_length(*geogs[0]) * S2Earth::RadiusMeters();
         NANOARROW_THROW_NOT_OK(ArrowArrayAppendDouble(out.get(), value));
       } else {
         NANOARROW_THROW_NOT_OK(ArrowArrayAppendNull(out.get(), 1));
       }
     }
 
+    NANOARROW_THROW_NOT_OK(ArrowArrayFinishBuildingDefault(out.get(), nullptr));
     return out;
   }
 };
+
+std::unique_ptr<ArrowUDF> Length() { return std::make_unique<S2Length>(); }
 
 }  // namespace arrow_udf
 

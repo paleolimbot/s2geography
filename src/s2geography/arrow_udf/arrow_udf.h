@@ -19,6 +19,8 @@ class ArrowUDF {
   virtual const char* GetLastError() = 0;
 };
 
+std::unique_ptr<ArrowUDF> Length();
+
 }  // namespace arrow_udf
 
 }  // namespace s2geography

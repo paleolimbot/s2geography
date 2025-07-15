@@ -266,6 +266,7 @@ add_library(
   src/s2geography/wkb.cc
   src/s2geography/op/cell.cc
   src/s2geography/op/point.cc
+  src/s2geography/arrow_udf/arrow_udf.cc
   ${GEOARROW_SOURCES})
 
 if(NOT BUILD_SHARED_LIBS)
@@ -336,6 +337,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   add_executable(op_cell_test src/s2geography/op/cell_test.cc)
   add_executable(wkt_writer_test src/s2geography/wkt-writer_test.cc)
   add_executable(wkb_test src/s2geography/wkb_test.cc)
+  add_executable(arrow_udf_test src/s2geography/arrow_udf/arrow_udf_test.cc)
 
   if(S2GEOGRAPHY_CODE_COVERAGE)
     target_compile_options(coverage_config INTERFACE -O0 -g --coverage)
@@ -352,8 +354,10 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   target_link_libraries(op_cell_test s2geography GTest::gtest_main)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
   target_link_libraries(wkb_test s2geography GTest::gtest_main)
+  target_link_libraries(arrow_udf_test s2geography nanoarrow GTest::gtest_main)
 
   target_include_directories(geoarrow_test PRIVATE src/vendored)
+  target_include_directories(arrow_udf_test PRIVATE src/vendored)
 
   include(GoogleTest)
   gtest_discover_tests(build_test)
@@ -363,6 +367,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   gtest_discover_tests(geography_test)
   gtest_discover_tests(wkt_writer_test)
   gtest_discover_tests(wkb_test)
+  gtest_discover_tests(arrow_udf_test)
 endif()
 
 if(S2GEOGRAPHY_BUILD_EXAMPLES)
