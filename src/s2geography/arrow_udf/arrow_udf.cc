@@ -2,7 +2,6 @@
 #include "s2geography/arrow_udf/arrow_udf.h"
 
 #include <cerrno>
-#include <optional>
 #include <string_view>
 #include <unordered_map>
 
@@ -73,6 +72,101 @@ class InternalUDF : public ArrowUDF {
  private:
   std::string last_error_;
 };
+
+// Combinations that appear
+// (geog) -> bool
+// (geog) -> int
+// (geog) -> double
+// (geog) -> geog
+// (geog, double) -> geog
+// (geog, geog) -> bool
+// (geog, geog) -> double
+// (geog, geog, double) -> bool
+// (geog, geog) -> geog
+
+class OutputBuilder {
+ public:
+  OutputBuilder(enum ArrowType type) {
+    NANOARROW_THROW_NOT_OK(ArrowArrayInitFromType(array_.get(), type));
+    NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(array_.get()));
+  }
+
+  void Reserve(int64_t additional_size) {
+    NANOARROW_THROW_NOT_OK(ArrowArrayReserve(array_.get(), additional_size));
+  }
+
+  void AppendNull() {
+    NANOARROW_THROW_NOT_OK(ArrowArrayAppendNull(array_.get(), 1));
+  }
+
+ protected:
+  nanoarrow::UniqueArray array_;
+};
+
+template <typename c_type_t, enum ArrowType arrow_type_val>
+class ArrowOutputBuilder {
+ public:
+  using c_type = c_type_t;
+  static constexpr enum ArrowType arrow_type = arrow_type_val;
+
+  ArrowOutputBuilder() {
+    NANOARROW_THROW_NOT_OK(
+        ArrowArrayInitFromType(array_.get(), arrow_type_val));
+    NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(array_.get()));
+  }
+
+  void Reserve(int64_t additional_size) {
+    NANOARROW_THROW_NOT_OK(ArrowArrayReserve(array_.get(), additional_size));
+  }
+
+  void AppendNull() {
+    NANOARROW_THROW_NOT_OK(ArrowArrayAppendNull(array_.get(), 1));
+  }
+
+  void Append(c_type value) {
+    if constexpr (std::is_integral_v<c_type>) {
+      NANOARROW_THROW_NOT_OK(ArrowArrayAppendInt(array_.get(), value));
+    } else if constexpr (std::is_floating_point_v<c_type>) {
+      NANOARROW_THROW_NOT_OK(ArrowArrayAppendDouble(array_.get(), value));
+    } else {
+      static_assert(false, "value type not supported");
+    }
+  }
+
+  void Finish(struct ArrowArray *out) {
+    NANOARROW_THROW_NOT_OK(
+        ArrowArrayFinishBuildingDefault(array_.get(), nullptr));
+  }
+
+ protected:
+  nanoarrow::UniqueArray array_;
+};
+
+using BoolOuputBuilder = ArrowOutputBuilder<bool, NANOARROW_TYPE_BOOL>;
+using IntOuputBuilder = ArrowOutputBuilder<int32_t, NANOARROW_TYPE_INT32>;
+using DoubleOuputBuilder = ArrowOutputBuilder<double, NANOARROW_TYPE_DOUBLE>;
+
+class WkbGeographyOutputBuilder {
+ public:
+  using c_type = const Geography &;
+  static constexpr enum ArrowType arrow_type = NANOARROW_TYPE_BINARY;
+
+  WkbGeographyOutputBuilder() {}
+
+  void Reserve(int64_t additional_size) {
+    // The current geoarrow writer doesn't provide any support for this
+  }
+
+  void AppendNull() { throw Exception("AppendNull() for geography output not implemented"); }
+
+  void Append(c_type value) { writer.WriteGeography(value); }
+
+  void Finish(struct ArrowArray *out) { writer.Finish(out); }
+
+ private:
+  geoarrow::Writer writer;
+};
+
 
 class S2Length : public InternalUDF {
  protected:
