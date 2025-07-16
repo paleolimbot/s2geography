@@ -229,6 +229,40 @@ class GeographyInputView {
   }
 };
 
+class GeographyIndexInputView {
+ public:
+  using c_type = const ShapeIndexGeography &;
+
+  GeographyIndexInputView(const struct ArrowSchema *type)
+      : inner_(type), stashed_index_(-1) {}
+
+  void SetArray(const struct ArrowArray *array, int64_t num_rows) {
+    stashed_index_ = -1;
+    inner_.SetArray(array, num_rows);
+    current_array_length_ = array->length;
+  }
+
+  bool IsNull(int64_t i) { return inner_.IsNull(i); }
+
+  const ShapeIndexGeography &Get(int64_t i) {
+    StashIfNeeded(i % current_array_length_);
+    return stashed_;
+  }
+
+ private:
+  GeographyInputView inner_;
+  int64_t current_array_length_;
+  int64_t stashed_index_;
+  ShapeIndexGeography stashed_;
+
+  void StashIfNeeded(int64_t i) {
+    if (i != stashed_index_) {
+      const auto &geog = inner_.Get(i);
+      stashed_ = ShapeIndexGeography(geog);
+    }
+  }
+};
+
 template <typename Exec>
 class UnaryUDF : public InternalUDF {
  protected:
@@ -368,6 +402,24 @@ struct S2InterpolateNormalizedExec {
 
 std::unique_ptr<ArrowUDF> InterpolateNormalized() {
   return std::make_unique<BinaryUDF<S2InterpolateNormalizedExec>>();
+}
+
+struct S2Intersects {
+  using arg0_t = GeographyIndexInputView;
+  using arg1_t = GeographyIndexInputView;
+  using out_t = BoolOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string> &options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    return s2_intersects(value0, value1, options_);
+  }
+
+  S2BooleanOperation::Options options_;
+};
+
+std::unique_ptr<ArrowUDF> Intersects() {
+  return std::make_unique<BinaryUDF<S2Intersects>>();
 }
 
 struct S2LengthExec {

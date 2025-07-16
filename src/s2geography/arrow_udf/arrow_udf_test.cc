@@ -185,3 +185,34 @@ TEST(ArrowUdf, InterpolateNormalized) {
   EXPECT_THAT(*result[2], WktEquals6("POINT (0 1)"));
   EXPECT_EQ(result[3].get(), nullptr);
 }
+
+TEST(ArrowUdf, Intersects) {
+  auto arg_schema = ArgSchema({std::nullopt, std::nullopt});
+  auto udf = s2geography::arrow_udf::Intersects();
+
+  nanoarrow::UniqueSchema out_type;
+  ASSERT_EQ(udf->Init(arg_schema.get(), "", out_type.get()), NANOARROW_OK);
+
+  nanoarrow::UniqueArrayView view;
+  ASSERT_EQ(ArrowArrayViewInitFromSchema(view.get(), out_type.get(), nullptr),
+            NANOARROW_OK);
+  ASSERT_EQ(view->storage_type, NANOARROW_TYPE_BOOL);
+
+  nanoarrow::UniqueArray in_array0 = ArgWkb({"POLYGON ((0 0, 1 0, 0 1, 0 0))"});
+  nanoarrow::UniqueArray in_array1 =
+      ArgWkb({"POINT (0.25 0.25)", "POINT (-1 -1)", ""});
+  std::vector<struct ArrowArray*> args = {in_array0.get(), in_array1.get()};
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_EQ(udf->Execute(args.data(), static_cast<int64_t>(args.size()),
+                         out_array.get()),
+            NANOARROW_OK);
+
+  ASSERT_EQ(ArrowArrayViewSetArray(view.get(), out_array.get(), nullptr),
+            NANOARROW_OK);
+  ASSERT_EQ(view->length, 3);
+  EXPECT_EQ(view->null_count, 1);
+  EXPECT_EQ(ArrowArrayViewGetIntUnsafe(view.get(), 0), true);
+  EXPECT_EQ(ArrowArrayViewGetIntUnsafe(view.get(), 1), false);
+  EXPECT_TRUE(ArrowArrayViewIsNull(view.get(), 2));
+}

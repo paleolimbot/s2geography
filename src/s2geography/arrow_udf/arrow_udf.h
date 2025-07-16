@@ -23,6 +23,7 @@ class ArrowUDF {
 std::unique_ptr<ArrowUDF> Length();
 std::unique_ptr<ArrowUDF> Centroid();
 std::unique_ptr<ArrowUDF> InterpolateNormalized();
+std::unique_ptr<ArrowUDF> Intersects();
 
 }  // namespace arrow_udf
 
