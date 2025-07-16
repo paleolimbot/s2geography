@@ -284,6 +284,91 @@ class UnaryUDF : public InternalUDF {
   Exec exec;
 };
 
+template <typename Exec>
+class BinaryUDF : public InternalUDF {
+ protected:
+  using arg0_t = typename Exec::arg0_t;
+  using arg1_t = typename Exec::arg1_t;
+  using out_t = typename Exec::out_t;
+
+  nanoarrow::UniqueSchema ReturnType() override {
+    // May need to update this if we have a "binary" UDF that can
+    // accept an optional constant argument via the options
+    if (arg_types_.size() != 2) {
+      throw Exception("Expected one argument in unary s2geography UDF");
+    }
+
+    arg0 = std::make_unique<arg0_t>(arg_types_[0].get());
+    arg1 = std::make_unique<arg1_t>(arg_types_[1].get());
+    out = std::make_unique<out_t>();
+    exec.Init(options_);
+
+    nanoarrow::UniqueSchema out_type;
+    NANOARROW_THROW_NOT_OK(
+        ArrowSchemaInitFromType(out_type.get(), out_t::arrow_type));
+    return out_type;
+  }
+
+  nanoarrow::UniqueArray ExecuteImpl(
+      const std::vector<nanoarrow::UniqueArray> &args) override {
+    if (args.size() != 2 || arg_types_.size() != 2) {
+      throw Exception(
+          "Expected one argument/one argument type in in unary s2geography "
+          "UDF");
+    }
+
+    int64_t num_rows = 1;
+    for (const auto &arg : args) {
+      if (arg->length != 1) {
+        num_rows = arg->length;
+        break;
+      }
+    }
+
+    arg0->SetArray(args[0].get(), num_rows);
+
+    for (int i = 0; i < num_rows; i++) {
+      if (arg0->IsNull(i) || arg1->IsNull(i)) {
+        out->AppendNull();
+      } else {
+        typename Exec::arg0_t::c_type item0 = arg0->Get(i);
+        typename Exec::arg1_t::c_type item1 = arg1->Get(i);
+        typename Exec::out_t::c_type item_out = exec.Exec(item0, item1);
+        out->Append(item_out);
+      }
+    }
+
+    nanoarrow::UniqueArray array_out;
+    out->Finish(array_out.get());
+    return array_out;
+  }
+
+ private:
+  std::unique_ptr<arg0_t> arg0;
+  std::unique_ptr<arg1_t> arg1;
+  std::unique_ptr<out_t> out;
+  Exec exec;
+};
+
+struct S2InterpolateNormalizedExec {
+  using arg0_t = GeographyInputView;
+  using arg1_t = DoubleInputView;
+  using out_t = WkbGeographyOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string> &options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    stashed_ = s2_interpolate_normalized(value0, value1);
+    return stashed_;
+  }
+
+  PointGeography stashed_;
+};
+
+std::unique_ptr<ArrowUDF> InterpolateNormalized() {
+  return std::make_unique<BinaryUDF<S2InterpolateNormalizedExec>>();
+}
+
 struct S2LengthExec {
   using arg0_t = GeographyInputView;
   using out_t = DoubleOutputBuilder;
