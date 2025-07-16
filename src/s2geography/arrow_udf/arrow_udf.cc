@@ -326,6 +326,7 @@ class BinaryUDF : public InternalUDF {
     }
 
     arg0->SetArray(args[0].get(), num_rows);
+    arg1->SetArray(args[1].get(), num_rows);
 
     for (int i = 0; i < num_rows; i++) {
       if (arg0->IsNull(i) || arg1->IsNull(i)) {

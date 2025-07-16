@@ -10,15 +10,19 @@
 
 using s2geography::WktEquals6;
 
-nanoarrow::UniqueSchema ArgSchemaWkb() {
+nanoarrow::UniqueSchema ArgSchema(
+    std::vector<std::optional<enum ArrowType>> cols) {
   nanoarrow::UniqueSchema schema;
   ArrowSchemaInit(schema.get());
-  NANOARROW_THROW_NOT_OK(ArrowSchemaSetTypeStruct(schema.get(), 0));
-  NANOARROW_THROW_NOT_OK(ArrowSchemaAllocateChildren(schema.get(), 1));
-  geoarrow::Wkb()
-      .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
-      .InitSchema(schema->children[0]);
-
+  NANOARROW_THROW_NOT_OK(ArrowSchemaSetTypeStruct(schema.get(), cols.size()));
+  for (int64_t i = 0; i < static_cast<int64_t>(cols.size()); i++) {
+    if (cols[i]) {
+      NANOARROW_THROW_NOT_OK(ArrowSchemaSetType(schema->children[i], *cols[i]));
+    } else {
+      ArrowSchemaRelease(schema->children[i]);
+      geoarrow::Wkb().InitSchema(schema->children[i]);
+    }
+  }
   return schema;
 }
 
@@ -52,8 +56,33 @@ nanoarrow::UniqueArray ArgWkb(const std::vector<std::string>& values) {
   return out;
 }
 
+template <typename c_type>
+nanoarrow::UniqueArray ArgArrow(enum ArrowType type,
+                                std::vector<std::optional<c_type>> values) {
+  nanoarrow::UniqueArray array;
+  NANOARROW_THROW_NOT_OK(ArrowArrayInitFromType(array.get(), type));
+  NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(array.get()));
+
+  for (const auto value : values) {
+    if (value.has_value()) {
+      if constexpr (std::is_integral_v<c_type>) {
+        NANOARROW_THROW_NOT_OK(ArrowArrayAppendInt(array.get(), *value));
+      } else if constexpr (std::is_floating_point_v<c_type>) {
+        NANOARROW_THROW_NOT_OK(ArrowArrayAppendDouble(array.get(), *value));
+      } else {
+        static_assert(false, "type not supported");
+      }
+    } else {
+      NANOARROW_THROW_NOT_OK(ArrowArrayAppendNull(array.get(), 1));
+    }
+  }
+
+  NANOARROW_THROW_NOT_OK(ArrowArrayFinishBuildingDefault(array.get(), nullptr));
+  return array;
+}
+
 TEST(ArrowUdf, Length) {
-  auto arg_schema = ArgSchemaWkb();
+  auto arg_schema = ArgSchema({std::nullopt});
   auto udf = s2geography::arrow_udf::Length();
 
   nanoarrow::UniqueSchema out_type;
@@ -86,7 +115,7 @@ TEST(ArrowUdf, Length) {
 }
 
 TEST(ArrowUdf, Centroid) {
-  auto arg_schema = ArgSchemaWkb();
+  auto arg_schema = ArgSchema({std::nullopt});
   auto udf = s2geography::arrow_udf::Centroid();
 
   nanoarrow::UniqueSchema out_type;
@@ -118,5 +147,41 @@ TEST(ArrowUdf, Centroid) {
   EXPECT_THAT(*result[0], WktEquals6("POINT (0 1)"));
   EXPECT_THAT(*result[1], WktEquals6("POINT (0 0.5)"));
   EXPECT_THAT(*result[2], WktEquals6("POINT (0.33335 0.333344)"));
+  EXPECT_EQ(result[3].get(), nullptr);
+}
+
+TEST(ArrowUdf, InterpolateNormalized) {
+  auto arg_schema = ArgSchema({std::nullopt, NANOARROW_TYPE_DOUBLE});
+  auto udf = s2geography::arrow_udf::InterpolateNormalized();
+
+  nanoarrow::UniqueSchema out_type;
+  ASSERT_EQ(udf->Init(arg_schema.get(), "", out_type.get()), NANOARROW_OK);
+
+  struct ArrowSchemaView out_type_view;
+  ASSERT_EQ(ArrowSchemaViewInit(&out_type_view, out_type.get(), nullptr),
+            NANOARROW_OK);
+  ASSERT_EQ(out_type_view.type, NANOARROW_TYPE_BINARY);
+
+  s2geography::geoarrow::Reader reader;
+  reader.Init(s2geography::geoarrow::Reader::InputType::kWKB,
+              s2geography::geoarrow::ImportOptions());
+
+  nanoarrow::UniqueArray in_array0 = ArgWkb({"LINESTRING (0 0, 0 1)"});
+  nanoarrow::UniqueArray in_array1 =
+      ArgArrow<double>(NANOARROW_TYPE_DOUBLE, {0.0, 0.5, 1.0, std::nullopt});
+
+  std::vector<struct ArrowArray*> args = {in_array0.get(), in_array1.get()};
+  nanoarrow::UniqueArray out_array;
+  ASSERT_EQ(udf->Execute(args.data(), static_cast<int64_t>(args.size()),
+                         out_array.get()),
+            NANOARROW_OK);
+  ASSERT_EQ(out_array->length, 4);
+
+  std::vector<std::unique_ptr<s2geography::Geography>> result;
+  reader.ReadGeography(out_array.get(), 0, out_array->length, &result);
+  ASSERT_EQ(result.size(), 4);
+  EXPECT_THAT(*result[0], WktEquals6("POINT (0 0)"));
+  EXPECT_THAT(*result[1], WktEquals6("POINT (0 0.5)"));
+  EXPECT_THAT(*result[2], WktEquals6("POINT (0 1)"));
   EXPECT_EQ(result[3].get(), nullptr);
 }
