@@ -84,25 +84,6 @@ class InternalUDF : public ArrowUDF {
 // (geog, geog, double) -> bool
 // (geog, geog) -> geog
 
-class OutputBuilder {
- public:
-  OutputBuilder(enum ArrowType type) {
-    NANOARROW_THROW_NOT_OK(ArrowArrayInitFromType(array_.get(), type));
-    NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(array_.get()));
-  }
-
-  void Reserve(int64_t additional_size) {
-    NANOARROW_THROW_NOT_OK(ArrowArrayReserve(array_.get(), additional_size));
-  }
-
-  void AppendNull() {
-    NANOARROW_THROW_NOT_OK(ArrowArrayAppendNull(array_.get(), 1));
-  }
-
- protected:
-  nanoarrow::UniqueArray array_;
-};
-
 template <typename c_type_t, enum ArrowType arrow_type_val>
 class ArrowOutputBuilder {
  public:
@@ -136,15 +117,16 @@ class ArrowOutputBuilder {
   void Finish(struct ArrowArray *out) {
     NANOARROW_THROW_NOT_OK(
         ArrowArrayFinishBuildingDefault(array_.get(), nullptr));
+    ArrowArrayMove(array_.get(), out);
   }
 
  protected:
   nanoarrow::UniqueArray array_;
 };
 
-using BoolOuputBuilder = ArrowOutputBuilder<bool, NANOARROW_TYPE_BOOL>;
-using IntOuputBuilder = ArrowOutputBuilder<int32_t, NANOARROW_TYPE_INT32>;
-using DoubleOuputBuilder = ArrowOutputBuilder<double, NANOARROW_TYPE_DOUBLE>;
+using BoolOutputBuilder = ArrowOutputBuilder<bool, NANOARROW_TYPE_BOOL>;
+using IntOutputBuilder = ArrowOutputBuilder<int32_t, NANOARROW_TYPE_INT32>;
+using DoubleOutputBuilder = ArrowOutputBuilder<double, NANOARROW_TYPE_DOUBLE>;
 
 class WkbGeographyOutputBuilder {
  public:
@@ -171,20 +153,14 @@ class WkbGeographyOutputBuilder {
   geoarrow::Writer writer;
 };
 
-template <typename c_type_t, enum ArrowType arrow_type_val>
+template <typename c_type_t>
 class ArrowInputView {
  public:
-  using c_type = const Geography &;
-  static constexpr enum ArrowType arrow_type = NANOARROW_TYPE_BINARY;
+  using c_type = c_type_t;
 
   ArrowInputView(const struct ArrowSchema *type) {
     NANOARROW_THROW_NOT_OK(
         ArrowArrayViewInitFromSchema(view_.get(), type, nullptr));
-    if (view_->storage_type != arrow_type) {
-      throw Exception("Expected storage type " +
-                      std::string(ArrowTypeString(arrow_type)) + " but got " +
-                      std::string(ArrowTypeString(view_->storage_type)));
-    }
   }
 
   void SetArray(const struct ArrowArray *array, int64_t num_rows) {
@@ -200,7 +176,7 @@ class ArrowInputView {
   }
 
   c_type_t Get(int64_t i) {
-    if constexpr (std::is_integral_v<c_type>) {
+    if constexpr (std::is_integral_v<c_type_t>) {
       return ArrowArrayViewGetIntUnsafe(view_.get(), i % view_->length);
     } else if constexpr (std::is_floating_point_v<c_type>) {
       return ArrowArrayViewGetDoubleUnsafe(view_.get(), i % view_->length);
@@ -213,14 +189,22 @@ class ArrowInputView {
   nanoarrow::UniqueArrayView view_;
 };
 
+using BoolInputView = ArrowInputView<bool>;
+using IntInputView = ArrowInputView<int64_t>;
+using DoubleInputView = ArrowInputView<double>;
+
 class GeographyInputView {
  public:
   using c_type = const Geography &;
-  static constexpr enum ArrowType arrow_type = NANOARROW_TYPE_BINARY;
 
   GeographyInputView(const struct ArrowSchema *type)
       : current_array_(nullptr), stashed_index_(-1) {
     reader_.Init(type);
+
+    auto geometry = ::geoarrow::GeometryDataType::Make(type);
+    if (geometry.edge_type() != GEOARROW_EDGE_TYPE_SPHERICAL) {
+      throw Exception("Expected input with spherical edges");
+    }
   }
 
   void SetArray(const struct ArrowArray *array, int64_t num_rows) {
@@ -252,56 +236,75 @@ class GeographyInputView {
   }
 };
 
-class S2Length : public InternalUDF {
+template <typename Exec>
+class UnaryUDF : public InternalUDF {
  protected:
+  using arg0_t = typename Exec::arg0_t;
+  using out_t = typename Exec::out_t;
+
   nanoarrow::UniqueSchema ReturnType() override {
+    // May need to update this if we have a "unary" UDF that can
+    // accept an optional constant argument via the options
     if (arg_types_.size() != 1) {
-      throw Exception("Expected one argument in S2Length");
+      throw Exception("Expected one argument in unary s2geography UDF");
     }
 
-    auto geometry = ::geoarrow::GeometryDataType::Make(arg_types_[0].get());
-    if (geometry.edge_type() != GEOARROW_EDGE_TYPE_SPHERICAL) {
-      throw Exception("Expected input with spherical edges");
-    }
+    arg0 = std::make_unique<arg0_t>(arg_types_[0].get());
+    out = std::make_unique<out_t>();
+    exec.Init(options_);
 
-    nanoarrow::UniqueSchema out;
+    nanoarrow::UniqueSchema out_type;
     NANOARROW_THROW_NOT_OK(
-        ArrowSchemaInitFromType(out.get(), NANOARROW_TYPE_DOUBLE));
-    return out;
+        ArrowSchemaInitFromType(out_type.get(), out_t::arrow_type));
+    return out_type;
   }
 
   nanoarrow::UniqueArray ExecuteImpl(
       const std::vector<nanoarrow::UniqueArray> &args) override {
     if (args.size() != 1 || arg_types_.size() != 1) {
       throw Exception(
-          "Expected one argument/one argument type in S2Length::Execute()");
+          "Expected one argument/one argument type in in unary s2geography "
+          "UDF");
     }
 
-    auto reader = geoarrow::Reader();
-    reader.Init(arg_types_[0].get());
+    int64_t num_rows = args[0]->length;
+    arg0->SetArray(args[0].get(), num_rows);
 
-    nanoarrow::UniqueArray out;
-    NANOARROW_THROW_NOT_OK(
-        ArrowArrayInitFromType(out.get(), NANOARROW_TYPE_DOUBLE));
-    NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(out.get()));
-    std::vector<std::unique_ptr<Geography>> geogs;
-    for (int64_t i = 0; i < args[0]->length; i++) {
-      geogs.clear();
-      reader.ReadGeography(args[0].get(), i, 1, &geogs);
-      if (geogs[0]) {
-        double value = s2_length(*geogs[0]) * S2Earth::RadiusMeters();
-        NANOARROW_THROW_NOT_OK(ArrowArrayAppendDouble(out.get(), value));
+    for (int i = 0; i < num_rows; i++) {
+      if (arg0->IsNull(i)) {
+        out->AppendNull();
       } else {
-        NANOARROW_THROW_NOT_OK(ArrowArrayAppendNull(out.get(), 1));
+        typename Exec::arg0_t::c_type item0 = arg0->Get(i);
+        typename Exec::out_t::c_type item_out = exec.Exec(item0);
+        out->Append(item_out);
       }
     }
 
-    NANOARROW_THROW_NOT_OK(ArrowArrayFinishBuildingDefault(out.get(), nullptr));
-    return out;
+    nanoarrow::UniqueArray array_out;
+    out->Finish(array_out.get());
+    return array_out;
+  }
+
+ private:
+  std::unique_ptr<arg0_t> arg0;
+  std::unique_ptr<out_t> out;
+  Exec exec;
+};
+
+struct S2LengthExec {
+  using arg0_t = GeographyInputView;
+  using out_t = DoubleOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string> &options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value) {
+    return s2_length(value) * S2Earth::RadiusMeters();
   }
 };
 
-std::unique_ptr<ArrowUDF> Length() { return std::make_unique<S2Length>(); }
+std::unique_ptr<ArrowUDF> Length() {
+  return std::make_unique<UnaryUDF<S2LengthExec>>();
+}
 
 }  // namespace arrow_udf
 
