@@ -134,23 +134,21 @@ class WkbGeographyOutputBuilder {
   static constexpr enum ArrowType arrow_type = NANOARROW_TYPE_BINARY;
 
   WkbGeographyOutputBuilder() {
-    writer.Init(geoarrow::Writer::OutputType::kWKB, geoarrow::ExportOptions());
+    writer_.Init(geoarrow::Writer::OutputType::kWKB, geoarrow::ExportOptions());
   }
 
   void Reserve(int64_t additional_size) {
     // The current geoarrow writer doesn't provide any support for this
   }
 
-  void AppendNull() {
-    throw Exception("AppendNull() for geography output not implemented");
-  }
+  void AppendNull() { writer_.WriteNull(); }
 
-  void Append(c_type value) { writer.WriteGeography(value); }
+  void Append(c_type value) { writer_.WriteGeography(value); }
 
-  void Finish(struct ArrowArray *out) { writer.Finish(out); }
+  void Finish(struct ArrowArray *out) { writer_.Finish(out); }
 
  private:
-  geoarrow::Writer writer;
+  geoarrow::Writer writer_;
 };
 
 template <typename c_type_t>
@@ -200,11 +198,6 @@ class GeographyInputView {
   GeographyInputView(const struct ArrowSchema *type)
       : current_array_(nullptr), stashed_index_(-1) {
     reader_.Init(type);
-
-    auto geometry = ::geoarrow::GeometryDataType::Make(type);
-    if (geometry.edge_type() != GEOARROW_EDGE_TYPE_SPHERICAL) {
-      throw Exception("Expected input with spherical edges");
-    }
   }
 
   void SetArray(const struct ArrowArray *array, int64_t num_rows) {
@@ -304,6 +297,25 @@ struct S2LengthExec {
 
 std::unique_ptr<ArrowUDF> Length() {
   return std::make_unique<UnaryUDF<S2LengthExec>>();
+}
+
+struct S2CentroidExec {
+  using arg0_t = GeographyInputView;
+  using out_t = WkbGeographyOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string> &options) {}
+
+  const Geography &Exec(const Geography &value) {
+    S2Point out = s2_centroid(value);
+    stashed_ = PointGeography(out);
+    return stashed_;
+  }
+
+  PointGeography stashed_;
+};
+
+std::unique_ptr<ArrowUDF> Centroid() {
+  return std::make_unique<UnaryUDF<S2CentroidExec>>();
 }
 
 }  // namespace arrow_udf

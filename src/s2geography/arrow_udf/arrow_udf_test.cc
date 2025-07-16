@@ -5,6 +5,10 @@
 
 #include "geoarrow/geoarrow.hpp"
 #include "nanoarrow/nanoarrow.hpp"
+#include "s2geography/geoarrow.h"
+#include "s2geography/s2geography_gtest_util.h"
+
+using s2geography::WktEquals6;
 
 nanoarrow::UniqueSchema ArgSchemaWkb() {
   nanoarrow::UniqueSchema schema;
@@ -58,6 +62,7 @@ TEST(ArrowUdf, Length) {
   nanoarrow::UniqueArrayView view;
   ASSERT_EQ(ArrowArrayViewInitFromSchema(view.get(), out_type.get(), nullptr),
             NANOARROW_OK);
+  ASSERT_EQ(view->storage_type, NANOARROW_TYPE_DOUBLE);
 
   nanoarrow::UniqueArray in_array =
       ArgWkb({"POINT (0 1)", "LINESTRING (0 0, 0 1)",
@@ -78,4 +83,40 @@ TEST(ArrowUdf, Length) {
                    111195.10117748393);
   EXPECT_EQ(ArrowArrayViewGetDoubleUnsafe(view.get(), 2), 0.0);
   EXPECT_TRUE(ArrowArrayViewIsNull(view.get(), 3));
+}
+
+TEST(ArrowUdf, Centroid) {
+  auto arg_schema = ArgSchemaWkb();
+  auto udf = s2geography::arrow_udf::Centroid();
+
+  nanoarrow::UniqueSchema out_type;
+  ASSERT_EQ(udf->Init(arg_schema.get(), "", out_type.get()), NANOARROW_OK);
+
+  struct ArrowSchemaView out_type_view;
+  ASSERT_EQ(ArrowSchemaViewInit(&out_type_view, out_type.get(), nullptr),
+            NANOARROW_OK);
+  ASSERT_EQ(out_type_view.type, NANOARROW_TYPE_BINARY);
+
+  s2geography::geoarrow::Reader reader;
+  reader.Init(s2geography::geoarrow::Reader::InputType::kWKB,
+              s2geography::geoarrow::ImportOptions());
+
+  nanoarrow::UniqueArray in_array =
+      ArgWkb({"POINT (0 1)", "LINESTRING (0 0, 0 1)",
+              "POLYGON ((0 0, 0 1, 1 0, 0 0))", ""});
+  std::vector<struct ArrowArray*> args;
+  args.push_back(in_array.get());
+  nanoarrow::UniqueArray out_array;
+  ASSERT_EQ(udf->Execute(args.data(), static_cast<int64_t>(args.size()),
+                         out_array.get()),
+            NANOARROW_OK);
+  ASSERT_EQ(out_array->length, 4);
+
+  std::vector<std::unique_ptr<s2geography::Geography>> result;
+  reader.ReadGeography(out_array.get(), 0, out_array->length, &result);
+  ASSERT_EQ(result.size(), 4);
+  EXPECT_THAT(*result[0], WktEquals6("POINT (0 1)"));
+  EXPECT_THAT(*result[1], WktEquals6("POINT (0 0.5)"));
+  EXPECT_THAT(*result[2], WktEquals6("POINT (0.33335 0.333344)"));
+  EXPECT_EQ(result[3].get(), nullptr);
 }

@@ -699,6 +699,12 @@ class WriterImpl {
 
   void WriteGeography(const Geography& geog) { VisitFeature(geog); }
 
+  void WriteNull() {
+    ThrowNotOk(visitor_.feat_start(&visitor_));
+    ThrowNotOk(visitor_.null_feat(&visitor_));
+    ThrowNotOk(visitor_.feat_end(&visitor_));
+  }
+
   void Finish(struct ArrowArray* out) {
     int code = GeoArrowArrayWriterFinish(&writer_, out, &error_);
     ThrowNotOk(code);
@@ -1028,6 +1034,8 @@ void Writer::Init(OutputType output_type, const ExportOptions& options) {
 void Writer::WriteGeography(const Geography& geog) {
   impl_->WriteGeography(geog);
 }
+
+void Writer::WriteNull() { impl_->WriteNull(); }
 
 void Writer::Finish(struct ArrowArray* out) { impl_->Finish(out); }
 

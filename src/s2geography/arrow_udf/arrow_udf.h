@@ -21,6 +21,7 @@ class ArrowUDF {
 };
 
 std::unique_ptr<ArrowUDF> Length();
+std::unique_ptr<ArrowUDF> Centroid();
 
 }  // namespace arrow_udf
 

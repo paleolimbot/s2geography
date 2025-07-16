@@ -354,7 +354,8 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   target_link_libraries(op_cell_test s2geography GTest::gtest_main)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
   target_link_libraries(wkb_test s2geography GTest::gtest_main)
-  target_link_libraries(arrow_udf_test s2geography nanoarrow GTest::gtest_main)
+  target_link_libraries(arrow_udf_test s2geography nanoarrow GTest::gtest_main
+                        GTest::gmock)
 
   target_include_directories(geoarrow_test PRIVATE src/vendored)
   target_include_directories(arrow_udf_test PRIVATE src/vendored)
