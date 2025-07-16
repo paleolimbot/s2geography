@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cerrno>
+#include <memory>
 #include <string_view>
 
 #include "s2geography/arrow_abi.h"
