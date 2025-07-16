@@ -99,7 +99,8 @@ class S2Length : public InternalUDF {
   nanoarrow::UniqueArray ExecuteImpl(
       const std::vector<nanoarrow::UniqueArray> &args) override {
     if (args.size() != 1 || arg_types_.size() != 1) {
-      throw Exception("Expected one argument in S2Length::Execute()");
+      throw Exception(
+          "Expected one argument/one argument type in S2Length::Execute()");
     }
 
     auto reader = geoarrow::Reader();
