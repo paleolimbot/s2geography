@@ -31,11 +31,7 @@ class InternalUDF : public ArrowUDF {
       }
 
       auto return_type = ReturnType();
-      if (return_type) {
-        ArrowSchemaMove(return_type->get(), out);
-      } else {
-        out->release = nullptr;
-      }
+      ArrowSchemaMove(return_type.get(), out);
 
       return GEOARROW_OK;
     } catch (std::exception &e) {
@@ -69,7 +65,7 @@ class InternalUDF : public ArrowUDF {
   std::vector<nanoarrow::UniqueSchema> arg_types_;
   std::unordered_map<std::string, std::string> options_;
 
-  virtual std::optional<nanoarrow::UniqueSchema> ReturnType() = 0;
+  virtual nanoarrow::UniqueSchema ReturnType() = 0;
 
   virtual nanoarrow::UniqueArray ExecuteImpl(
       const std::vector<nanoarrow::UniqueArray> &args) = 0;
@@ -80,20 +76,20 @@ class InternalUDF : public ArrowUDF {
 
 class S2Length : public InternalUDF {
  protected:
-  std::optional<nanoarrow::UniqueSchema> ReturnType() override {
+  nanoarrow::UniqueSchema ReturnType() override {
     if (arg_types_.size() != 1) {
       throw Exception("Expected one argument in S2Length");
     }
 
     auto geometry = ::geoarrow::GeometryDataType::Make(arg_types_[0].get());
     if (geometry.edge_type() != GEOARROW_EDGE_TYPE_SPHERICAL) {
-      return std::nullopt;
-    } else {
-      nanoarrow::UniqueSchema out;
-      NANOARROW_THROW_NOT_OK(
-          ArrowSchemaInitFromType(out.get(), NANOARROW_TYPE_DOUBLE));
-      return out;
+      throw Exception("Expected input with spherical edges");
     }
+
+    nanoarrow::UniqueSchema out;
+    NANOARROW_THROW_NOT_OK(
+        ArrowSchemaInitFromType(out.get(), NANOARROW_TYPE_DOUBLE));
+    return out;
   }
 
   nanoarrow::UniqueArray ExecuteImpl(
