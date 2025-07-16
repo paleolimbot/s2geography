@@ -151,13 +151,17 @@ class WkbGeographyOutputBuilder {
   using c_type = const Geography &;
   static constexpr enum ArrowType arrow_type = NANOARROW_TYPE_BINARY;
 
-  WkbGeographyOutputBuilder() {}
+  WkbGeographyOutputBuilder() {
+    writer.Init(geoarrow::Writer::OutputType::kWKB, geoarrow::ExportOptions());
+  }
 
   void Reserve(int64_t additional_size) {
     // The current geoarrow writer doesn't provide any support for this
   }
 
-  void AppendNull() { throw Exception("AppendNull() for geography output not implemented"); }
+  void AppendNull() {
+    throw Exception("AppendNull() for geography output not implemented");
+  }
 
   void Append(c_type value) { writer.WriteGeography(value); }
 
@@ -167,6 +171,86 @@ class WkbGeographyOutputBuilder {
   geoarrow::Writer writer;
 };
 
+template <typename c_type_t, enum ArrowType arrow_type_val>
+class ArrowInputView {
+ public:
+  using c_type = const Geography &;
+  static constexpr enum ArrowType arrow_type = NANOARROW_TYPE_BINARY;
+
+  ArrowInputView(const struct ArrowSchema *type) {
+    NANOARROW_THROW_NOT_OK(
+        ArrowArrayViewInitFromSchema(view_.get(), type, nullptr));
+    if (view_->storage_type != arrow_type) {
+      throw Exception("Expected storage type " +
+                      std::string(ArrowTypeString(arrow_type)) + " but got " +
+                      std::string(ArrowTypeString(view_->storage_type)));
+    }
+  }
+
+  void SetArray(const struct ArrowArray *array, int64_t num_rows) {
+    NANOARROW_THROW_NOT_OK(ArrowArrayViewSetArray(view_.get(), array, nullptr));
+
+    if (array->length == 0) {
+      throw Exception("Array input must not be empty");
+    }
+  }
+
+  bool IsNull(int64_t i) {
+    return ArrowArrayViewIsNull(view_.get(), i % view_->length);
+  }
+
+  c_type_t Get(int64_t i) {
+    if constexpr (std::is_integral_v<c_type>) {
+      return ArrowArrayViewGetIntUnsafe(view_.get(), i % view_->length);
+    } else if constexpr (std::is_floating_point_v<c_type>) {
+      return ArrowArrayViewGetDoubleUnsafe(view_.get(), i % view_->length);
+    } else {
+      static_assert(false, "value type not supported");
+    }
+  }
+
+ private:
+  nanoarrow::UniqueArrayView view_;
+};
+
+class GeographyInputView {
+ public:
+  using c_type = const Geography &;
+  static constexpr enum ArrowType arrow_type = NANOARROW_TYPE_BINARY;
+
+  GeographyInputView(const struct ArrowSchema *type)
+      : current_array_(nullptr), stashed_index_(-1) {
+    reader_.Init(type);
+  }
+
+  void SetArray(const struct ArrowArray *array, int64_t num_rows) {
+    current_array_ = array;
+    stashed_index_ = -1;
+  }
+
+  bool IsNull(int64_t i) {
+    StashIfNeeded(i % current_array_->length);
+    return stashed_[0].get() == nullptr;
+  }
+
+  const Geography &Get(int64_t i) {
+    StashIfNeeded(i % current_array_->length);
+    return *stashed_[0];
+  }
+
+ private:
+  geoarrow::Reader reader_;
+  const struct ArrowArray *current_array_;
+  int64_t stashed_index_;
+  std::vector<std::unique_ptr<Geography>> stashed_;
+
+  void StashIfNeeded(int64_t i) {
+    if (i != stashed_index_) {
+      stashed_.clear();
+      reader_.ReadGeography(current_array_, i, 1, &stashed_);
+    }
+  }
+};
 
 class S2Length : public InternalUDF {
  protected:
