@@ -114,12 +114,15 @@ template <typename c_type_t, enum ArrowType arrow_type_val>
 class ArrowOutputBuilder {
  public:
   using c_type = c_type_t;
-  static constexpr enum ArrowType arrow_type = arrow_type_val;
 
   ArrowOutputBuilder() {
     NANOARROW_THROW_NOT_OK(
         ArrowArrayInitFromType(array_.get(), arrow_type_val));
     NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(array_.get()));
+  }
+
+  void InitOutputType(struct ArrowSchema *out) {
+    NANOARROW_THROW_NOT_OK(ArrowSchemaInitFromType(out, arrow_type_val));
   }
 
   void Reserve(int64_t additional_size) {
@@ -165,10 +168,13 @@ using DoubleOutputBuilder = ArrowOutputBuilder<double, NANOARROW_TYPE_DOUBLE>;
 class WkbGeographyOutputBuilder {
  public:
   using c_type = const Geography &;
-  static constexpr enum ArrowType arrow_type = NANOARROW_TYPE_BINARY;
 
   WkbGeographyOutputBuilder() {
     writer_.Init(geoarrow::Writer::OutputType::kWKB, geoarrow::ExportOptions());
+  }
+
+  void InitOutputType(struct ArrowSchema *out) {
+    ::geoarrow::Wkb().InitSchema(out);
   }
 
   void Reserve(int64_t additional_size) {
@@ -347,8 +353,7 @@ class UnaryUDF : public InternalUDF {
     exec.Init(options_);
 
     nanoarrow::UniqueSchema out_type;
-    NANOARROW_THROW_NOT_OK(
-        ArrowSchemaInitFromType(out_type.get(), out_t::arrow_type));
+    out->InitOutputType(out_type.get());
     return out_type;
   }
 
@@ -410,8 +415,7 @@ class BinaryUDF : public InternalUDF {
     exec.Init(options_);
 
     nanoarrow::UniqueSchema out_type;
-    NANOARROW_THROW_NOT_OK(
-        ArrowSchemaInitFromType(out_type.get(), out_t::arrow_type));
+    out->InitOutputType(out_type.get());
     return out_type;
   }
 

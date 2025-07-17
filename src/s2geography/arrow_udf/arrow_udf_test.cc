@@ -56,21 +56,31 @@ nanoarrow::UniqueArray ArgWkb(const std::vector<std::string>& values) {
   return out;
 }
 
-template <typename c_type>
 nanoarrow::UniqueArray ArgArrow(enum ArrowType type,
-                                std::vector<std::optional<c_type>> values) {
+                                std::vector<std::optional<double>> values) {
   nanoarrow::UniqueArray array;
   NANOARROW_THROW_NOT_OK(ArrowArrayInitFromType(array.get(), type));
   NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(array.get()));
 
   for (const auto value : values) {
     if (value.has_value()) {
-      if constexpr (std::is_integral_v<c_type>) {
-        NANOARROW_THROW_NOT_OK(ArrowArrayAppendInt(array.get(), *value));
-      } else if constexpr (std::is_floating_point_v<c_type>) {
-        NANOARROW_THROW_NOT_OK(ArrowArrayAppendDouble(array.get(), *value));
-      } else {
-        static_assert(false, "type not supported");
+      switch (type) {
+        case NANOARROW_TYPE_BOOL: {
+          NANOARROW_THROW_NOT_OK(ArrowArrayAppendInt(array.get(), *value != 0));
+          break;
+        }
+        case NANOARROW_TYPE_INT32: {
+          NANOARROW_THROW_NOT_OK(
+              ArrowArrayAppendInt(array.get(), static_cast<int32_t>(*value)));
+          break;
+        }
+        case NANOARROW_TYPE_DOUBLE: {
+          NANOARROW_THROW_NOT_OK(ArrowArrayAppendDouble(array.get(), *value));
+          break;
+        }
+        default:
+          throw std::runtime_error(
+              "creating test data with type not supported");
       }
     } else {
       NANOARROW_THROW_NOT_OK(ArrowArrayAppendNull(array.get(), 1));
@@ -81,138 +91,171 @@ nanoarrow::UniqueArray ArgArrow(enum ArrowType type,
   return array;
 }
 
+void TestInitArrowUDF(s2geography::arrow_udf::ArrowUDF* udf,
+                      std::vector<std::optional<enum ArrowType>> arg_types,
+                      std::optional<enum ArrowType> result_type) {
+  auto arg_schema = ArgSchema(std::move(arg_types));
+  nanoarrow::UniqueSchema result_schema;
+  ASSERT_EQ(udf->Init(arg_schema.get(), "", result_schema.get()), NANOARROW_OK);
+
+  if (result_type) {
+    struct ArrowSchemaView out_type_view;
+    ASSERT_EQ(ArrowSchemaViewInit(&out_type_view, result_schema.get(), nullptr),
+              NANOARROW_OK);
+    ASSERT_EQ(out_type_view.type, result_type);
+  } else {
+    auto type = ::geoarrow::GeometryDataType::Make(result_schema.get());
+    ASSERT_EQ(type.id(), GEOARROW_TYPE_WKB);
+  }
+}
+
+void TestExecuteArrowUDF(
+    s2geography::arrow_udf::ArrowUDF* udf,
+    std::vector<std::optional<enum ArrowType>> arg_types,
+    std::optional<enum ArrowType> result_type,
+    std::vector<std::vector<std::string>> geometry_args,
+    std::vector<std::vector<std::optional<double>>> other_args,
+    struct ArrowArray* out) {
+  auto arg_type_it = arg_types.begin();
+  std::vector<nanoarrow::UniqueArray> args;
+
+  for (const auto& geometry_arg : geometry_args) {
+    ASSERT_NE(arg_type_it, arg_types.end());
+    auto arg_type = *arg_type_it++;
+    ASSERT_FALSE(arg_type.has_value());
+
+    args.push_back(ArgWkb(geometry_arg));
+  }
+
+  for (const auto& arg : other_args) {
+    ASSERT_NE(arg_type_it, arg_types.end());
+    auto arg_type = *arg_type_it++;
+    ASSERT_TRUE(arg_type.has_value());
+
+    args.push_back(ArgArrow(*arg_type, arg));
+  }
+
+  ASSERT_EQ(arg_type_it, arg_types.end());
+
+  std::vector<struct ArrowArray*> arg_pointers;
+  for (auto& arg : args) {
+    arg_pointers.push_back(arg.get());
+  }
+
+  ASSERT_EQ(udf->Execute(arg_pointers.data(),
+                         static_cast<int64_t>(arg_pointers.size()), out),
+            NANOARROW_OK);
+}
+
+void TestResultArrow(struct ArrowArray* result, enum ArrowType result_type,
+                     std::vector<std::optional<double>> expected) {
+  std::vector<std::optional<double>> actual;
+  nanoarrow::UniqueArrayView array_view;
+  ArrowArrayViewInitFromType(array_view.get(), result_type);
+  ASSERT_EQ(ArrowArrayViewSetArray(array_view.get(), result, nullptr),
+            NANOARROW_OK);
+
+  for (int64_t i = 0; i < array_view->length; i++) {
+    if (ArrowArrayViewIsNull(array_view.get(), i)) {
+      actual.push_back(std::nullopt);
+    } else if (result_type == NANOARROW_TYPE_BOOL) {
+      actual.push_back(
+          static_cast<double>(ArrowArrayViewGetIntUnsafe(array_view.get(), i)));
+    } else {
+      actual.push_back(ArrowArrayViewGetDoubleUnsafe(array_view.get(), i));
+    }
+  }
+
+  ASSERT_EQ(actual, expected);
+}
+
+void TestResultGeography(struct ArrowArray* result,
+                         std::vector<std::optional<std::string>> expected) {
+  ASSERT_EQ(result->length, expected.size());
+
+  s2geography::geoarrow::Reader reader;
+  reader.Init(s2geography::geoarrow::Reader::InputType::kWKB,
+              s2geography::geoarrow::ImportOptions());
+  std::vector<std::unique_ptr<s2geography::Geography>> geogs;
+  reader.ReadGeography(result, 0, result->length, &geogs);
+
+  for (int64_t i = 0; i < result->length; i++) {
+    SCOPED_TRACE("expected[" + std::to_string(i) + "]");
+    if (geogs[i].get() == nullptr) {
+      ASSERT_FALSE(expected[i].has_value());
+    } else {
+      ASSERT_TRUE(expected[i].has_value());
+      ASSERT_THAT(*geogs[i], WktEquals6(*expected[i]));
+    }
+  }
+}
+
 TEST(ArrowUdf, Length) {
-  auto arg_schema = ArgSchema({std::nullopt});
   auto udf = s2geography::arrow_udf::Length();
 
-  nanoarrow::UniqueSchema out_type;
-  ASSERT_EQ(udf->Init(arg_schema.get(), "", out_type.get()), NANOARROW_OK);
+  ASSERT_NO_FATAL_FAILURE(
+      TestInitArrowUDF(udf.get(), {std::nullopt}, NANOARROW_TYPE_DOUBLE));
 
-  nanoarrow::UniqueArrayView view;
-  ASSERT_EQ(ArrowArrayViewInitFromSchema(view.get(), out_type.get(), nullptr),
-            NANOARROW_OK);
-  ASSERT_EQ(view->storage_type, NANOARROW_TYPE_DOUBLE);
-
-  nanoarrow::UniqueArray in_array =
-      ArgWkb({"POINT (0 1)", "LINESTRING (0 0, 0 1)",
-              "POLYGON ((0 0, 0 1, 1 0, 0 0))", ""});
-  std::vector<struct ArrowArray*> args;
-  args.push_back(in_array.get());
   nanoarrow::UniqueArray out_array;
-  ASSERT_EQ(udf->Execute(args.data(), static_cast<int64_t>(args.size()),
-                         out_array.get()),
-            NANOARROW_OK);
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteArrowUDF(udf.get(), {std::nullopt}, NANOARROW_TYPE_DOUBLE,
+                          {{"POINT (0 1)", "LINESTRING (0 0, 0 1)",
+                            "POLYGON ((0 0, 0 1, 1 0, 0 0))", ""}},
+                          {}, out_array.get()));
 
-  ASSERT_EQ(ArrowArrayViewSetArray(view.get(), out_array.get(), nullptr),
-            NANOARROW_OK);
-  ASSERT_EQ(view->length, 4);
-  EXPECT_EQ(view->null_count, 1);
-  EXPECT_EQ(ArrowArrayViewGetDoubleUnsafe(view.get(), 0), 0.0);
-  EXPECT_DOUBLE_EQ(ArrowArrayViewGetDoubleUnsafe(view.get(), 1),
-                   111195.10117748393);
-  EXPECT_EQ(ArrowArrayViewGetDoubleUnsafe(view.get(), 2), 0.0);
-  EXPECT_TRUE(ArrowArrayViewIsNull(view.get(), 3));
+  ASSERT_NO_FATAL_FAILURE(
+      TestResultArrow(out_array.get(), NANOARROW_TYPE_DOUBLE,
+                      {0.0, 111195.10117748393, 0.0, std::nullopt}));
 }
 
 TEST(ArrowUdf, Centroid) {
-  auto arg_schema = ArgSchema({std::nullopt});
   auto udf = s2geography::arrow_udf::Centroid();
 
-  nanoarrow::UniqueSchema out_type;
-  ASSERT_EQ(udf->Init(arg_schema.get(), "", out_type.get()), NANOARROW_OK);
+  ASSERT_NO_FATAL_FAILURE(
+      TestInitArrowUDF(udf.get(), {std::nullopt}, std::nullopt));
 
-  struct ArrowSchemaView out_type_view;
-  ASSERT_EQ(ArrowSchemaViewInit(&out_type_view, out_type.get(), nullptr),
-            NANOARROW_OK);
-  ASSERT_EQ(out_type_view.type, NANOARROW_TYPE_BINARY);
-
-  s2geography::geoarrow::Reader reader;
-  reader.Init(s2geography::geoarrow::Reader::InputType::kWKB,
-              s2geography::geoarrow::ImportOptions());
-
-  nanoarrow::UniqueArray in_array =
-      ArgWkb({"POINT (0 1)", "LINESTRING (0 0, 0 1)",
-              "POLYGON ((0 0, 0 1, 1 0, 0 0))", ""});
-  std::vector<struct ArrowArray*> args;
-  args.push_back(in_array.get());
   nanoarrow::UniqueArray out_array;
-  ASSERT_EQ(udf->Execute(args.data(), static_cast<int64_t>(args.size()),
-                         out_array.get()),
-            NANOARROW_OK);
-  ASSERT_EQ(out_array->length, 4);
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteArrowUDF(udf.get(), {std::nullopt}, NANOARROW_TYPE_DOUBLE,
+                          {{"POINT (0 1)", "LINESTRING (0 0, 0 1)",
+                            "POLYGON ((0 0, 0 1, 1 0, 0 0))", ""}},
+                          {}, out_array.get()));
 
-  std::vector<std::unique_ptr<s2geography::Geography>> result;
-  reader.ReadGeography(out_array.get(), 0, out_array->length, &result);
-  ASSERT_EQ(result.size(), 4);
-  EXPECT_THAT(*result[0], WktEquals6("POINT (0 1)"));
-  EXPECT_THAT(*result[1], WktEquals6("POINT (0 0.5)"));
-  EXPECT_THAT(*result[2], WktEquals6("POINT (0.33335 0.333344)"));
-  EXPECT_EQ(result[3].get(), nullptr);
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(
+      out_array.get(), {"POINT (0 1)", "POINT (0 0.5)",
+                        "POINT (0.33335 0.333344)", std::nullopt}));
 }
 
 TEST(ArrowUdf, InterpolateNormalized) {
-  auto arg_schema = ArgSchema({std::nullopt, NANOARROW_TYPE_DOUBLE});
   auto udf = s2geography::arrow_udf::InterpolateNormalized();
 
-  nanoarrow::UniqueSchema out_type;
-  ASSERT_EQ(udf->Init(arg_schema.get(), "", out_type.get()), NANOARROW_OK);
+  ASSERT_NO_FATAL_FAILURE(TestInitArrowUDF(
+      udf.get(), {std::nullopt, NANOARROW_TYPE_DOUBLE}, std::nullopt));
 
-  struct ArrowSchemaView out_type_view;
-  ASSERT_EQ(ArrowSchemaViewInit(&out_type_view, out_type.get(), nullptr),
-            NANOARROW_OK);
-  ASSERT_EQ(out_type_view.type, NANOARROW_TYPE_BINARY);
-
-  s2geography::geoarrow::Reader reader;
-  reader.Init(s2geography::geoarrow::Reader::InputType::kWKB,
-              s2geography::geoarrow::ImportOptions());
-
-  nanoarrow::UniqueArray in_array0 = ArgWkb({"LINESTRING (0 0, 0 1)"});
-  nanoarrow::UniqueArray in_array1 =
-      ArgArrow<double>(NANOARROW_TYPE_DOUBLE, {0.0, 0.5, 1.0, std::nullopt});
-
-  std::vector<struct ArrowArray*> args = {in_array0.get(), in_array1.get()};
   nanoarrow::UniqueArray out_array;
-  ASSERT_EQ(udf->Execute(args.data(), static_cast<int64_t>(args.size()),
-                         out_array.get()),
-            NANOARROW_OK);
-  ASSERT_EQ(out_array->length, 4);
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteArrowUDF(udf.get(), {std::nullopt, NANOARROW_TYPE_DOUBLE},
+                          std::nullopt, {{"LINESTRING (0 0, 0 1)"}},
+                          {{0.0, 0.5, 1.0, std::nullopt}}, out_array.get()));
 
-  std::vector<std::unique_ptr<s2geography::Geography>> result;
-  reader.ReadGeography(out_array.get(), 0, out_array->length, &result);
-  ASSERT_EQ(result.size(), 4);
-  EXPECT_THAT(*result[0], WktEquals6("POINT (0 0)"));
-  EXPECT_THAT(*result[1], WktEquals6("POINT (0 0.5)"));
-  EXPECT_THAT(*result[2], WktEquals6("POINT (0 1)"));
-  EXPECT_EQ(result[3].get(), nullptr);
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(
+      out_array.get(),
+      {"POINT (0 0)", "POINT (0 0.5)", "POINT (0 1)", std::nullopt}));
 }
 
 TEST(ArrowUdf, Intersects) {
-  auto arg_schema = ArgSchema({std::nullopt, std::nullopt});
   auto udf = s2geography::arrow_udf::Intersects();
 
-  nanoarrow::UniqueSchema out_type;
-  ASSERT_EQ(udf->Init(arg_schema.get(), "", out_type.get()), NANOARROW_OK);
-
-  nanoarrow::UniqueArrayView view;
-  ASSERT_EQ(ArrowArrayViewInitFromSchema(view.get(), out_type.get(), nullptr),
-            NANOARROW_OK);
-  ASSERT_EQ(view->storage_type, NANOARROW_TYPE_BOOL);
-
-  nanoarrow::UniqueArray in_array0 = ArgWkb({"POLYGON ((0 0, 1 0, 0 1, 0 0))"});
-  nanoarrow::UniqueArray in_array1 =
-      ArgWkb({"POINT (0.25 0.25)", "POINT (-1 -1)", ""});
-  std::vector<struct ArrowArray*> args = {in_array0.get(), in_array1.get()};
+  ASSERT_NO_FATAL_FAILURE(TestInitArrowUDF(
+      udf.get(), {std::nullopt, std::nullopt}, NANOARROW_TYPE_BOOL));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_EQ(udf->Execute(args.data(), static_cast<int64_t>(args.size()),
-                         out_array.get()),
-            NANOARROW_OK);
+  ASSERT_NO_FATAL_FAILURE(TestExecuteArrowUDF(
+      udf.get(), {std::nullopt, std::nullopt}, NANOARROW_TYPE_BOOL,
+      {{"POLYGON ((0 0, 1 0, 0 1, 0 0))"},
+       {"POINT (0.25 0.25)", "POINT (-1 -1)", ""}},
+      {}, out_array.get()));
 
-  ASSERT_EQ(ArrowArrayViewSetArray(view.get(), out_array.get(), nullptr),
-            NANOARROW_OK);
-  ASSERT_EQ(view->length, 3);
-  EXPECT_EQ(view->null_count, 1);
-  EXPECT_EQ(ArrowArrayViewGetIntUnsafe(view.get(), 0), true);
-  EXPECT_EQ(ArrowArrayViewGetIntUnsafe(view.get(), 1), false);
-  EXPECT_TRUE(ArrowArrayViewIsNull(view.get(), 2));
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
+                                          {true, false, std::nullopt}));
 }
