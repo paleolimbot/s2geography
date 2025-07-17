@@ -109,7 +109,8 @@ void TestInitArrowUDF(s2geography::arrow_udf::ArrowUDF* udf,
                       ArrowTypeOrWKB result_type) {
   auto arg_schema = ArgSchema(std::move(arg_types));
   nanoarrow::UniqueSchema result_schema;
-  ASSERT_EQ(udf->Init(arg_schema.get(), "", result_schema.get()), NANOARROW_OK);
+  ASSERT_EQ(udf->Init(arg_schema.get(), nullptr, result_schema.get()),
+            NANOARROW_OK);
 
   if (result_type) {
     struct ArrowSchemaView out_type_view;

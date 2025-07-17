@@ -29,8 +29,20 @@ class InternalUDF : public ArrowUDF {
         return EINVAL;
       }
 
+      // Consume schemas
       for (int64_t i = 0; i < arg_schema->n_children; i++) {
         arg_types_.emplace_back(arg_schema->children[i]);
+      }
+
+      // Parse options
+      struct ArrowMetadataReader reader;
+      struct ArrowStringView k, v;
+      NANOARROW_THROW_NOT_OK(ArrowMetadataReaderInit(&reader, options));
+      while (reader.remaining_keys > 0) {
+        NANOARROW_THROW_NOT_OK(ArrowMetadataReaderRead(&reader, &k, &v));
+        options_.insert(
+            {std::string(k.data, static_cast<size_t>(k.size_bytes)),
+             std::string(v.data, static_cast<size_t>(k.size_bytes))});
       }
 
       auto return_type = ReturnType();
