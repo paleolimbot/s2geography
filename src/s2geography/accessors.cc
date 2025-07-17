@@ -218,7 +218,7 @@ bool s2_find_validation_error(const GeographyCollection& geog, S2Error* error) {
 
 bool s2_find_validation_error(const Geography& geog, S2Error* error) {
   if (geog.dimension() == 0) {
-    error->Clear();
+    *error = S2Error();
     return false;
   }
 
@@ -231,7 +231,7 @@ bool s2_find_validation_error(const Geography& geog, S2Error* error) {
         auto poly = s2_build_polyline(geog);
         return s2_find_validation_error(*poly, error);
       } catch (Exception& e) {
-        error->Init(S2Error::INTERNAL, "%s", e.what());
+        *error = ToS2Error(absl::Status(absl::StatusCode::kInternal, e.what()));
         return true;
       }
     }
@@ -246,7 +246,7 @@ bool s2_find_validation_error(const Geography& geog, S2Error* error) {
         auto poly = s2_build_polygon(geog);
         return s2_find_validation_error(*poly, error);
       } catch (Exception& e) {
-        error->Init(S2Error::INTERNAL, "%s", e.what());
+        *error = ToS2Error(absl::Status(absl::StatusCode::kInternal, e.what()));
         return true;
       }
     }
@@ -260,7 +260,7 @@ bool s2_find_validation_error(const Geography& geog, S2Error* error) {
       auto collection = s2_build_polygon(geog);
       return s2_find_validation_error(*collection, error);
     } catch (Exception& e) {
-      error->Init(S2Error::INTERNAL, "%s", e.what());
+      *error = ToS2Error(absl::Status(absl::StatusCode::kInternal, e.what()));
       return true;
     }
   }

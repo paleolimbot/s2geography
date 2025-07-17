@@ -292,7 +292,9 @@ class PolylineConstructor : public Constructor {
 
       if (options_.check() && !polyline->IsValid()) {
         polyline->FindValidationError(&error_);
-        throw Exception(error_.text());
+        std::stringstream ss;
+        ss << error_;
+        throw Exception(ss.str());
       }
 
       polylines_.push_back(std::move(polyline));
@@ -352,7 +354,7 @@ class PolygonConstructor : public Constructor {
       std::stringstream err;
       err << "Loop " << (loops_.size()) << " is not valid: ";
       loop->FindValidationError(&error_);
-      err << error_.text();
+      err << error_;
       throw Exception(err.str());
     }
 
@@ -374,7 +376,9 @@ class PolygonConstructor : public Constructor {
 
     if (options_.check() && !polygon->IsValid()) {
       polygon->FindValidationError(&error_);
-      throw Exception(error_.text());
+      std::stringstream ss;
+      ss << error_;
+      throw Exception(ss.str());
     }
 
     auto result = absl::make_unique<PolygonGeography>(std::move(polygon));
@@ -698,6 +702,12 @@ class WriterImpl {
   }
 
   void WriteGeography(const Geography& geog) { VisitFeature(geog); }
+
+  void WriteNull() {
+    ThrowNotOk(visitor_.feat_start(&visitor_));
+    ThrowNotOk(visitor_.null_feat(&visitor_));
+    ThrowNotOk(visitor_.feat_end(&visitor_));
+  }
 
   void Finish(struct ArrowArray* out) {
     int code = GeoArrowArrayWriterFinish(&writer_, out, &error_);
@@ -1028,6 +1038,8 @@ void Writer::Init(OutputType output_type, const ExportOptions& options) {
 void Writer::WriteGeography(const Geography& geog) {
   impl_->WriteGeography(geog);
 }
+
+void Writer::WriteNull() { impl_->WriteNull(); }
 
 void Writer::Finish(struct ArrowArray* out) { impl_->Finish(out); }
 

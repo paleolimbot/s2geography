@@ -345,7 +345,7 @@ TEST(GeoArrow, GeoArrowWriterPolygonTessellated) {
 
   EXPECT_EQ(array->length, 1);
   auto length_no_tesselation =
-      reinterpret_cast<const int32*>(array->buffers[1])[1];
+      reinterpret_cast<const int32_t*>(array->buffers[1])[1];
 
   // with tessellation -> more coordinates
   nanoarrow::UniqueArray array2;
@@ -359,7 +359,7 @@ TEST(GeoArrow, GeoArrowWriterPolygonTessellated) {
 
   EXPECT_EQ(array2->length, 1);
   auto length_with_tesselation =
-      reinterpret_cast<const int32*>(array2->buffers[1])[1];
+      reinterpret_cast<const int32_t*>(array2->buffers[1])[1];
 
   // dummy test to check that the WKT string length is larger with tessellation
   EXPECT_GT(length_with_tesselation, length_no_tesselation);

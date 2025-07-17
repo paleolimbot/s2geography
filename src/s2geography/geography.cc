@@ -15,6 +15,8 @@
 #include <s2/s2shape_index_region.h>
 #include <s2/s2shapeutil_coding.h>
 
+#include <sstream>
+
 #include "s2geography/macros.h"
 
 using namespace s2geography;
@@ -261,7 +263,7 @@ void PointGeography::EncodeTagged(Encoder* encoder,
   }
 
   int face;
-  uint32 si, ti;
+  uint32_t si, ti;
   int level = S2::XYZtoFaceSiTi(points_[0], &face, &si, &ti);
 
   // Only encode this for very high levels: because the covering *is* the
@@ -471,15 +473,27 @@ void EncodedShapeIndexGeography::Decode(Decoder* decoder,
   }
 
   tag.SkipCovering(decoder);
-  auto new_index = absl::make_unique<EncodedS2ShapeIndex>();
-  S2Error error;
+
+  // TaggedShapeFactory constructors are incompatible between 0.11 and 0.12
+#if defined(S2_VERSION_MAJOR) && \
+    (S2_VERSION_MAJOR == 0 && S2_VERSION_MINOR <= 11)
   shape_factory_ = absl::make_unique<s2shapeutil::TaggedShapeFactory>(
       s2shapeutil::LazyDecodeShape, decoder);
+#else
+  S2Error error;
+  shape_factory_ = absl::make_unique<s2shapeutil::TaggedShapeFactory>(
+      s2shapeutil::LazyDecodeShape, decoder, error);
+  if (!error.ok()) {
+    std::stringstream ss;
+    ss << "EncodedShapeIndexGeography decoding error: " << error;
+    throw Exception(ss.str());
+  }
+#endif
 
+  auto new_index = absl::make_unique<EncodedS2ShapeIndex>();
   bool success = new_index->Init(decoder, *shape_factory_);
-  if (!success || !error.ok()) {
-    throw Exception("EncodedShapeIndexGeography decoding error: " +
-                    error.text());
+  if (!success) {
+    throw Exception("EncodedShapeIndexGeography decoding error");
   }
 
   shape_index_ = std::move(new_index);
@@ -634,7 +648,7 @@ void EncodeTag::Validate() {
     throw Exception("EncodeTag: reserved byte must be zero");
   }
 
-  uint8 flags_validate = flags & ~kFlagEmpty;
+  uint8_t flags_validate = flags & ~kFlagEmpty;
   if (flags_validate != 0) {
     throw Exception("EncodeTag: Unknown flag(s)");
   }
