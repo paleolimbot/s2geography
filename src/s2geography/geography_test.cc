@@ -376,7 +376,8 @@ TEST(Geography, EncodeRoundtripInvalid) {
   EncodeOptions opt;
   ASSERT_NO_FATAL_FAILURE(
       TestEncodeWKTRoundtrip("LINESTRING (0 0, 0 0, 1 1)", opt));
-  ASSERT_NO_FATAL_FAILURE(TestEncodeWKTRoundtrip("POLYGON ((0 0, 0 0))", opt));
+  ASSERT_NO_FATAL_FAILURE(
+      TestEncodeWKTRoundtrip("POLYGON ((0 0, 1 1, 0 1, 1 0, 0 0))", opt));
 }
 
 }  // namespace s2geography
