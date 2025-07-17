@@ -15,6 +15,8 @@
 #include <s2/s2shape_index_region.h>
 #include <s2/s2shapeutil_coding.h>
 
+#include <sstream>
+
 #include "s2geography/macros.h"
 
 using namespace s2geography;
@@ -478,8 +480,9 @@ void EncodedShapeIndexGeography::Decode(Decoder* decoder,
 
   bool success = new_index->Init(decoder, *shape_factory_);
   if (!success || !error.ok()) {
-    throw Exception("EncodedShapeIndexGeography decoding error: " +
-                    error.text());
+    std::stringstream ss;
+    ss << "EncodedShapeIndexGeography decoding error: " << error;
+    throw Exception(ss.str());
   }
 
   shape_index_ = std::move(new_index);
@@ -634,7 +637,7 @@ void EncodeTag::Validate() {
     throw Exception("EncodeTag: reserved byte must be zero");
   }
 
-  uint8 flags_validate = flags & ~kFlagEmpty;
+  uint8_t flags_validate = flags & ~kFlagEmpty;
   if (flags_validate != 0) {
     throw Exception("EncodeTag: Unknown flag(s)");
   }

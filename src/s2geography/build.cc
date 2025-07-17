@@ -8,6 +8,8 @@
 #include <s2/s2builderutil_s2polygon_layer.h>
 #include <s2/s2builderutil_s2polyline_vector_layer.h>
 
+#include <sstream>
+
 #include "s2geography/accessors.h"
 #include "s2geography/geography.h"
 #include "s2geography/macros.h"
@@ -123,7 +125,9 @@ static std::unique_ptr<Geography> s2_boolean_operation(
   // do the boolean operation, build layers, and check for errors
   S2Error error;
   if (!op.Build(geog1, geog2, &error)) {
-    throw Exception(error.text());
+    std::stringstream ss;
+    ss << error;
+    throw Exception(ss.str());
   }
 
   // construct output
@@ -166,7 +170,9 @@ std::unique_ptr<PolygonGeography> s2_unary_union(const PolygonGeography& geog,
     builder.AddShape(S2Loop::Shape(geog.Polygon()->loop(i)));
     S2Error error;
     if (!builder.Build(&error)) {
-      throw Exception(error.text());
+      std::stringstream ss;
+      ss << error;
+      throw Exception(ss.str());
     }
 
     // Check if the builder created a polygon whose boundary contained more than
@@ -284,7 +290,9 @@ std::unique_ptr<Geography> s2_rebuild(
   // build the output
   S2Error error;
   if (!builder.Build(&error)) {
-    throw Exception(error.text());
+    std::stringstream ss;
+    ss << error;
+    throw Exception(ss.str());
   }
 
   // construct output
