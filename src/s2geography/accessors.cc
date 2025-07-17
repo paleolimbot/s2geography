@@ -231,7 +231,7 @@ bool s2_find_validation_error(const Geography& geog, S2Error* error) {
         auto poly = s2_build_polyline(geog);
         return s2_find_validation_error(*poly, error);
       } catch (Exception& e) {
-        *error = S2Error(S2Error::INTERNAL, "%s", e.what());
+        *error = ToS2Error(absl::Status(absl::StatusCode::kInternal, e.what()));
         return true;
       }
     }
@@ -246,7 +246,7 @@ bool s2_find_validation_error(const Geography& geog, S2Error* error) {
         auto poly = s2_build_polygon(geog);
         return s2_find_validation_error(*poly, error);
       } catch (Exception& e) {
-        *error = S2Error(S2Error::INTERNAL, "%s", e.what());
+        *error = ToS2Error(absl::Status(absl::StatusCode::kInternal, e.what()));
         return true;
       }
     }
