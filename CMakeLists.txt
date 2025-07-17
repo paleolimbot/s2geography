@@ -89,9 +89,16 @@ macro(find_s2 ARG)
   find_package(s2 CONFIG QUIET)
   if(${s2_FOUND})
     set(s2_NOALIAS_TARGET "s2::s2")
-    # FIXME: until s2geometry provides the version with its cmake configuration,
-    # let's hard-code the version as an hugly workaround
-    extract_s2_version("0.11.1")
+    # Extract version information from the found package
+    if(DEFINED s2_VERSION)
+      extract_s2_version("${s2_VERSION}")
+      message(STATUS "Found s2 version: ${s2_VERSION}")
+    else()
+      # Fallback if s2_VERSION isn't defined
+      extract_s2_version("0.11.1")
+      message(STATUS "Using fallback s2 version: 0.11.1")
+    endif()
+
     get_target_property(s2_INCLUDE_DIRS s2::s2 INTERFACE_INCLUDE_DIRECTORIES)
     message(
       STATUS
@@ -373,7 +380,7 @@ endif()
 
 if(S2GEOGRAPHY_BUILD_EXAMPLES)
   add_executable(example-simple examples/example-simple/example-simple.cc)
-  target_link_libraries(example-simple PUBLIC s2geography s2)
+  target_link_libraries(example-simple PUBLIC s2geography s2::s2)
 endif()
 
 # Install s2geography
