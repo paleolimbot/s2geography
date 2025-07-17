@@ -263,7 +263,7 @@ void PointGeography::EncodeTagged(Encoder* encoder,
   }
 
   int face;
-  uint32 si, ti;
+  uint32_t si, ti;
   int level = S2::XYZtoFaceSiTi(points_[0], &face, &si, &ti);
 
   // Only encode this for very high levels: because the covering *is* the
@@ -473,16 +473,27 @@ void EncodedShapeIndexGeography::Decode(Decoder* decoder,
   }
 
   tag.SkipCovering(decoder);
-  auto new_index = absl::make_unique<EncodedS2ShapeIndex>();
-  S2Error error;
+
+  // TaggedShapeFactory constructors are incompatible between 0.11 and 0.12
+#if defined(S2_VERSION_MAJOR) && \
+    (S2_VERSION_MAJOR == 0 && S2_VERSION_MINOR <= 11)
   shape_factory_ = absl::make_unique<s2shapeutil::TaggedShapeFactory>(
       s2shapeutil::LazyDecodeShape, decoder);
-
-  bool success = new_index->Init(decoder, *shape_factory_);
-  if (!success || !error.ok()) {
+#else
+  S2Error error;
+  shape_factory_ = absl::make_unique<s2shapeutil::TaggedShapeFactory>(
+      s2shapeutil::LazyDecodeShape, decoder, error);
+  if (!error.ok()) {
     std::stringstream ss;
     ss << "EncodedShapeIndexGeography decoding error: " << error;
     throw Exception(ss.str());
+  }
+#endif
+
+  auto new_index = absl::make_unique<EncodedS2ShapeIndex>();
+  bool success = new_index->Init(decoder, *shape_factory_);
+  if (!success) {
+    throw Exception("EncodedShapeIndexGeography decoding error");
   }
 
   shape_index_ = std::move(new_index);
