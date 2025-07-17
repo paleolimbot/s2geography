@@ -225,6 +225,7 @@ class GeographyInputView {
     if (i != stashed_index_) {
       stashed_.clear();
       reader_.ReadGeography(current_array_, i, 1, &stashed_);
+      stashed_index_ = i;
     }
   }
 };
@@ -259,6 +260,7 @@ class GeographyIndexInputView {
     if (i != stashed_index_) {
       const auto &geog = inner_.Get(i);
       stashed_ = ShapeIndexGeography(geog);
+      stashed_index_ = i;
     }
   }
 };
