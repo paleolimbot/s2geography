@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cerrno>
-#include <string_view>
 #include <unordered_map>
 
 #include "geoarrow/geoarrow.hpp"
@@ -13,9 +12,15 @@ namespace s2geography {
 
 namespace arrow_udf {
 
+/// \brief Friendlier UDF wrapper
+///
+/// The user-facing ArrowUDF is designed to be C-friendly; however, its
+/// signatures make it difficult to leverage C++ idoms to create an
+/// implementation. This abstract class provides a slightly nicer interface for
+/// implementors.
 class InternalUDF : public ArrowUDF {
  public:
-  int Init(struct ArrowSchema *arg_schema, std::string_view options,
+  int Init(struct ArrowSchema *arg_schema, const char *options,
            struct ArrowSchema *out) override {
     last_error_.clear();
     try {
@@ -60,11 +65,17 @@ class InternalUDF : public ArrowUDF {
   const char *GetLastError() override { return last_error_.c_str(); }
 
  protected:
+  /// \brief Argument types populated by this class before calling ReturnType()
   std::vector<nanoarrow::UniqueSchema> arg_types_;
+
+  /// \brief Parsed options if any were provided, populated by this class before
+  /// calling ReturnType().
   std::unordered_map<std::string, std::string> options_;
 
+  /// \brief Validate input and calculate a return type
   virtual nanoarrow::UniqueSchema ReturnType() = 0;
 
+  /// \brief Execute a single batch
   virtual nanoarrow::UniqueArray ExecuteImpl(
       const std::vector<nanoarrow::UniqueArray> &args) = 0;
 
@@ -72,17 +83,33 @@ class InternalUDF : public ArrowUDF {
   std::string last_error_;
 };
 
-// Combinations that appear
-// (geog) -> bool
-// (geog) -> int
-// (geog) -> double
-// (geog) -> geog
-// (geog, double) -> geog
-// (geog, geog) -> bool
-// (geog, geog) -> double
-// (geog, geog, double) -> bool
-// (geog, geog) -> geog
+/// \defgroup arrow_udf-utils Arrow UDF Utilities
+///
+/// To simplify implementations of a large number of functions, we
+/// define some templated abstractions to handle input and output.
+/// Each argument gets its own input view and every scalar UDF
+/// has one output builder.
+///
+/// Combinations that appear
+/// - (geog) -> bool
+/// - (geog) -> int
+/// - (geog) -> double
+/// - (geog) -> geog
+/// - (geog, double) -> geog
+/// - (geog, geog) -> bool
+/// - (geog, geog) -> double
+/// - (geog, geog, double) -> bool
+/// - (geog, geog) -> geog
+///
+/// @{
 
+/// \brief Generic output builder for Arrow output
+///
+/// This output builder handles non-nested Arrow output using the
+/// nanoarrow builder. This builder is not the fastest way to build this
+/// output but it is relatively flexible. It may be faster to build
+/// output include building a C++ vector and wrap that vector into
+/// an array at the very end.
 template <typename c_type_t, enum ArrowType arrow_type_val>
 class ArrowOutputBuilder {
  public:
@@ -127,6 +154,14 @@ using BoolOutputBuilder = ArrowOutputBuilder<bool, NANOARROW_TYPE_BOOL>;
 using IntOutputBuilder = ArrowOutputBuilder<int32_t, NANOARROW_TYPE_INT32>;
 using DoubleOutputBuilder = ArrowOutputBuilder<double, NANOARROW_TYPE_DOUBLE>;
 
+/// \brief Output builder for Geography as WKB
+///
+/// This builder handles output from functions that return geometry
+/// and exports the output as WKB. This is probably slow in many cases
+/// and could possibly be accelerated by returning the "encoded" form
+/// or by circumventing the GeoArrow writer entirely to build point output
+/// (other than the boolean operation, functions that return geographies
+/// mostly return points or line segments).
 class WkbGeographyOutputBuilder {
  public:
   using c_type = const Geography &;
@@ -150,6 +185,16 @@ class WkbGeographyOutputBuilder {
   geoarrow::Writer writer_;
 };
 
+/// \brief Generic view of Arrow input
+///
+/// This input viewer uses nanoarrow's ArrowArrayView to provide
+/// random access to array elements. This is not the fastest way to
+/// do this but does nicely handle multiple input types (e.g., any
+/// integral type when accepting an integer as an argument) and nulls.
+/// The functions we expose here are probably limited by the speed at
+/// which the geometry can be decoded rather than iteration over
+/// primitive arrays; however, we could attempt optimizing this if
+/// we expose cheaper functions in this way.
 template <typename c_type_t>
 class ArrowInputView {
  public:
@@ -190,6 +235,15 @@ using BoolInputView = ArrowInputView<bool>;
 using IntInputView = ArrowInputView<int64_t>;
 using DoubleInputView = ArrowInputView<double>;
 
+/// \brief View of geography input
+///
+/// This handles any GeoArrow array as input. The return type is a reference
+/// because the decoding is stashed for each element. This is essential for
+/// the scalar case, where a single element would otherwise be decoded
+/// thousands of time. This decoding is a particularly slow feature of
+/// s2geography and is probably the first place to look to accelerate...either
+/// by avoiding an abstract Geometry completely or by using the encoded form
+/// instead of WKB to avoid the simple features--s2 conversion overhead.
 class GeographyInputView {
  public:
   using c_type = const Geography &;
@@ -229,6 +283,12 @@ class GeographyInputView {
   }
 };
 
+/// \brief View of geometry index input
+///
+/// This is used for operations like the S2BooleanOperation that require
+/// a ShapeIndexGeometry as input. Like the GeographyInputView, we stash
+/// the decoded value to avoid decoding and indexing a scalar input more
+/// than once.
 class GeographyIndexInputView {
  public:
   using c_type = const ShapeIndexGeography &;
@@ -264,6 +324,13 @@ class GeographyIndexInputView {
   }
 };
 
+/// \brief ArrowUDF implementation for unary functions
+///
+/// This class is templated on an Exec, which provides type parameters
+/// denoting the input view class and output builder class. Exec::Init()
+/// is called to provide the implementation the options, and Exec() is
+/// called for each non-null scalar input. This implementation always
+/// propagates nulls from input to output.
 template <typename Exec>
 class UnaryUDF : public InternalUDF {
  protected:
@@ -271,8 +338,6 @@ class UnaryUDF : public InternalUDF {
   using out_t = typename Exec::out_t;
 
   nanoarrow::UniqueSchema ReturnType() override {
-    // May need to update this if we have a "unary" UDF that can
-    // accept an optional constant argument via the options
     if (arg_types_.size() != 1) {
       throw Exception("Expected one argument in unary s2geography UDF");
     }
@@ -297,6 +362,7 @@ class UnaryUDF : public InternalUDF {
 
     int64_t num_rows = args[0]->length;
     arg0->SetArray(args[0].get(), num_rows);
+    out->Reserve(num_rows);
 
     for (int i = 0; i < num_rows; i++) {
       if (arg0->IsNull(i)) {
@@ -319,6 +385,13 @@ class UnaryUDF : public InternalUDF {
   Exec exec;
 };
 
+/// \brief ArrowUDF implementation for binary functions
+///
+/// This class is templated on an Exec, which provides type parameters
+/// denoting the input view classes and output builder class. Exec::Init()
+/// is called to provide the implementation the options, and Exec() is
+/// called for each non-null scalar input. This implementation always
+/// propagates nulls from input to output.
 template <typename Exec>
 class BinaryUDF : public InternalUDF {
  protected:
@@ -327,8 +400,6 @@ class BinaryUDF : public InternalUDF {
   using out_t = typename Exec::out_t;
 
   nanoarrow::UniqueSchema ReturnType() override {
-    // May need to update this if we have a "binary" UDF that can
-    // accept an optional constant argument via the options
     if (arg_types_.size() != 2) {
       throw Exception("Expected one argument in unary s2geography UDF");
     }
@@ -362,6 +433,7 @@ class BinaryUDF : public InternalUDF {
 
     arg0->SetArray(args[0].get(), num_rows);
     arg1->SetArray(args[1].get(), num_rows);
+    out->Reserve(num_rows);
 
     for (int i = 0; i < num_rows; i++) {
       if (arg0->IsNull(i) || arg1->IsNull(i)) {
@@ -385,6 +457,8 @@ class BinaryUDF : public InternalUDF {
   std::unique_ptr<out_t> out;
   Exec exec;
 };
+
+/// @}
 
 }  // namespace arrow_udf
 

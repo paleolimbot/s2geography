@@ -18,6 +18,9 @@ namespace arrow_udf {
 /// access to methods if an instance is shared across threads. In general,
 /// constructing and initializing this structure should be sufficiently
 /// cheap that it shouldn't need to be shared in this way.
+///
+/// Implementations must not throw exceptions (i.e., must communicate
+/// error information via errno and GetLastError()).
 class ArrowUDF {
  public:
   virtual ~ArrowUDF() {}
@@ -41,7 +44,7 @@ class ArrowUDF {
   /// \brief Execute a single batch
   ///
   /// \param args Input arguments. Input must be length one (e.g., a scalar)
-  /// or the size of the batch. Implmentations must handle scalar or array
+  /// or the size of the batch. Implementations must handle scalar or array
   /// inputs.
   /// \param n_args The number of pointers in args
   /// \param out Will be populated with the result on success.
