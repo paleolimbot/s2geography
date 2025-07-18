@@ -63,12 +63,16 @@ class ArrowUDF {
 /// a double array as output. Note that unlike s2_length(), this
 /// function returns results in meters by default.
 std::unique_ptr<ArrowUDF> Length();
+std::unique_ptr<ArrowUDF> Area();
+std::unique_ptr<ArrowUDF> Perimeter();
 
 /// \brief Instantiate an ArrowUDF for the s2_centroid() function
 ///
 /// This ArrowUDF handles any GeoArrow array as input and produces
 /// a geoarrow.wkb array as output.
 std::unique_ptr<ArrowUDF> Centroid();
+std::unique_ptr<ArrowUDF> ConvexHull();
+std::unique_ptr<ArrowUDF> PointOnSurface();
 
 /// \brief Instantiate an ArrowUDF for the s2_interpolate_normalized() function
 ///
@@ -81,26 +85,16 @@ std::unique_ptr<ArrowUDF> InterpolateNormalized();
 /// This ArrowUDF handles any GeoArrow array as input and produces a boolean
 /// array as output.
 std::unique_ptr<ArrowUDF> Intersects();
-
-std::unique_ptr<ArrowUDF> ClosestPoint();
-std::unique_ptr<ArrowUDF> ShortestLine();
-std::unique_ptr<ArrowUDF> Difference();
-
-std::unique_ptr<ArrowUDF> SymmetricDifference();
-
-std::unique_ptr<ArrowUDF> Intersection();
-
-std::unique_ptr<ArrowUDF> Union();
-
-std::unique_ptr<ArrowUDF> Area();
-std::unique_ptr<ArrowUDF> Perimeter();
-std::unique_ptr<ArrowUDF> Centroid();
-std::unique_ptr<ArrowUDF> ClosestPoint();
-std::unique_ptr<ArrowUDF> ConvexHull();
-std::unique_ptr<ArrowUDF> PointOnSurface();
-std::unique_ptr<ArrowUDF> Intersects();
 std::unique_ptr<ArrowUDF> Contains();
 std::unique_ptr<ArrowUDF> Equals();
+
+std::unique_ptr<ArrowUDF> Difference();
+std::unique_ptr<ArrowUDF> SymmetricDifference();
+std::unique_ptr<ArrowUDF> Intersection();
+std::unique_ptr<ArrowUDF> Union();
+std::unique_ptr<ArrowUDF> ShortestLine();
+std::unique_ptr<ArrowUDF> ClosestPoint();
+
 std::unique_ptr<ArrowUDF> Distance();
 
 }  // namespace arrow_udf
