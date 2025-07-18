@@ -273,7 +273,6 @@ add_library(
   src/s2geography/wkb.cc
   src/s2geography/op/cell.cc
   src/s2geography/op/point.cc
-  src/s2geography/arrow_udf/arrow_udf.cc
   ${GEOARROW_SOURCES})
 
 if(NOT BUILD_SHARED_LIBS)

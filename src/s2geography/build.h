@@ -6,6 +6,7 @@
 #include <s2/s2builderutil_s2polyline_vector_layer.h>
 
 #include "s2geography/aggregator.h"
+#include "s2geography/arrow_udf/arrow_udf.h"
 #include "s2geography/geography.h"
 
 namespace s2geography {
@@ -101,5 +102,12 @@ class S2UnionAggregator : public Aggregator<std::unique_ptr<Geography>> {
   Node root_;
   std::vector<std::unique_ptr<Node>> other_;
 };
+
+namespace arrow_udf {
+std::unique_ptr<ArrowUDF> Difference();
+std::unique_ptr<ArrowUDF> SymmetricDifference();
+std::unique_ptr<ArrowUDF> Intersection();
+std::unique_ptr<ArrowUDF> Union();
+}  // namespace arrow_udf
 
 }  // namespace s2geography

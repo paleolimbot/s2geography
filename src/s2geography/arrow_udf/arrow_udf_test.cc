@@ -5,7 +5,7 @@
 
 #include "geoarrow/geoarrow.hpp"
 #include "nanoarrow/nanoarrow.hpp"
-#include "s2geography/geoarrow.h"
+#include "s2geography.h"
 #include "s2geography/s2geography_gtest_util.h"
 
 using s2geography::WktEquals6;

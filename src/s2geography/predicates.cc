@@ -6,6 +6,7 @@
 #include <s2/s2lax_loop_shape.h>
 
 #include "s2geography/accessors.h"
+#include "s2geography/arrow_udf/arrow_udf_internal.h"
 
 namespace s2geography {
 
@@ -79,5 +80,63 @@ bool s2_intersects_box(const ShapeIndexGeography& geog1,
 
   return S2BooleanOperation::Intersects(geog1.ShapeIndex(), index, options);
 }
+
+namespace arrow_udf {
+
+struct S2Intersects {
+  using arg0_t = GeographyIndexInputView;
+  using arg1_t = GeographyIndexInputView;
+  using out_t = BoolOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    return s2_intersects(value0, value1, options_);
+  }
+
+  S2BooleanOperation::Options options_;
+};
+
+std::unique_ptr<ArrowUDF> Intersects() {
+  return std::make_unique<BinaryUDF<S2Intersects>>();
+}
+
+struct S2Contains {
+  using arg0_t = GeographyIndexInputView;
+  using arg1_t = GeographyIndexInputView;
+  using out_t = BoolOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    return s2_contains(value0, value1, options_);
+  }
+
+  S2BooleanOperation::Options options_;
+};
+
+std::unique_ptr<ArrowUDF> Contains() {
+  return std::make_unique<BinaryUDF<S2Contains>>();
+}
+
+struct S2Equals {
+  using arg0_t = GeographyIndexInputView;
+  using arg1_t = GeographyIndexInputView;
+  using out_t = BoolOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    return s2_equals(value0, value1, options_);
+  }
+
+  S2BooleanOperation::Options options_;
+};
+
+std::unique_ptr<ArrowUDF> Equals() {
+  return std::make_unique<BinaryUDF<S2Equals>>();
+}
+
+}  // namespace arrow_udf
 
 }  // namespace s2geography
