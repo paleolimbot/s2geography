@@ -336,6 +336,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
 
   enable_testing()
 
+  add_executable(accessors_geog_test src/s2geography/accessors-geog_test.cc)
   add_executable(build_test src/s2geography/build_test.cc)
   add_executable(distance_test src/s2geography/distance_test.cc)
   add_executable(geoarrow_test src/s2geography/geoarrow_test.cc)
@@ -351,6 +352,8 @@ if(S2GEOGRAPHY_BUILD_TESTS)
     target_link_libraries(s2geography PUBLIC coverage_config)
   endif()
 
+  target_link_libraries(accessors_geog_test s2geography nanoarrow GTest::gtest_main
+                        GTest::gmock)
   target_link_libraries(build_test s2geography GTest::gtest_main GTest::gmock)
   target_link_libraries(distance_test s2geography GTest::gtest_main)
   target_link_libraries(geoarrow_test s2geography nanoarrow GTest::gtest_main
@@ -363,10 +366,12 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   target_link_libraries(arrow_udf_test s2geography nanoarrow GTest::gtest_main
                         GTest::gmock)
 
+  target_include_directories(accessors_geog_test PRIVATE src/vendored)
   target_include_directories(geoarrow_test PRIVATE src/vendored)
   target_include_directories(arrow_udf_test PRIVATE src/vendored)
 
   include(GoogleTest)
+  gtest_discover_tests(accessors_geog_test)
   gtest_discover_tests(build_test)
   gtest_discover_tests(distance_test)
   gtest_discover_tests(geoarrow_test)
