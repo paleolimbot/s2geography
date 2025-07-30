@@ -67,3 +67,19 @@ TEST(Distance, ArrowUdfShortestLine) {
       out_array.get(),
       {"LINESTRING (0 0, 0 1)", "LINESTRING (0 0, 0 0)", std::nullopt}));
 }
+
+TEST(Distance, ArrowUdfClosestPoint) {
+  auto udf = s2geography::arrow_udf::ClosestPoint();
+
+  ASSERT_NO_FATAL_FAILURE(TestInitArrowUDF(
+      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteArrowUDF(
+      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB,
+      {{"POINT (0 1)", "LINESTRING (0 0, 0 1)", std::nullopt}, {"POINT (0 0)"}},
+      {}, out_array.get()));
+
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(
+      out_array.get(), {"POINT (0 1)", "POINT (0 0)", std::nullopt}));
+}
