@@ -19,7 +19,7 @@ TEST(Predicates, ArrowUdfIntersects) {
       {}, out_array.get()));
 
   ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
-                                          {true, false, ARROW_TYPE_WKB}));
+                                          {true, false, std::nullopt}));
 }
 
 TEST(Predicates, ArrowUdfEquals) {
@@ -37,7 +37,7 @@ TEST(Predicates, ArrowUdfEquals) {
       {}, out_array.get()));
 
   ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
-                                          {true, false, ARROW_TYPE_WKB}));
+                                          {true, false, std::nullopt}));
 }
 
 TEST(Predicates, ArrowUdfContains) {
@@ -54,5 +54,5 @@ TEST(Predicates, ArrowUdfContains) {
       {}, out_array.get()));
 
   ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
-                                          {true, false, ARROW_TYPE_WKB}));
+                                          {true, false, std::nullopt}));
 }

@@ -295,7 +295,7 @@ struct S2AreaExec {
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value) {
-    return s2_area(value) * S2Earth::RadiusMeters();
+    return s2_area(value) * S2Earth::RadiusMeters() * S2Earth::RadiusMeters();
   }
 };
 

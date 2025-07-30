@@ -111,7 +111,7 @@ struct S2ShortestLineExec {
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
-  out_t::c_type Exec(arg0_t::c_type value0, arg0_t::c_type value1) {
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
     std::pair<S2Point, S2Point> out =
         s2_minimum_clearance_line_between(value0, value1);
     stashed_ = PolylineGeography(std::make_unique<S2Polyline>(

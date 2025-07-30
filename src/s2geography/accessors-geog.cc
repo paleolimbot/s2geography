@@ -228,7 +228,7 @@ struct S2ClosestPointExec {
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
-  out_t::c_type Exec(arg0_t::c_type value0, arg0_t::c_type value1) {
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
     S2Point out = s2_closest_point(value0, value1);
     stashed_ = PointGeography(out);
     return stashed_;
