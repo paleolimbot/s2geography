@@ -76,7 +76,7 @@ S2Point s2_interpolate_normalized(const Geography& geog, double distance_norm) {
 
 namespace arrow_udf {
 
-struct S2InterpolateNormalizedExec {
+struct S2LineInterpolatePointExec {
   using arg0_t = GeographyInputView;
   using arg1_t = DoubleInputView;
   using out_t = WkbGeographyOutputBuilder;
@@ -91,9 +91,26 @@ struct S2InterpolateNormalizedExec {
   PointGeography stashed_;
 };
 
-std::unique_ptr<ArrowUDF> InterpolateNormalized() {
-  return std::make_unique<BinaryUDF<S2InterpolateNormalizedExec>>();
+std::unique_ptr<ArrowUDF> LineInterpolatePoint() {
+  return std::make_unique<BinaryUDF<S2LineInterpolatePointExec>>();
 }
+
+struct S2LineLocatePointExec {
+  using arg0_t = GeographyInputView;
+  using arg1_t = GeographyInputView;
+  using out_t = DoubleOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    return s2_project_normalized(value0, value1);
+  }
+};
+
+std::unique_ptr<ArrowUDF> LineLocatePoint() {
+  return std::make_unique<BinaryUDF<S2LineLocatePointExec>>();
+}
+
 }  // namespace arrow_udf
 
 }  // namespace s2geography

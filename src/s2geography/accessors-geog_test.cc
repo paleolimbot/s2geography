@@ -43,7 +43,7 @@ TEST(ArrowUdf, Centroid) {
 }
 
 TEST(ArrowUdf, InterpolateNormalized) {
-  auto udf = s2geography::arrow_udf::InterpolateNormalized();
+  auto udf = s2geography::arrow_udf::LineInterpolatePoint();
 
   ASSERT_NO_FATAL_FAILURE(TestInitArrowUDF(
       udf.get(), {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
