@@ -211,8 +211,9 @@ inline void TestResultGeography(
   ASSERT_EQ(result->length, expected.size());
 
   s2geography::geoarrow::Reader reader;
-  reader.Init(s2geography::geoarrow::Reader::InputType::kWKB,
-              s2geography::geoarrow::ImportOptions());
+  s2geography::geoarrow::ImportOptions options;
+  options.set_check(false);
+  reader.Init(s2geography::geoarrow::Reader::InputType::kWKB, options);
   std::vector<std::unique_ptr<s2geography::Geography>> geogs;
   reader.ReadGeography(result, 0, result->length, &geogs);
 

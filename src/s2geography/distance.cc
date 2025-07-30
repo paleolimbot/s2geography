@@ -2,6 +2,7 @@
 #include "s2geography/distance.h"
 
 #include <s2/s2closest_edge_query.h>
+#include <s2/s2debug.h>
 #include <s2/s2earth.h>
 #include <s2/s2furthest_edge_query.h>
 
@@ -114,7 +115,7 @@ struct S2ShortestLineExec {
     std::pair<S2Point, S2Point> out =
         s2_minimum_clearance_line_between(value0, value1);
     stashed_ = PolylineGeography(std::make_unique<S2Polyline>(
-        std::vector<S2Point>{out.first, out.second}));
+        std::vector<S2Point>{out.first, out.second}, S2Debug::DISABLE));
     return stashed_;
   }
 
