@@ -184,7 +184,23 @@ inline void TestResultArrow(struct ArrowArray* result,
     }
   }
 
-  ASSERT_EQ(actual, expected);
+  if (actual == expected) {
+    return;
+  }
+
+  if (actual.size() != expected.size()) {
+    ASSERT_EQ(actual, expected);
+  }
+
+  for (size_t i = 0; i < actual.size(); i++) {
+    if (actual[i].has_value() && expected[i].has_value()) {
+      ASSERT_DOUBLE_EQ(*actual[i], *expected[i]) << " Element " << i;
+    } else if (!actual[i].has_value() && !expected[i].has_value()) {
+      continue;
+    } else {
+      ASSERT_EQ(actual, expected);
+    }
+  }
 }
 
 // Check a geography result. This rounds the WKT output to 6 decimal places

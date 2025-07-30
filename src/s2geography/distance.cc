@@ -2,6 +2,7 @@
 #include "s2geography/distance.h"
 
 #include <s2/s2closest_edge_query.h>
+#include <s2/s2earth.h>
 #include <s2/s2furthest_edge_query.h>
 
 #include "s2geography/arrow_udf/arrow_udf_internal.h"
@@ -78,7 +79,7 @@ struct S2DistanceExec {
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    return s2_distance(value0, value1);
+    return s2_distance(value0, value1) * S2Earth::RadiusMeters();
   }
 };
 
