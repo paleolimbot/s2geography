@@ -342,6 +342,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   add_executable(geoarrow_test src/s2geography/geoarrow_test.cc)
   add_executable(geography_test src/s2geography/geography_test.cc)
   add_executable(op_cell_test src/s2geography/op/cell_test.cc)
+  add_executable(predicates_test src/s2geography/predicates_test.cc)
   add_executable(wkt_writer_test src/s2geography/wkt-writer_test.cc)
   add_executable(wkb_test src/s2geography/wkb_test.cc)
   add_executable(arrow_udf_test src/s2geography/arrow_udf/arrow_udf_test.cc)
@@ -352,8 +353,8 @@ if(S2GEOGRAPHY_BUILD_TESTS)
     target_link_libraries(s2geography PUBLIC coverage_config)
   endif()
 
-  target_link_libraries(accessors_geog_test s2geography nanoarrow GTest::gtest_main
-                        GTest::gmock)
+  target_link_libraries(accessors_geog_test s2geography nanoarrow
+                        GTest::gtest_main GTest::gmock)
   target_link_libraries(build_test s2geography GTest::gtest_main GTest::gmock)
   target_link_libraries(distance_test s2geography GTest::gtest_main)
   target_link_libraries(geoarrow_test s2geography nanoarrow GTest::gtest_main
@@ -361,6 +362,8 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   target_link_libraries(geography_test s2geography nanoarrow GTest::gtest_main
                         GTest::gmock)
   target_link_libraries(op_cell_test s2geography GTest::gtest_main)
+  target_link_libraries(predicates_test s2geography nanoarrow GTest::gtest_main
+                        GTest::gmock)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
   target_link_libraries(wkb_test s2geography GTest::gtest_main)
   target_link_libraries(arrow_udf_test s2geography nanoarrow GTest::gtest_main
@@ -368,6 +371,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
 
   target_include_directories(accessors_geog_test PRIVATE src/vendored)
   target_include_directories(geoarrow_test PRIVATE src/vendored)
+  target_include_directories(predicates_test PRIVATE src/vendored)
   target_include_directories(arrow_udf_test PRIVATE src/vendored)
 
   include(GoogleTest)
@@ -376,6 +380,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   gtest_discover_tests(distance_test)
   gtest_discover_tests(geoarrow_test)
   gtest_discover_tests(op_cell_test)
+  gtest_discover_tests(predicates_test)
   gtest_discover_tests(geography_test)
   gtest_discover_tests(wkt_writer_test)
   gtest_discover_tests(wkb_test)

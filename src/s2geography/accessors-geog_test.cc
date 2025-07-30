@@ -1,8 +1,9 @@
+#include "s2geography/accessors-geog.h"
+
 #include <gtest/gtest.h>
 
 #include "geoarrow/geoarrow.hpp"
 #include "nanoarrow/nanoarrow.hpp"
-#include "s2geography.h"
 #include "s2geography/arrow_udf/arrow_udf_test_internal.h"
 
 TEST(ArrowUdf, Length) {
