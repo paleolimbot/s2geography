@@ -456,7 +456,7 @@ std::unique_ptr<ArrowUDF> Difference() {
       BooleanOperationExec<S2BooleanOperation::OpType::DIFFERENCE>>>();
 }
 
-std::unique_ptr<ArrowUDF> SymmetricDifference() {
+std::unique_ptr<ArrowUDF> SymDifference() {
   return std::make_unique<BinaryUDF<BooleanOperationExec<
       S2BooleanOperation::OpType::SYMMETRIC_DIFFERENCE>>>();
 }

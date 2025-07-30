@@ -105,7 +105,7 @@ class S2UnionAggregator : public Aggregator<std::unique_ptr<Geography>> {
 
 namespace arrow_udf {
 std::unique_ptr<ArrowUDF> Difference();
-std::unique_ptr<ArrowUDF> SymmetricDifference();
+std::unique_ptr<ArrowUDF> SymDifference();
 std::unique_ptr<ArrowUDF> Intersection();
 std::unique_ptr<ArrowUDF> Union();
 }  // namespace arrow_udf

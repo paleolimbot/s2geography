@@ -356,7 +356,8 @@ if(S2GEOGRAPHY_BUILD_TESTS)
 
   target_link_libraries(accessors_geog_test s2geography nanoarrow
                         GTest::gtest_main GTest::gmock)
-  target_link_libraries(build_test s2geography GTest::gtest_main GTest::gmock)
+  target_link_libraries(build_test s2geography nanoarrow GTest::gtest_main
+                        GTest::gmock)
   target_link_libraries(distance_test s2geography nanoarrow GTest::gtest_main
                         GTest::gmock)
   target_link_libraries(geoarrow_test s2geography nanoarrow GTest::gtest_main
@@ -372,6 +373,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   target_link_libraries(wkb_test s2geography GTest::gtest_main)
 
   target_include_directories(accessors_geog_test PRIVATE src/vendored)
+  target_include_directories(build_test PRIVATE src/vendored)
   target_include_directories(distance_test PRIVATE src/vendored)
   target_include_directories(geoarrow_test PRIVATE src/vendored)
   target_include_directories(linear_referencing_test PRIVATE src/vendored)
