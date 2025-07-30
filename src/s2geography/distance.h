@@ -17,6 +17,7 @@ std::pair<S2Point, S2Point> s2_minimum_clearance_line_between(
 
 namespace arrow_udf {
 std::unique_ptr<ArrowUDF> Distance();
+std::unique_ptr<ArrowUDF> MaxDistance();
 std::unique_ptr<ArrowUDF> ShortestLine();
 std::unique_ptr<ArrowUDF> ClosestPoint();
 }  // namespace arrow_udf
