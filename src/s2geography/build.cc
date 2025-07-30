@@ -11,6 +11,7 @@
 #include <sstream>
 
 #include "s2geography/accessors.h"
+#include "s2geography/arrow_udf/arrow_udf_internal.h"
 #include "s2geography/geography.h"
 #include "s2geography/macros.h"
 
@@ -430,5 +431,46 @@ std::unique_ptr<Geography> S2UnionAggregator::Finalize() {
     return root_.Merge(options_);
   }
 }
+
+namespace arrow_udf {
+
+template <S2BooleanOperation::OpType op_type>
+struct BooleanOperationExec {
+  using arg0_t = GeographyIndexInputView;
+  using arg1_t = GeographyIndexInputView;
+  using out_t = WkbGeographyOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    stashed_ = s2_boolean_operation(value0, value1, op_type, options_);
+    return *stashed_;
+  }
+
+  std::unique_ptr<Geography> stashed_;
+  GlobalOptions options_;
+};
+
+std::unique_ptr<ArrowUDF> Difference() {
+  return std::make_unique<BinaryUDF<
+      BooleanOperationExec<S2BooleanOperation::OpType::DIFFERENCE>>>();
+}
+
+std::unique_ptr<ArrowUDF> SymDifference() {
+  return std::make_unique<BinaryUDF<BooleanOperationExec<
+      S2BooleanOperation::OpType::SYMMETRIC_DIFFERENCE>>>();
+}
+
+std::unique_ptr<ArrowUDF> Intersection() {
+  return std::make_unique<BinaryUDF<
+      BooleanOperationExec<S2BooleanOperation::OpType::INTERSECTION>>>();
+}
+
+std::unique_ptr<ArrowUDF> Union() {
+  return std::make_unique<
+      BinaryUDF<BooleanOperationExec<S2BooleanOperation::OpType::UNION>>>();
+}
+
+}  // namespace arrow_udf
 
 }  // namespace s2geography

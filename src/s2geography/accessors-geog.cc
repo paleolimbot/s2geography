@@ -4,6 +4,7 @@
 #include <s2/s2centroids.h>
 
 #include "s2geography/accessors.h"
+#include "s2geography/arrow_udf/arrow_udf_internal.h"
 #include "s2geography/build.h"
 #include "s2geography/geography.h"
 
@@ -198,5 +199,85 @@ std::unique_ptr<PolygonGeography> S2ConvexHullAggregator::Finalize() {
   polygon->Init(query_.GetConvexHull());
   return absl::make_unique<PolygonGeography>(std::move(polygon));
 }
+
+namespace arrow_udf {
+
+struct S2CentroidExec {
+  using arg0_t = GeographyInputView;
+  using out_t = WkbGeographyOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value) {
+    S2Point out = s2_centroid(value);
+    stashed_ = PointGeography(out);
+    return stashed_;
+  }
+
+  PointGeography stashed_;
+};
+
+std::unique_ptr<ArrowUDF> Centroid() {
+  return std::make_unique<UnaryUDF<S2CentroidExec>>();
+}
+
+struct S2ClosestPointExec {
+  using arg0_t = GeographyIndexInputView;
+  using arg1_t = GeographyIndexInputView;
+  using out_t = WkbGeographyOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    S2Point out = s2_closest_point(value0, value1);
+    stashed_ = PointGeography(out);
+    return stashed_;
+  }
+
+  PointGeography stashed_;
+};
+
+std::unique_ptr<ArrowUDF> ClosestPoint() {
+  return std::make_unique<BinaryUDF<S2ClosestPointExec>>();
+}
+
+struct S2ConvexHullExec {
+  using arg0_t = GeographyInputView;
+  using out_t = WkbGeographyOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value) {
+    stashed_ = s2_convex_hull(value);
+    return *stashed_;
+  }
+
+  std::unique_ptr<Geography> stashed_;
+};
+
+std::unique_ptr<ArrowUDF> ConvexHull() {
+  return std::make_unique<UnaryUDF<S2ConvexHullExec>>();
+}
+
+struct S2PointOnSurfaceExec {
+  using arg0_t = GeographyInputView;
+  using out_t = WkbGeographyOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value) {
+    S2Point out = s2_point_on_surface(value, coverer_);
+    stashed_ = PointGeography(out);
+    return stashed_;
+  }
+
+  PointGeography stashed_;
+  S2RegionCoverer coverer_;
+};
+
+std::unique_ptr<ArrowUDF> PointOnSurface() {
+  return std::make_unique<UnaryUDF<S2PointOnSurfaceExec>>();
+}
+}  // namespace arrow_udf
 
 }  // namespace s2geography

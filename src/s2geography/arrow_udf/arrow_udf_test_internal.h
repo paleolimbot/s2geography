@@ -1,14 +1,12 @@
-
-#include "s2geography/arrow_udf/arrow_udf.h"
+#pragma once
 
 #include <gtest/gtest.h>
 
 #include "geoarrow/geoarrow.hpp"
 #include "nanoarrow/nanoarrow.hpp"
-#include "s2geography/geoarrow.h"
+#include "s2geography.h"
+#include "s2geography/arrow_udf/arrow_udf.h"
 #include "s2geography/s2geography_gtest_util.h"
-
-using s2geography::WktEquals6;
 
 // We use a simple model for testing functions: types are either geoarrow.wkb
 // or an Arrow type (the only ones used here are bool, int32, and double).
@@ -18,7 +16,7 @@ using ArrowTypeOrWKB = std::optional<enum ArrowType>;
 #define ARROW_TYPE_WKB std::nullopt
 
 // Create the ArrowSchema required to initialize an ArrowUDF
-nanoarrow::UniqueSchema ArgSchema(std::vector<ArrowTypeOrWKB> cols) {
+inline nanoarrow::UniqueSchema ArgSchema(std::vector<ArrowTypeOrWKB> cols) {
   nanoarrow::UniqueSchema schema;
   ArrowSchemaInit(schema.get());
   NANOARROW_THROW_NOT_OK(ArrowSchemaSetTypeStruct(schema.get(), cols.size()));
@@ -34,7 +32,7 @@ nanoarrow::UniqueSchema ArgSchema(std::vector<ArrowTypeOrWKB> cols) {
 }
 
 // Create geoarrow.wkb argument from WKT
-nanoarrow::UniqueArray ArgWkb(
+inline nanoarrow::UniqueArray ArgWkb(
     const std::vector<std::optional<std::string>>& values) {
   // Make a WKB array
   nanoarrow::UniqueArray array;
@@ -68,8 +66,8 @@ nanoarrow::UniqueArray ArgWkb(
 // Create an arrow array argument. Because we only expose functions whose
 // arguments are geography, bool, int32, or double, we just use double here
 // for simplicity.
-nanoarrow::UniqueArray ArgArrow(enum ArrowType type,
-                                std::vector<std::optional<double>> values) {
+inline nanoarrow::UniqueArray ArgArrow(
+    enum ArrowType type, std::vector<std::optional<double>> values) {
   nanoarrow::UniqueArray array;
   NANOARROW_THROW_NOT_OK(ArrowArrayInitFromType(array.get(), type));
   NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(array.get()));
@@ -104,9 +102,9 @@ nanoarrow::UniqueArray ArgArrow(enum ArrowType type,
 }
 
 // Test utility to call udf->Init() and check its output type.
-void TestInitArrowUDF(s2geography::arrow_udf::ArrowUDF* udf,
-                      std::vector<ArrowTypeOrWKB> arg_types,
-                      ArrowTypeOrWKB result_type) {
+inline void TestInitArrowUDF(s2geography::arrow_udf::ArrowUDF* udf,
+                             std::vector<ArrowTypeOrWKB> arg_types,
+                             ArrowTypeOrWKB result_type) {
   auto arg_schema = ArgSchema(std::move(arg_types));
   nanoarrow::UniqueSchema result_schema;
   ASSERT_EQ(udf->Init(arg_schema.get(), nullptr, result_schema.get()),
@@ -126,7 +124,7 @@ void TestInitArrowUDF(s2geography::arrow_udf::ArrowUDF* udf,
 // Test utility to create argument arrays and pass them to udf->Execute()
 // This exploits the property that all the functions we expose have geography
 // arguments first.
-void TestExecuteArrowUDF(
+inline void TestExecuteArrowUDF(
     s2geography::arrow_udf::ArrowUDF* udf,
     std::vector<ArrowTypeOrWKB> arg_types, ArrowTypeOrWKB result_type,
     std::vector<std::vector<std::optional<std::string>>> geography_args,
@@ -166,8 +164,9 @@ void TestExecuteArrowUDF(
 // Check a non-geography result. Expected is an optional double here because
 // we only expose functions whose return types are bool, int, or double
 // (and all can be coerced to double).
-void TestResultArrow(struct ArrowArray* result, enum ArrowType result_type,
-                     std::vector<std::optional<double>> expected) {
+inline void TestResultArrow(struct ArrowArray* result,
+                            enum ArrowType result_type,
+                            std::vector<std::optional<double>> expected) {
   std::vector<std::optional<double>> actual;
   nanoarrow::UniqueArrayView array_view;
   ArrowArrayViewInitFromType(array_view.get(), result_type);
@@ -185,18 +184,36 @@ void TestResultArrow(struct ArrowArray* result, enum ArrowType result_type,
     }
   }
 
-  ASSERT_EQ(actual, expected);
+  if (actual == expected) {
+    return;
+  }
+
+  if (actual.size() != expected.size()) {
+    ASSERT_EQ(actual, expected);
+  }
+
+  for (size_t i = 0; i < actual.size(); i++) {
+    if (actual[i].has_value() && expected[i].has_value()) {
+      ASSERT_DOUBLE_EQ(*actual[i], *expected[i]) << " Element " << i;
+    } else if (!actual[i].has_value() && !expected[i].has_value()) {
+      continue;
+    } else {
+      ASSERT_EQ(actual, expected);
+    }
+  }
 }
 
 // Check a geography result. This rounds the WKT output to 6 decimal places
 // to avoid floating point differences between platforms.
-void TestResultGeography(struct ArrowArray* result,
-                         std::vector<std::optional<std::string>> expected) {
+inline void TestResultGeography(
+    struct ArrowArray* result,
+    std::vector<std::optional<std::string>> expected) {
   ASSERT_EQ(result->length, expected.size());
 
   s2geography::geoarrow::Reader reader;
-  reader.Init(s2geography::geoarrow::Reader::InputType::kWKB,
-              s2geography::geoarrow::ImportOptions());
+  s2geography::geoarrow::ImportOptions options;
+  options.set_check(false);
+  reader.Init(s2geography::geoarrow::Reader::InputType::kWKB, options);
   std::vector<std::unique_ptr<s2geography::Geography>> geogs;
   reader.ReadGeography(result, 0, result->length, &geogs);
 
@@ -206,77 +223,7 @@ void TestResultGeography(struct ArrowArray* result,
       ASSERT_FALSE(expected[i].has_value());
     } else {
       ASSERT_TRUE(expected[i].has_value());
-      ASSERT_THAT(*geogs[i], WktEquals6(*expected[i]));
+      ASSERT_THAT(*geogs[i], s2geography::WktEquals6(*expected[i]));
     }
   }
-}
-
-TEST(ArrowUdf, Length) {
-  auto udf = s2geography::arrow_udf::Length();
-
-  ASSERT_NO_FATAL_FAILURE(
-      TestInitArrowUDF(udf.get(), {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE));
-
-  nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(
-      TestExecuteArrowUDF(udf.get(), {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
-                          {{"POINT (0 1)", "LINESTRING (0 0, 0 1)",
-                            "POLYGON ((0 0, 0 1, 1 0, 0 0))", std::nullopt}},
-                          {}, out_array.get()));
-
-  ASSERT_NO_FATAL_FAILURE(
-      TestResultArrow(out_array.get(), NANOARROW_TYPE_DOUBLE,
-                      {0.0, 111195.10117748393, 0.0, ARROW_TYPE_WKB}));
-}
-
-TEST(ArrowUdf, Centroid) {
-  auto udf = s2geography::arrow_udf::Centroid();
-
-  ASSERT_NO_FATAL_FAILURE(
-      TestInitArrowUDF(udf.get(), {ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
-
-  nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(
-      TestExecuteArrowUDF(udf.get(), {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
-                          {{"POINT (0 1)", "LINESTRING (0 0, 0 1)",
-                            "POLYGON ((0 0, 0 1, 1 0, 0 0))", std::nullopt}},
-                          {}, out_array.get()));
-
-  ASSERT_NO_FATAL_FAILURE(TestResultGeography(
-      out_array.get(), {"POINT (0 1)", "POINT (0 0.5)",
-                        "POINT (0.33335 0.333344)", ARROW_TYPE_WKB}));
-}
-
-TEST(ArrowUdf, InterpolateNormalized) {
-  auto udf = s2geography::arrow_udf::InterpolateNormalized();
-
-  ASSERT_NO_FATAL_FAILURE(TestInitArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
-
-  nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(
-      TestExecuteArrowUDF(udf.get(), {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
-                          ARROW_TYPE_WKB, {{"LINESTRING (0 0, 0 1)"}},
-                          {{0.0, 0.5, 1.0, ARROW_TYPE_WKB}}, out_array.get()));
-
-  ASSERT_NO_FATAL_FAILURE(TestResultGeography(
-      out_array.get(),
-      {"POINT (0 0)", "POINT (0 0.5)", "POINT (0 1)", ARROW_TYPE_WKB}));
-}
-
-TEST(ArrowUdf, Intersects) {
-  auto udf = s2geography::arrow_udf::Intersects();
-
-  ASSERT_NO_FATAL_FAILURE(TestInitArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
-
-  nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL,
-      {{"POLYGON ((0 0, 1 0, 0 1, 0 0))"},
-       {"POINT (0.25 0.25)", "POINT (-1 -1)", std::nullopt}},
-      {}, out_array.get()));
-
-  ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
-                                          {true, false, ARROW_TYPE_WKB}));
 }

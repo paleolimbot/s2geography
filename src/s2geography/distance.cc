@@ -2,8 +2,11 @@
 #include "s2geography/distance.h"
 
 #include <s2/s2closest_edge_query.h>
+#include <s2/s2debug.h>
+#include <s2/s2earth.h>
 #include <s2/s2furthest_edge_query.h>
 
+#include "s2geography/arrow_udf/arrow_udf_internal.h"
 #include "s2geography/geography.h"
 
 namespace s2geography {
@@ -66,5 +69,63 @@ std::pair<S2Point, S2Point> s2_minimum_clearance_line_between(
   // Find the closest point pair on edge1 and edge2.
   return S2::GetEdgePairClosestPoints(edge1.v0, edge1.v1, edge2.v0, edge2.v1);
 }
+
+namespace arrow_udf {
+
+struct S2DistanceExec {
+  using arg0_t = GeographyIndexInputView;
+  using arg1_t = GeographyIndexInputView;
+  using out_t = DoubleOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    return s2_distance(value0, value1) * S2Earth::RadiusMeters();
+  }
+};
+
+std::unique_ptr<ArrowUDF> Distance() {
+  return std::make_unique<BinaryUDF<S2DistanceExec>>();
+}
+
+struct S2MaxDistanceExec {
+  using arg0_t = GeographyIndexInputView;
+  using arg1_t = GeographyIndexInputView;
+  using out_t = DoubleOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    return s2_max_distance(value0, value1) * S2Earth::RadiusMeters();
+  }
+};
+
+std::unique_ptr<ArrowUDF> MaxDistance() {
+  return std::make_unique<BinaryUDF<S2MaxDistanceExec>>();
+}
+
+struct S2ShortestLineExec {
+  using arg0_t = GeographyIndexInputView;
+  using arg1_t = GeographyIndexInputView;
+  using out_t = WkbGeographyOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    std::pair<S2Point, S2Point> out =
+        s2_minimum_clearance_line_between(value0, value1);
+    stashed_ = PolylineGeography(std::make_unique<S2Polyline>(
+        std::vector<S2Point>{out.first, out.second}, S2Debug::DISABLE));
+    return stashed_;
+  }
+
+  PolylineGeography stashed_;
+};
+
+std::unique_ptr<ArrowUDF> ShortestLine() {
+  return std::make_unique<BinaryUDF<S2ShortestLineExec>>();
+}
+
+}  // namespace arrow_udf
 
 }  // namespace s2geography

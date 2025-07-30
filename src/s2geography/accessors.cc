@@ -1,6 +1,9 @@
 
 #include "s2geography/accessors.h"
 
+#include <s2/s2earth.h>
+
+#include "s2geography/arrow_udf/arrow_udf_internal.h"
 #include "s2geography/build.h"
 #include "s2geography/geography.h"
 
@@ -268,5 +271,52 @@ bool s2_find_validation_error(const Geography& geog, S2Error* error) {
   throw Exception(
       "s2_find_validation() error not implemented for this geography type");
 }
+
+namespace arrow_udf {
+struct S2LengthExec {
+  using arg0_t = GeographyInputView;
+  using out_t = DoubleOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value) {
+    return s2_length(value) * S2Earth::RadiusMeters();
+  }
+};
+
+std::unique_ptr<ArrowUDF> Length() {
+  return std::make_unique<UnaryUDF<S2LengthExec>>();
+}
+
+struct S2AreaExec {
+  using arg0_t = GeographyInputView;
+  using out_t = DoubleOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value) {
+    return s2_area(value) * S2Earth::RadiusMeters() * S2Earth::RadiusMeters();
+  }
+};
+
+std::unique_ptr<ArrowUDF> Area() {
+  return std::make_unique<UnaryUDF<S2AreaExec>>();
+}
+
+struct S2PerimeterExec {
+  using arg0_t = GeographyInputView;
+  using out_t = DoubleOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value) {
+    return s2_perimeter(value) * S2Earth::RadiusMeters();
+  }
+};
+
+std::unique_ptr<ArrowUDF> Perimeter() {
+  return std::make_unique<UnaryUDF<S2PerimeterExec>>();
+}
+}  // namespace arrow_udf
 
 }  // namespace s2geography

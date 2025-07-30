@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cerrno>
-#include <memory>
 
 #include "s2geography/arrow_abi.h"
 
@@ -56,31 +55,6 @@ class ArrowUDF {
   /// The result is valid until the next call to a UDF method.
   virtual const char* GetLastError() = 0;
 };
-
-/// \brief Instantiate an ArrowUDF for the s2_length() function
-///
-/// This ArrowUDF handles any GeoArrow array as input and produces
-/// a double array as output. Note that unlike s2_length(), this
-/// function returns results in meters by default.
-std::unique_ptr<ArrowUDF> Length();
-
-/// \brief Instantiate an ArrowUDF for the s2_centroid() function
-///
-/// This ArrowUDF handles any GeoArrow array as input and produces
-/// a geoarrow.wkb array as output.
-std::unique_ptr<ArrowUDF> Centroid();
-
-/// \brief Instantiate an ArrowUDF for the s2_interpolate_normalized() function
-///
-/// This ArrowUDF accepts any GeoArrow array and any numeric array as input
-/// and produces a boolean array as output.
-std::unique_ptr<ArrowUDF> InterpolateNormalized();
-
-/// \brief Instantiate an ArrowUDF for the s2_intersects() function
-///
-/// This ArrowUDF handles any GeoArrow array as input and produces a boolean
-/// array as output.
-std::unique_ptr<ArrowUDF> Intersects();
 
 }  // namespace arrow_udf
 
