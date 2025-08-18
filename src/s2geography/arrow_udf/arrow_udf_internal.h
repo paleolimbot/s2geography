@@ -13,7 +13,8 @@ namespace s2geography {
 namespace arrow_udf {
 
 /// \brief Helper to detect unreachable code, for use in static_assert
-template <class... T> struct always_false : std::false_type {};
+template <class... T>
+struct always_false : std::false_type {};
 
 /// \brief Friendlier UDF wrapper
 ///
