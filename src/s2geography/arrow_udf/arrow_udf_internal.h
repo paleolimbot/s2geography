@@ -12,6 +12,9 @@ namespace s2geography {
 
 namespace arrow_udf {
 
+/// \brief Helper to detect unreachable code, for use in static_assert
+template <class... T> struct always_false : std::false_type {};
+
 /// \brief Friendlier UDF wrapper
 ///
 /// The user-facing ArrowUDF is designed to be C-friendly; however, its
@@ -151,7 +154,7 @@ class ArrowOutputBuilder {
     } else if constexpr (std::is_floating_point_v<c_type>) {
       NANOARROW_THROW_NOT_OK(ArrowArrayAppendDouble(array_.get(), value));
     } else {
-      static_assert(false, "value type not supported");
+      static_assert(always_false<c_type>::value, "value type not supported");
     }
   }
 
@@ -241,7 +244,7 @@ class ArrowInputView {
     } else if constexpr (std::is_floating_point_v<c_type>) {
       return ArrowArrayViewGetDoubleUnsafe(view_.get(), i % view_->length);
     } else {
-      static_assert(false, "value type not supported");
+      static_assert(always_false<c_type>::value, "value type not supported");
     }
   }
 
