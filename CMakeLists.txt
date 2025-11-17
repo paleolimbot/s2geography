@@ -194,38 +194,82 @@ else()
   message(FATAL_ERROR "Couldn't find absl")
 endif()
 
-# --- nanoarrow (no longer bundled with geoarrow...could be bundled here, or
-# bundled as a fallback)
-if(NOT TARGET nanoarrow)
-  FetchContent_Declare(
-    nanoarrow
-    URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.6.0.zip
-    URL_HASH
-      SHA256=73b3235453902c9e92b5e942683d02d764a2aea1f999c03bf4a747c90df2f505)
+# --- geoarrow and nanoarrow
 
-  FetchContent_MakeAvailable(nanoarrow)
-
-  # do not install nanoarrow by default when running cmake --install
-  set_property(DIRECTORY ${nanoarrow_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
+if(TARGET nanoarrow AND TARGET geoarrow)
+  set(S2GEOGRAPHY_GEOARROW_SOURCE_DEFAULT "NONE")
+elseif(DEFINED ENV{CONDA_PREFIX})
+  set(S2GEOGRAPHY_GEOARROW_SOURCE_DEFAULT "CONDA")
+else()
+  set(S2GEOGRAPHY_GEOARROW_SOURCE_DEFAULT "AUTO")
 endif()
 
-# --- geoarrow (vendored, but we can use an external version of it)
-if(NOT TARGET geoarrow)
-  set(GEOARROW_SOURCES src/vendored/geoarrow/geoarrow.c src/vendored/ryu/d2s.c
-                       src/vendored/geoarrow/double_parse_fast_float.cc)
-  set(GEOARROW_INCLUDE_DIRECTORY src/vendored)
+set(S2GEOGRAPHY_GEOARROW_SOURCE
+    "${S2GEOGRAPHY_GEOARROW_SOURCE_DEFAULT}"
+    CACHE STRING "Method to use for acquiring the geoarrow (and nanoarrow) dependency")
 
-  if(GEOARROW_NAMESPACE)
-    set(GEOARROW_COMPILE_DEFINITIONS
-        GEOARROW_USE_FAST_FLOAT=1 GEOARROW_USE_RYU=1
-        GEOARROW_NAMESPACE=${GEOARROW_NAMESPACE})
-  else()
-    set(GEOARROW_COMPILE_DEFINITIONS
-        GEOARROW_USE_FAST_FLOAT=1 GEOARROW_USE_RYU=1
-        GEOARROW_NAMESPACE=S2Geography)
+message(STATUS "Using ${S2GEOGRAPHY_GEOARROW_SOURCE} approach to find geoarrow")
+
+macro(find_geoarrow ARG)
+  find_package(nanoarrow CONFIG ${ARG})
+  find_package(geoarrow CONFIG ${ARG})
+endmacro()
+
+macro(build_geoarrow)
+  # bundle nanoarrow, unless it is already bundled in downstream project
+  if(NOT TARGET geoarrow)
+    FetchContent_Declare(
+      nanoarrow
+      URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.6.0.zip
+      URL_HASH
+        SHA256=73b3235453902c9e92b5e942683d02d764a2aea1f999c03bf4a747c90df2f505)
+
+    FetchContent_MakeAvailable(nanoarrow)
+
+    # do not install nanoarrow by default when running cmake --install
+    set_property(DIRECTORY ${nanoarrow_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
   endif()
+
+  # use vendored geoarrow, unless it is already bundled in downstream project
+  if(NOT TARGET geoarrow)
+    set(GEOARROW_SOURCES src/vendored/geoarrow/geoarrow.c src/vendored/ryu/d2s.c
+                         src/vendored/geoarrow/double_parse_fast_float.cc)
+    set(GEOARROW_INCLUDE_DIRECTORY src/vendored)
+
+    if(GEOARROW_NAMESPACE)
+      set(GEOARROW_COMPILE_DEFINITIONS
+          GEOARROW_USE_FAST_FLOAT=1 GEOARROW_USE_RYU=1
+          GEOARROW_NAMESPACE=${GEOARROW_NAMESPACE})
+    else()
+      set(GEOARROW_COMPILE_DEFINITIONS
+          GEOARROW_USE_FAST_FLOAT=1 GEOARROW_USE_RYU=1
+          GEOARROW_NAMESPACE=S2Geography)
+    endif()
+  else()
+    set(S2GEOGRAPHY_GEOARROW_TARGET geoarrow::geoarrow)
+  endif()
+endmacro()
+
+if(${S2GEOGRAPHY_GEOARROW_SOURCE} STREQUAL "CONDA")
+  set(GEOARROW_SOURCE "SYSTEM")
 else()
-  set(S2GEOGRAPHY_GEOARROW_TARGET geoarrow::geoarrow)
+  set(GEOARROW_SOURCE ${S2GEOGRAPHY_GEOARROW_SOURCE})
+endif()
+
+if(${GEOARROW_SOURCE} STREQUAL "AUTO")
+  find_geoarrow(QUIET)
+  if(${geoarrow_FOUND})
+    message(STATUS "Found geoarrow: ${geoarrow_INCLUDE_DIRS}")
+  else()
+    build_geoarrow()
+  endif()
+elseif(${GEOARROW_SOURCE} STREQUAL "BUNDLED")
+  build_geoarrow()
+elseif(${GEOARROW_SOURCE} STREQUAL "SYSTEM")
+  find_geoarrow(REQUIRED)
+  if(NOT ${geoarrow_FOUND})
+    message(FATAL_ERROR "Couldn't find geoarrow")
+  endif()
 endif()
 
 # --- googletest (always bundled)
