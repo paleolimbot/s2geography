@@ -206,7 +206,8 @@ endif()
 
 set(S2GEOGRAPHY_GEOARROW_SOURCE
     "${S2GEOGRAPHY_GEOARROW_SOURCE_DEFAULT}"
-    CACHE STRING "Method to use for acquiring the geoarrow (and nanoarrow) dependency")
+    CACHE STRING
+          "Method to use for acquiring the geoarrow (and nanoarrow) dependency")
 
 message(STATUS "Using ${S2GEOGRAPHY_GEOARROW_SOURCE} approach to find geoarrow")
 
@@ -227,13 +228,15 @@ macro(build_geoarrow)
     FetchContent_MakeAvailable(nanoarrow)
 
     # do not install nanoarrow by default when running cmake --install
-    set_property(DIRECTORY ${nanoarrow_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
+    set_property(DIRECTORY ${nanoarrow_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL
+                                                            YES)
   endif()
 
   # use vendored geoarrow, unless it is already bundled in a parent project
   if(NOT TARGET geoarrow)
-    set(GEOARROW_SOURCES src/vendored/geoarrow/geoarrow.c src/vendored/ryu/d2s.c
-                         src/vendored/geoarrow/double_parse_fast_float.cc)
+    set(GEOARROW_SOURCES
+        src/vendored/geoarrow/geoarrow.c src/vendored/ryu/d2s.c
+        src/vendored/geoarrow/double_parse_fast_float.cc)
     set(GEOARROW_INCLUDE_DIRECTORY src/vendored)
 
     if(GEOARROW_NAMESPACE)
@@ -400,36 +403,28 @@ if(S2GEOGRAPHY_BUILD_TESTS)
     target_link_libraries(s2geography PUBLIC coverage_config)
   endif()
 
-  target_link_libraries(accessors_geog_test
-    s2geography
-    nanoarrow::nanoarrow ${S2GEOGRAPHY_GEOARROW_TARGET}
-    GTest::gtest_main GTest::gmock)
-  target_link_libraries(build_test
-    s2geography
-    nanoarrow::nanoarrow ${S2GEOGRAPHY_GEOARROW_TARGET}
-    GTest::gtest_main GTest::gmock)
-  target_link_libraries(distance_test
-    s2geography
-    nanoarrow::nanoarrow ${S2GEOGRAPHY_GEOARROW_TARGET}
-    GTest::gtest_main GTest::gmock)
-  target_link_libraries(geoarrow_test
-    s2geography
-    nanoarrow::nanoarrow ${S2GEOGRAPHY_GEOARROW_TARGET}
-    GTest::gtest_main GTest::gmock)
-  target_link_libraries(geography_test
-    s2geography
-    nanoarrow::nanoarrow ${S2GEOGRAPHY_GEOARROW_TARGET}
+  target_link_libraries(
+    accessors_geog_test s2geography nanoarrow::nanoarrow
+    ${S2GEOGRAPHY_GEOARROW_TARGET} GTest::gtest_main GTest::gmock)
+  target_link_libraries(
+    build_test s2geography nanoarrow::nanoarrow ${S2GEOGRAPHY_GEOARROW_TARGET}
     GTest::gtest_main GTest::gmock)
   target_link_libraries(
-    linear_referencing_test
-    s2geography
-    nanoarrow::nanoarrow ${S2GEOGRAPHY_GEOARROW_TARGET}
-    GTest::gtest_main GTest::gmock)
+    distance_test s2geography nanoarrow::nanoarrow
+    ${S2GEOGRAPHY_GEOARROW_TARGET} GTest::gtest_main GTest::gmock)
+  target_link_libraries(
+    geoarrow_test s2geography nanoarrow::nanoarrow
+    ${S2GEOGRAPHY_GEOARROW_TARGET} GTest::gtest_main GTest::gmock)
+  target_link_libraries(
+    geography_test s2geography nanoarrow::nanoarrow
+    ${S2GEOGRAPHY_GEOARROW_TARGET} GTest::gtest_main GTest::gmock)
+  target_link_libraries(
+    linear_referencing_test s2geography nanoarrow::nanoarrow
+    ${S2GEOGRAPHY_GEOARROW_TARGET} GTest::gtest_main GTest::gmock)
   target_link_libraries(op_cell_test s2geography GTest::gtest_main)
-  target_link_libraries(predicates_test
-    s2geography
-    nanoarrow::nanoarrow ${S2GEOGRAPHY_GEOARROW_TARGET}
-    GTest::gtest_main GTest::gmock)
+  target_link_libraries(
+    predicates_test s2geography nanoarrow::nanoarrow
+    ${S2GEOGRAPHY_GEOARROW_TARGET} GTest::gtest_main GTest::gmock)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
   target_link_libraries(wkb_test s2geography GTest::gtest_main)
 
