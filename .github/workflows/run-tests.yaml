@@ -74,7 +74,9 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DS2GEOGRAPHY_BUILD_TESTS=ON \
-            -DS2GEOGRAPHY_S2_SOURCE=CONDA
+            -DS2GEOGRAPHY_S2_SOURCE=CONDA \
+            # TODO: install nanoarrow and geoarrow C libs using conda when available
+            -DS2GEOGRAPHY_GEOARROW_SOURCE=BUNDLED
 
       - name: Build s2geography
         shell: bash -l {0}
