@@ -217,7 +217,7 @@ endmacro()
 
 macro(build_geoarrow)
   # bundle nanoarrow, unless it is already bundled in downstream project
-  if(NOT TARGET geoarrow)
+  if(NOT TARGET nanoarrow)
     FetchContent_Declare(
       nanoarrow
       URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.6.0.zip
@@ -260,6 +260,7 @@ if(${GEOARROW_SOURCE} STREQUAL "AUTO")
   find_geoarrow(QUIET)
   if(${geoarrow_FOUND})
     message(STATUS "Found geoarrow: ${geoarrow_INCLUDE_DIRS}")
+    set(S2GEOGRAPHY_GEOARROW_TARGET geoarrow::geoarrow)
   else()
     build_geoarrow()
   endif()
@@ -270,6 +271,7 @@ elseif(${GEOARROW_SOURCE} STREQUAL "SYSTEM")
   if(NOT ${geoarrow_FOUND})
     message(FATAL_ERROR "Couldn't find geoarrow")
   endif()
+  set(S2GEOGRAPHY_GEOARROW_TARGET geoarrow::geoarrow)
 endif()
 
 # --- googletest (always bundled)
