@@ -216,7 +216,7 @@ macro(find_geoarrow ARG)
 endmacro()
 
 macro(build_geoarrow)
-  # bundle nanoarrow, unless it is already bundled in downstream project
+  # bundle nanoarrow, unless it is already bundled in a parent project
   if(NOT TARGET nanoarrow)
     FetchContent_Declare(
       nanoarrow
@@ -230,7 +230,7 @@ macro(build_geoarrow)
     set_property(DIRECTORY ${nanoarrow_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
   endif()
 
-  # use vendored geoarrow, unless it is already bundled in downstream project
+  # use vendored geoarrow, unless it is already bundled in a parent project
   if(NOT TARGET geoarrow)
     set(GEOARROW_SOURCES src/vendored/geoarrow/geoarrow.c src/vendored/ryu/d2s.c
                          src/vendored/geoarrow/double_parse_fast_float.cc)

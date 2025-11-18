@@ -51,9 +51,19 @@ Many operations in S2 require a `S2ShapeIndex` as input. This concept is similar
 
 The s2geography library sits on top of the s2geometry library, and you can and should use s2 directly!
 
-## Build and Installation (from source)
+## Installation using Conda
 
-There is no s2geography package available yet. If you want to use it, you need to build it from source. You can download the source by cloning this repository:
+s2geography is available on conda-forge. You can install it using conda:
+
+``` bash
+conda install s2geography -c conda-forge
+```
+
+This will also install all its required runtime dependencies.
+
+## Build and Installation from source
+
+You can download the source by cloning this repository:
 
 ```bash
 git clone https://github.com/paleolimbot/s2geography.git
@@ -65,10 +75,14 @@ git clone https://github.com/paleolimbot/s2geography.git
 - s2geometry
 - [Abseil](https://github.com/abseil/abseil-cpp)
 - OpenSSL (via s2geometry)
+- [nanoarrow](https://github.com/apache/arrow-nanoarrow)
+- [geoarrow](https://github.com/geoarrow/geoarrow-c)
 
 #### Conda
 
-All the required dependencies above are available on conda-forge. You can install them using conda (or mamba):
+All the required dependencies above are available on conda-forge (except for the
+nanoarrow and geoarrow C libraries, which will be available shortly). You can
+install them using conda (or mamba):
 
 ```bash
 conda install cmake libabseil s2geometry openssl -c conda-forge
@@ -93,6 +107,10 @@ cmake .. -DS2GEOGRAPHY_S2_SOURCE=AUTO -DCMAKE_CXX_STANDARD=17
 cmake --build .
 ```
 
+The project is structured such that the VSCode CMake integration is triggered when the folder is open (if the default build doesn't work, consider adding `CMakeUserPresets.json` to configure things like the install directory, absl_DIR, or the location of OpenSSL).
+
+#### Find the dependencies
+
 The CMake option `S2GEOGRAPHY_S2_SOURCE` specifies the method to use for acquiring s2geometry:
 
 - `AUTO`: try to find s2geometry on the system default locations or download and build it from source if not found (default)
@@ -105,7 +123,7 @@ Note: s2geography does not support automatically acquiring and building Abseil a
 
 The CMake option `CMAKE_CXX_STANDARD` should be set according to the standard used to build Abseil and s2geometry (C++17 is set by default).
 
-The project is structured such that the VSCode CMake integration is triggered when the folder is open (if the default build doesn't work, consider adding `CMakeUserPresets.json` to configure things like the install directory, absl_DIR, or the location of OpenSSL).
+The CMake option `S2GEOGRAPHY_GEOARROW_SOURCE` specifies the method to use for acquiring nanoarrow and geoarrow. You can choose one of the values above for this option as well, except `BREW`. Note that if the `nanoarrow` and `geoarrow` targets are already defined (e.g., in a parent project including s2geography) these will be reused.
 
 ### Install
 
