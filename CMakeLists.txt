@@ -200,9 +200,10 @@ endif()
 # Try to find a system-installed nanoarrow first
 find_package(nanoarrow QUIET)
 if(nanoarrow_FOUND)
-  # nanoarrow::nanoarrow may be an ALIAS target (e.g., to nanoarrow::nanoarrow_shared
-  # or nanoarrow::nanoarrow_static), and CMake does not allow creating an alias of an
-  # alias. Resolve to the underlying IMPORTED target.
+  # nanoarrow::nanoarrow may be an ALIAS target (e.g., to
+  # nanoarrow::nanoarrow_shared or nanoarrow::nanoarrow_static), and CMake does
+  # not allow creating an alias of an alias. Resolve to the underlying IMPORTED
+  # target.
   if(TARGET nanoarrow::nanoarrow_shared)
     add_library(nanoarrow ALIAS nanoarrow::nanoarrow_shared)
   elseif(TARGET nanoarrow::nanoarrow_static)
