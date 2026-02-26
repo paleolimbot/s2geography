@@ -35,19 +35,25 @@ bool s2_contains(const ShapeIndexGeography& geog1,
   }
 }
 
-// Note that 'touches' can be implemented using:
-//
-// S2BooleanOperation::Options closedOptions = options;
-// closedOptions.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
-// closedOptions.set_polyline_model(S2BooleanOperation::PolylineModel::CLOSED);
-// S2BooleanOperation::Options openOptions = options;
-// openOptions.set_polygon_model(S2BooleanOperation::PolygonModel::OPEN);
-// openOptions.set_polyline_model(S2BooleanOperation::PolylineModel::OPEN);
-// s2_intersects(geog1, geog2, closed_options) &&
-//   !s2_intersects(geog1, geog2, open_options);
-//
-// ...it isn't implemented here because the options creation should be done
-// outside of any loop.
+TouchesPredicate::TouchesPredicate(const S2BooleanOperation::Options& options)
+    : closed_options_(options), open_options_(options) {
+  closed_options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
+  closed_options_.set_polyline_model(S2BooleanOperation::PolylineModel::CLOSED);
+  open_options_.set_polygon_model(S2BooleanOperation::PolygonModel::OPEN);
+  open_options_.set_polyline_model(S2BooleanOperation::PolylineModel::OPEN);
+}
+
+bool TouchesPredicate::operator()(const ShapeIndexGeography& geog1,
+                                  const ShapeIndexGeography& geog2) const {
+  return s2_intersects(geog1, geog2, closed_options_) &&
+         !s2_intersects(geog1, geog2, open_options_);
+}
+
+bool s2_touches(const ShapeIndexGeography& geog1,
+                const ShapeIndexGeography& geog2,
+                const S2BooleanOperation::Options& options) {
+  return TouchesPredicate(options)(geog1, geog2);
+}
 
 bool s2_intersects_box(const ShapeIndexGeography& geog1,
                        const S2LatLngRect& rect,
