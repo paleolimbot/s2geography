@@ -197,6 +197,24 @@ endif()
 # --- nanoarrow (no longer bundled with geoarrow...could be bundled here, or
 # bundled as a fallback)
 if(NOT TARGET nanoarrow)
+  find_package(nanoarrow QUIET)
+  if(nanoarrow_FOUND)
+    # nanoarrow::nanoarrow may be an ALIAS target (e.g., to
+    # nanoarrow::nanoarrow_shared or nanoarrow::nanoarrow_static), and CMake
+    # does not allow creating an alias of an alias. Resolve to the underlying
+    # IMPORTED target.
+    if(TARGET nanoarrow::nanoarrow_shared)
+      add_library(nanoarrow ALIAS nanoarrow::nanoarrow_shared)
+    elseif(TARGET nanoarrow::nanoarrow_static)
+      add_library(nanoarrow ALIAS nanoarrow::nanoarrow_static)
+    else()
+      add_library(nanoarrow ALIAS nanoarrow::nanoarrow)
+    endif()
+    message(STATUS "Found system nanoarrow")
+  endif()
+endif()
+
+if(NOT TARGET nanoarrow)
   FetchContent_Declare(
     nanoarrow
     URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.6.0.zip
