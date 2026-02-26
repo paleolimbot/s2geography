@@ -292,11 +292,13 @@ target_compile_definitions(
          S2_VERSION_PATCH=${S2_VERSION_PATCH}
   PRIVATE ${GEOARROW_COMPILE_DEFINITIONS})
 
-if(MSVC)
+if(WIN32)
   # used in s2geometry's CMakeLists.txt but not defined in target
   target_compile_definitions(s2geography PUBLIC _USE_MATH_DEFINES)
   target_compile_definitions(s2geography PUBLIC NOMINMAX)
-  target_compile_options(s2geography PUBLIC /J)
+  if(MSVC)
+    target_compile_options(s2geography PUBLIC /J)
+  endif()
 endif()
 
 target_link_libraries(
