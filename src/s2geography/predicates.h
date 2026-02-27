@@ -20,6 +20,20 @@ bool s2_contains(const ShapeIndexGeography& geog1,
                  const ShapeIndexGeography& geog2,
                  const S2BooleanOperation::Options& options);
 
+/// Pre-computes closed/open boundary options for efficient repeated
+/// s2_touches() evaluation in a loop.
+class TouchesPredicate {
+ public:
+  explicit TouchesPredicate(const S2BooleanOperation::Options& options);
+
+  bool operator()(const ShapeIndexGeography& geog1,
+                  const ShapeIndexGeography& geog2) const;
+
+ private:
+  S2BooleanOperation::Options closed_options_;
+  S2BooleanOperation::Options open_options_;
+};
+
 bool s2_touches(const ShapeIndexGeography& geog1,
                 const ShapeIndexGeography& geog2,
                 const S2BooleanOperation::Options& options);
