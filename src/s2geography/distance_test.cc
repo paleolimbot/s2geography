@@ -17,7 +17,7 @@ TEST(Distance, PointDistance) {
   EXPECT_DOUBLE_EQ(s2_distance(geog1_index, geog2_index), M_PI / 2);
 }
 
-TEST(Distance, ArrowUdfDistance) {
+TEST(Distance, SedonaUdfDistance) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::DistanceKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -37,7 +37,7 @@ TEST(Distance, ArrowUdfDistance) {
                       {111195.10117748393, 0.0, std::nullopt}));
 }
 
-TEST(Distance, ArrowUdfMaxDistance) {
+TEST(Distance, SedonaUdfMaxDistance) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::MaxDistanceKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -57,7 +57,7 @@ TEST(Distance, ArrowUdfMaxDistance) {
                       {111195.10117748393, 111195.10117748393, std::nullopt}));
 }
 
-TEST(Distance, ArrowUdfShortestLine) {
+TEST(Distance, SedonaUdfShortestLine) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::ShortestLineKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -77,7 +77,7 @@ TEST(Distance, ArrowUdfShortestLine) {
       {"LINESTRING (0 0, 0 1)", "LINESTRING (0 0, 0 0)", std::nullopt}));
 }
 
-TEST(Distance, ArrowUdfClosestPoint) {
+TEST(Distance, SedonaUdfClosestPoint) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::ClosestPointKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;

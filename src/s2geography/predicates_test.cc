@@ -5,7 +5,7 @@
 #include "nanoarrow/nanoarrow.hpp"
 #include "s2geography/sedona_udf/sedona_udf_test_internal.h"
 
-TEST(Predicates, ArrowUdfIntersects) {
+TEST(Predicates, SedonaUdfIntersects) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::IntersectsKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -25,7 +25,7 @@ TEST(Predicates, ArrowUdfIntersects) {
                                           {true, false, std::nullopt}));
 }
 
-TEST(Predicates, ArrowUdfEquals) {
+TEST(Predicates, SedonaUdfEquals) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::EqualsKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -46,7 +46,7 @@ TEST(Predicates, ArrowUdfEquals) {
                                           {true, false, std::nullopt}));
 }
 
-TEST(Predicates, ArrowUdfContains) {
+TEST(Predicates, SedonaUdfContains) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::ContainsKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;

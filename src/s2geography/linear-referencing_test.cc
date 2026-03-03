@@ -7,7 +7,7 @@
 
 using namespace s2geography;
 
-TEST(LinearReferencing, ArrowUdfLineLocatePoint) {
+TEST(LinearReferencing, SedonaUdfLineLocatePoint) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::LineLocatePointKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -27,7 +27,7 @@ TEST(LinearReferencing, ArrowUdfLineLocatePoint) {
       out_array.get(), NANOARROW_TYPE_DOUBLE, {0.0, 0.5, 1.0, std::nullopt}));
 }
 
-TEST(LinearReferencing, ArrowUdfLineInterpolatePoint) {
+TEST(LinearReferencing, SedonaUdfLineInterpolatePoint) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::LineInterpolatePointKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;

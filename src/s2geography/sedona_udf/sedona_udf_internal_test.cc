@@ -5,7 +5,7 @@
 #include "s2geography/accessors-geog.h"
 #include "s2geography/sedona_udf/sedona_udf_test_internal.h"
 
-TEST(ArrowUdf, GeographyToArrow) {
+TEST(SedonaUdf, GeographyToArrow) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::LengthKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -26,7 +26,7 @@ TEST(ArrowUdf, GeographyToArrow) {
                       {0.0, 111195.10117748393, 0.0, std::nullopt}));
 }
 
-TEST(ArrowUdf, GeographyToGeography) {
+TEST(SedonaUdf, GeographyToGeography) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::CentroidKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -47,7 +47,7 @@ TEST(ArrowUdf, GeographyToGeography) {
                         "POINT (0.33335 0.333344)", std::nullopt}));
 }
 
-TEST(ArrowUdf, GeographyGeographyToGeography) {
+TEST(SedonaUdf, GeographyGeographyToGeography) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::ClosestPointKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -66,7 +66,7 @@ TEST(ArrowUdf, GeographyGeographyToGeography) {
       out_array.get(), {"POINT (0 1)", "POINT (0 0)", std::nullopt}));
 }
 
-TEST(ArrowUdf, GeographyArrowToGeography) {
+TEST(SedonaUdf, GeographyArrowToGeography) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::LineInterpolatePointKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;

@@ -6,7 +6,7 @@
 #include "nanoarrow/nanoarrow.hpp"
 #include "s2geography/sedona_udf/sedona_udf_test_internal.h"
 
-TEST(ArrowUdf, Area) {
+TEST(Accessors, SedonaUdfArea) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::AreaKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -27,7 +27,7 @@ TEST(ArrowUdf, Area) {
                       {0.0, 0.0, 6182489130.9071951, std::nullopt}));
 }
 
-TEST(ArrowUdf, Length) {
+TEST(Accessors, SedonaUdfLength) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::LengthKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -48,7 +48,7 @@ TEST(ArrowUdf, Length) {
                       {0.0, 111195.10117748393, 0.0, std::nullopt}));
 }
 
-TEST(ArrowUdf, Centroid) {
+TEST(AccessorsGeog, SedonaUdfCentroid) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::CentroidKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -69,7 +69,7 @@ TEST(ArrowUdf, Centroid) {
                         "POINT (0.33335 0.333344)", std::nullopt}));
 }
 
-TEST(ArrowUdf, InterpolateNormalized) {
+TEST(AccessorsGeog, SedonaUdfInterpolateNormalized) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::LineInterpolatePointKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;

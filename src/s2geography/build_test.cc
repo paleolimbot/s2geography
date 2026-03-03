@@ -143,7 +143,7 @@ TEST(Build, UnaryUnionRoundtrip) {
   ASSERT_NO_FATAL_FAILURE(TestUnaryUnionRoundtrip("MULTIPOLYGON"));
 }
 
-TEST(Build, ArrowUdfIntersection) {
+TEST(Build, SedonaUdfIntersection) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::IntersectionKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -163,7 +163,7 @@ TEST(Build, ArrowUdfIntersection) {
       {"POINT (0 0)", "GEOMETRYCOLLECTION EMPTY", std::nullopt}));
 }
 
-TEST(Build, ArrowUdfUnion) {
+TEST(Build, SedonaUdfUnion) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::UnionKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -183,7 +183,7 @@ TEST(Build, ArrowUdfUnion) {
       {"POINT (0 0)", "MULTIPOINT ((0 0), (0 1))", std::nullopt}));
 }
 
-TEST(Build, ArrowUdfDifference) {
+TEST(Build, SedonaUdfDifference) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::DifferenceKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -203,7 +203,7 @@ TEST(Build, ArrowUdfDifference) {
       {"GEOMETRYCOLLECTION EMPTY", "POINT (0 1)", std::nullopt}));
 }
 
-TEST(Build, ArrowUdfSymDifference) {
+TEST(Build, SedonaUdfSymDifference) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::SymDifferenceKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;

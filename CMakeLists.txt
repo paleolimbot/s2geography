@@ -356,7 +356,8 @@ if(S2GEOGRAPHY_BUILD_TESTS)
 
   enable_testing()
 
-  add_executable(sedona_udf_internal_test src/s2geography/sedona_udf/sedona_udf_internal_test.cc)
+  add_executable(sedona_udf_internal_test
+                 src/s2geography/sedona_udf/sedona_udf_internal_test.cc)
   add_executable(accessors_geog_test src/s2geography/accessors-geog_test.cc)
   add_executable(build_test src/s2geography/build_test.cc)
   add_executable(distance_test src/s2geography/distance_test.cc)
