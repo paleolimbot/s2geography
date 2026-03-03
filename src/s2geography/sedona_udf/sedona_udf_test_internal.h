@@ -25,7 +25,9 @@ inline std::vector<nanoarrow::UniqueSchema> ArgSchemas(
       NANOARROW_THROW_NOT_OK(
           ArrowSchemaInitFromType(schemas.back().get(), *col));
     } else {
-      geoarrow::Wkb().InitSchema(schemas.back().get());
+      geoarrow::Wkb()
+          .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
+          .InitSchema(schemas.back().get());
     }
   }
   return schemas;

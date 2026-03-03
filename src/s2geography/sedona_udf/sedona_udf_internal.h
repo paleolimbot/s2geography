@@ -164,6 +164,52 @@ class ArrowInputView {
  public:
   using c_type = c_type_t;
 
+  static bool Matches(const struct ArrowSchema* type) {
+    struct ArrowSchemaView schema_view;
+    NANOARROW_THROW_NOT_OK(ArrowSchemaViewInit(&schema_view, type, nullptr));
+
+    if (schema_view.extension_name.data != nullptr) {
+      return false;
+    }
+
+    if constexpr (std::is_same_v<c_type_t, bool>) {
+      switch (schema_view.type) {
+        case NANOARROW_TYPE_BOOL:
+          return true;
+
+        default:
+          return false;
+      }
+    } else if constexpr (std::is_integral_v<c_type_t>) {
+      switch (schema_view.type) {
+        case NANOARROW_TYPE_INT8:
+        case NANOARROW_TYPE_UINT8:
+        case NANOARROW_TYPE_INT16:
+        case NANOARROW_TYPE_UINT16:
+        case NANOARROW_TYPE_INT32:
+        case NANOARROW_TYPE_UINT32:
+        case NANOARROW_TYPE_INT64:
+        case NANOARROW_TYPE_UINT64:
+          return true;
+
+        default:
+          return false;
+      }
+    } else if constexpr (std::is_floating_point_v<c_type>) {
+      switch (schema_view.type) {
+        case NANOARROW_TYPE_HALF_FLOAT:
+        case NANOARROW_TYPE_FLOAT:
+        case NANOARROW_TYPE_DOUBLE:
+          return true;
+
+        default:
+          return false;
+      }
+    } else {
+      static_assert(always_false<c_type>::value, "value type not supported");
+    }
+  }
+
   ArrowInputView(const struct ArrowSchema* type) {
     NANOARROW_THROW_NOT_OK(
         ArrowArrayViewInitFromSchema(view_.get(), type, nullptr));
@@ -212,6 +258,11 @@ class GeographyInputView {
  public:
   using c_type = const Geography&;
 
+  static bool Matches(const struct ArrowSchema* type) {
+    auto geoarrow_type = ::geoarrow::GeometryDataType::Make(type);
+    return geoarrow_type.edge_type() != GEOARROW_EDGE_TYPE_PLANAR;
+  }
+
   GeographyInputView(const struct ArrowSchema* type)
       : current_array_(nullptr), stashed_index_(-1) {
     reader_.Init(type);
@@ -256,6 +307,11 @@ class GeographyInputView {
 class GeographyIndexInputView {
  public:
   using c_type = const ShapeIndexGeography&;
+
+  static bool Matches(const struct ArrowSchema* type) {
+    auto geoarrow_type = ::geoarrow::GeometryDataType::Make(type);
+    return geoarrow_type.edge_type() != GEOARROW_EDGE_TYPE_PLANAR;
+  }
 
   GeographyIndexInputView(const struct ArrowSchema* type)
       : inner_(type), stashed_index_(-1) {}
@@ -333,7 +389,8 @@ class SedonaUnaryKernelAdapter {
     auto* data = static_cast<ImplData*>(self->private_data);
     data->last_error.clear();
     try {
-      if (n_args != 1) {
+      // Check if this kernel applies to the input arguments
+      if (n_args != 1 || !Exec::arg0_t::Matches(arg_types[0])) {
         out->release = nullptr;
         return NANOARROW_OK;
       }
@@ -424,7 +481,9 @@ class SedonaBinaryKernelAdapter {
     auto* data = static_cast<ImplData*>(self->private_data);
     data->last_error.clear();
     try {
-      if (n_args != 2) {
+      // Check if this kernel applies to the input arguments
+      if (n_args != 2 || !Exec::arg0_t::Matches(arg_types[0]) ||
+          !Exec::arg1_t::Matches(arg_types[1])) {
         out->release = nullptr;
         return NANOARROW_OK;
       }
