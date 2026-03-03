@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cerrno>
-#include <unordered_map>
 
 #include "geoarrow/geoarrow.hpp"
 #include "nanoarrow/nanoarrow.hpp"
@@ -35,6 +34,29 @@ struct always_false : std::false_type {};
 /// - (geog, geog) -> geog
 ///
 /// @{
+
+/// \brief Calculate the number of iterations required for execution
+///
+/// Execute implementations are given an n_rows argument but also may have
+/// been handed a collection of arguments that are entirely scalar (and thus
+/// only require a single iteration even if n_rows is large).
+inline int64_t ExecuteNumIterations(int64_t n_rows,
+                                    struct ArrowArray* const* args,
+                                    int64_t n_args) {
+  if (n_args == 0) {
+    return n_rows;
+  }
+
+  for (int64_t i = 0; i < n_args; i++) {
+    // If any of the arguments have a size != 1, use the row count
+    if (args[i]->length != 1) {
+      return n_rows;
+    }
+  }
+
+  // Otherwise, we have all scalar arguments
+  return 1;
+}
 
 /// \brief Generic output builder for Arrow output
 ///
@@ -309,8 +331,8 @@ class SedonaUnaryKernelAdapter {
     data->last_error.clear();
     try {
       if (n_args != 1) {
-        data->last_error = "Expected one argument in unary s2geography kernel";
-        return EINVAL;
+        out->release = nullptr;
+        return NANOARROW_OK;
       }
 
       data->arg0 = std::make_unique<typename Exec::arg0_t>(arg_types[0]);
@@ -337,9 +359,10 @@ class SedonaUnaryKernelAdapter {
       }
 
       data->arg0->SetArray(args[0], n_rows);
-      data->out->Reserve(n_rows);
+      int64_t num_iterations = ExecuteNumIterations(n_rows, args, n_args);
+      data->out->Reserve(num_iterations);
 
-      for (int64_t i = 0; i < n_rows; i++) {
+      for (int64_t i = 0; i < num_iterations; i++) {
         if (data->arg0->IsNull(i)) {
           data->out->AppendNull();
         } else {
@@ -399,9 +422,8 @@ class SedonaBinaryKernelAdapter {
     data->last_error.clear();
     try {
       if (n_args != 2) {
-        data->last_error =
-            "Expected two arguments in binary s2geography kernel";
-        return EINVAL;
+        out->release = nullptr;
+        return NANOARROW_OK;
       }
 
       data->arg0 = std::make_unique<typename Exec::arg0_t>(arg_types[0]);
@@ -431,9 +453,10 @@ class SedonaBinaryKernelAdapter {
 
       data->arg0->SetArray(args[0], n_rows);
       data->arg1->SetArray(args[1], n_rows);
-      data->out->Reserve(n_rows);
+      int64_t num_iterations = ExecuteNumIterations(n_rows, args, n_args);
+      data->out->Reserve(num_iterations);
 
-      for (int64_t i = 0; i < n_rows; i++) {
+      for (int64_t i = 0; i < num_iterations; i++) {
         if (data->arg0->IsNull(i) || data->arg1->IsNull(i)) {
           data->out->AppendNull();
         } else {
