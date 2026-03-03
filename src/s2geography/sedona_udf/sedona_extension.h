@@ -78,7 +78,8 @@ struct ArrowArrayStream {
   //
   // Return value: 0 if successful, an `errno`-compatible error code otherwise.
   //
-  // If successful, the ArrowSchema must be released independently from the stream.
+  // If successful, the ArrowSchema must be released independently from the
+  // stream.
   int (*get_schema)(struct ArrowArrayStream*, struct ArrowSchema* out);
 
   // Callback to get the next array
@@ -86,7 +87,8 @@ struct ArrowArrayStream {
   //
   // Return value: 0 if successful, an `errno`-compatible error code otherwise.
   //
-  // If successful, the ArrowArray must be released independently from the stream.
+  // If successful, the ArrowArray must be released independently from the
+  // stream.
   int (*get_next)(struct ArrowArrayStream*, struct ArrowArray* out);
 
   // Callback to get optional detailed error information.
@@ -120,8 +122,8 @@ struct ArrowArrayStream {
 ///
 /// Briefly, the SedonaCScalarKernelImpl is typically the stack-allocated
 /// structure that is not thread safe and the SedonaCScalarKernel is the
-/// value that lives in a registry (whose job it is to initialize implementations
-/// on each stack that needs one).
+/// value that lives in a registry (whose job it is to initialize
+/// implementations on each stack that needs one).
 struct SedonaCScalarKernelImpl {
   /// \brief Initialize the state of this instance and calculate a return type
   ///
@@ -139,10 +141,11 @@ struct SedonaCScalarKernelImpl {
   /// Implementations MAY take ownership over the elements of scalar_args but
   /// are not required to do so (i.e., caller must check if these elements were
   /// released, and must release them if needed).
-  /// \param n_args Number of elements in the arg_types and/or scalar_args arrays.
-  /// \param out Will be populated with the return type on success, or initialized
-  /// to a released value if this implementation does not apply to the arguments
-  /// passed.
+  /// \param n_args Number of elements in the arg_types and/or scalar_args
+  /// arrays.
+  /// \param out Will be populated with the return type on success, or
+  /// initialized to a released value if this implementation does not apply to
+  /// the arguments passed.
   ///
   /// \return An errno-compatible error code, or zero on success.
   int (*init)(struct SedonaCScalarKernelImpl* self,
@@ -157,8 +160,9 @@ struct SedonaCScalarKernelImpl {
   /// inputs.
   /// \param n_args The number of pointers in args
   /// \param out Will be populated with the result on success.
-  int (*execute)(struct SedonaCScalarKernelImpl* self, struct ArrowArray* const* args,
-                 int64_t n_args, int64_t n_rows, struct ArrowArray* out);
+  int (*execute)(struct SedonaCScalarKernelImpl* self,
+                 struct ArrowArray* const* args, int64_t n_args, int64_t n_rows,
+                 struct ArrowArray* out);
 
   /// \brief Get the last error message
   ///

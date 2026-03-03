@@ -116,10 +116,10 @@ inline void TestInitKernel(struct SedonaCScalarKernel* kernel,
   }
 
   nanoarrow::UniqueSchema result_schema;
-  ASSERT_EQ(impl->init(impl, schema_ptrs.data(), nullptr,
-                        static_cast<int64_t>(schema_ptrs.size()),
-                        result_schema.get()),
-            0)
+  ASSERT_EQ(
+      impl->init(impl, schema_ptrs.data(), nullptr,
+                 static_cast<int64_t>(schema_ptrs.size()), result_schema.get()),
+      0)
       << impl->get_last_error(impl);
 
   if (result_type) {
@@ -138,8 +138,8 @@ inline void TestInitKernel(struct SedonaCScalarKernel* kernel,
 // This exploits the property that all the functions we expose have geography
 // arguments first.
 inline void TestExecuteKernel(
-    struct SedonaCScalarKernelImpl* impl,
-    std::vector<ArrowTypeOrWKB> arg_types, ArrowTypeOrWKB result_type,
+    struct SedonaCScalarKernelImpl* impl, std::vector<ArrowTypeOrWKB> arg_types,
+    ArrowTypeOrWKB result_type,
     std::vector<std::vector<std::optional<std::string>>> geography_args,
     std::vector<std::vector<std::optional<double>>> other_args,
     struct ArrowArray* out) {
@@ -177,10 +177,10 @@ inline void TestExecuteKernel(
     }
   }
 
-  ASSERT_EQ(impl->execute(impl, arg_pointers.data(),
-                           static_cast<int64_t>(arg_pointers.size()), n_rows,
-                           out),
-            0)
+  ASSERT_EQ(
+      impl->execute(impl, arg_pointers.data(),
+                    static_cast<int64_t>(arg_pointers.size()), n_rows, out),
+      0)
       << impl->get_last_error(impl);
 }
 

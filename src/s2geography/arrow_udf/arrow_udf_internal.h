@@ -54,7 +54,7 @@ class ArrowOutputBuilder {
     NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(array_.get()));
   }
 
-  void InitOutputType(struct ArrowSchema *out) {
+  void InitOutputType(struct ArrowSchema* out) {
     NANOARROW_THROW_NOT_OK(ArrowSchemaInitFromType(out, arrow_type_val));
   }
 
@@ -76,7 +76,7 @@ class ArrowOutputBuilder {
     }
   }
 
-  void Finish(struct ArrowArray *out) {
+  void Finish(struct ArrowArray* out) {
     NANOARROW_THROW_NOT_OK(
         ArrowArrayFinishBuildingDefault(array_.get(), nullptr));
     ArrowArrayMove(array_.get(), out);
@@ -100,13 +100,13 @@ using DoubleOutputBuilder = ArrowOutputBuilder<double, NANOARROW_TYPE_DOUBLE>;
 /// mostly return points or line segments).
 class WkbGeographyOutputBuilder {
  public:
-  using c_type = const Geography &;
+  using c_type = const Geography&;
 
   WkbGeographyOutputBuilder() {
     writer_.Init(geoarrow::Writer::OutputType::kWKB, geoarrow::ExportOptions());
   }
 
-  void InitOutputType(struct ArrowSchema *out) {
+  void InitOutputType(struct ArrowSchema* out) {
     ::geoarrow::Wkb().InitSchema(out);
   }
 
@@ -118,7 +118,7 @@ class WkbGeographyOutputBuilder {
 
   void Append(c_type value) { writer_.WriteGeography(value); }
 
-  void Finish(struct ArrowArray *out) { writer_.Finish(out); }
+  void Finish(struct ArrowArray* out) { writer_.Finish(out); }
 
  private:
   geoarrow::Writer writer_;
@@ -139,12 +139,12 @@ class ArrowInputView {
  public:
   using c_type = c_type_t;
 
-  ArrowInputView(const struct ArrowSchema *type) {
+  ArrowInputView(const struct ArrowSchema* type) {
     NANOARROW_THROW_NOT_OK(
         ArrowArrayViewInitFromSchema(view_.get(), type, nullptr));
   }
 
-  void SetArray(const struct ArrowArray *array, int64_t num_rows) {
+  void SetArray(const struct ArrowArray* array, int64_t num_rows) {
     NANOARROW_THROW_NOT_OK(ArrowArrayViewSetArray(view_.get(), array, nullptr));
 
     if (array->length == 0) {
@@ -185,14 +185,14 @@ using DoubleInputView = ArrowInputView<double>;
 /// instead of WKB to avoid the simple features--s2 conversion overhead.
 class GeographyInputView {
  public:
-  using c_type = const Geography &;
+  using c_type = const Geography&;
 
-  GeographyInputView(const struct ArrowSchema *type)
+  GeographyInputView(const struct ArrowSchema* type)
       : current_array_(nullptr), stashed_index_(-1) {
     reader_.Init(type);
   }
 
-  void SetArray(const struct ArrowArray *array, int64_t num_rows) {
+  void SetArray(const struct ArrowArray* array, int64_t num_rows) {
     current_array_ = array;
     stashed_index_ = -1;
   }
@@ -202,14 +202,14 @@ class GeographyInputView {
     return stashed_[0].get() == nullptr;
   }
 
-  const Geography &Get(int64_t i) {
+  const Geography& Get(int64_t i) {
     StashIfNeeded(i % current_array_->length);
     return *stashed_[0];
   }
 
  private:
   geoarrow::Reader reader_;
-  const struct ArrowArray *current_array_;
+  const struct ArrowArray* current_array_;
   int64_t stashed_index_;
   std::vector<std::unique_ptr<Geography>> stashed_;
 
@@ -230,12 +230,12 @@ class GeographyInputView {
 /// than once.
 class GeographyIndexInputView {
  public:
-  using c_type = const ShapeIndexGeography &;
+  using c_type = const ShapeIndexGeography&;
 
-  GeographyIndexInputView(const struct ArrowSchema *type)
+  GeographyIndexInputView(const struct ArrowSchema* type)
       : inner_(type), stashed_index_(-1) {}
 
-  void SetArray(const struct ArrowArray *array, int64_t num_rows) {
+  void SetArray(const struct ArrowArray* array, int64_t num_rows) {
     stashed_index_ = -1;
     inner_.SetArray(array, num_rows);
     current_array_length_ = array->length;
@@ -243,7 +243,7 @@ class GeographyIndexInputView {
 
   bool IsNull(int64_t i) { return inner_.IsNull(i); }
 
-  const ShapeIndexGeography &Get(int64_t i) {
+  const ShapeIndexGeography& Get(int64_t i) {
     StashIfNeeded(i % current_array_length_);
     return stashed_;
   }
@@ -256,7 +256,7 @@ class GeographyIndexInputView {
 
   void StashIfNeeded(int64_t i) {
     if (i != stashed_index_) {
-      const auto &geog = inner_.Get(i);
+      const auto& geog = inner_.Get(i);
       stashed_ = ShapeIndexGeography(geog);
       stashed_index_ = i;
     }
@@ -303,19 +303,17 @@ class SedonaUnaryKernelAdapter {
 
   static int ImplInit(struct SedonaCScalarKernelImpl* self,
                       const struct ArrowSchema* const* arg_types,
-                      struct ArrowArray* const* /*scalar_args*/,
-                      int64_t n_args, struct ArrowSchema* out) {
+                      struct ArrowArray* const* /*scalar_args*/, int64_t n_args,
+                      struct ArrowSchema* out) {
     auto* data = static_cast<ImplData*>(self->private_data);
     data->last_error.clear();
     try {
       if (n_args != 1) {
-        data->last_error =
-            "Expected one argument in unary s2geography kernel";
+        data->last_error = "Expected one argument in unary s2geography kernel";
         return EINVAL;
       }
 
-      data->arg0 =
-          std::make_unique<typename Exec::arg0_t>(arg_types[0]);
+      data->arg0 = std::make_unique<typename Exec::arg0_t>(arg_types[0]);
       data->out = std::make_unique<typename Exec::out_t>();
       data->exec.Init({});
 
@@ -334,8 +332,7 @@ class SedonaUnaryKernelAdapter {
     data->last_error.clear();
     try {
       if (n_args != 1) {
-        data->last_error =
-            "Expected one argument in unary s2geography kernel";
+        data->last_error = "Expected one argument in unary s2geography kernel";
         return EINVAL;
       }
 
@@ -396,8 +393,8 @@ class SedonaBinaryKernelAdapter {
 
   static int ImplInit(struct SedonaCScalarKernelImpl* self,
                       const struct ArrowSchema* const* arg_types,
-                      struct ArrowArray* const* /*scalar_args*/,
-                      int64_t n_args, struct ArrowSchema* out) {
+                      struct ArrowArray* const* /*scalar_args*/, int64_t n_args,
+                      struct ArrowSchema* out) {
     auto* data = static_cast<ImplData*>(self->private_data);
     data->last_error.clear();
     try {
@@ -407,10 +404,8 @@ class SedonaBinaryKernelAdapter {
         return EINVAL;
       }
 
-      data->arg0 =
-          std::make_unique<typename Exec::arg0_t>(arg_types[0]);
-      data->arg1 =
-          std::make_unique<typename Exec::arg1_t>(arg_types[1]);
+      data->arg0 = std::make_unique<typename Exec::arg0_t>(arg_types[0]);
+      data->arg1 = std::make_unique<typename Exec::arg1_t>(arg_types[1]);
       data->out = std::make_unique<typename Exec::out_t>();
       data->exec.Init({});
 
@@ -444,8 +439,7 @@ class SedonaBinaryKernelAdapter {
         } else {
           typename Exec::arg0_t::c_type item0 = data->arg0->Get(i);
           typename Exec::arg1_t::c_type item1 = data->arg1->Get(i);
-          typename Exec::out_t::c_type item_out =
-              data->exec.Exec(item0, item1);
+          typename Exec::out_t::c_type item_out = data->exec.Exec(item0, item1);
           data->out->Append(item_out);
         }
       }
