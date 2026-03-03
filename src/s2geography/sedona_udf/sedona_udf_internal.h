@@ -80,6 +80,10 @@ class ArrowOutputBuilder {
     NANOARROW_THROW_NOT_OK(ArrowSchemaInitFromType(out, arrow_type_val));
   }
 
+  void InitOutputTypeWithCrs(struct ArrowSchema* out, const std::string& crs) {
+    InitOutputType(out);
+  }
+
   void Reserve(int64_t additional_size) {
     NANOARROW_THROW_NOT_OK(ArrowArrayReserve(array_.get(), additional_size));
   }
@@ -131,7 +135,13 @@ class WkbGeographyOutputBuilder {
   void InitOutputType(struct ArrowSchema* out) {
     ::geoarrow::Wkb()
         .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
-        .WithCrs("OGC:CRS84")
+        .InitSchema(out);
+  }
+
+  void InitOutputTypeWithCrs(struct ArrowSchema* out, const std::string& crs) {
+    ::geoarrow::Wkb()
+        .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
+        .WithCrs(crs)
         .InitSchema(out);
   }
 
@@ -210,6 +220,8 @@ class ArrowInputView {
     }
   }
 
+  static std::string GetCrs(const struct ArrowSchema* type) { return ""; }
+
   ArrowInputView(const struct ArrowSchema* type) {
     NANOARROW_THROW_NOT_OK(
         ArrowArrayViewInitFromSchema(view_.get(), type, nullptr));
@@ -265,8 +277,11 @@ class GeographyInputView {
 
   GeographyInputView(const struct ArrowSchema* type)
       : current_array_(nullptr), stashed_index_(-1) {
+    type_ = ::geoarrow::GeometryDataType::Make(type);
     reader_.Init(type);
   }
+
+  std::string GetCrs() { return type_.crs(); }
 
   void SetArray(const struct ArrowArray* array, int64_t num_rows) {
     current_array_ = array;
@@ -284,6 +299,7 @@ class GeographyInputView {
   }
 
  private:
+  ::geoarrow::GeometryDataType type_;
   geoarrow::Reader reader_;
   const struct ArrowArray* current_array_;
   int64_t stashed_index_;
@@ -315,6 +331,8 @@ class GeographyIndexInputView {
 
   GeographyIndexInputView(const struct ArrowSchema* type)
       : inner_(type), stashed_index_(-1) {}
+
+  std::string GetCrs() { return inner_.GetCrs(); }
 
   void SetArray(const struct ArrowArray* array, int64_t num_rows) {
     stashed_index_ = -1;
@@ -399,8 +417,14 @@ class SedonaUnaryKernelAdapter {
       data->out = std::make_unique<typename Exec::out_t>();
       data->exec.Init({});
 
-      data->out->InitOutputType(out);
-      return 0;
+      std::string crs_out = data->arg0->GetCrs();
+      if (crs_out.empty()) {
+        data->out->InitOutputType(out);
+      } else {
+        data->out->InitOutputTypeWithCrs(out, crs_out);
+      }
+
+      return NANOARROW_OK;
     } catch (std::exception& e) {
       data->last_error = e.what();
       return EINVAL;
@@ -492,6 +516,15 @@ class SedonaBinaryKernelAdapter {
       data->arg1 = std::make_unique<typename Exec::arg1_t>(arg_types[1]);
       data->out = std::make_unique<typename Exec::out_t>();
       data->exec.Init({});
+
+      // We don't have a reliable way to check the equality of CRSes, so
+      // here we just return the first CRS.
+      std::string crs_out = data->arg0->GetCrs();
+      if (crs_out.empty()) {
+        data->out->InitOutputType(out);
+      } else {
+        data->out->InitOutputTypeWithCrs(out, crs_out);
+      }
 
       data->out->InitOutputType(out);
       return 0;
