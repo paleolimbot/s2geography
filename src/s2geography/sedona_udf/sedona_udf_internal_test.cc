@@ -5,6 +5,17 @@
 #include "s2geography/accessors-geog.h"
 #include "s2geography/sedona_udf/sedona_udf_test_internal.h"
 
+// TODO: tests
+// - Test that Arrow, Geography, and GeographyIndexView inputs gracefully refuse
+// to match
+//   an incorrect number of input arguments or non-matching types
+// - Test that Arrow inputs can match the correct suite of inputs (e.g., float
+// input
+//   can accept integers or any float type)
+// - Test that Geography inputs match geography inputs but don't match geometry
+// - Test that CRSes are propatated from input to output for unary kernels
+// - Test that CRSes are propagsated from input to output for binary kernels
+
 TEST(SedonaUdf, GeographyToArrow) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::LengthKernel(&kernel);
