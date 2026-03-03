@@ -129,7 +129,10 @@ class WkbGeographyOutputBuilder {
   }
 
   void InitOutputType(struct ArrowSchema* out) {
-    ::geoarrow::Wkb().InitSchema(out);
+    ::geoarrow::Wkb()
+        .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
+        .WithCrs("OGC:CRS84")
+        .InitSchema(out);
   }
 
   void Reserve(int64_t additional_size) {
