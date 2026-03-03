@@ -115,15 +115,15 @@ struct S2ShortestLineExec {
 };
 
 void DistanceKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2DistanceExec>(out, "s2_distance");
+  InitBinaryKernel<S2DistanceExec>(out, "st_distance");
 }
 
 void MaxDistanceKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2MaxDistanceExec>(out, "s2_max_distance");
+  InitBinaryKernel<S2MaxDistanceExec>(out, "st_maxdistance");
 }
 
 void ShortestLineKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2ShortestLineExec>(out, "s2_shortest_line");
+  InitBinaryKernel<S2ShortestLineExec>(out, "st_shortestline");
 }
 
 }  // namespace arrow_udf

@@ -454,24 +454,24 @@ struct BooleanOperationExec {
 void DifferenceKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<
       BooleanOperationExec<S2BooleanOperation::OpType::DIFFERENCE>>(
-      out, "s2_difference");
+      out, "st_difference");
 }
 
 void SymDifferenceKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<
       BooleanOperationExec<S2BooleanOperation::OpType::SYMMETRIC_DIFFERENCE>>(
-      out, "s2_sym_difference");
+      out, "st_symdifference");
 }
 
 void IntersectionKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<
       BooleanOperationExec<S2BooleanOperation::OpType::INTERSECTION>>(
-      out, "s2_intersection");
+      out, "st_intersection");
 }
 
 void UnionKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<BooleanOperationExec<S2BooleanOperation::OpType::UNION>>(
-      out, "s2_union");
+      out, "st_union");
 }
 
 }  // namespace arrow_udf

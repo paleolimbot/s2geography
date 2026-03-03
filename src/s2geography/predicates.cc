@@ -126,15 +126,15 @@ struct S2Equals {
 };
 
 void IntersectsKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2Intersects>(out, "s2_intersects");
+  InitBinaryKernel<S2Intersects>(out, "st_intersects");
 }
 
 void ContainsKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2Contains>(out, "s2_contains");
+  InitBinaryKernel<S2Contains>(out, "st_contains");
 }
 
 void EqualsKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2Equals>(out, "s2_equals");
+  InitBinaryKernel<S2Equals>(out, "st_equals");
 }
 
 }  // namespace arrow_udf

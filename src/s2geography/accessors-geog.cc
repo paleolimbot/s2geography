@@ -264,19 +264,19 @@ struct S2PointOnSurfaceExec {
 };
 
 void CentroidKernel(struct SedonaCScalarKernel* out) {
-  InitUnaryKernel<S2CentroidExec>(out, "s2_centroid");
+  InitUnaryKernel<S2CentroidExec>(out, "st_centroid");
 }
 
 void ConvexHullKernel(struct SedonaCScalarKernel* out) {
-  InitUnaryKernel<S2ConvexHullExec>(out, "s2_convex_hull");
+  InitUnaryKernel<S2ConvexHullExec>(out, "st_convexhull");
 }
 
 void PointOnSurfaceKernel(struct SedonaCScalarKernel* out) {
-  InitUnaryKernel<S2PointOnSurfaceExec>(out, "s2_point_on_surface");
+  InitUnaryKernel<S2PointOnSurfaceExec>(out, "st_pointonsurface");
 }
 
 void ClosestPointKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2ClosestPointExec>(out, "s2_closest_point");
+  InitBinaryKernel<S2ClosestPointExec>(out, "st_closestpoint");
 }
 }  // namespace arrow_udf
 

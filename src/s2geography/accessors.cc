@@ -307,15 +307,15 @@ struct S2PerimeterExec {
 };
 
 void LengthKernel(struct SedonaCScalarKernel* out) {
-  InitUnaryKernel<S2LengthExec>(out, "s2_length");
+  InitUnaryKernel<S2LengthExec>(out, "st_length");
 }
 
 void AreaKernel(struct SedonaCScalarKernel* out) {
-  InitUnaryKernel<S2AreaExec>(out, "s2_area");
+  InitUnaryKernel<S2AreaExec>(out, "st_area");
 }
 
 void PerimeterKernel(struct SedonaCScalarKernel* out) {
-  InitUnaryKernel<S2PerimeterExec>(out, "s2_perimeter");
+  InitUnaryKernel<S2PerimeterExec>(out, "st_perimeter");
 }
 }  // namespace arrow_udf
 

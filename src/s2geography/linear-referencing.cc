@@ -105,11 +105,11 @@ struct S2LineLocatePointExec {
 
 void LineInterpolatePointKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<S2LineInterpolatePointExec>(out,
-                                               "s2_line_interpolate_point");
+                                               "st_lineinterpolatepoint");
 }
 
 void LineLocatePointKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2LineLocatePointExec>(out, "s2_line_locate_point");
+  InitBinaryKernel<S2LineLocatePointExec>(out, "st_linelocatepoint");
 }
 
 }  // namespace arrow_udf
