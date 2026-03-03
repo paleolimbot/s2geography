@@ -451,26 +451,6 @@ struct BooleanOperationExec {
   GlobalOptions options_;
 };
 
-std::unique_ptr<ArrowUDF> Difference() {
-  return std::make_unique<BinaryUDF<
-      BooleanOperationExec<S2BooleanOperation::OpType::DIFFERENCE>>>();
-}
-
-std::unique_ptr<ArrowUDF> SymDifference() {
-  return std::make_unique<BinaryUDF<BooleanOperationExec<
-      S2BooleanOperation::OpType::SYMMETRIC_DIFFERENCE>>>();
-}
-
-std::unique_ptr<ArrowUDF> Intersection() {
-  return std::make_unique<BinaryUDF<
-      BooleanOperationExec<S2BooleanOperation::OpType::INTERSECTION>>>();
-}
-
-std::unique_ptr<ArrowUDF> Union() {
-  return std::make_unique<
-      BinaryUDF<BooleanOperationExec<S2BooleanOperation::OpType::UNION>>>();
-}
-
 void DifferenceKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<
       BooleanOperationExec<S2BooleanOperation::OpType::DIFFERENCE>>(

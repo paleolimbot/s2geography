@@ -284,10 +284,6 @@ struct S2LengthExec {
   }
 };
 
-std::unique_ptr<ArrowUDF> Length() {
-  return std::make_unique<UnaryUDF<S2LengthExec>>();
-}
-
 struct S2AreaExec {
   using arg0_t = GeographyInputView;
   using out_t = DoubleOutputBuilder;
@@ -299,10 +295,6 @@ struct S2AreaExec {
   }
 };
 
-std::unique_ptr<ArrowUDF> Area() {
-  return std::make_unique<UnaryUDF<S2AreaExec>>();
-}
-
 struct S2PerimeterExec {
   using arg0_t = GeographyInputView;
   using out_t = DoubleOutputBuilder;
@@ -313,10 +305,6 @@ struct S2PerimeterExec {
     return s2_perimeter(value) * S2Earth::RadiusMeters();
   }
 };
-
-std::unique_ptr<ArrowUDF> Perimeter() {
-  return std::make_unique<UnaryUDF<S2PerimeterExec>>();
-}
 
 void LengthKernel(struct SedonaCScalarKernel* out) {
   InitUnaryKernel<S2LengthExec>(out, "s2_length");

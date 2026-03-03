@@ -6,7 +6,6 @@
 #include <s2/s2builderutil_s2polyline_vector_layer.h>
 
 #include "s2geography/aggregator.h"
-#include "s2geography/arrow_udf/arrow_udf.h"
 #include "s2geography/geography.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
 
@@ -105,10 +104,6 @@ class S2UnionAggregator : public Aggregator<std::unique_ptr<Geography>> {
 };
 
 namespace arrow_udf {
-std::unique_ptr<ArrowUDF> Difference();
-std::unique_ptr<ArrowUDF> SymDifference();
-std::unique_ptr<ArrowUDF> Intersection();
-std::unique_ptr<ArrowUDF> Union();
 
 void DifferenceKernel(struct SedonaCScalarKernel* out);
 void SymDifferenceKernel(struct SedonaCScalarKernel* out);

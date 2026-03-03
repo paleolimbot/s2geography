@@ -97,10 +97,6 @@ struct S2Intersects {
   S2BooleanOperation::Options options_;
 };
 
-std::unique_ptr<ArrowUDF> Intersects() {
-  return std::make_unique<BinaryUDF<S2Intersects>>();
-}
-
 struct S2Contains {
   using arg0_t = GeographyIndexInputView;
   using arg1_t = GeographyIndexInputView;
@@ -115,10 +111,6 @@ struct S2Contains {
   S2BooleanOperation::Options options_;
 };
 
-std::unique_ptr<ArrowUDF> Contains() {
-  return std::make_unique<BinaryUDF<S2Contains>>();
-}
-
 struct S2Equals {
   using arg0_t = GeographyIndexInputView;
   using arg1_t = GeographyIndexInputView;
@@ -132,10 +124,6 @@ struct S2Equals {
 
   S2BooleanOperation::Options options_;
 };
-
-std::unique_ptr<ArrowUDF> Equals() {
-  return std::make_unique<BinaryUDF<S2Equals>>();
-}
 
 void IntersectsKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<S2Intersects>(out, "s2_intersects");

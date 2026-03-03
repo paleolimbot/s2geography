@@ -91,10 +91,6 @@ struct S2LineInterpolatePointExec {
   PointGeography stashed_;
 };
 
-std::unique_ptr<ArrowUDF> LineInterpolatePoint() {
-  return std::make_unique<BinaryUDF<S2LineInterpolatePointExec>>();
-}
-
 struct S2LineLocatePointExec {
   using arg0_t = GeographyInputView;
   using arg1_t = GeographyInputView;
@@ -106,10 +102,6 @@ struct S2LineLocatePointExec {
     return s2_project_normalized(value0, value1);
   }
 };
-
-std::unique_ptr<ArrowUDF> LineLocatePoint() {
-  return std::make_unique<BinaryUDF<S2LineLocatePointExec>>();
-}
 
 void LineInterpolatePointKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<S2LineInterpolatePointExec>(out,

@@ -4,7 +4,6 @@
 #include <s2/s2convex_hull_query.h>
 
 #include "s2geography/aggregator.h"
-#include "s2geography/arrow_udf/arrow_udf.h"
 #include "s2geography/geography.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
 
@@ -36,13 +35,6 @@ class S2ConvexHullAggregator
 };
 
 namespace arrow_udf {
-/// \brief Instantiate an ArrowUDF for the s2_centroid() function
-///
-/// This ArrowUDF handles any GeoArrow array as input and produces
-/// a geoarrow.wkb array as output.
-std::unique_ptr<ArrowUDF> Centroid();
-std::unique_ptr<ArrowUDF> ConvexHull();
-std::unique_ptr<ArrowUDF> PointOnSurface();
 
 void CentroidKernel(struct SedonaCScalarKernel* out);
 void ConvexHullKernel(struct SedonaCScalarKernel* out);

@@ -5,7 +5,6 @@
 #include "geoarrow/geoarrow.hpp"
 #include "nanoarrow/nanoarrow.hpp"
 #include "s2geography.h"
-#include "s2geography/arrow_udf/arrow_udf.h"
 #include "s2geography/s2geography_gtest_util.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
 
@@ -30,22 +29,6 @@ inline std::vector<nanoarrow::UniqueSchema> ArgSchemas(
     }
   }
   return schemas;
-}
-
-// Create the ArrowSchema required to initialize an ArrowUDF
-inline nanoarrow::UniqueSchema ArgSchema(std::vector<ArrowTypeOrWKB> cols) {
-  nanoarrow::UniqueSchema schema;
-  ArrowSchemaInit(schema.get());
-  NANOARROW_THROW_NOT_OK(ArrowSchemaSetTypeStruct(schema.get(), cols.size()));
-  for (int64_t i = 0; i < static_cast<int64_t>(cols.size()); i++) {
-    if (cols[i]) {
-      NANOARROW_THROW_NOT_OK(ArrowSchemaSetType(schema->children[i], *cols[i]));
-    } else {
-      ArrowSchemaRelease(schema->children[i]);
-      geoarrow::Wkb().InitSchema(schema->children[i]);
-    }
-  }
-  return schema;
 }
 
 // Create geoarrow.wkb argument from WKT
@@ -118,26 +101,6 @@ inline nanoarrow::UniqueArray ArgArrow(
   return array;
 }
 
-// Test utility to call udf->Init() and check its output type.
-inline void TestInitArrowUDF(s2geography::arrow_udf::ArrowUDF* udf,
-                             std::vector<ArrowTypeOrWKB> arg_types,
-                             ArrowTypeOrWKB result_type) {
-  auto arg_schema = ArgSchema(std::move(arg_types));
-  nanoarrow::UniqueSchema result_schema;
-  ASSERT_EQ(udf->Init(arg_schema.get(), nullptr, result_schema.get()),
-            NANOARROW_OK);
-
-  if (result_type) {
-    struct ArrowSchemaView out_type_view;
-    ASSERT_EQ(ArrowSchemaViewInit(&out_type_view, result_schema.get(), nullptr),
-              NANOARROW_OK);
-    ASSERT_EQ(out_type_view.type, result_type);
-  } else {
-    auto type = ::geoarrow::GeometryDataType::Make(result_schema.get());
-    ASSERT_EQ(type.id(), GEOARROW_TYPE_WKB);
-  }
-}
-
 // Test utility to create a SedonaCScalarKernelImpl from a kernel, call init,
 // and check its output type.
 inline void TestInitKernel(struct SedonaCScalarKernel* kernel,
@@ -168,46 +131,6 @@ inline void TestInitKernel(struct SedonaCScalarKernel* kernel,
     auto type = ::geoarrow::GeometryDataType::Make(result_schema.get());
     ASSERT_EQ(type.id(), GEOARROW_TYPE_WKB);
   }
-}
-
-// Test utility to create argument arrays and pass them to udf->Execute()
-// This exploits the property that all the functions we expose have geography
-// arguments first.
-inline void TestExecuteArrowUDF(
-    s2geography::arrow_udf::ArrowUDF* udf,
-    std::vector<ArrowTypeOrWKB> arg_types, ArrowTypeOrWKB result_type,
-    std::vector<std::vector<std::optional<std::string>>> geography_args,
-    std::vector<std::vector<std::optional<double>>> other_args,
-    struct ArrowArray* out) {
-  auto arg_type_it = arg_types.begin();
-  std::vector<nanoarrow::UniqueArray> args;
-
-  for (const auto& geometry_arg : geography_args) {
-    ASSERT_NE(arg_type_it, arg_types.end());
-    auto arg_type = *arg_type_it++;
-    ASSERT_FALSE(arg_type.has_value());
-
-    args.push_back(ArgWkb(geometry_arg));
-  }
-
-  for (const auto& arg : other_args) {
-    ASSERT_NE(arg_type_it, arg_types.end());
-    auto arg_type = *arg_type_it++;
-    ASSERT_TRUE(arg_type.has_value());
-
-    args.push_back(ArgArrow(*arg_type, arg));
-  }
-
-  ASSERT_EQ(arg_type_it, arg_types.end());
-
-  std::vector<struct ArrowArray*> arg_pointers;
-  for (auto& arg : args) {
-    arg_pointers.push_back(arg.get());
-  }
-
-  ASSERT_EQ(udf->Execute(arg_pointers.data(),
-                         static_cast<int64_t>(arg_pointers.size()), out),
-            NANOARROW_OK);
 }
 
 // Test utility to create argument arrays and call impl->execute() on an

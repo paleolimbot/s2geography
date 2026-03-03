@@ -217,10 +217,6 @@ struct S2CentroidExec {
   PointGeography stashed_;
 };
 
-std::unique_ptr<ArrowUDF> Centroid() {
-  return std::make_unique<UnaryUDF<S2CentroidExec>>();
-}
-
 struct S2ClosestPointExec {
   using arg0_t = GeographyIndexInputView;
   using arg1_t = GeographyIndexInputView;
@@ -237,10 +233,6 @@ struct S2ClosestPointExec {
   PointGeography stashed_;
 };
 
-std::unique_ptr<ArrowUDF> ClosestPoint() {
-  return std::make_unique<BinaryUDF<S2ClosestPointExec>>();
-}
-
 struct S2ConvexHullExec {
   using arg0_t = GeographyInputView;
   using out_t = WkbGeographyOutputBuilder;
@@ -254,10 +246,6 @@ struct S2ConvexHullExec {
 
   std::unique_ptr<Geography> stashed_;
 };
-
-std::unique_ptr<ArrowUDF> ConvexHull() {
-  return std::make_unique<UnaryUDF<S2ConvexHullExec>>();
-}
 
 struct S2PointOnSurfaceExec {
   using arg0_t = GeographyInputView;
@@ -274,10 +262,6 @@ struct S2PointOnSurfaceExec {
   PointGeography stashed_;
   S2RegionCoverer coverer_;
 };
-
-std::unique_ptr<ArrowUDF> PointOnSurface() {
-  return std::make_unique<UnaryUDF<S2PointOnSurfaceExec>>();
-}
 
 void CentroidKernel(struct SedonaCScalarKernel* out) {
   InitUnaryKernel<S2CentroidExec>(out, "s2_centroid");
