@@ -356,6 +356,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
 
   enable_testing()
 
+  add_executable(sedona_udf_internal_test src/s2geography/sedona_udf/sedona_udf_internal_test.cc)
   add_executable(accessors_geog_test src/s2geography/accessors-geog_test.cc)
   add_executable(build_test src/s2geography/build_test.cc)
   add_executable(distance_test src/s2geography/distance_test.cc)
@@ -374,6 +375,8 @@ if(S2GEOGRAPHY_BUILD_TESTS)
     target_link_libraries(s2geography PUBLIC coverage_config)
   endif()
 
+  target_link_libraries(sedona_udf_internal_test s2geography nanoarrow
+                        GTest::gtest_main GTest::gmock)
   target_link_libraries(accessors_geog_test s2geography nanoarrow
                         GTest::gtest_main GTest::gmock)
   target_link_libraries(build_test s2geography nanoarrow GTest::gtest_main
@@ -392,6 +395,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
   target_link_libraries(wkb_test s2geography GTest::gtest_main)
 
+  target_include_directories(sedona_udf_internal_test PRIVATE src/vendored)
   target_include_directories(accessors_geog_test PRIVATE src/vendored)
   target_include_directories(build_test PRIVATE src/vendored)
   target_include_directories(distance_test PRIVATE src/vendored)
@@ -400,6 +404,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   target_include_directories(predicates_test PRIVATE src/vendored)
 
   include(GoogleTest)
+  gtest_discover_tests(sedona_udf_internal_test)
   gtest_discover_tests(accessors_geog_test)
   gtest_discover_tests(build_test)
   gtest_discover_tests(distance_test)
