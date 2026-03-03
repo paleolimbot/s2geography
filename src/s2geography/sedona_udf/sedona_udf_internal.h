@@ -271,8 +271,17 @@ class GeographyInputView {
   using c_type = const Geography&;
 
   static bool Matches(const struct ArrowSchema* type) {
-    auto geoarrow_type = ::geoarrow::GeometryDataType::Make(type);
-    return geoarrow_type.edge_type() != GEOARROW_EDGE_TYPE_PLANAR;
+    struct GeoArrowSchemaView schema_view;
+    int err_code = GeoArrowSchemaViewInit(&schema_view, type, nullptr);
+    if (err_code != GEOARROW_OK) {
+      return false;
+    }
+
+    struct GeoArrowMetadataView metadata_view;
+    err_code = GeoArrowMetadataViewInit(
+        &metadata_view, schema_view.extension_metadata, nullptr);
+    return err_code == GEOARROW_OK &&
+           metadata_view.edge_type == GEOARROW_EDGE_TYPE_SPHERICAL;
   }
 
   GeographyInputView(const struct ArrowSchema* type)
@@ -325,8 +334,7 @@ class GeographyIndexInputView {
   using c_type = const ShapeIndexGeography&;
 
   static bool Matches(const struct ArrowSchema* type) {
-    auto geoarrow_type = ::geoarrow::GeometryDataType::Make(type);
-    return geoarrow_type.edge_type() != GEOARROW_EDGE_TYPE_PLANAR;
+    return GeographyInputView::Matches(type);
   }
 
   GeographyIndexInputView(const struct ArrowSchema* type)
