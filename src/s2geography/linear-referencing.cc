@@ -111,6 +111,15 @@ std::unique_ptr<ArrowUDF> LineLocatePoint() {
   return std::make_unique<BinaryUDF<S2LineLocatePointExec>>();
 }
 
+void LineInterpolatePointKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<S2LineInterpolatePointExec>(out,
+                                               "s2_line_interpolate_point");
+}
+
+void LineLocatePointKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<S2LineLocatePointExec>(out, "s2_line_locate_point");
+}
+
 }  // namespace arrow_udf
 
 }  // namespace s2geography

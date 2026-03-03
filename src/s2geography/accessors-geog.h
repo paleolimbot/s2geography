@@ -6,6 +6,7 @@
 #include "s2geography/aggregator.h"
 #include "s2geography/arrow_udf/arrow_udf.h"
 #include "s2geography/geography.h"
+#include "s2geography/sedona_udf/sedona_extension.h"
 
 namespace s2geography {
 
@@ -42,6 +43,10 @@ namespace arrow_udf {
 std::unique_ptr<ArrowUDF> Centroid();
 std::unique_ptr<ArrowUDF> ConvexHull();
 std::unique_ptr<ArrowUDF> PointOnSurface();
+
+void CentroidKernel(struct SedonaCScalarKernel* out);
+void ConvexHullKernel(struct SedonaCScalarKernel* out);
+void PointOnSurfaceKernel(struct SedonaCScalarKernel* out);
 
 }  // namespace arrow_udf
 

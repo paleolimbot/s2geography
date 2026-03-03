@@ -7,6 +7,7 @@
 #include "s2geography.h"
 #include "s2geography/arrow_udf/arrow_udf.h"
 #include "s2geography/s2geography_gtest_util.h"
+#include "s2geography/sedona_udf/sedona_extension.h"
 
 // We use a simple model for testing functions: types are either geoarrow.wkb
 // or an Arrow type (the only ones used here are bool, int32, and double).
@@ -14,6 +15,22 @@
 // make it more clean in the tests what the input/output types actually are.
 using ArrowTypeOrWKB = std::optional<enum ArrowType>;
 #define ARROW_TYPE_WKB std::nullopt
+
+// Create individual ArrowSchema values for each argument type
+inline std::vector<nanoarrow::UniqueSchema> ArgSchemas(
+    std::vector<ArrowTypeOrWKB> cols) {
+  std::vector<nanoarrow::UniqueSchema> schemas;
+  for (const auto& col : cols) {
+    schemas.emplace_back();
+    if (col) {
+      NANOARROW_THROW_NOT_OK(
+          ArrowSchemaInitFromType(schemas.back().get(), *col));
+    } else {
+      geoarrow::Wkb().InitSchema(schemas.back().get());
+    }
+  }
+  return schemas;
+}
 
 // Create the ArrowSchema required to initialize an ArrowUDF
 inline nanoarrow::UniqueSchema ArgSchema(std::vector<ArrowTypeOrWKB> cols) {
@@ -121,6 +138,38 @@ inline void TestInitArrowUDF(s2geography::arrow_udf::ArrowUDF* udf,
   }
 }
 
+// Test utility to create a SedonaCScalarKernelImpl from a kernel, call init,
+// and check its output type.
+inline void TestInitKernel(struct SedonaCScalarKernel* kernel,
+                           struct SedonaCScalarKernelImpl* impl,
+                           std::vector<ArrowTypeOrWKB> arg_types,
+                           ArrowTypeOrWKB result_type) {
+  kernel->new_impl(kernel, impl);
+
+  auto schemas = ArgSchemas(arg_types);
+  std::vector<const struct ArrowSchema*> schema_ptrs;
+  for (auto& s : schemas) {
+    schema_ptrs.push_back(s.get());
+  }
+
+  nanoarrow::UniqueSchema result_schema;
+  ASSERT_EQ(impl->init(impl, schema_ptrs.data(), nullptr,
+                        static_cast<int64_t>(schema_ptrs.size()),
+                        result_schema.get()),
+            0)
+      << impl->get_last_error(impl);
+
+  if (result_type) {
+    struct ArrowSchemaView out_type_view;
+    ASSERT_EQ(ArrowSchemaViewInit(&out_type_view, result_schema.get(), nullptr),
+              NANOARROW_OK);
+    ASSERT_EQ(out_type_view.type, result_type);
+  } else {
+    auto type = ::geoarrow::GeometryDataType::Make(result_schema.get());
+    ASSERT_EQ(type.id(), GEOARROW_TYPE_WKB);
+  }
+}
+
 // Test utility to create argument arrays and pass them to udf->Execute()
 // This exploits the property that all the functions we expose have geography
 // arguments first.
@@ -159,6 +208,57 @@ inline void TestExecuteArrowUDF(
   ASSERT_EQ(udf->Execute(arg_pointers.data(),
                          static_cast<int64_t>(arg_pointers.size()), out),
             NANOARROW_OK);
+}
+
+// Test utility to create argument arrays and call impl->execute() on an
+// already-initialized SedonaCScalarKernelImpl.
+// This exploits the property that all the functions we expose have geography
+// arguments first.
+inline void TestExecuteKernel(
+    struct SedonaCScalarKernelImpl* impl,
+    std::vector<ArrowTypeOrWKB> arg_types, ArrowTypeOrWKB result_type,
+    std::vector<std::vector<std::optional<std::string>>> geography_args,
+    std::vector<std::vector<std::optional<double>>> other_args,
+    struct ArrowArray* out) {
+  auto arg_type_it = arg_types.begin();
+  std::vector<nanoarrow::UniqueArray> args;
+
+  for (const auto& geometry_arg : geography_args) {
+    ASSERT_NE(arg_type_it, arg_types.end());
+    auto arg_type = *arg_type_it++;
+    ASSERT_FALSE(arg_type.has_value());
+
+    args.push_back(ArgWkb(geometry_arg));
+  }
+
+  for (const auto& arg : other_args) {
+    ASSERT_NE(arg_type_it, arg_types.end());
+    auto arg_type = *arg_type_it++;
+    ASSERT_TRUE(arg_type.has_value());
+
+    args.push_back(ArgArrow(*arg_type, arg));
+  }
+
+  ASSERT_EQ(arg_type_it, arg_types.end());
+
+  std::vector<struct ArrowArray*> arg_pointers;
+  for (auto& arg : args) {
+    arg_pointers.push_back(arg.get());
+  }
+
+  // Compute n_rows: the maximum length across all args (scalars have length 1)
+  int64_t n_rows = 1;
+  for (auto& arg : args) {
+    if (arg->length > n_rows) {
+      n_rows = arg->length;
+    }
+  }
+
+  ASSERT_EQ(impl->execute(impl, arg_pointers.data(),
+                           static_cast<int64_t>(arg_pointers.size()), n_rows,
+                           out),
+            0)
+      << impl->get_last_error(impl);
 }
 
 // Check a non-geography result. Expected is an optional double here because

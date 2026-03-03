@@ -7,6 +7,7 @@
 #include "nanoarrow/nanoarrow.hpp"
 #include "s2geography.h"
 #include "s2geography/arrow_udf/arrow_udf.h"
+#include "s2geography/sedona_udf/sedona_extension.h"
 
 namespace s2geography {
 
@@ -477,6 +478,245 @@ class BinaryUDF : public InternalUDF {
   std::unique_ptr<out_t> out;
   Exec exec;
 };
+
+/// @}
+
+/// \defgroup sedona-kernel-adapters Sedona C Scalar Kernel Adapters
+///
+/// These adapters wrap the Exec-based UDF pattern into the
+/// SedonaCScalarKernel / SedonaCScalarKernelImpl C ABI defined in
+/// sedona_extension.h.
+///
+/// @{
+
+/// \brief Private data for SedonaCScalarKernel
+struct KernelData {
+  std::string name;
+};
+
+inline const char* KernelFunctionName(const struct SedonaCScalarKernel* self) {
+  return static_cast<KernelData*>(self->private_data)->name.c_str();
+}
+
+inline void KernelRelease(struct SedonaCScalarKernel* self) {
+  if (self->private_data != nullptr) {
+    delete static_cast<KernelData*>(self->private_data);
+    self->private_data = nullptr;
+  }
+  self->release = nullptr;
+}
+
+/// \brief Sedona C ABI adapter for unary UDFs (one argument)
+template <typename Exec>
+class SedonaUnaryKernelAdapter {
+ public:
+  struct ImplData {
+    std::string last_error;
+    std::unique_ptr<typename Exec::arg0_t> arg0;
+    std::unique_ptr<typename Exec::out_t> out;
+    Exec exec;
+  };
+
+  static int ImplInit(struct SedonaCScalarKernelImpl* self,
+                      const struct ArrowSchema* const* arg_types,
+                      struct ArrowArray* const* /*scalar_args*/,
+                      int64_t n_args, struct ArrowSchema* out) {
+    auto* data = static_cast<ImplData*>(self->private_data);
+    data->last_error.clear();
+    try {
+      if (n_args != 1) {
+        data->last_error =
+            "Expected one argument in unary s2geography kernel";
+        return EINVAL;
+      }
+
+      data->arg0 =
+          std::make_unique<typename Exec::arg0_t>(arg_types[0]);
+      data->out = std::make_unique<typename Exec::out_t>();
+      data->exec.Init({});
+
+      data->out->InitOutputType(out);
+      return 0;
+    } catch (std::exception& e) {
+      data->last_error = e.what();
+      return EINVAL;
+    }
+  }
+
+  static int ImplExecute(struct SedonaCScalarKernelImpl* self,
+                         struct ArrowArray* const* args, int64_t n_args,
+                         int64_t n_rows, struct ArrowArray* out) {
+    auto* data = static_cast<ImplData*>(self->private_data);
+    data->last_error.clear();
+    try {
+      if (n_args != 1) {
+        data->last_error =
+            "Expected one argument in unary s2geography kernel";
+        return EINVAL;
+      }
+
+      data->arg0->SetArray(args[0], n_rows);
+      data->out->Reserve(n_rows);
+
+      for (int64_t i = 0; i < n_rows; i++) {
+        if (data->arg0->IsNull(i)) {
+          data->out->AppendNull();
+        } else {
+          typename Exec::arg0_t::c_type item0 = data->arg0->Get(i);
+          typename Exec::out_t::c_type item_out = data->exec.Exec(item0);
+          data->out->Append(item_out);
+        }
+      }
+
+      data->out->Finish(out);
+      return 0;
+    } catch (std::exception& e) {
+      data->last_error = e.what();
+      return EINVAL;
+    }
+  }
+
+  static const char* ImplGetLastError(struct SedonaCScalarKernelImpl* self) {
+    return static_cast<ImplData*>(self->private_data)->last_error.c_str();
+  }
+
+  static void ImplRelease(struct SedonaCScalarKernelImpl* self) {
+    if (self->private_data != nullptr) {
+      delete static_cast<ImplData*>(self->private_data);
+      self->private_data = nullptr;
+    }
+    self->release = nullptr;
+  }
+
+  static void NewImpl(const struct SedonaCScalarKernel* /*kernel*/,
+                      struct SedonaCScalarKernelImpl* out) {
+    out->private_data = new ImplData();
+    out->init = &ImplInit;
+    out->execute = &ImplExecute;
+    out->get_last_error = &ImplGetLastError;
+    out->release = &ImplRelease;
+  }
+};
+
+/// \brief Sedona C ABI adapter for binary UDFs (two arguments)
+template <typename Exec>
+class SedonaBinaryKernelAdapter {
+ public:
+  struct ImplData {
+    std::string last_error;
+    std::unique_ptr<typename Exec::arg0_t> arg0;
+    std::unique_ptr<typename Exec::arg1_t> arg1;
+    std::unique_ptr<typename Exec::out_t> out;
+    Exec exec;
+  };
+
+  static int ImplInit(struct SedonaCScalarKernelImpl* self,
+                      const struct ArrowSchema* const* arg_types,
+                      struct ArrowArray* const* /*scalar_args*/,
+                      int64_t n_args, struct ArrowSchema* out) {
+    auto* data = static_cast<ImplData*>(self->private_data);
+    data->last_error.clear();
+    try {
+      if (n_args != 2) {
+        data->last_error =
+            "Expected two arguments in binary s2geography kernel";
+        return EINVAL;
+      }
+
+      data->arg0 =
+          std::make_unique<typename Exec::arg0_t>(arg_types[0]);
+      data->arg1 =
+          std::make_unique<typename Exec::arg1_t>(arg_types[1]);
+      data->out = std::make_unique<typename Exec::out_t>();
+      data->exec.Init({});
+
+      data->out->InitOutputType(out);
+      return 0;
+    } catch (std::exception& e) {
+      data->last_error = e.what();
+      return EINVAL;
+    }
+  }
+
+  static int ImplExecute(struct SedonaCScalarKernelImpl* self,
+                         struct ArrowArray* const* args, int64_t n_args,
+                         int64_t n_rows, struct ArrowArray* out) {
+    auto* data = static_cast<ImplData*>(self->private_data);
+    data->last_error.clear();
+    try {
+      if (n_args != 2) {
+        data->last_error =
+            "Expected two arguments in binary s2geography kernel";
+        return EINVAL;
+      }
+
+      data->arg0->SetArray(args[0], n_rows);
+      data->arg1->SetArray(args[1], n_rows);
+      data->out->Reserve(n_rows);
+
+      for (int64_t i = 0; i < n_rows; i++) {
+        if (data->arg0->IsNull(i) || data->arg1->IsNull(i)) {
+          data->out->AppendNull();
+        } else {
+          typename Exec::arg0_t::c_type item0 = data->arg0->Get(i);
+          typename Exec::arg1_t::c_type item1 = data->arg1->Get(i);
+          typename Exec::out_t::c_type item_out =
+              data->exec.Exec(item0, item1);
+          data->out->Append(item_out);
+        }
+      }
+
+      data->out->Finish(out);
+      return 0;
+    } catch (std::exception& e) {
+      data->last_error = e.what();
+      return EINVAL;
+    }
+  }
+
+  static const char* ImplGetLastError(struct SedonaCScalarKernelImpl* self) {
+    return static_cast<ImplData*>(self->private_data)->last_error.c_str();
+  }
+
+  static void ImplRelease(struct SedonaCScalarKernelImpl* self) {
+    if (self->private_data != nullptr) {
+      delete static_cast<ImplData*>(self->private_data);
+      self->private_data = nullptr;
+    }
+    self->release = nullptr;
+  }
+
+  static void NewImpl(const struct SedonaCScalarKernel* /*kernel*/,
+                      struct SedonaCScalarKernelImpl* out) {
+    out->private_data = new ImplData();
+    out->init = &ImplInit;
+    out->execute = &ImplExecute;
+    out->get_last_error = &ImplGetLastError;
+    out->release = &ImplRelease;
+  }
+};
+
+/// \brief Initialize a SedonaCScalarKernel for a unary Exec
+template <typename Exec>
+void InitUnaryKernel(struct SedonaCScalarKernel* out, const char* name) {
+  auto* data = new KernelData();
+  data->name = name;
+  out->private_data = data;
+  out->function_name = &KernelFunctionName;
+  out->new_impl = &SedonaUnaryKernelAdapter<Exec>::NewImpl;
+  out->release = &KernelRelease;
+}
+
+/// \brief Initialize a SedonaCScalarKernel for a binary Exec
+template <typename Exec>
+void InitBinaryKernel(struct SedonaCScalarKernel* out, const char* name) {
+  auto* data = new KernelData();
+  data->name = name;
+  out->private_data = data;
+  out->function_name = &KernelFunctionName;
+  out->new_impl = &SedonaBinaryKernelAdapter<Exec>::NewImpl;
+  out->release = &KernelRelease;
+}
 
 /// @}
 

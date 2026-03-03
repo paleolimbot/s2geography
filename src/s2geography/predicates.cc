@@ -137,6 +137,18 @@ std::unique_ptr<ArrowUDF> Equals() {
   return std::make_unique<BinaryUDF<S2Equals>>();
 }
 
+void IntersectsKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<S2Intersects>(out, "s2_intersects");
+}
+
+void ContainsKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<S2Contains>(out, "s2_contains");
+}
+
+void EqualsKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<S2Equals>(out, "s2_equals");
+}
+
 }  // namespace arrow_udf
 
 }  // namespace s2geography

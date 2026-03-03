@@ -18,16 +18,19 @@ TEST(Distance, PointDistance) {
 }
 
 TEST(Distance, ArrowUdfDistance) {
-  auto udf = s2geography::arrow_udf::Distance();
-
-  ASSERT_NO_FATAL_FAILURE(TestInitArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE));
+  struct SedonaCScalarKernel kernel;
+  s2geography::arrow_udf::DistanceKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
       {{"POINT (0 0)"}, {"POINT (0 1)", "LINESTRING (0 0, 0 1)", std::nullopt}},
       {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
 
   ASSERT_NO_FATAL_FAILURE(
       TestResultArrow(out_array.get(), NANOARROW_TYPE_DOUBLE,
@@ -35,16 +38,19 @@ TEST(Distance, ArrowUdfDistance) {
 }
 
 TEST(Distance, ArrowUdfMaxDistance) {
-  auto udf = s2geography::arrow_udf::MaxDistance();
-
-  ASSERT_NO_FATAL_FAILURE(TestInitArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE));
+  struct SedonaCScalarKernel kernel;
+  s2geography::arrow_udf::MaxDistanceKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
       {{"POINT (0 0)"}, {"POINT (0 1)", "LINESTRING (0 0, 0 1)", std::nullopt}},
       {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
 
   ASSERT_NO_FATAL_FAILURE(
       TestResultArrow(out_array.get(), NANOARROW_TYPE_DOUBLE,
@@ -52,16 +58,19 @@ TEST(Distance, ArrowUdfMaxDistance) {
 }
 
 TEST(Distance, ArrowUdfShortestLine) {
-  auto udf = s2geography::arrow_udf::ShortestLine();
-
-  ASSERT_NO_FATAL_FAILURE(TestInitArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
+  struct SedonaCScalarKernel kernel;
+  s2geography::arrow_udf::ShortestLineKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB,
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB,
       {{"POINT (0 0)"}, {"POINT (0 1)", "LINESTRING (0 0, 0 1)", std::nullopt}},
       {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
 
   ASSERT_NO_FATAL_FAILURE(TestResultGeography(
       out_array.get(),
@@ -69,16 +78,19 @@ TEST(Distance, ArrowUdfShortestLine) {
 }
 
 TEST(Distance, ArrowUdfClosestPoint) {
-  auto udf = s2geography::arrow_udf::ClosestPoint();
-
-  ASSERT_NO_FATAL_FAILURE(TestInitArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
+  struct SedonaCScalarKernel kernel;
+  s2geography::arrow_udf::ClosestPointKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB,
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB,
       {{"POINT (0 1)", "LINESTRING (0 0, 0 1)", std::nullopt}, {"POINT (0 0)"}},
       {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
 
   ASSERT_NO_FATAL_FAILURE(TestResultGeography(
       out_array.get(), {"POINT (0 1)", "POINT (0 0)", std::nullopt}));

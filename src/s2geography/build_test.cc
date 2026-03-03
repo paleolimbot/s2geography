@@ -144,16 +144,19 @@ TEST(Build, UnaryUnionRoundtrip) {
 }
 
 TEST(Build, ArrowUdfIntersection) {
-  auto udf = s2geography::arrow_udf::Intersection();
-
-  ASSERT_NO_FATAL_FAILURE(TestInitArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
+  struct SedonaCScalarKernel kernel;
+  s2geography::arrow_udf::IntersectionKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB,
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB,
       {{"POINT (0 0)", "POINT (0 1)", std::nullopt}, {"POINT (0 0)"}}, {},
       out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
 
   ASSERT_NO_FATAL_FAILURE(TestResultGeography(
       out_array.get(),
@@ -161,16 +164,19 @@ TEST(Build, ArrowUdfIntersection) {
 }
 
 TEST(Build, ArrowUdfUnion) {
-  auto udf = s2geography::arrow_udf::Union();
-
-  ASSERT_NO_FATAL_FAILURE(TestInitArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
+  struct SedonaCScalarKernel kernel;
+  s2geography::arrow_udf::UnionKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB,
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB,
       {{"POINT (0 0)", "POINT (0 1)", std::nullopt}, {"POINT (0 0)"}}, {},
       out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
 
   ASSERT_NO_FATAL_FAILURE(TestResultGeography(
       out_array.get(),
@@ -178,16 +184,19 @@ TEST(Build, ArrowUdfUnion) {
 }
 
 TEST(Build, ArrowUdfDifference) {
-  auto udf = s2geography::arrow_udf::Difference();
-
-  ASSERT_NO_FATAL_FAILURE(TestInitArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
+  struct SedonaCScalarKernel kernel;
+  s2geography::arrow_udf::DifferenceKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB,
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB,
       {{"POINT (0 0)", "POINT (0 1)", std::nullopt}, {"POINT (0 0)"}}, {},
       out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
 
   ASSERT_NO_FATAL_FAILURE(TestResultGeography(
       out_array.get(),
@@ -195,16 +204,19 @@ TEST(Build, ArrowUdfDifference) {
 }
 
 TEST(Build, ArrowUdfSymDifference) {
-  auto udf = s2geography::arrow_udf::SymDifference();
-
-  ASSERT_NO_FATAL_FAILURE(TestInitArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
+  struct SedonaCScalarKernel kernel;
+  s2geography::arrow_udf::SymDifferenceKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteArrowUDF(
-      udf.get(), {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB,
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB,
       {{"POINT (0 0)", "POINT (0 1)", std::nullopt}, {"POINT (0 0)"}}, {},
       out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
 
   ASSERT_NO_FATAL_FAILURE(TestResultGeography(
       out_array.get(),

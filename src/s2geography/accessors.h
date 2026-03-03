@@ -3,6 +3,7 @@
 
 #include "s2geography/arrow_udf/arrow_udf.h"
 #include "s2geography/geography.h"
+#include "s2geography/sedona_udf/sedona_extension.h"
 
 namespace s2geography {
 
@@ -26,6 +27,10 @@ namespace arrow_udf {
 std::unique_ptr<ArrowUDF> Length();
 std::unique_ptr<ArrowUDF> Area();
 std::unique_ptr<ArrowUDF> Perimeter();
+
+void LengthKernel(struct SedonaCScalarKernel* out);
+void AreaKernel(struct SedonaCScalarKernel* out);
+void PerimeterKernel(struct SedonaCScalarKernel* out);
 }  // namespace arrow_udf
 
 }  // namespace s2geography

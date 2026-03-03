@@ -126,6 +126,18 @@ std::unique_ptr<ArrowUDF> ShortestLine() {
   return std::make_unique<BinaryUDF<S2ShortestLineExec>>();
 }
 
+void DistanceKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<S2DistanceExec>(out, "s2_distance");
+}
+
+void MaxDistanceKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<S2MaxDistanceExec>(out, "s2_max_distance");
+}
+
+void ShortestLineKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<S2ShortestLineExec>(out, "s2_shortest_line");
+}
+
 }  // namespace arrow_udf
 
 }  // namespace s2geography

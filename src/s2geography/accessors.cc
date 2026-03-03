@@ -317,6 +317,18 @@ struct S2PerimeterExec {
 std::unique_ptr<ArrowUDF> Perimeter() {
   return std::make_unique<UnaryUDF<S2PerimeterExec>>();
 }
+
+void LengthKernel(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<S2LengthExec>(out, "s2_length");
+}
+
+void AreaKernel(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<S2AreaExec>(out, "s2_area");
+}
+
+void PerimeterKernel(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<S2PerimeterExec>(out, "s2_perimeter");
+}
 }  // namespace arrow_udf
 
 }  // namespace s2geography

@@ -278,6 +278,22 @@ struct S2PointOnSurfaceExec {
 std::unique_ptr<ArrowUDF> PointOnSurface() {
   return std::make_unique<UnaryUDF<S2PointOnSurfaceExec>>();
 }
+
+void CentroidKernel(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<S2CentroidExec>(out, "s2_centroid");
+}
+
+void ConvexHullKernel(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<S2ConvexHullExec>(out, "s2_convex_hull");
+}
+
+void PointOnSurfaceKernel(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<S2PointOnSurfaceExec>(out, "s2_point_on_surface");
+}
+
+void ClosestPointKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<S2ClosestPointExec>(out, "s2_closest_point");
+}
 }  // namespace arrow_udf
 
 }  // namespace s2geography

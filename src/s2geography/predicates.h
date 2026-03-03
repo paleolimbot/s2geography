@@ -5,6 +5,7 @@
 
 #include "s2geography/arrow_udf/arrow_udf.h"
 #include "s2geography/geography.h"
+#include "s2geography/sedona_udf/sedona_extension.h"
 
 namespace s2geography {
 
@@ -37,6 +38,10 @@ namespace arrow_udf {
 std::unique_ptr<ArrowUDF> Intersects();
 std::unique_ptr<ArrowUDF> Contains();
 std::unique_ptr<ArrowUDF> Equals();
+
+void IntersectsKernel(struct SedonaCScalarKernel* out);
+void ContainsKernel(struct SedonaCScalarKernel* out);
+void EqualsKernel(struct SedonaCScalarKernel* out);
 
 }  // namespace arrow_udf
 

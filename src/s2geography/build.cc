@@ -471,6 +471,30 @@ std::unique_ptr<ArrowUDF> Union() {
       BinaryUDF<BooleanOperationExec<S2BooleanOperation::OpType::UNION>>>();
 }
 
+void DifferenceKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<
+      BooleanOperationExec<S2BooleanOperation::OpType::DIFFERENCE>>(
+      out, "s2_difference");
+}
+
+void SymDifferenceKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<
+      BooleanOperationExec<S2BooleanOperation::OpType::SYMMETRIC_DIFFERENCE>>(
+      out, "s2_sym_difference");
+}
+
+void IntersectionKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<
+      BooleanOperationExec<S2BooleanOperation::OpType::INTERSECTION>>(
+      out, "s2_intersection");
+}
+
+void UnionKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<
+      BooleanOperationExec<S2BooleanOperation::OpType::UNION>>(
+      out, "s2_union");
+}
+
 }  // namespace arrow_udf
 
 }  // namespace s2geography
