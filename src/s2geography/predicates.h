@@ -29,12 +29,12 @@ bool s2_intersects_box(const ShapeIndexGeography& geog1,
                        const S2BooleanOperation::Options& options,
                        double tolerance);
 
-namespace arrow_udf {
+namespace sedona_udf {
 
 void IntersectsKernel(struct SedonaCScalarKernel* out);
 void ContainsKernel(struct SedonaCScalarKernel* out);
 void EqualsKernel(struct SedonaCScalarKernel* out);
 
-}  // namespace arrow_udf
+}  // namespace sedona_udf
 
 }  // namespace s2geography

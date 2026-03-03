@@ -103,12 +103,12 @@ class S2UnionAggregator : public Aggregator<std::unique_ptr<Geography>> {
   std::vector<std::unique_ptr<Node>> other_;
 };
 
-namespace arrow_udf {
+namespace sedona_udf {
 
 void DifferenceKernel(struct SedonaCScalarKernel* out);
 void SymDifferenceKernel(struct SedonaCScalarKernel* out);
 void IntersectionKernel(struct SedonaCScalarKernel* out);
 void UnionKernel(struct SedonaCScalarKernel* out);
-}  // namespace arrow_udf
+}  // namespace sedona_udf
 
 }  // namespace s2geography

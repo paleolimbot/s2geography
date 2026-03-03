@@ -4,9 +4,9 @@
 #include <s2/s2centroids.h>
 
 #include "s2geography/accessors.h"
-#include "s2geography/arrow_udf/arrow_udf_internal.h"
 #include "s2geography/build.h"
 #include "s2geography/geography.h"
+#include "s2geography/sedona_udf/sedona_udf_internal.h"
 
 namespace s2geography {
 
@@ -200,7 +200,7 @@ std::unique_ptr<PolygonGeography> S2ConvexHullAggregator::Finalize() {
   return absl::make_unique<PolygonGeography>(std::move(polygon));
 }
 
-namespace arrow_udf {
+namespace sedona_udf {
 
 struct S2CentroidExec {
   using arg0_t = GeographyInputView;
@@ -278,6 +278,6 @@ void PointOnSurfaceKernel(struct SedonaCScalarKernel* out) {
 void ClosestPointKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<S2ClosestPointExec>(out, "st_closestpoint");
 }
-}  // namespace arrow_udf
+}  // namespace sedona_udf
 
 }  // namespace s2geography

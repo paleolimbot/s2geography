@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "nanoarrow/nanoarrow.hpp"
-#include "s2geography/arrow_udf/arrow_udf_test_internal.h"
+#include "s2geography/sedona_udf/sedona_udf_test_internal.h"
 
 using namespace s2geography;
 
@@ -19,7 +19,7 @@ TEST(Distance, PointDistance) {
 
 TEST(Distance, ArrowUdfDistance) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::DistanceKernel(&kernel);
+  s2geography::sedona_udf::DistanceKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE));
@@ -39,7 +39,7 @@ TEST(Distance, ArrowUdfDistance) {
 
 TEST(Distance, ArrowUdfMaxDistance) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::MaxDistanceKernel(&kernel);
+  s2geography::sedona_udf::MaxDistanceKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE));
@@ -59,7 +59,7 @@ TEST(Distance, ArrowUdfMaxDistance) {
 
 TEST(Distance, ArrowUdfShortestLine) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::ShortestLineKernel(&kernel);
+  s2geography::sedona_udf::ShortestLineKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
@@ -79,7 +79,7 @@ TEST(Distance, ArrowUdfShortestLine) {
 
 TEST(Distance, ArrowUdfClosestPoint) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::ClosestPointKernel(&kernel);
+  s2geography::sedona_udf::ClosestPointKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));

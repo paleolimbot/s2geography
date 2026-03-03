@@ -3,9 +3,9 @@
 
 #include <s2/s2earth.h>
 
-#include "s2geography/arrow_udf/arrow_udf_internal.h"
 #include "s2geography/build.h"
 #include "s2geography/geography.h"
+#include "s2geography/sedona_udf/sedona_udf_internal.h"
 
 namespace s2geography {
 
@@ -272,7 +272,7 @@ bool s2_find_validation_error(const Geography& geog, S2Error* error) {
       "s2_find_validation() error not implemented for this geography type");
 }
 
-namespace arrow_udf {
+namespace sedona_udf {
 struct S2LengthExec {
   using arg0_t = GeographyInputView;
   using out_t = DoubleOutputBuilder;
@@ -317,6 +317,6 @@ void AreaKernel(struct SedonaCScalarKernel* out) {
 void PerimeterKernel(struct SedonaCScalarKernel* out) {
   InitUnaryKernel<S2PerimeterExec>(out, "st_perimeter");
 }
-}  // namespace arrow_udf
+}  // namespace sedona_udf
 
 }  // namespace s2geography

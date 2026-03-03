@@ -4,11 +4,11 @@
 
 #include "geoarrow/geoarrow.hpp"
 #include "nanoarrow/nanoarrow.hpp"
-#include "s2geography/arrow_udf/arrow_udf_test_internal.h"
+#include "s2geography/sedona_udf/sedona_udf_test_internal.h"
 
 TEST(ArrowUdf, Length) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::LengthKernel(&kernel);
+  s2geography::sedona_udf::LengthKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(
       TestInitKernel(&kernel, &impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE));
@@ -29,7 +29,7 @@ TEST(ArrowUdf, Length) {
 
 TEST(ArrowUdf, Centroid) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::CentroidKernel(&kernel);
+  s2geography::sedona_udf::CentroidKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(
       TestInitKernel(&kernel, &impl, {ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
@@ -50,7 +50,7 @@ TEST(ArrowUdf, Centroid) {
 
 TEST(ArrowUdf, InterpolateNormalized) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::LineInterpolatePointKernel(&kernel);
+  s2geography::sedona_udf::LineInterpolatePointKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));

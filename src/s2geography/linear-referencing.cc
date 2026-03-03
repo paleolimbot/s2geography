@@ -2,9 +2,9 @@
 #include "s2geography/linear-referencing.h"
 
 #include "s2geography/accessors.h"
-#include "s2geography/arrow_udf/arrow_udf_internal.h"
 #include "s2geography/build.h"
 #include "s2geography/geography.h"
+#include "s2geography/sedona_udf/sedona_udf_internal.h"
 
 namespace s2geography {
 
@@ -74,7 +74,7 @@ S2Point s2_interpolate_normalized(const Geography& geog, double distance_norm) {
   return s2_interpolate_normalized(*geog_poly, distance_norm);
 }
 
-namespace arrow_udf {
+namespace sedona_udf {
 
 struct S2LineInterpolatePointExec {
   using arg0_t = GeographyInputView;
@@ -104,14 +104,13 @@ struct S2LineLocatePointExec {
 };
 
 void LineInterpolatePointKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2LineInterpolatePointExec>(out,
-                                               "st_lineinterpolatepoint");
+  InitBinaryKernel<S2LineInterpolatePointExec>(out, "st_lineinterpolatepoint");
 }
 
 void LineLocatePointKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<S2LineLocatePointExec>(out, "st_linelocatepoint");
 }
 
-}  // namespace arrow_udf
+}  // namespace sedona_udf
 
 }  // namespace s2geography

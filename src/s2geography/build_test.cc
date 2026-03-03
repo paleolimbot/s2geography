@@ -3,8 +3,8 @@
 #include <gtest/gtest.h>
 
 #include "nanoarrow/nanoarrow.hpp"
-#include "s2geography/arrow_udf/arrow_udf_test_internal.h"
 #include "s2geography/s2geography_gtest_util.h"
+#include "s2geography/sedona_udf/sedona_udf_test_internal.h"
 
 namespace s2geography {
 
@@ -145,7 +145,7 @@ TEST(Build, UnaryUnionRoundtrip) {
 
 TEST(Build, ArrowUdfIntersection) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::IntersectionKernel(&kernel);
+  s2geography::sedona_udf::IntersectionKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
@@ -165,7 +165,7 @@ TEST(Build, ArrowUdfIntersection) {
 
 TEST(Build, ArrowUdfUnion) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::UnionKernel(&kernel);
+  s2geography::sedona_udf::UnionKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
@@ -185,7 +185,7 @@ TEST(Build, ArrowUdfUnion) {
 
 TEST(Build, ArrowUdfDifference) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::DifferenceKernel(&kernel);
+  s2geography::sedona_udf::DifferenceKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
@@ -205,7 +205,7 @@ TEST(Build, ArrowUdfDifference) {
 
 TEST(Build, ArrowUdfSymDifference) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::SymDifferenceKernel(&kernel);
+  s2geography::sedona_udf::SymDifferenceKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));

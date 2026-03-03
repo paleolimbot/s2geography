@@ -3,11 +3,11 @@
 #include <gtest/gtest.h>
 
 #include "nanoarrow/nanoarrow.hpp"
-#include "s2geography/arrow_udf/arrow_udf_test_internal.h"
+#include "s2geography/sedona_udf/sedona_udf_test_internal.h"
 
 TEST(Predicates, ArrowUdfIntersects) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::IntersectsKernel(&kernel);
+  s2geography::sedona_udf::IntersectsKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
@@ -27,7 +27,7 @@ TEST(Predicates, ArrowUdfIntersects) {
 
 TEST(Predicates, ArrowUdfEquals) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::EqualsKernel(&kernel);
+  s2geography::sedona_udf::EqualsKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
@@ -48,7 +48,7 @@ TEST(Predicates, ArrowUdfEquals) {
 
 TEST(Predicates, ArrowUdfContains) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::ContainsKernel(&kernel);
+  s2geography::sedona_udf::ContainsKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));

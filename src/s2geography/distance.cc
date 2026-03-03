@@ -6,8 +6,8 @@
 #include <s2/s2earth.h>
 #include <s2/s2furthest_edge_query.h>
 
-#include "s2geography/arrow_udf/arrow_udf_internal.h"
 #include "s2geography/geography.h"
+#include "s2geography/sedona_udf/sedona_udf_internal.h"
 
 namespace s2geography {
 
@@ -70,7 +70,7 @@ std::pair<S2Point, S2Point> s2_minimum_clearance_line_between(
   return S2::GetEdgePairClosestPoints(edge1.v0, edge1.v1, edge2.v0, edge2.v1);
 }
 
-namespace arrow_udf {
+namespace sedona_udf {
 
 struct S2DistanceExec {
   using arg0_t = GeographyIndexInputView;
@@ -126,6 +126,6 @@ void ShortestLineKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<S2ShortestLineExec>(out, "st_shortestline");
 }
 
-}  // namespace arrow_udf
+}  // namespace sedona_udf
 
 }  // namespace s2geography

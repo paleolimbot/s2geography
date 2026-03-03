@@ -15,12 +15,12 @@ S2Point s2_closest_point(const ShapeIndexGeography& geog1,
 std::pair<S2Point, S2Point> s2_minimum_clearance_line_between(
     const ShapeIndexGeography& geog1, const ShapeIndexGeography& geog2);
 
-namespace arrow_udf {
+namespace sedona_udf {
 
 void DistanceKernel(struct SedonaCScalarKernel* out);
 void MaxDistanceKernel(struct SedonaCScalarKernel* out);
 void ShortestLineKernel(struct SedonaCScalarKernel* out);
 void ClosestPointKernel(struct SedonaCScalarKernel* out);
-}  // namespace arrow_udf
+}  // namespace sedona_udf
 
 }  // namespace s2geography

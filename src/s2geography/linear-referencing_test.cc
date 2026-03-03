@@ -3,13 +3,13 @@
 #include <gtest/gtest.h>
 
 #include "nanoarrow/nanoarrow.hpp"
-#include "s2geography/arrow_udf/arrow_udf_test_internal.h"
+#include "s2geography/sedona_udf/sedona_udf_test_internal.h"
 
 using namespace s2geography;
 
 TEST(LinearReferencing, ArrowUdfLineLocatePoint) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::LineLocatePointKernel(&kernel);
+  s2geography::sedona_udf::LineLocatePointKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE));
@@ -29,7 +29,7 @@ TEST(LinearReferencing, ArrowUdfLineLocatePoint) {
 
 TEST(LinearReferencing, ArrowUdfLineInterpolatePoint) {
   struct SedonaCScalarKernel kernel;
-  s2geography::arrow_udf::LineInterpolatePointKernel(&kernel);
+  s2geography::sedona_udf::LineInterpolatePointKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));

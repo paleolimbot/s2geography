@@ -34,12 +34,12 @@ class S2ConvexHullAggregator
   std::vector<std::unique_ptr<Geography>> keep_alive_;
 };
 
-namespace arrow_udf {
+namespace sedona_udf {
 
 void CentroidKernel(struct SedonaCScalarKernel* out);
 void ConvexHullKernel(struct SedonaCScalarKernel* out);
 void PointOnSurfaceKernel(struct SedonaCScalarKernel* out);
 
-}  // namespace arrow_udf
+}  // namespace sedona_udf
 
 }  // namespace s2geography

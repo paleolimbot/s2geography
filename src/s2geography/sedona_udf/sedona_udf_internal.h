@@ -9,13 +9,13 @@
 
 namespace s2geography {
 
-namespace arrow_udf {
+namespace sedona_udf {
 
 /// \brief Helper to detect unreachable code, for use in static_assert
 template <class... T>
 struct always_false : std::false_type {};
 
-/// \defgroup arrow_udf-utils Arrow UDF Utilities
+/// \defgroup sedona_udf-utils Arrow UDF Utilities
 ///
 /// To simplify implementations of a large number of functions, we
 /// define some templated abstractions to handle input and output.
@@ -521,6 +521,6 @@ void InitBinaryKernel(struct SedonaCScalarKernel* out, const char* name) {
 
 /// @}
 
-}  // namespace arrow_udf
+}  // namespace sedona_udf
 
 }  // namespace s2geography

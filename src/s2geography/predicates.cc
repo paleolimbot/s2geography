@@ -6,7 +6,7 @@
 #include <s2/s2lax_loop_shape.h>
 
 #include "s2geography/accessors.h"
-#include "s2geography/arrow_udf/arrow_udf_internal.h"
+#include "s2geography/sedona_udf/sedona_udf_internal.h"
 
 namespace s2geography {
 
@@ -81,7 +81,7 @@ bool s2_intersects_box(const ShapeIndexGeography& geog1,
   return S2BooleanOperation::Intersects(geog1.ShapeIndex(), index, options);
 }
 
-namespace arrow_udf {
+namespace sedona_udf {
 
 struct S2Intersects {
   using arg0_t = GeographyIndexInputView;
@@ -137,6 +137,6 @@ void EqualsKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<S2Equals>(out, "st_equals");
 }
 
-}  // namespace arrow_udf
+}  // namespace sedona_udf
 
 }  // namespace s2geography

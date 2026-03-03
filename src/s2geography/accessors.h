@@ -17,11 +17,11 @@ double s2_x(const Geography& geog);
 double s2_y(const Geography& geog);
 bool s2_find_validation_error(const Geography& geog, S2Error* error);
 
-namespace arrow_udf {
+namespace sedona_udf {
 
 void LengthKernel(struct SedonaCScalarKernel* out);
 void AreaKernel(struct SedonaCScalarKernel* out);
 void PerimeterKernel(struct SedonaCScalarKernel* out);
-}  // namespace arrow_udf
+}  // namespace sedona_udf
 
 }  // namespace s2geography

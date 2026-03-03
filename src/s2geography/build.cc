@@ -11,9 +11,9 @@
 #include <sstream>
 
 #include "s2geography/accessors.h"
-#include "s2geography/arrow_udf/arrow_udf_internal.h"
 #include "s2geography/geography.h"
 #include "s2geography/macros.h"
+#include "s2geography/sedona_udf/sedona_udf_internal.h"
 
 namespace s2geography {
 
@@ -432,7 +432,7 @@ std::unique_ptr<Geography> S2UnionAggregator::Finalize() {
   }
 }
 
-namespace arrow_udf {
+namespace sedona_udf {
 
 template <S2BooleanOperation::OpType op_type>
 struct BooleanOperationExec {
@@ -474,6 +474,6 @@ void UnionKernel(struct SedonaCScalarKernel* out) {
       out, "st_union");
 }
 
-}  // namespace arrow_udf
+}  // namespace sedona_udf
 
 }  // namespace s2geography
