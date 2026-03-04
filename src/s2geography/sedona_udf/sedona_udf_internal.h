@@ -70,11 +70,7 @@ class ArrowOutputBuilder {
  public:
   using c_type = c_type_t;
 
-  ArrowOutputBuilder() {
-    NANOARROW_THROW_NOT_OK(
-        ArrowArrayInitFromType(array_.get(), arrow_type_val));
-    NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(array_.get()));
-  }
+  ArrowOutputBuilder() = default;
 
   void InitOutputType(struct ArrowSchema* out) {
     NANOARROW_THROW_NOT_OK(ArrowSchemaInitFromType(out, arrow_type_val));
@@ -85,6 +81,11 @@ class ArrowOutputBuilder {
   }
 
   void Reserve(int64_t additional_size) {
+    array_.reset();
+    NANOARROW_THROW_NOT_OK(
+        ArrowArrayInitFromType(array_.get(), arrow_type_val));
+    NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(array_.get()));
+
     NANOARROW_THROW_NOT_OK(ArrowArrayReserve(array_.get(), additional_size));
   }
 
@@ -146,7 +147,8 @@ class WkbGeographyOutputBuilder {
   }
 
   void Reserve(int64_t additional_size) {
-    // The current geoarrow writer doesn't provide any support for this
+    // The current geoarrow writer doesn't provide any support for this; however,
+    // it does support multiple cylces of Append/Finish.
   }
 
   void AppendNull() { writer_.WriteNull(); }

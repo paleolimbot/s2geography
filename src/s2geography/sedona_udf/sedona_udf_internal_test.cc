@@ -3,7 +3,9 @@
 #include "geoarrow/geoarrow.hpp"
 #include "nanoarrow/nanoarrow.hpp"
 #include "s2geography/accessors-geog.h"
+#include "s2geography/accessors.h"
 #include "s2geography/linear-referencing.h"
+#include "s2geography/sedona_udf/sedona_udf_test_internal.h"
 
 // Tests the matching of the Arrow argument and also propagation of the CRS from
 // the first argument in a binary kernel.
@@ -84,6 +86,72 @@ TEST(SedonaUdf, GeographyInputMatches) {
   ASSERT_NE(out->release, nullptr);
   auto out_type = ::geoarrow::GeometryDataType::Make(out.get());
   ASSERT_EQ(out_type.ToString(), "spherical geoarrow.wkb<OGC:CRS84>");
+
+  impl.release(&impl);
+  kernel.release(&kernel);
+}
+
+// Check that the same SedonaCScalarKernelImpl with Arrow output can be executed
+// more than once.
+TEST(SedonaUdf, ArrowOutputMultipleExecuteCalls) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::AreaKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(
+      TestInitKernel(&kernel, &impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
+                        {{"POINT (0 1)", "LINESTRING (0 0, 0 1)",
+                          "POLYGON ((0 0, 0 1, 1 0, 0 0))", std::nullopt}},
+                        {}, out_array.get()));
+  ASSERT_NO_FATAL_FAILURE(
+      TestResultArrow(out_array.get(), NANOARROW_TYPE_DOUBLE,
+                      {0.0, 0.0, 6182489130.9071951, std::nullopt}));
+
+  out_array.reset();
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
+                        {{"POINT (1 2)", "LINESTRING (1 2, 3 4)",
+                          "POLYGON ((0 0, 0 0.1, 0.1 0, 0 0))", std::nullopt}},
+                        {}, out_array.get()));
+  ASSERT_NO_FATAL_FAILURE(
+      TestResultArrow(out_array.get(), NANOARROW_TYPE_DOUBLE,
+                      {0.0, 0.0, 61821784.015993997, std::nullopt}));
+
+  impl.release(&impl);
+  kernel.release(&kernel);
+}
+
+// Check that the same SedonaCScalarKernelImpl with Arrow output can be executed
+// more than once.
+TEST(SedonaUdf, GeographyOutputMultipleExecuteCalls) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::CentroidKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(
+      TestInitKernel(&kernel, &impl, {ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
+                        {{"POINT (0 1)", "LINESTRING (0 0, 0 1)",
+                          "POLYGON ((0 0, 0 1, 1 0, 0 0))", std::nullopt}},
+                        {}, out_array.get()));
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(
+      out_array.get(), {"POINT (0 1)", "POINT (0 0.5)",
+                        "POINT (0.33335 0.333344)", std::nullopt}));
+
+  out_array.reset();
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
+                        {{"POINT (0 1)", "LINESTRING (0 0, 0 1)",
+                          "POLYGON ((0 0, 0 0.1, 0.1 0, 0 0))", std::nullopt}},
+                        {}, out_array.get()));
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(
+      out_array.get(), {"POINT (0 1)", "POINT (0 0.5)",
+                        "POINT (0.033333 0.033333)", std::nullopt}));
 
   impl.release(&impl);
   kernel.release(&kernel);
