@@ -16,6 +16,89 @@
 // - Test that CRSes are propatated from input to output for unary kernels
 // - Test that CRSes are propagsated from input to output for binary kernels
 
+// Tests the matching of the Arrow argument and also propagation of the CRS from
+// the first argument in a binary kernel.
+TEST(SedonaUdf, ArrowInputMatches) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::LineInterpolatePointKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  kernel.new_impl(&kernel, &impl);
+
+  // Wrong number of arguments
+  nanoarrow::UniqueSchema out;
+  ASSERT_EQ(impl.init(&impl, nullptr, nullptr, 0, out.get()), NANOARROW_OK);
+  ASSERT_EQ(out->release, nullptr);
+
+  // Wrong argument type for the Arrow input (second arg)
+  nanoarrow::UniqueSchema arg0;
+  nanoarrow::UniqueSchema arg1;
+  struct ArrowSchema* arg_ptrs[] = {arg0.get(), arg1.get()};
+
+  // Correct first arg
+  ::geoarrow::Wkb()
+      .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
+      .WithCrs("OGC:CRS84")
+      .InitSchema(arg0.get());
+  // Incorrect second arg
+  ASSERT_EQ(ArrowSchemaInitFromType(arg1.get(), NANOARROW_TYPE_STRING),
+            NANOARROW_OK);
+  ASSERT_EQ(impl.init(&impl, arg_ptrs, nullptr, 2, out.get()), NANOARROW_OK);
+  ASSERT_EQ(out->release, nullptr);
+
+  // Correct second arg
+  ASSERT_EQ(ArrowSchemaInitFromType(arg1.get(), NANOARROW_TYPE_DOUBLE),
+            NANOARROW_OK);
+  ASSERT_EQ(impl.init(&impl, arg_ptrs, nullptr, 2, out.get()), NANOARROW_OK);
+  ASSERT_NE(out->release, nullptr);
+  auto out_type = ::geoarrow::GeometryDataType::Make(out.get());
+  ASSERT_EQ(out_type.ToString(), "spherical geoarrow.wkb<OGC:CRS84>");
+
+  impl.release(&impl);
+  kernel.release(&kernel);
+}
+
+// Tests the matching of the Arrow argument and also propagation of the CRS from
+// the first argument in a unary kernel.
+TEST(SedonaUdf, GeographyInputMatches) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::CentroidKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  kernel.new_impl(&kernel, &impl);
+
+  // Wrong number of arguments
+  nanoarrow::UniqueSchema out;
+  ASSERT_EQ(impl.init(&impl, nullptr, nullptr, 0, out.get()), NANOARROW_OK);
+  ASSERT_EQ(out->release, nullptr);
+
+  // Wrong argument type
+  nanoarrow::UniqueSchema arg0;
+  struct ArrowSchema* arg0_ptr = arg0.get();
+  ASSERT_EQ(ArrowSchemaInitFromType(arg0.get(), NANOARROW_TYPE_INT32),
+            NANOARROW_OK);
+  ASSERT_EQ(impl.init(&impl, &arg0_ptr, nullptr, 1, out.get()), NANOARROW_OK);
+  ASSERT_EQ(out->release, nullptr);
+
+  // Wkb type with wrong edge type
+  arg0.reset();
+  ::geoarrow::Wkb().InitSchema(arg0.get());
+  ASSERT_EQ(impl.init(&impl, &arg0_ptr, nullptr, 1, out.get()), NANOARROW_OK);
+  ASSERT_EQ(out->release, nullptr);
+
+  // Correct argument
+  arg0.reset();
+  ::geoarrow::Wkb()
+      .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
+      .WithCrs("OGC:CRS84")
+      .InitSchema(arg0.get());
+  ASSERT_EQ(impl.init(&impl, &arg0_ptr, nullptr, 1, out.get()), NANOARROW_OK);
+  ASSERT_NE(out->release, nullptr);
+  auto out_type = ::geoarrow::GeometryDataType::Make(out.get());
+  ASSERT_EQ(out_type.ToString(), "spherical geoarrow.wkb<OGC:CRS84>");
+
+  impl.release(&impl);
+  kernel.release(&kernel);
+}
+
 TEST(SedonaUdf, GeographyToArrow) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::LengthKernel(&kernel);

@@ -190,7 +190,7 @@ class ArrowInputView {
         default:
           return false;
       }
-    } else if constexpr (std::is_integral_v<c_type_t>) {
+    } else if constexpr (std::is_same_v<c_type_t, int64_t>) {
       switch (schema_view.type) {
         case NANOARROW_TYPE_INT8:
         case NANOARROW_TYPE_UINT8:
@@ -205,8 +205,16 @@ class ArrowInputView {
         default:
           return false;
       }
-    } else if constexpr (std::is_floating_point_v<c_type>) {
+    } else if constexpr (std::is_same_v<c_type_t, double>) {
       switch (schema_view.type) {
+        case NANOARROW_TYPE_INT8:
+        case NANOARROW_TYPE_UINT8:
+        case NANOARROW_TYPE_INT16:
+        case NANOARROW_TYPE_UINT16:
+        case NANOARROW_TYPE_INT32:
+        case NANOARROW_TYPE_UINT32:
+        case NANOARROW_TYPE_INT64:
+        case NANOARROW_TYPE_UINT64:
         case NANOARROW_TYPE_HALF_FLOAT:
         case NANOARROW_TYPE_FLOAT:
         case NANOARROW_TYPE_DOUBLE:
@@ -240,9 +248,11 @@ class ArrowInputView {
   }
 
   c_type_t Get(int64_t i) {
-    if constexpr (std::is_integral_v<c_type_t>) {
+    if constexpr (std::is_same_v<c_type_t, bool>) {
       return ArrowArrayViewGetIntUnsafe(view_.get(), i % view_->length);
-    } else if constexpr (std::is_floating_point_v<c_type>) {
+    } else if constexpr (std::is_same_v<c_type_t, int64_t>) {
+      return ArrowArrayViewGetIntUnsafe(view_.get(), i % view_->length);
+    } else if constexpr (std::is_same_v<c_type, double>) {
       return ArrowArrayViewGetDoubleUnsafe(view_.get(), i % view_->length);
     } else {
       static_assert(always_false<c_type>::value, "value type not supported");
@@ -465,7 +475,7 @@ class SedonaUnaryKernelAdapter {
       }
 
       data->out->Finish(out);
-      return 0;
+      return NANOARROW_OK;
     } catch (std::exception& e) {
       data->last_error = e.what();
       return EINVAL;
@@ -534,7 +544,6 @@ class SedonaBinaryKernelAdapter {
         data->out->InitOutputTypeWithCrs(out, crs_out);
       }
 
-      data->out->InitOutputType(out);
       return 0;
     } catch (std::exception& e) {
       data->last_error = e.what();
