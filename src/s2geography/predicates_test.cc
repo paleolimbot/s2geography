@@ -13,11 +13,11 @@ TEST(Predicates, SedonaUdfIntersects) {
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
-      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL,
-      {{"POLYGON ((0 0, 1 0, 0 1, 0 0))"},
-       {"POINT (0.25 0.25)", "POINT (-1 -1)", std::nullopt}},
-      {}, out_array.get()));
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                        {{"POLYGON ((0 0, 1 0, 0 1, 0 0))"},
+                         {"POINT (0.25 0.25)", "POINT (-1 -1)", std::nullopt}},
+                        {}, out_array.get()));
   impl.release(&impl);
   kernel.release(&kernel);
 
@@ -33,12 +33,12 @@ TEST(Predicates, SedonaUdfEquals) {
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
-      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL,
-      {{"POLYGON ((0 0, 1 0, 0 1, 0 0))"},
-       {"POLYGON ((1 0, 0 1, 0 0, 1 0))", "POLYGON ((0 0, 2 0, 0 2, 0 0))",
-        std::nullopt}},
-      {}, out_array.get()));
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                        {{"POLYGON ((0 0, 1 0, 0 1, 0 0))"},
+                         {"POLYGON ((1 0, 0 1, 0 0, 1 0))",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", std::nullopt}},
+                        {}, out_array.get()));
   impl.release(&impl);
   kernel.release(&kernel);
 
@@ -54,11 +54,11 @@ TEST(Predicates, SedonaUdfContains) {
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
-      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL,
-      {{"POLYGON ((0 0, 2 0, 0 2, 0 0))"},
-       {"POINT (0.25 0.25)", "POINT (-1 -1)", std::nullopt}},
-      {}, out_array.get()));
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                        {{"POLYGON ((0 0, 2 0, 0 2, 0 0))"},
+                         {"POINT (0.25 0.25)", "POINT (-1 -1)", std::nullopt}},
+                        {}, out_array.get()));
   impl.release(&impl);
   kernel.release(&kernel);
 

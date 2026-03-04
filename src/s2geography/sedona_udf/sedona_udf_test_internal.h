@@ -141,7 +141,6 @@ inline void TestInitKernel(struct SedonaCScalarKernel* kernel,
 // arguments first.
 inline void TestExecuteKernel(
     struct SedonaCScalarKernelImpl* impl, std::vector<ArrowTypeOrWKB> arg_types,
-    ArrowTypeOrWKB result_type,
     std::vector<std::vector<std::optional<std::string>>> geography_args,
     std::vector<std::vector<std::optional<double>>> other_args,
     struct ArrowArray* out) {

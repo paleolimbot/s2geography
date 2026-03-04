@@ -102,7 +102,7 @@ TEST(SedonaUdf, ArrowOutputMultipleExecuteCalls) {
 
   nanoarrow::UniqueArray out_array;
   ASSERT_NO_FATAL_FAILURE(
-      TestExecuteKernel(&impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB},
                         {{"POINT (0 1)", "LINESTRING (0 0, 0 1)",
                           "POLYGON ((0 0, 0 1, 1 0, 0 0))", std::nullopt}},
                         {}, out_array.get()));
@@ -112,7 +112,7 @@ TEST(SedonaUdf, ArrowOutputMultipleExecuteCalls) {
 
   out_array.reset();
   ASSERT_NO_FATAL_FAILURE(
-      TestExecuteKernel(&impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB},
                         {{"POINT (1 2)", "LINESTRING (1 2, 3 4)",
                           "POLYGON ((0 0, 0 0.1, 0.1 0, 0 0))", std::nullopt}},
                         {}, out_array.get()));
@@ -135,7 +135,7 @@ TEST(SedonaUdf, GeographyOutputMultipleExecuteCalls) {
 
   nanoarrow::UniqueArray out_array;
   ASSERT_NO_FATAL_FAILURE(
-      TestExecuteKernel(&impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB},
                         {{"POINT (0 1)", "LINESTRING (0 0, 0 1)",
                           "POLYGON ((0 0, 0 1, 1 0, 0 0))", std::nullopt}},
                         {}, out_array.get()));
@@ -145,7 +145,7 @@ TEST(SedonaUdf, GeographyOutputMultipleExecuteCalls) {
 
   out_array.reset();
   ASSERT_NO_FATAL_FAILURE(
-      TestExecuteKernel(&impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB},
                         {{"POINT (0 1)", "LINESTRING (0 0, 0 1)",
                           "POLYGON ((0 0, 0 0.1, 0.1 0, 0 0))", std::nullopt}},
                         {}, out_array.get()));

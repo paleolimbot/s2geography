@@ -26,7 +26,7 @@ TEST(Distance, SedonaUdfDistance) {
 
   nanoarrow::UniqueArray out_array;
   ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
-      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
       {{"POINT (0 0)"}, {"POINT (0 1)", "LINESTRING (0 0, 0 1)", std::nullopt}},
       {}, out_array.get()));
   impl.release(&impl);
@@ -46,7 +46,7 @@ TEST(Distance, SedonaUdfMaxDistance) {
 
   nanoarrow::UniqueArray out_array;
   ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
-      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
       {{"POINT (0 0)"}, {"POINT (0 1)", "LINESTRING (0 0, 0 1)", std::nullopt}},
       {}, out_array.get()));
   impl.release(&impl);
@@ -66,7 +66,7 @@ TEST(Distance, SedonaUdfShortestLine) {
 
   nanoarrow::UniqueArray out_array;
   ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
-      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB,
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
       {{"POINT (0 0)"}, {"POINT (0 1)", "LINESTRING (0 0, 0 1)", std::nullopt}},
       {}, out_array.get()));
   impl.release(&impl);
@@ -86,7 +86,7 @@ TEST(Distance, SedonaUdfClosestPoint) {
 
   nanoarrow::UniqueArray out_array;
   ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
-      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB,
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
       {{"POINT (0 1)", "LINESTRING (0 0, 0 1)", std::nullopt}, {"POINT (0 0)"}},
       {}, out_array.get()));
   impl.release(&impl);

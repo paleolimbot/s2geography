@@ -15,7 +15,7 @@ TEST(Accessors, SedonaUdfArea) {
 
   nanoarrow::UniqueArray out_array;
   ASSERT_NO_FATAL_FAILURE(
-      TestExecuteKernel(&impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB},
                         {{"POINT (0 1)", "LINESTRING (0 0, 0 1)",
                           "POLYGON ((0 0, 0 1, 1 0, 0 0))", std::nullopt}},
                         {}, out_array.get()));
@@ -36,7 +36,7 @@ TEST(Accessors, SedonaUdfLength) {
 
   nanoarrow::UniqueArray out_array;
   ASSERT_NO_FATAL_FAILURE(
-      TestExecuteKernel(&impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB},
                         {{"POINT (0 1)", "LINESTRING (0 0, 0 1)",
                           "POLYGON ((0 0, 0 1, 1 0, 0 0))", std::nullopt}},
                         {}, out_array.get()));
@@ -57,7 +57,7 @@ TEST(AccessorsGeog, SedonaUdfCentroid) {
 
   nanoarrow::UniqueArray out_array;
   ASSERT_NO_FATAL_FAILURE(
-      TestExecuteKernel(&impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE,
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB},
                         {{"POINT (0 1)", "LINESTRING (0 0, 0 1)",
                           "POLYGON ((0 0, 0 1, 1 0, 0 0))", std::nullopt}},
                         {}, out_array.get()));
@@ -79,7 +79,7 @@ TEST(AccessorsGeog, SedonaUdfInterpolateNormalized) {
   nanoarrow::UniqueArray out_array;
   ASSERT_NO_FATAL_FAILURE(
       TestExecuteKernel(&impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
-                        ARROW_TYPE_WKB, {{"LINESTRING (0 0, 0 1)"}},
+                        {{"LINESTRING (0 0, 0 1)"}},
                         {{0.0, 0.5, 1.0, std::nullopt}}, out_array.get()));
   impl.release(&impl);
   kernel.release(&kernel);
