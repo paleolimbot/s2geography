@@ -35,6 +35,7 @@ TEST(SedonaUdf, ArrowInputMatches) {
   ASSERT_EQ(out->release, nullptr);
 
   // Correct second arg
+  arg1.reset();
   ASSERT_EQ(ArrowSchemaInitFromType(arg1.get(), NANOARROW_TYPE_DOUBLE),
             NANOARROW_OK);
   ASSERT_EQ(impl.init(&impl, arg_ptrs, nullptr, 2, out.get()), NANOARROW_OK);
