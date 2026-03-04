@@ -11,9 +11,9 @@
 #include <sstream>
 
 #include "s2geography/accessors.h"
-#include "s2geography/arrow_udf/arrow_udf_internal.h"
 #include "s2geography/geography.h"
 #include "s2geography/macros.h"
+#include "s2geography/sedona_udf/sedona_udf_internal.h"
 
 namespace s2geography {
 
@@ -432,7 +432,7 @@ std::unique_ptr<Geography> S2UnionAggregator::Finalize() {
   }
 }
 
-namespace arrow_udf {
+namespace sedona_udf {
 
 template <S2BooleanOperation::OpType op_type>
 struct BooleanOperationExec {
@@ -451,26 +451,29 @@ struct BooleanOperationExec {
   GlobalOptions options_;
 };
 
-std::unique_ptr<ArrowUDF> Difference() {
-  return std::make_unique<BinaryUDF<
-      BooleanOperationExec<S2BooleanOperation::OpType::DIFFERENCE>>>();
+void DifferenceKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<
+      BooleanOperationExec<S2BooleanOperation::OpType::DIFFERENCE>>(
+      out, "st_difference");
 }
 
-std::unique_ptr<ArrowUDF> SymDifference() {
-  return std::make_unique<BinaryUDF<BooleanOperationExec<
-      S2BooleanOperation::OpType::SYMMETRIC_DIFFERENCE>>>();
+void SymDifferenceKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<
+      BooleanOperationExec<S2BooleanOperation::OpType::SYMMETRIC_DIFFERENCE>>(
+      out, "st_symdifference");
 }
 
-std::unique_ptr<ArrowUDF> Intersection() {
-  return std::make_unique<BinaryUDF<
-      BooleanOperationExec<S2BooleanOperation::OpType::INTERSECTION>>>();
+void IntersectionKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<
+      BooleanOperationExec<S2BooleanOperation::OpType::INTERSECTION>>(
+      out, "st_intersection");
 }
 
-std::unique_ptr<ArrowUDF> Union() {
-  return std::make_unique<
-      BinaryUDF<BooleanOperationExec<S2BooleanOperation::OpType::UNION>>>();
+void UnionKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<BooleanOperationExec<S2BooleanOperation::OpType::UNION>>(
+      out, "st_union");
 }
 
-}  // namespace arrow_udf
+}  // namespace sedona_udf
 
 }  // namespace s2geography

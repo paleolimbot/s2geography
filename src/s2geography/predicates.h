@@ -3,8 +3,8 @@
 
 #include <s2/s2boolean_operation.h>
 
-#include "s2geography/arrow_udf/arrow_udf.h"
 #include "s2geography/geography.h"
+#include "s2geography/sedona_udf/sedona_extension.h"
 
 namespace s2geography {
 
@@ -29,15 +29,12 @@ bool s2_intersects_box(const ShapeIndexGeography& geog1,
                        const S2BooleanOperation::Options& options,
                        double tolerance);
 
-namespace arrow_udf {
-/// \brief Instantiate an ArrowUDF for the s2_intersects() function
-///
-/// This ArrowUDF handles any GeoArrow array as input and produces a boolean
-/// array as output.
-std::unique_ptr<ArrowUDF> Intersects();
-std::unique_ptr<ArrowUDF> Contains();
-std::unique_ptr<ArrowUDF> Equals();
+namespace sedona_udf {
 
-}  // namespace arrow_udf
+void IntersectsKernel(struct SedonaCScalarKernel* out);
+void ContainsKernel(struct SedonaCScalarKernel* out);
+void EqualsKernel(struct SedonaCScalarKernel* out);
+
+}  // namespace sedona_udf
 
 }  // namespace s2geography

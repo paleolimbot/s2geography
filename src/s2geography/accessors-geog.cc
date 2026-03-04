@@ -4,9 +4,9 @@
 #include <s2/s2centroids.h>
 
 #include "s2geography/accessors.h"
-#include "s2geography/arrow_udf/arrow_udf_internal.h"
 #include "s2geography/build.h"
 #include "s2geography/geography.h"
+#include "s2geography/sedona_udf/sedona_udf_internal.h"
 
 namespace s2geography {
 
@@ -200,7 +200,7 @@ std::unique_ptr<PolygonGeography> S2ConvexHullAggregator::Finalize() {
   return absl::make_unique<PolygonGeography>(std::move(polygon));
 }
 
-namespace arrow_udf {
+namespace sedona_udf {
 
 struct S2CentroidExec {
   using arg0_t = GeographyInputView;
@@ -216,10 +216,6 @@ struct S2CentroidExec {
 
   PointGeography stashed_;
 };
-
-std::unique_ptr<ArrowUDF> Centroid() {
-  return std::make_unique<UnaryUDF<S2CentroidExec>>();
-}
 
 struct S2ClosestPointExec {
   using arg0_t = GeographyIndexInputView;
@@ -237,10 +233,6 @@ struct S2ClosestPointExec {
   PointGeography stashed_;
 };
 
-std::unique_ptr<ArrowUDF> ClosestPoint() {
-  return std::make_unique<BinaryUDF<S2ClosestPointExec>>();
-}
-
 struct S2ConvexHullExec {
   using arg0_t = GeographyInputView;
   using out_t = WkbGeographyOutputBuilder;
@@ -254,10 +246,6 @@ struct S2ConvexHullExec {
 
   std::unique_ptr<Geography> stashed_;
 };
-
-std::unique_ptr<ArrowUDF> ConvexHull() {
-  return std::make_unique<UnaryUDF<S2ConvexHullExec>>();
-}
 
 struct S2PointOnSurfaceExec {
   using arg0_t = GeographyInputView;
@@ -275,9 +263,21 @@ struct S2PointOnSurfaceExec {
   S2RegionCoverer coverer_;
 };
 
-std::unique_ptr<ArrowUDF> PointOnSurface() {
-  return std::make_unique<UnaryUDF<S2PointOnSurfaceExec>>();
+void CentroidKernel(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<S2CentroidExec>(out, "st_centroid");
 }
-}  // namespace arrow_udf
+
+void ConvexHullKernel(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<S2ConvexHullExec>(out, "st_convexhull");
+}
+
+void PointOnSurfaceKernel(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<S2PointOnSurfaceExec>(out, "st_pointonsurface");
+}
+
+void ClosestPointKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<S2ClosestPointExec>(out, "st_closestpoint");
+}
+}  // namespace sedona_udf
 
 }  // namespace s2geography

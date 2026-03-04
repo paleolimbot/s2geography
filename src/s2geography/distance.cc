@@ -6,8 +6,8 @@
 #include <s2/s2earth.h>
 #include <s2/s2furthest_edge_query.h>
 
-#include "s2geography/arrow_udf/arrow_udf_internal.h"
 #include "s2geography/geography.h"
+#include "s2geography/sedona_udf/sedona_udf_internal.h"
 
 namespace s2geography {
 
@@ -70,7 +70,7 @@ std::pair<S2Point, S2Point> s2_minimum_clearance_line_between(
   return S2::GetEdgePairClosestPoints(edge1.v0, edge1.v1, edge2.v0, edge2.v1);
 }
 
-namespace arrow_udf {
+namespace sedona_udf {
 
 struct S2DistanceExec {
   using arg0_t = GeographyIndexInputView;
@@ -84,10 +84,6 @@ struct S2DistanceExec {
   }
 };
 
-std::unique_ptr<ArrowUDF> Distance() {
-  return std::make_unique<BinaryUDF<S2DistanceExec>>();
-}
-
 struct S2MaxDistanceExec {
   using arg0_t = GeographyIndexInputView;
   using arg1_t = GeographyIndexInputView;
@@ -99,10 +95,6 @@ struct S2MaxDistanceExec {
     return s2_max_distance(value0, value1) * S2Earth::RadiusMeters();
   }
 };
-
-std::unique_ptr<ArrowUDF> MaxDistance() {
-  return std::make_unique<BinaryUDF<S2MaxDistanceExec>>();
-}
 
 struct S2ShortestLineExec {
   using arg0_t = GeographyIndexInputView;
@@ -122,10 +114,18 @@ struct S2ShortestLineExec {
   PolylineGeography stashed_;
 };
 
-std::unique_ptr<ArrowUDF> ShortestLine() {
-  return std::make_unique<BinaryUDF<S2ShortestLineExec>>();
+void DistanceKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<S2DistanceExec>(out, "st_distance");
 }
 
-}  // namespace arrow_udf
+void MaxDistanceKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<S2MaxDistanceExec>(out, "st_maxdistance");
+}
+
+void ShortestLineKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<S2ShortestLineExec>(out, "st_shortestline");
+}
+
+}  // namespace sedona_udf
 
 }  // namespace s2geography

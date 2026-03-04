@@ -3,9 +3,9 @@
 
 #include <s2/s2earth.h>
 
-#include "s2geography/arrow_udf/arrow_udf_internal.h"
 #include "s2geography/build.h"
 #include "s2geography/geography.h"
+#include "s2geography/sedona_udf/sedona_udf_internal.h"
 
 namespace s2geography {
 
@@ -272,7 +272,7 @@ bool s2_find_validation_error(const Geography& geog, S2Error* error) {
       "s2_find_validation() error not implemented for this geography type");
 }
 
-namespace arrow_udf {
+namespace sedona_udf {
 struct S2LengthExec {
   using arg0_t = GeographyInputView;
   using out_t = DoubleOutputBuilder;
@@ -283,10 +283,6 @@ struct S2LengthExec {
     return s2_length(value) * S2Earth::RadiusMeters();
   }
 };
-
-std::unique_ptr<ArrowUDF> Length() {
-  return std::make_unique<UnaryUDF<S2LengthExec>>();
-}
 
 struct S2AreaExec {
   using arg0_t = GeographyInputView;
@@ -299,10 +295,6 @@ struct S2AreaExec {
   }
 };
 
-std::unique_ptr<ArrowUDF> Area() {
-  return std::make_unique<UnaryUDF<S2AreaExec>>();
-}
-
 struct S2PerimeterExec {
   using arg0_t = GeographyInputView;
   using out_t = DoubleOutputBuilder;
@@ -314,9 +306,17 @@ struct S2PerimeterExec {
   }
 };
 
-std::unique_ptr<ArrowUDF> Perimeter() {
-  return std::make_unique<UnaryUDF<S2PerimeterExec>>();
+void LengthKernel(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<S2LengthExec>(out, "st_length");
 }
-}  // namespace arrow_udf
+
+void AreaKernel(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<S2AreaExec>(out, "st_area");
+}
+
+void PerimeterKernel(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<S2PerimeterExec>(out, "st_perimeter");
+}
+}  // namespace sedona_udf
 
 }  // namespace s2geography
