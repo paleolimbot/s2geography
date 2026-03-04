@@ -147,8 +147,8 @@ class WkbGeographyOutputBuilder {
   }
 
   void Reserve(int64_t additional_size) {
-    // The current geoarrow writer doesn't provide any support for this; however,
-    // it does support multiple cylces of Append/Finish.
+    // The current geoarrow writer doesn't provide any support for this;
+    // however, it does support multiple cylces of Append/Finish.
   }
 
   void AppendNull() { writer_.WriteNull(); }
