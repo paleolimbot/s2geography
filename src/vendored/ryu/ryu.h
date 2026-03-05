@@ -23,6 +23,8 @@ extern "C" {
 
 #include <inttypes.h>
 
+#include "geoarrow/geoarrow.h"
+
 /* Print the shortest representation of a double using fixed notation
  * Only works for numbers smaller than 1e+17 (absolute value)
  * Precision limits the amount of digits of the decimal part

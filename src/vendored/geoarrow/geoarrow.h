@@ -14,6 +14,10 @@
 
 #define GEOARROW_USE_RYU 1
 
+#ifndef GEOARROW_NATIVE_ENDIAN
+#define GEOARROW_NATIVE_ENDIAN 0x01
+#endif
+
 #endif
 
 #ifndef GEOARROW_GEOARROW_TYPES_H_INCLUDED
@@ -134,6 +138,160 @@ struct ArrowArrayStream {
 
 #define GEOARROW_UNUSED(expr) ((void)expr)
 
+// This section remaps the non-prefixed symbols to the prefixed symbols so that
+// code written against this build can be used independent of the value of
+// GEOARROW_NAMESPACE.
+#ifdef GEOARROW_NAMESPACE
+
+#define GeoArrowVersion _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowVersion)
+#define GeoArrowVersionInt _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowVersionInt)
+#define GeoArrowErrorSet _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowErrorSet)
+#define GeoArrowFromChars _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowFromChars)
+#define GeoArrowPrintDouble _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowPrintDouble)
+#define GeoArrowSchemaInit _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowSchemaInit)
+#define GeoArrowSchemaInitExtension \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowSchemaInitExtension)
+#define GeoArrowSchemaViewInit \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowSchemaViewInit)
+#define GeoArrowSchemaViewInitFromStorage \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowSchemaViewInitFromStorage)
+#define GeoArrowSchemaViewInitFromType \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowSchemaViewInitFromType)
+#define GeoArrowMetadataViewInit \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowMetadataViewInit)
+#define GeoArrowMetadataSerialize \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowMetadataSerialize)
+#define GeoArrowSchemaSetMetadata \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowSchemaSetMetadata)
+#define GeoArrowSchemaSetMetadataFrom \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowSchemaSetMetadataFrom)
+#define GeoArrowMetadataSetLonLat \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowMetadataSetLonLat)
+#define GeoArrowUnescapeCrs _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowUnescapeCrs)
+#define GeoArrowArrayViewInitFromType \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayViewInitFromType)
+#define GeoArrowArrayViewInitFromSchema \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayViewInitFromSchema)
+#define GeoArrowArrayViewSetArray \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayViewSetArray)
+#define GeoArrowBuilderInitFromType \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowBuilderInitFromType)
+#define GeoArrowBuilderInitFromSchema \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowBuilderInitFromSchema)
+#define GeoArrowBuilderReserveBuffer \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowBuilderReserveBuffer)
+#define GeoArrowBuilderAppendBufferUnsafe \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowBuilderAppendBufferUnsafe)
+#define GeoArrowBuilderAppendBuffer \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowBuilderAppendBuffer)
+#define GeoArrowBuilderSetOwnedBuffer \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowBuilderSetOwnedBuffer)
+#define GeoArrowBuilderFinish \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowBuilderFinish)
+#define GeoArrowBuilderReset _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowBuilderReset)
+#define GeoArrowScalarUdfFactoryInit \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowScalarUdfFactoryInit)
+#define GeoArrowKernelInit _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowKernelInit)
+#define GeoArrowGeometryInit _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowGeometryInit)
+#define GeoArrowGeometryReset \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowGeometryReset)
+#define GeoArrowGeometryShallowCopy \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowGeometryShallowCopy)
+#define GeoArrowGeometryDeepCopy \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowGeometryDeepCopy)
+#define GeoArrowGeometryResizeNodes \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowGeometryResizeNodes)
+#define GeoArrowGeometryAppendNode \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowGeometryAppendNode)
+#define GeoArrowGeometryViewVisit \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowGeometryViewVisit)
+#define GeoArrowGeometryVisit \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowGeometryVisit)
+#define GeoArrowGeometryInitVisitor \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowGeometryInitVisitor)
+#define GeoArrowVisitorInitVoid \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowVisitorInitVoid)
+#define GeoArrowArrayViewVisitNative \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayViewVisitNative)
+#define GeoArrowNativeWriterInit \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowNativeWriterInit)
+#define GeoArrowNativeWriterAppend \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowNativeWriterAppend)
+#define GeoArrowNativeWriterAppendNull \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowNativeWriterAppendNull)
+#define GeoArrowNativeWriterInitVisitor \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowNativeWriterInitVisitor)
+#define GeoArrowNativeWriterFinish \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowNativeWriterFinish)
+#define GeoArrowNativeWriterReset \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowNativeWriterReset)
+#define GeoArrowWKTWriterInit \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKTWriterInit)
+#define GeoArrowWKTWriterInitVisitor \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKTWriterInitVisitor)
+#define GeoArrowWKTWriterFinish \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKTWriterFinish)
+#define GeoArrowWKTWriterReset \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKTWriterReset)
+#define GeoArrowWKTReaderInit \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKTReaderInit)
+#define GeoArrowWKTReaderVisit \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKTReaderVisit)
+#define GeoArrowWKTReaderReset \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKTReaderReset)
+#define GeoArrowWKBWriterInit \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKBWriterInit)
+#define GeoArrowWKBWriterInitVisitor \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKBWriterInitVisitor)
+#define GeoArrowWKBWriterAppend \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKBWriterAppend)
+#define GeoArrowWKBWriterAppendNull \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKBWriterAppendNull)
+#define GeoArrowWKBWriterFinish \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKBWriterFinish)
+#define GeoArrowWKBWriterReset \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKBWriterReset)
+#define GeoArrowWKBReaderInit \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKBReaderInit)
+#define GeoArrowWKBReaderVisit \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKBReaderVisit)
+#define GeoArrowWKBReaderRead \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKBReaderRead)
+#define GeoArrowWKBReaderReset \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowWKBReaderReset)
+#define GeoArrowArrayReaderInitFromType \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayReaderInitFromType)
+#define GeoArrowArrayReaderInitFromSchema \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayReaderInitFromSchema)
+#define GeoArrowArrayReaderSetArray \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayReaderSetArray)
+#define GeoArrowArrayReaderVisit \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayReaderVisit)
+#define GeoArrowArrayReaderArrayView \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayReaderArrayView)
+#define GeoArrowArrayReaderReset \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayReaderReset)
+#define GeoArrowArrayWriterInitFromType \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayWriterInitFromType)
+#define GeoArrowArrayWriterInitFromSchema \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayWriterInitFromSchema)
+#define GeoArrowArrayWriterSetPrecision \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayWriterSetPrecision)
+#define GeoArrowArrayWriterSetFlatMultipoint \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayWriterSetFlatMultipoint)
+#define GeoArrowArrayWriterInitVisitor \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayWriterInitVisitor)
+#define GeoArrowArrayWriterFinish \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayWriterFinish)
+#define GeoArrowArrayWriterReset \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowArrayWriterReset)
+#define GeoArrowFromChars _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowFromChars)
+#define GeoArrowd2sexp_buffered_n \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowd2sexp_buffered_n)
+#define GeoArrowd2sfixed_buffered_n \
+  _GEOARROW_MAKE_NAME(GEOARROW_NAMESPACE, GeoArrowd2sfixed_buffered_n)
+#endif
+
 /// \brief Represents an errno-compatible error code
 /// \ingroup geoarrow-utility
 typedef int GeoArrowErrorCode;
@@ -183,6 +341,9 @@ enum GeoArrowType {
 
   GEOARROW_TYPE_WKT = 100003,
   GEOARROW_TYPE_LARGE_WKT = 100004,
+
+  GEOARROW_TYPE_WKB_VIEW = 100005,
+  GEOARROW_TYPE_WKT_VIEW = 100006,
 
   GEOARROW_TYPE_BOX = 990,
   GEOARROW_TYPE_BOX_Z = 1990,
@@ -281,7 +442,14 @@ enum GeoArrowCoordType {
 
 /// \brief Edge types/interpolations supported by GeoArrow
 /// \ingroup geoarrow-schema
-enum GeoArrowEdgeType { GEOARROW_EDGE_TYPE_PLANAR, GEOARROW_EDGE_TYPE_SPHERICAL };
+enum GeoArrowEdgeType {
+  GEOARROW_EDGE_TYPE_PLANAR,
+  GEOARROW_EDGE_TYPE_SPHERICAL,
+  GEOARROW_EDGE_TYPE_VINCENTY,
+  GEOARROW_EDGE_TYPE_THOMAS,
+  GEOARROW_EDGE_TYPE_ANDOYER,
+  GEOARROW_EDGE_TYPE_KARNEY
+};
 
 /// \brief Coordinate reference system types supported by GeoArrow
 /// \ingroup geoarrow-schema
@@ -292,6 +460,148 @@ enum GeoArrowCrsType {
   GEOARROW_CRS_TYPE_WKT2_2019,
   GEOARROW_CRS_TYPE_AUTHORITY_CODE,
   GEOARROW_CRS_TYPE_SRID
+};
+
+/// \brief Flag to indicate that coordinates must be endian-swapped before being
+/// interpreted on the current platform
+#define GEOARROW_GEOMETRY_NODE_FLAG_SWAP_ENDIAN 0x01
+
+/// \brief Generic Geometry node representation
+///
+/// This structure represents a generic view on a geometry, inspired by DuckDB-spatial's
+/// sgl::geometry. The ownership of this struct is typically managed by a
+/// GeoArrowGeometryRoot or a generic sequence type (e.g., std::vector). Its design allows
+/// for efficient iteration over a wide variety of underlying structures without the need
+/// for recursive structures (but allowing for recursive iteration where required).
+///
+/// A typical geometry is represented by one or more GeoArrowGeometryNodes arranged
+/// sequentially in memory depth-first such that a node is followed by its children (if
+/// any), then any remaining siblings from a common parent (if any), and so on. Nodes
+/// should be passed by pointer such that a function can iterate over children; however,
+/// function signatures should make this expectation clear.
+///
+/// This structure is packed such that it is pointer-aligned and occupies 64 bytes.
+struct GeoArrowGeometryNode {
+  /// \brief Coordinate data
+  ///
+  /// Each pointer in coords points to the first coordinate in the sequence when
+  /// geometry_type is GEOARROW_GEOMETRY_TYPE_POINT or GEOARROW_GEOMETRY_TYPE_LINESTRING
+  /// ordered according to the dimensions specified in dimensions.
+  ///
+  /// The pointers need not be aligned. The data type must be a float, double, or signed
+  /// 32-bit integer, communicated by a parent structure. Producers should produce double
+  /// coordinates unless absolutely necessary; consumers may choose to only support double
+  /// coordinates. Unless specified by a parent structure coordinates are C doubles.
+  ///
+  /// For dimension j, it must be safe to access the range
+  /// [coords[j], coords[j] + size * stride[j] + sizeof(T)].
+  ///
+  /// The pointers in coords must never be NULL. Empty dimensions must point to a valid
+  /// address whose value is NaN (for floating point types) or the most negative possible
+  /// value (for integer types). This is true even when size is 0 (i.e., it must always be
+  /// safe to access at least one value).
+  const uint8_t* coords[4];
+
+  /// \brief Number of bytes between adjacent coordinate values in coords, respectively
+  ///
+  /// The number of bytes to advance each pointer in coords when moving to the next
+  /// coordinate. This allow representing a wide variety of coordinate layouts:
+  ///
+  /// - Interleaved coordinates: coord_stride is n_dimensions * sizeof(T). For
+  ///   example, interleaved XY coordinates with double precision would have
+  ///   coords set to {data, data + 8, &kNaN, &kNaN} and coord_stride set to
+  ///   {16, 16, 0, 0}
+  /// - Separated coordinates: coord_stride is sizeof(T). For example, separated
+  ///   XY coordinates would have coords set to {x, y, &kNaN, &kNaN} and
+  ///   coord_stride set to {8, 8, 0, 0}.
+  /// - A constant value: coord_stride is 0. For example, the value 30, 10 as
+  ///   a constant would have coords set to {&thirty, &ten, &kNaN, &kNaN} and
+  ///   coord_stride set to {0, 0, 0, 0}.
+  /// - WKB values with constant length packed end-to-end contiguously in memory
+  ///   (e.g., in an Arrow array as the data buffer in an Array that does not
+  ///   contain nulls): coord_stride is the size of one WKB item. For example,
+  ///   an Arrow array of XY points would have coords set to {data + 1 + 4,
+  ///   data + 1 + 4 + 8, &kNaN, &kNaN} and stride set to {21, 21, 0, 0}.
+  /// - Any of the above but reversed (by pointing to the last coordinate
+  ///   and setting the stride to a negative value).
+  int32_t coord_stride[4];
+
+  /// \brief The number of coordinates or children in this geometry
+  ///
+  /// When geometry_type is GEOARROW_GEOMETRY_TYPE_POINT or
+  /// GEOARROW_GEOMETRY_TYPE_LINESTRING, the number of coordinates in the sequence.
+  /// Otherwise, the number of child geometries.
+  uint32_t size;
+
+  /// \brief The GeoArrowGeometryType of this geometry
+  ///
+  /// For the purposes of this structure, rings of a polygon are considered a
+  /// GEOARROW_GEOMETRY_TYPE_LINESTRING. The value GEOARROW_GEOMETRY_TYPE_UNINITIALIZED
+  /// can be used to communicate an invalid or null value but must set size to zero.
+  uint8_t geometry_type;
+
+  /// \brief The GeoArrowDimensions
+  uint8_t dimensions;
+
+  /// \brief Flags
+  ///
+  /// The only currently supported flag is GEOARROW_GEOMETRY_NODE_FLAG_SWAP_ENDIAN
+  /// to indicate that coords must be endian-swapped before being interpreted
+  /// on the current platform.
+  uint8_t flags;
+
+  /// \brief The recursion level
+  ///
+  /// A level of 0 represents the root geometry and is incremented for
+  /// child geometries (e.g., polygon ring or child of a multi geometry
+  /// or collection).
+  uint8_t level;
+
+  /// \brief User data
+  ///
+  /// The user data is an opportunity for the producer to attach additional
+  /// information to a node or for the consumer to cache information during
+  /// processing. The producer nor the consumer must not rely on the value of this
+  /// pointer for memory management (i.e., bookkeeping details must be handled
+  /// elsewhere).
+  const void* user_data;
+};
+
+/// \brief View of a geometry represented by a sequence of GeoArrowGeometryNode
+///
+/// This struct owns neither the array of nodes nor the array(s) of coordinates.
+struct GeoArrowGeometryView {
+  /// \brief A pointer to the root geometry node
+  ///
+  /// The memory is managed by the producer of the struct (e.g., a WKBReader
+  /// will hold the array of GeoArrowGeometryNode and populate this struct
+  /// to communicate the result.
+  const struct GeoArrowGeometryNode* root;
+
+  /// \brief The number of valid nodes in the root array
+  ///
+  /// This can be used when iterating over the geometry to ensure the sizes of
+  /// the children are correctly set.
+  int64_t size_nodes;
+};
+
+/// \brief Variant of the GeoArrowGeometry that owns its GeoArrowGeometryNode and/or
+/// its coordinates
+struct GeoArrowGeometry {
+  /// \brief A pointer to the root geometry node
+  struct GeoArrowGeometryNode* root;
+
+  /// \brief The number of valid nodes in the root array
+  ///
+  /// This can be used when iterating over the geometry to ensure the sizes of
+  /// the children are correctly set.
+  int64_t size_nodes;
+
+  /// \brief The number of allocated nodes in the root array
+  int64_t capacity_nodes;
+
+  /// \brief Opaque data
+  void* private_data;
 };
 
 /// \brief Parsed view of an ArrowSchema representation of a GeoArrowType
@@ -572,6 +882,85 @@ struct GeoArrowVisitor {
   struct GeoArrowError* error;
 };
 
+/// \brief Simple ABI-stable scalar function implementation
+///
+/// This object is not thread safe: callers must take care to serialize
+/// access to methods if an instance is shared across threads. In general,
+/// constructing and initializing this structure should be sufficiently
+/// cheap that it shouldn't need to be shared in this way.
+struct GeoArrowScalarUdf {
+  /// \brief Initialize the state of this UDF instance and calculate a return
+  /// type
+  ///
+  /// The init callback either computes a return ArrowSchema or initializes the
+  /// return ArrowSchema to an explicitly released value to indicate that this
+  /// implementation does not apply to the arguments passed. An implementation
+  /// that does not apply to the arguments passed is not necessarily an error
+  /// (there may be another implementation prepared to handle such a case).
+  ///
+  /// \param arg_types Argument types
+  /// \param scalar_args An optional array of scalar arguments. The entire
+  /// array may be null to indicate that none of the arguments are scalars, or
+  /// individual items in the array may be NULL to indicate that a particular
+  /// argument is not a scalar. Any non-NULL arrays must be of length 1.
+  /// Implementations MAY take ownership over the elements of scalar_args but
+  /// are not required to do so (i.e., caller must check if these elements were
+  /// released, and must release them if needed).
+  /// \param n_args Number of elements in the arg_types and/or scalar_args arrays.
+  /// \param out Will be populated with the return type on success, or initialized
+  /// to a released value if this implementation does not apply to the arguments
+  /// passed.
+  ///
+  /// \return An errno-compatible error code, or zero on success.
+  int (*init)(struct GeoArrowScalarUdf* self, const struct ArrowSchema** arg_types,
+              struct ArrowArray** scalar_args, int64_t n_args, struct ArrowSchema* out);
+
+  /// \brief Execute a single batch
+  ///
+  /// \param args Input arguments. Input must be length one (e.g., a scalar)
+  /// or the size of the batch. Implementations must handle scalar or array
+  /// inputs.
+  /// \param n_args The number of pointers in args
+  /// \param out Will be populated with the result on success.
+  int (*execute)(struct GeoArrowScalarUdf* self, struct ArrowArray** args, int64_t n_args,
+                 int64_t n_rows, struct ArrowArray* out);
+
+  /// \brief Get the last error message
+  ///
+  /// The result is valid until the next call to a UDF method.
+  const char* (*get_last_error)(struct GeoArrowScalarUdf* self);
+
+  /// \brief Release this instance
+  ///
+  /// Implementations of this callback must set self->release to NULL.
+  void (*release)(struct GeoArrowScalarUdf* self);
+
+  /// \brief Opaque implementation-specific data
+  void* private_data;
+};
+
+/// \brief Scalar function initializer
+///
+/// Usually a GeoArrowScalarUdf will be used to execute a single batch
+/// (although it may be reused if a caller can serialize callback use). This
+/// structure is a factory object that initializes such objects.
+struct GeoArrowScalarUdfFactory {
+  /// \brief Initialize a new implementation struct
+  ///
+  /// This callback is thread safe and may be called concurrently from any
+  /// thread at any time (as long as this object is valid).
+  void (*new_scalar_udf_impl)(struct GeoArrowScalarUdfFactory* self,
+                              struct GeoArrowScalarUdf* out);
+
+  /// \brief Release this instance
+  ///
+  /// Implementations of this callback must set self->release to NULL.
+  void (*release)(struct GeoArrowScalarUdfFactory* self);
+
+  /// \brief Opaque implementation-specific data
+  void* private_data;
+};
+
 /// \brief Generalized compute kernel
 ///
 /// Callers are responsible for calling the release callback when finished
@@ -826,6 +1215,23 @@ void GeoArrowBuilderReset(struct GeoArrowBuilder* builder);
 
 /// @}
 
+/// \defgroup geoarrow-udf Function implementations
+///
+/// The GeoArrow C library provides a limited number of function implementations
+/// for several low-level ST_ functions. These functions are more database-like
+/// than the previous GeoArrowKernel-based framework whose interface did not
+/// align well with any existing UDF framework. The implementations provided here
+/// may still require some composition at a higher level but are better suited
+/// to dropping in to a SedonaDB/DuckDB/Acero-like engine.
+///
+/// @{
+
+GeoArrowErrorCode GeoArrowScalarUdfFactoryInit(struct GeoArrowScalarUdfFactory* out,
+                                               const char* name, const char* options,
+                                               struct GeoArrowError* error);
+
+/// @}
+
 /// \defgroup geoarrow-kernels Transform Arrays
 ///
 /// The GeoArrow C library provides limited support for transforming arrays.
@@ -891,6 +1297,79 @@ GeoArrowErrorCode GeoArrowKernelInit(struct GeoArrowKernel* kernel, const char* 
 
 /// @}
 
+/// \defgroup geoarrow-geometry Zero-copy friendly scalar geometries
+///
+/// The GeoArrowGeometry, GeoArrowGeometry, and GeoArrowGeometryNode form the
+/// basis for iterating over single geometries in the GeoArrow C library. Whereas
+/// GeoArrow allows a more efficient implementation of many algorithms by treating
+/// Arrays as a whole, sometimes the concept of a scalar is needed to interact
+/// with other libraries or reduce the complexity of an operation.
+///
+/// - A GeoArrowGeometryNode is a view of a coordinate sequence (point, linestring, or
+///   polygon ring) or size (with children immediately following in depth-first order).
+/// - A GeoArrowGeometry is a view of a contiguous sequence of GeoArrowGeometryNodes,
+///   and owns neither the array of nodes nor the underlying coordinates.
+/// - A GeoArrowGeometry owns its array of nodes and optionally the underlying
+///   coordinates.
+///
+/// This approach is friendly to iteration over a potentially many items with few
+/// if any dynamic allocations.
+///
+/// @{
+
+/// \brief Initialize geometry for a GeoArrowGeometry
+///
+/// If GEOARROW_OK is returned, the caller is responsible for calling
+/// GeoArrowGeometryReset.
+GeoArrowErrorCode GeoArrowGeometryInit(struct GeoArrowGeometry* geom);
+
+/// \brief Free memory associated with a GeoArrowGeometry
+void GeoArrowGeometryReset(struct GeoArrowGeometry* geom);
+
+/// \brief Populate the nodes of a GeoArrowGeometry from a GeoArrowGeometryView
+///
+/// Copies nodes from src into a previously initialized GeoArrowGeometry. On success
+/// the destination owns its nodes but not any underlying coordinates.
+GeoArrowErrorCode GeoArrowGeometryShallowCopy(struct GeoArrowGeometryView src,
+                                              struct GeoArrowGeometry* dst);
+
+/// \brief Populate the coords and nodes of a GeoArrowGeometry from a GeoArrowGeometryView
+///
+/// Copies nodes and coords from src into a previously initialized GeoArrowGeometry. On
+/// success the destination owns its nodes but and any underlying coordinates.
+GeoArrowErrorCode GeoArrowGeometryDeepCopy(struct GeoArrowGeometryView src,
+                                           struct GeoArrowGeometry* dst);
+
+/// \brief Resize the nodes list
+///
+/// This can be used to truncate the nodes list to zero before populating
+/// its contents with another value. Use GeoArrowGeometryResizeNodesInline()
+/// when calling this in a loop.
+GeoArrowErrorCode GeoArrowGeometryResizeNodes(struct GeoArrowGeometry* geom,
+                                              int64_t size_nodes);
+
+/// \brief Append a node to the nodes list and initialize its contents
+///
+/// This can be used to truncate the nodes list to zero before populating
+/// its contents with another value. Use GeoArrowGeometryAppendNodeInline()
+/// when calling this in a loop.
+GeoArrowErrorCode GeoArrowGeometryAppendNode(struct GeoArrowGeometry* geom,
+                                             struct GeoArrowGeometryNode** out);
+
+/// \brief Export a GeoArrowGeometryView using a GeoArrowVisitor
+GeoArrowErrorCode GeoArrowGeometryViewVisit(struct GeoArrowGeometryView geometry,
+                                            struct GeoArrowVisitor* v);
+
+/// \brief Export a GeoArrowGeometry using a GeoArrowVisitor
+GeoArrowErrorCode GeoArrowGeometryVisit(const struct GeoArrowGeometry* geom,
+                                        struct GeoArrowVisitor* v);
+
+/// \brief Build a GeoArrowGeometry using a visitor
+void GeoArrowGeometryInitVisitor(struct GeoArrowGeometry* geom,
+                                 struct GeoArrowVisitor* v);
+
+/// @}
+
 /// \defgroup geoarrow-visitor Low-level reader/visitor interfaces
 ///
 /// The GeoArrow specification defines memory layouts for many types.
@@ -940,6 +1419,14 @@ GeoArrowErrorCode GeoArrowNativeWriterInit(struct GeoArrowNativeWriter* writer,
 /// \brief Populate a GeoArrowVisitor pointing to this writer
 GeoArrowErrorCode GeoArrowNativeWriterInitVisitor(struct GeoArrowNativeWriter* writer,
                                                   struct GeoArrowVisitor* v);
+
+/// \brief Append a GeoArrowGeometryView to this writer
+GeoArrowErrorCode GeoArrowNativeWriterAppend(struct GeoArrowNativeWriter* writer,
+                                             struct GeoArrowGeometryView geom,
+                                             struct GeoArrowError* error);
+
+/// \brief Append a null element to this writer
+GeoArrowErrorCode GeoArrowNativeWriterAppendNull(struct GeoArrowNativeWriter* writer);
 
 /// \brief Finish an ArrowArray containing elements from the visited input
 ///
@@ -1036,6 +1523,13 @@ struct GeoArrowWKBWriter {
 /// GeoArrowWKBWriterReset().
 GeoArrowErrorCode GeoArrowWKBWriterInit(struct GeoArrowWKBWriter* writer);
 
+/// \brief Append a null element to this writer
+GeoArrowErrorCode GeoArrowWKBWriterAppendNull(struct GeoArrowWKBWriter* writer);
+
+/// \brief Append a GeoArrowGeometryView to this writer
+GeoArrowErrorCode GeoArrowWKBWriterAppend(struct GeoArrowWKBWriter* writer,
+                                          struct GeoArrowGeometryView geom);
+
 /// \brief Populate a GeoArrowVisitor pointing to this writer
 void GeoArrowWKBWriterInitVisitor(struct GeoArrowWKBWriter* writer,
                                   struct GeoArrowVisitor* v);
@@ -1069,6 +1563,11 @@ GeoArrowErrorCode GeoArrowWKBReaderInit(struct GeoArrowWKBReader* reader);
 GeoArrowErrorCode GeoArrowWKBReaderVisit(struct GeoArrowWKBReader* reader,
                                          struct GeoArrowBufferView src,
                                          struct GeoArrowVisitor* v);
+
+GeoArrowErrorCode GeoArrowWKBReaderRead(struct GeoArrowWKBReader* reader,
+                                        struct GeoArrowBufferView src,
+                                        struct GeoArrowGeometryView* out,
+                                        struct GeoArrowError* error);
 
 /// \brief Free resources held by a GeoArrowWKBWriter
 void GeoArrowWKBReaderReset(struct GeoArrowWKBReader* reader);
@@ -1188,6 +1687,26 @@ void GeoArrowArrayWriterReset(struct GeoArrowArrayWriter* writer);
 extern "C" {
 #endif
 
+static inline uint32_t GeoArrowBSwap32(uint32_t x) {
+  return (((x & 0xFF) << 24) | ((x & 0xFF00) << 8) | ((x & 0xFF0000) >> 8) |
+          ((x & 0xFF000000) >> 24));
+}
+
+static inline uint64_t GeoArrowBSwap64(uint64_t x) {
+  return (((x & 0xFFULL) << 56) | ((x & 0xFF00ULL) << 40) | ((x & 0xFF0000ULL) << 24) |
+          ((x & 0xFF000000ULL) << 8) | ((x & 0xFF00000000ULL) >> 8) |
+          ((x & 0xFF0000000000ULL) >> 24) | ((x & 0xFF000000000000ULL) >> 40) |
+          ((x & 0xFF00000000000000ULL) >> 56));
+}
+
+#ifndef GEOARROW_BSWAP32
+#define GEOARROW_BSWAP32(x) GeoArrowBSwap32(x)
+#endif
+
+#ifndef GEOARROW_BSWAP64
+#define GEOARROW_BSWAP64(x) GeoArrowBSwap64(x)
+#endif
+
 /// \brief Extract GeometryType from a GeoArrowType
 /// \ingroup geoarrow-schema
 static inline enum GeoArrowGeometryType GeoArrowGeometryTypeFromType(
@@ -1198,6 +1717,8 @@ static inline enum GeoArrowGeometryType GeoArrowGeometryTypeFromType(
     case GEOARROW_TYPE_LARGE_WKB:
     case GEOARROW_TYPE_WKT:
     case GEOARROW_TYPE_LARGE_WKT:
+    case GEOARROW_TYPE_WKB_VIEW:
+    case GEOARROW_TYPE_WKT_VIEW:
       return GEOARROW_GEOMETRY_TYPE_GEOMETRY;
 
     default:
@@ -1225,9 +1746,11 @@ static inline const char* GeoArrowExtensionNameFromType(enum GeoArrowType type) 
   switch (type) {
     case GEOARROW_TYPE_WKB:
     case GEOARROW_TYPE_LARGE_WKB:
+    case GEOARROW_TYPE_WKB_VIEW:
       return "geoarrow.wkb";
     case GEOARROW_TYPE_WKT:
     case GEOARROW_TYPE_LARGE_WKT:
+    case GEOARROW_TYPE_WKT_VIEW:
       return "geoarrow.wkt";
 
     default:
@@ -1297,6 +1820,14 @@ static inline const char* GeoArrowEdgeTypeString(enum GeoArrowEdgeType edge_type
       return "planar";
     case GEOARROW_EDGE_TYPE_SPHERICAL:
       return "spherical";
+    case GEOARROW_EDGE_TYPE_VINCENTY:
+      return "vincenty";
+    case GEOARROW_EDGE_TYPE_THOMAS:
+      return "thomas";
+    case GEOARROW_EDGE_TYPE_ANDOYER:
+      return "andoyer";
+    case GEOARROW_EDGE_TYPE_KARNEY:
+      return "karney";
     default:
       return "<not valid>";
   }
@@ -1330,8 +1861,10 @@ static inline enum GeoArrowDimensions GeoArrowDimensionsFromType(enum GeoArrowTy
     case GEOARROW_TYPE_UNINITIALIZED:
     case GEOARROW_TYPE_WKB:
     case GEOARROW_TYPE_LARGE_WKB:
+    case GEOARROW_TYPE_WKB_VIEW:
     case GEOARROW_TYPE_WKT:
     case GEOARROW_TYPE_LARGE_WKT:
+    case GEOARROW_TYPE_WKT_VIEW:
       return GEOARROW_DIMENSIONS_UNKNOWN;
 
     default:
@@ -1496,10 +2029,222 @@ static inline void GeoArrowMapDimensions(enum GeoArrowDimensions src_dim,
 }
 
 // Four little-endian NANs
+#if defined(GEOARROW_NATIVE_ENDIAN) && GEOARROW_NATIVE_ENDIAN == 0x00
+static uint8_t _GeoArrowkEmptyPointCoords[] = {
+    0x7f, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7f, 0xf8, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x7f, 0xf8, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x7f, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+#else
 static uint8_t _GeoArrowkEmptyPointCoords[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x7f, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0xf8, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0xf8, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x7f};
+#endif
+
+/// \brief View a GeoArrowGeometry
+/// \ingroup geoarrow-geometry
+///
+/// The geometry_type must be a POINT or LINESTRING.
+static inline struct GeoArrowGeometryView GeoArrowGeometryAsView(
+    const struct GeoArrowGeometry* geom) {
+  struct GeoArrowGeometryView out;
+  out.root = geom->root;
+  out.size_nodes = geom->size_nodes;
+  return out;
+}
+
+/// \brief Set a node where coordinates are stored in a row-major (C) array
+/// \ingroup geoarrow-geometry
+///
+/// The geometry_type must be a POINT or LINESTRING.
+static inline void GeoArrowGeometryNodeSetInterleaved(
+    struct GeoArrowGeometryNode* node, enum GeoArrowGeometryType geometry_type,
+    enum GeoArrowDimensions dimensions, struct GeoArrowBufferView coords) {
+  node->geometry_type = (uint8_t)geometry_type;
+  node->dimensions = (uint8_t)dimensions;
+
+  int32_t coord_stride_bytes = _GeoArrowkNumDimensions[dimensions] * sizeof(double);
+  node->size = (uint32_t)(coords.size_bytes / coord_stride_bytes);
+  for (int i = 0; i < 4; i++) {
+    node->coord_stride[i] = coord_stride_bytes;
+    node->coords[i] = coords.data + (i * sizeof(double));
+  }
+}
+
+/// \brief Set a node where coordinates are stored in a column-major (Fortran) array
+/// \ingroup geoarrow-geometry
+///
+/// The geometry_type must be a POINT or LINESTRING.
+static inline void GeoArrowGeometryNodeSetSeparated(
+    struct GeoArrowGeometryNode* node, enum GeoArrowGeometryType geometry_type,
+    enum GeoArrowDimensions dimensions, struct GeoArrowBufferView coords) {
+  node->geometry_type = (uint8_t)geometry_type;
+  node->dimensions = (uint8_t)dimensions;
+
+  int64_t dimension_size_bytes = coords.size_bytes / _GeoArrowkNumDimensions[dimensions];
+  node->size = (uint32_t)(dimension_size_bytes / sizeof(double));
+  for (int i = 0; i < 4; i++) {
+    node->coord_stride[i] = sizeof(double);
+    node->coords[i] = coords.data + (i * dimension_size_bytes);
+  }
+}
+
+/// \brief Inline version of GeoArrowGeometryResizeNodes
+/// \ingroup geoarrow-geometry
+static inline GeoArrowErrorCode GeoArrowGeometryResizeNodesInline(
+    struct GeoArrowGeometry* geom, int64_t size_nodes) {
+  if (size_nodes < geom->capacity_nodes) {
+    geom->size_nodes = size_nodes;
+    return GEOARROW_OK;
+  } else {
+    return GeoArrowGeometryResizeNodes(geom, size_nodes);
+  }
+}
+
+/// \brief Inline version of GeoArrowGeometryAppendNode
+/// \ingroup geoarrow-geometry
+static inline GeoArrowErrorCode GeoArrowGeometryAppendNodeInline(
+    struct GeoArrowGeometry* geom, struct GeoArrowGeometryNode** out) {
+  if (geom->size_nodes < geom->capacity_nodes) {
+    *out = geom->root + (geom->size_nodes++);
+    memset(*out, 0, sizeof(struct GeoArrowGeometryNode));
+    for (uint32_t i = 0; i < 4; i++) {
+      (*out)->coords[i] = _GeoArrowkEmptyPointCoords;
+    }
+    return GEOARROW_OK;
+  } else {
+    return GeoArrowGeometryAppendNode(geom, out);
+  }
+}
+
+/// \brief Count coordinates in a GeoArrowGeometryView
+/// \ingroup geoarrow-geometry
+static inline uint32_t GeoArrowGeometryViewNumCoords(struct GeoArrowGeometryView geom) {
+  uint32_t count = 0;
+  const struct GeoArrowGeometryNode* end = geom.root + geom.size_nodes;
+  for (const struct GeoArrowGeometryNode* node = geom.root; node < end; node++) {
+    switch (node->geometry_type) {
+      case GEOARROW_GEOMETRY_TYPE_POINT:
+      case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+        count += node->size;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return count;
+}
+
+/// \brief Copy a GeoArrowGeometryNode representing a sequence to interleaved coordinates
+/// \ingroup geoarrow-geometry
+static inline int64_t GeoArrowGeometryNodeWriteSequence(
+    const struct GeoArrowGeometryNode* node, uint8_t* dst, int64_t dst_size) {
+  uint32_t n_values = _GeoArrowkNumDimensions[node->dimensions];
+  uint32_t n_coords = node->size;
+  int64_t bytes_required = n_values * n_coords * sizeof(double);
+  if (dst_size < bytes_required) {
+    return bytes_required;
+  }
+
+  const uint8_t* src[4];
+  memcpy(src, node->coords, sizeof(src));
+
+  for (uint32_t i = 0; i < n_coords; i++) {
+    for (uint32_t j = 0; j < n_values; j++) {
+      memcpy(dst, src[j], sizeof(double));
+      dst += sizeof(double);
+      src[j] += node->coord_stride[j];
+    }
+  }
+
+  if (node->flags & GEOARROW_GEOMETRY_NODE_FLAG_SWAP_ENDIAN) {
+    uint64_t tmp;
+    for (uint8_t* dst_swap = dst - bytes_required; dst_swap < dst;
+         dst_swap += sizeof(double)) {
+      memcpy(&tmp, dst_swap, sizeof(double));
+      tmp = GEOARROW_BSWAP64(tmp);
+      memcpy(dst_swap, &tmp, sizeof(double));
+    }
+  }
+
+  return bytes_required;
+}
+
+/// \brief Copy all coordinates from a GeoArrowGeometryView into into output of a given
+/// dimensions
+///
+/// This is useful to append all coordinates of a geometry of arbitrary dimensions
+/// dimensions into output of fixed dimensions. The combination of out and out_strides
+/// may be used to copy into either separated or interleaved coordinate output.
+///
+/// \ingroup geoarrow-geometry
+static inline void GeoArrowGeometryViewCopyCoordsGeneric(
+    struct GeoArrowGeometryView geom, uint8_t** out, const int32_t* out_strides,
+    enum GeoArrowDimensions out_dimensions) {
+  int map[4];
+
+  uint32_t out_dimensions_size = _GeoArrowkNumDimensions[out_dimensions];
+
+  const uint8_t* src[5];
+  src[0] = _GeoArrowkEmptyPointCoords;
+
+  int32_t src_strides[5];
+  src_strides[0] = 0;
+
+  const uint8_t* src_mapped;
+  int32_t src_stride_mapped;
+  uint8_t* out_cursor[4];
+  memcpy(out_cursor, out, out_dimensions_size * sizeof(uint8_t*));
+  int32_t out_stride;
+
+  const struct GeoArrowGeometryNode* end = geom.root + geom.size_nodes;
+  for (const struct GeoArrowGeometryNode* node = geom.root; node < end; ++node) {
+    switch (node->geometry_type) {
+      case GEOARROW_GEOMETRY_TYPE_POINT:
+      case GEOARROW_GEOMETRY_TYPE_LINESTRING: {
+        GeoArrowMapDimensions((enum GeoArrowDimensions)node->dimensions, out_dimensions,
+                              map);
+        src[1] = node->coords[0];
+        src[2] = node->coords[1];
+        src[3] = node->coords[2];
+        src[4] = node->coords[3];
+        src_strides[1] = node->coord_stride[0];
+        src_strides[2] = node->coord_stride[1];
+        src_strides[3] = node->coord_stride[2];
+        src_strides[4] = node->coord_stride[3];
+
+        for (uint32_t i = 0; i < out_dimensions_size; ++i) {
+          src_mapped = src[map[i] + 1];
+          src_stride_mapped = src_strides[map[i] + 1];
+          out_stride = out_strides[i];
+
+          if (node->flags & GEOARROW_GEOMETRY_NODE_FLAG_SWAP_ENDIAN) {
+            uint64_t tmp;
+            for (uint32_t j = 0; j < node->size; ++j) {
+              memcpy(&tmp, src_mapped, sizeof(double));
+              tmp = GEOARROW_BSWAP64(tmp);
+              memcpy(out_cursor[i], &tmp, sizeof(double));
+              src_mapped += src_stride_mapped;
+              out_cursor[i] += out_stride;
+            }
+          } else {
+            for (uint32_t j = 0; j < node->size; ++j) {
+              memcpy(out_cursor[i], src_mapped, sizeof(double));
+              src_mapped += src_stride_mapped;
+              out_cursor[i] += out_stride;
+            }
+          }
+        }
+
+        break;
+      }
+
+      default:
+        break;
+    }
+  }
+}
 
 // Copies coordinates from one view to another keeping dimensions the same.
 // This function fills dimensions in dst but not in src with NAN; dimensions

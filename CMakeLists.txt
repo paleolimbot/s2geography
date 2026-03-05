@@ -217,11 +217,18 @@ endif()
 if(NOT TARGET nanoarrow)
   FetchContent_Declare(
     nanoarrow
-    URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.6.0.zip
+    URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.8.0.zip
     URL_HASH
-      SHA256=73b3235453902c9e92b5e942683d02d764a2aea1f999c03bf4a747c90df2f505)
+      SHA256=97923d39eb60149117ca48dde547b14689b943ee84983883f3cbff87315717a3)
 
   FetchContent_MakeAvailable(nanoarrow)
+
+  # Create a plain "nanoarrow" alias so test targets can link against it
+  if(TARGET nanoarrow_shared)
+    add_library(nanoarrow ALIAS nanoarrow_shared)
+  elseif(TARGET nanoarrow_static)
+    add_library(nanoarrow ALIAS nanoarrow_static)
+  endif()
 
   # do not install nanoarrow by default when running cmake --install
   set_property(DIRECTORY ${nanoarrow_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
@@ -355,6 +362,8 @@ endif()
 if(S2GEOGRAPHY_BUILD_TESTS)
 
   enable_testing()
+
+  target_compile_definitions(s2geography PUBLIC ${GEOARROW_COMPILE_DEFINITIONS})
 
   add_executable(sedona_udf_internal_test
                  src/s2geography/sedona_udf/sedona_udf_internal_test.cc)

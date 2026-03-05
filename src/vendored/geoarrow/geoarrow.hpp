@@ -418,6 +418,10 @@ class GeometryDataType {
       modifiers.push_back("large");
     }
 
+    if (id() == GEOARROW_TYPE_WKT_VIEW || id() == GEOARROW_TYPE_WKB_VIEW) {
+      modifiers.push_back("view");
+    }
+
     if (edge_type() != GEOARROW_EDGE_TYPE_PLANAR) {
       modifiers.push_back(GeoArrowEdgeTypeString(edge_type()));
     }
@@ -543,10 +547,14 @@ class ArrayReader {
   }
 
   void SetArray(struct ArrowArray* array) {
-    struct GeoArrowError error {};
-    GEOARROW_THROW_NOT_OK(&error, GeoArrowArrayReaderSetArray(&reader_, array, &error));
     std::memcpy(&array_.array, array, sizeof(struct ArrowArray));
     array->release = nullptr;
+    SetArrayNonOwning(&array_.array);
+  }
+
+  void SetArrayNonOwning(const struct ArrowArray* array) {
+    struct GeoArrowError error {};
+    GEOARROW_THROW_NOT_OK(&error, GeoArrowArrayReaderSetArray(&reader_, array, &error));
   }
 
   GeoArrowErrorCode Visit(struct GeoArrowVisitor* visitor, int64_t offset, int64_t length,
@@ -1119,6 +1127,10 @@ struct BoxXY : public std::array<T, 4> {
   T mmax() const { return -std::numeric_limits<T>::infinity(); }
   bound_type lower_bound() const { return {xmin(), ymin()}; }
   bound_type upper_bound() const { return {xmax(), ymax()}; }
+  static BoxXY Empty() {
+    return {std::numeric_limits<T>::infinity(), std::numeric_limits<T>::infinity(),
+            -std::numeric_limits<T>::infinity(), -std::numeric_limits<T>::infinity()};
+  }
 };
 
 /// \brief Coord implementation for BoxZ
@@ -1135,6 +1147,10 @@ struct BoxXYZ : public std::array<T, 6> {
   T mmax() const { return -std::numeric_limits<T>::infinity(); }
   bound_type lower_bound() const { return {xmin(), ymin(), zmin()}; }
   bound_type upper_bound() const { return {xmax(), ymax(), zmax()}; }
+  static BoxXYZ Empty() {
+    return {std::numeric_limits<T>::infinity(), std::numeric_limits<T>::infinity(),
+            -std::numeric_limits<T>::infinity(), -std::numeric_limits<T>::infinity()};
+  }
 };
 
 /// \brief Coord implementation for BoxM
@@ -1151,6 +1167,10 @@ struct BoxXYM : public std::array<T, 6> {
   T mmax() const { return this->at(5); }
   bound_type lower_bound() const { return {xmin(), ymin(), mmin()}; }
   bound_type upper_bound() const { return {xmax(), ymax(), mmax()}; }
+  static BoxXYM Empty() {
+    return {std::numeric_limits<T>::infinity(), std::numeric_limits<T>::infinity(),
+            -std::numeric_limits<T>::infinity(), -std::numeric_limits<T>::infinity()};
+  }
 };
 
 /// \brief Coord implementation for BoxZM
@@ -1167,6 +1187,12 @@ struct BoxXYZM : public std::array<T, 8> {
   T mmax() const { return this->at(7); }
   bound_type lower_bound() const { return {xmin(), ymin(), zmin(), mmin()}; }
   bound_type upper_bound() const { return {xmax(), ymax(), zmax(), mmax()}; }
+  static BoxXYZM Empty() {
+    return {std::numeric_limits<T>::infinity(),  std::numeric_limits<T>::infinity(),
+            std::numeric_limits<T>::infinity(),  std::numeric_limits<T>::infinity(),
+            -std::numeric_limits<T>::infinity(), -std::numeric_limits<T>::infinity(),
+            -std::numeric_limits<T>::infinity(), -std::numeric_limits<T>::infinity()};
+  }
 };
 
 /// \brief View of a GeoArrow coordinate sequence
@@ -1990,10 +2016,6 @@ struct MultiPolygonArray
 
 
 
-
-#ifndef GEOARROW_NATIVE_ENDIAN
-#define GEOARROW_NATIVE_ENDIAN 0x01
-#endif
 
 /// \defgroup hpp-binary-utility Binary iteration utilities
 ///

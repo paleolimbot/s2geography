@@ -22,6 +22,9 @@
 #include <string.h>
 #include <stdbool.h>
 
+// For namespacing symbols
+#include "geoarrow/geoarrow.h"
+
 #if defined(_M_IX86) || defined(_M_ARM)
 #define RYU_32_BIT_PLATFORM
 #endif

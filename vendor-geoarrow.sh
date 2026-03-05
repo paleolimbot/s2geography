@@ -1,7 +1,7 @@
 
 rm -rf src/vendored/geoarrow
 
-GEOARROW_C_REF="62b71c603bfea1ccd89a9f90784635d6aeb3945d"
+GEOARROW_C_REF="6d9f746281101c7f21210bbd247bd49d42feae82"
 
 curl -L \
     "https://github.com/geoarrow/geoarrow-c/archive/${GEOARROW_C_REF}.zip" \
