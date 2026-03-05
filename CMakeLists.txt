@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.14)
 
+# Use better timestamp logic for versions of CMake that include it
+if(POLICY CMP0135)
+  cmake_policy(SET CMP0135 NEW)
+endif()
+
 project(
   s2geography
   LANGUAGES CXX C
@@ -42,18 +47,26 @@ if(APPLE AND NOT OPENSSL_ROOT_DIR)
   find_program(BREW_PROG brew)
   if(BREW_PROG)
     execute_process(
-      COMMAND ${BREW_PROG} --prefix "openssl@1.1"
-      OUTPUT_VARIABLE OPENSSL11_BREW_PREFIX
+      COMMAND ${BREW_PROG} --prefix "openssl@3"
+      OUTPUT_VARIABLE OPENSSL3_BREW_PREFIX
       OUTPUT_STRIP_TRAILING_WHITESPACE)
-    if(OPENSSL11_BREW_PREFIX)
-      set(OPENSSL_ROOT_DIR ${OPENSSL11_BREW_PREFIX})
+    if(OPENSSL3_BREW_PREFIX)
+      set(OPENSSL_ROOT_DIR ${OPENSSL3_BREW_PREFIX})
     else()
       execute_process(
-        COMMAND ${BREW_PROG} --prefix "openssl"
-        OUTPUT_VARIABLE OPENSSL_BREW_PREFIX
+        COMMAND ${BREW_PROG} --prefix "openssl@1.1"
+        OUTPUT_VARIABLE OPENSSL11_BREW_PREFIX
         OUTPUT_STRIP_TRAILING_WHITESPACE)
-      if(OPENSSL_BREW_PREFIX)
-        set(OPENSSL_ROOT_DIR ${OPENSSL_BREW_PREFIX})
+      if(OPENSSL11_BREW_PREFIX)
+        set(OPENSSL_ROOT_DIR ${OPENSSL11_BREW_PREFIX})
+      else()
+        execute_process(
+          COMMAND ${BREW_PROG} --prefix "openssl"
+          OUTPUT_VARIABLE OPENSSL_BREW_PREFIX
+          OUTPUT_STRIP_TRAILING_WHITESPACE)
+        if(OPENSSL_BREW_PREFIX)
+          set(OPENSSL_ROOT_DIR ${OPENSSL_BREW_PREFIX})
+        endif()
       endif()
     endif()
   endif()
@@ -259,7 +272,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   FetchContent_Declare(
     googletest
     GIT_REPOSITORY https://github.com/google/googletest
-    GIT_TAG tags/release-1.12.0
+    GIT_TAG v1.17.0
     GIT_SHALLOW TRUE)
 
   # For Windows: Prevent overriding the parent project's compiler/linker
