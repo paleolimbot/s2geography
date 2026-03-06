@@ -4,8 +4,6 @@ on:
   pull_request:
     branches: [main, master]
 
-name: Run tests
-
 permissions:
   contents: read
 
@@ -13,8 +11,7 @@ jobs:
   test:
     runs-on: macos-latest
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install dependencies
         run: brew install abseil s2geometry nanoarrow
