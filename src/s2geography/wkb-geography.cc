@@ -1,11 +1,12 @@
 
+#include "s2geography/wkb-geography.h"
+
 #include <s2/s2point.h>
 #include <s2/s2projections.h>
-#include <s2/s2shape.h>
 
 #include <cstring>
+#include <limits>
 
-#include "geoarrow/geoarrow.hpp"
 #include "s2geography/geography.h"
 
 namespace s2geography {
@@ -57,123 +58,116 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
 
 }  // namespace
 
-class GeoArrowLaxPolylineShape : public S2Shape {
- public:
-  static constexpr TypeTag kTypeTag = 48493;
+GeoArrowLaxPolylineShape::GeoArrowLaxPolylineShape(
+    struct GeoArrowGeometryView geom) {
+  Init(geom);
+}
 
-  GeoArrowLaxPolylineShape() = default;
-
-  explicit GeoArrowLaxPolylineShape(struct GeoArrowGeometryView geom) {
-    Init(geom);
-  }
-
-  void Init(struct GeoArrowGeometryView geom) {
-    switch (geom.root->geometry_type) {
-      case GEOARROW_GEOMETRY_TYPE_LINESTRING:
-        geom_ = geom;
-        break;
-      case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
-        geom_ = {geom.root + 1, geom.size_nodes - 1};
-        break;
-      default:
-        throw Exception(
-            "Can't create GeoArrowLaxPolylineShape() from geometry of unknown "
-            "type ");
-    }
-
-    if (geom_.size_nodes > std::numeric_limits<int>::max()) {
+void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
+  switch (geom.root->geometry_type) {
+    case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+      geom_ = geom;
+      break;
+    case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
+      geom_ = {geom.root + 1, geom.size_nodes - 1};
+      break;
+    default:
       throw Exception(
-          "Can't create GeoArrowLaxPolylineShape() from geometry with > "
-          "INT_MAX parts");
+          "Can't create GeoArrowLaxPolylineShape() from geometry of unknown "
+          "type ");
+  }
+
+  if (geom_.size_nodes > std::numeric_limits<int>::max()) {
+    throw Exception(
+        "Can't create GeoArrowLaxPolylineShape() from geometry with > "
+        "INT_MAX parts");
+  }
+
+  if (geom_.size_nodes == 0) {
+  }
+
+  num_chains_ = geom_.size_nodes;
+  num_vertices_.resize(num_chains_ + 1);
+  num_edges_.resize(num_chains_ + 1);
+  int64_t num_vertices = 0;
+  int64_t num_edges = 0;
+  int64_t i = 0;
+
+  num_vertices_[0] = 0;
+  num_edges_[0] = 0;
+  VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
+    num_vertices += node->size;
+    num_edges += 0 ? node->size == 0 : node->size - 1;
+    if (num_edges > std::numeric_limits<int>::max()) {
+      throw Exception(
+          "Can't create GeoArrowLaxPpolylineShape from geometry with > "
+          "INT_MAX edges");
     }
 
-    if (geom_.size_nodes == 0) {
+    num_vertices_[i] = num_vertices;
+    num_edges_[i] = num_edges;
+    ++i;
+  });
+}
+
+int GeoArrowLaxPolylineShape::num_vertices() const {
+  return num_vertices_.back();
+}
+
+S2Point GeoArrowLaxPolylineShape::vertex(int v) const {
+  for (int i = 0; i < num_chains_; i++) {
+    if (v < num_vertices_[i + 1]) {
+      S2LatLng ll;
+      VisitLngLat(geom_.root + i, v - num_vertices_[i], 2,
+                  [&](double lng, double lat) {
+                    ll = S2LatLng::FromDegrees(lat, lng);
+                  });
+      return ll.ToPoint();
     }
-
-    num_chains_ = geom_.size_nodes;
-    num_vertices_.resize(num_chains_ + 1);
-    num_edges_.resize(num_chains_ + 1);
-    int64_t num_vertices = 0;
-    int64_t num_edges = 0;
-    int64_t i = 0;
-
-    num_vertices_[0] = 0;
-    num_edges_[0] = 0;
-    VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
-      num_vertices += node->size;
-      num_edges += 0 ? node->size == 0 : node->size - 1;
-      if (num_edges > std::numeric_limits<int>::max()) {
-        throw Exception(
-            "Can't create GeoArrowLaxPpolylineShape from geometry with > "
-            "INT_MAX edges");
-      }
-
-      num_vertices_[i] = num_vertices;
-      num_edges_[i] = num_edges;
-      ++i;
-    });
   }
 
-  int num_vertices() const { return num_vertices_.back(); }
+  throw Exception("Vertex at position " + std::to_string(v) +
+                  " does not exist");
+}
 
-  S2Point vertex(int v) const {
-    for (int i = 0; i < num_chains_; i++) {
-      if (v < num_vertices_[i + 1]) {
-        S2LatLng ll;
-        VisitLngLat(geom_.root + i, v - num_vertices_[i], 2,
-                    [&](double lng, double lat) {
-                      ll = S2LatLng::FromDegrees(lat, lng);
-                    });
-        return ll.ToPoint();
-      }
+int GeoArrowLaxPolylineShape::num_edges() const { return num_edges_.back(); }
+
+S2Shape::Edge GeoArrowLaxPolylineShape::edge(int e) const {
+  return Edge(vertex(e), vertex(e + 1));
+}
+
+int GeoArrowLaxPolylineShape::dimension() const { return 1; }
+
+S2Shape::ReferencePoint GeoArrowLaxPolylineShape::GetReferencePoint() const {
+  return ReferencePoint::Contained(false);
+}
+
+int GeoArrowLaxPolylineShape::num_chains() const { return num_chains_; }
+
+S2Shape::Chain GeoArrowLaxPolylineShape::chain(int i) const {
+  return Chain(0, num_edges());
+}
+
+S2Shape::Edge GeoArrowLaxPolylineShape::chain_edge(int i, int j) const {
+  S2LatLng v[2];
+  int vi = 0;
+  VisitLngLat(geom_.root + i, j, 2, [&](double lng, double lat) {
+    v[vi++] = S2LatLng::FromDegrees(lat, lng);
+  });
+
+  return Edge(v[0].ToPoint(), v[1].ToPoint());
+}
+
+S2Shape::ChainPosition GeoArrowLaxPolylineShape::chain_position(int e) const {
+  for (int i = 0; i < num_chains_; i++) {
+    if (e < num_edges_[i + 1]) {
+      return ChainPosition(i, e - num_edges_[i]);
     }
-
-    throw Exception("Vertex at position " + std::to_string(v) +
-                    " does not exist");
   }
 
-  int num_edges() const override { return num_edges_.back(); }
+  throw Exception("Edge at position " + std::to_string(e) + " does not exist");
+}
 
-  Edge edge(int e) const override { return Edge(vertex(e), vertex(e + 1)); }
-
-  int dimension() const override { return 1; }
-
-  ReferencePoint GetReferencePoint() const override {
-    return ReferencePoint::Contained(false);
-  }
-
-  int num_chains() const override { return num_chains_; }
-
-  Chain chain(int i) const override { return Chain(0, num_edges()); }
-
-  Edge chain_edge(int i, int j) const override {
-    S2LatLng v[2];
-    int vi = 0;
-    VisitLngLat(geom_.root + i, j, 2, [&](double lng, double lat) {
-      v[vi++] = S2LatLng::FromDegrees(lat, lng);
-    });
-
-    return Edge(v[0].ToPoint(), v[1].ToPoint());
-  }
-
-  ChainPosition chain_position(int e) const override {
-    for (int i = 0; i < num_chains_; i++) {
-      if (e < num_edges_[i + 1]) {
-        return ChainPosition(i, e - num_edges_[i]);
-      }
-    }
-
-    throw Exception("Edge at position " + std::to_string(e) +
-                    " does not exist");
-  }
-
-  TypeTag type_tag() const override { return kTypeTag; }
-
- private:
-  struct GeoArrowGeometryView geom_{};
-  int num_chains_;
-  std::vector<int> num_vertices_;
-  std::vector<int> num_edges_;
-};
+S2Shape::TypeTag GeoArrowLaxPolylineShape::type_tag() const { return kTypeTag; }
 
 }  // namespace s2geography
