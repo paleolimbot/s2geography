@@ -1,0 +1,88 @@
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+env:
+  VCPKG_REF: 5a01de756c28279ddfdd2b061d1c75710a6255fa
+
+name: vcpkg
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Clone vcpkg
+        uses: actions/checkout@v6
+        with:
+          repository: microsoft/vcpkg
+          ref: ${{ env.VCPKG_REF }}
+          path: vcpkg
+
+      - name: Set up environment variables and bootstrap vcpkg
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+          CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+        run: |
+          cd vcpkg
+          ./bootstrap-vcpkg.sh
+          cd ..
+
+          echo "VCPKG_ROOT=$VCPKG_ROOT" >> $GITHUB_ENV
+          echo "PATH=$VCPKG_ROOT:$PATH" >> $GITHUB_ENV
+          echo "CMAKE_TOOLCHAIN_FILE=$CMAKE_TOOLCHAIN_FILE" >> $GITHUB_ENV
+
+      - name: Cache vcpkg binaries
+        id: cache-vcpkg
+        uses: actions/cache@v5
+        with:
+          path: vcpkg/installed
+          # Bump the number at the end of this line to force a new dependency build
+          key: vcpkg-installed-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REF }}-2
+
+      - name: Install vcpkg dependencies
+        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
+        run: |
+          ./vcpkg/vcpkg install nanoarrow s2geometry abseil openssl
+          # Clean up vcpkg buildtrees and downloads to save space
+          rm -rf vcpkg/buildtrees
+          rm -rf vcpkg/downloads
+
+      - name: Build s2geography
+        run: |
+          mkdir build && cd build
+          cmake .. -DS2GEOGRAPHY_BUILD_EXAMPLES=ON -DS2GEOGRAPHY_BUILD_TESTS=ON -DS2GEOGRAPHY_CODE_COVERAGE=ON -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=OFF
+          cmake --build .
+
+      - name: Run tests
+        run: |
+          cd build
+          ctest -T test --output-on-failure .
+
+      - name: Install
+        run: |
+          cd build
+          cmake --install . --prefix ../dist
+
+      - name: Calculate coverage
+        run: |
+          SOURCE_PREFIX=`pwd`
+          mkdir build/cov
+          cd build/cov
+          gcov -abcfu --source-prefix=$SOURCE_PREFIX `find ../CMakeFiles/s2geography.dir/ -name "*.gcno"`
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v2
+        with:
+          directory: build/cov
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Run example-simple
+        run: |
+          ./dist/examples/example-simple
