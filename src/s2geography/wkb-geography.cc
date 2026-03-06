@@ -5,6 +5,7 @@
 #include <s2/s2projections.h>
 #include <s2/s2shapeutil_get_reference_point.h>
 
+#include <algorithm>
 #include <cstring>
 #include <limits>
 
@@ -113,19 +114,19 @@ int GeoArrowLaxPolylineShape::num_vertices() const {
 }
 
 S2Point GeoArrowLaxPolylineShape::vertex(int v) const {
-  for (int i = 0; i < num_chains_; i++) {
-    if (v < num_vertices_[i + 1]) {
-      S2LatLng ll;
-      VisitLngLat(geom_.root + i, v - num_vertices_[i], 2,
-                  [&](double lng, double lat) {
-                    ll = S2LatLng::FromDegrees(lat, lng);
-                  });
-      return ll.ToPoint();
-    }
+  auto it = std::upper_bound(num_vertices_.begin(), num_vertices_.end(), v);
+  if (it == num_vertices_.begin() || it == num_vertices_.end()) {
+    throw Exception("Vertex at position " + std::to_string(v) +
+                    " does not exist");
   }
 
-  throw Exception("Vertex at position " + std::to_string(v) +
-                  " does not exist");
+  int i = static_cast<int>(it - num_vertices_.begin()) - 1;
+  S2LatLng ll;
+  VisitLngLat(
+      geom_.root + i, v - num_vertices_[i], 2,
+      [&](double lng, double lat) { ll = S2LatLng::FromDegrees(lat, lng); });
+
+  return ll.ToPoint();
 }
 
 int GeoArrowLaxPolylineShape::num_edges() const { return num_edges_.back(); }
@@ -157,13 +158,14 @@ S2Shape::Edge GeoArrowLaxPolylineShape::chain_edge(int i, int j) const {
 }
 
 S2Shape::ChainPosition GeoArrowLaxPolylineShape::chain_position(int e) const {
-  for (int i = 0; i < num_chains_; i++) {
-    if (e < num_edges_[i + 1]) {
-      return ChainPosition(i, e - num_edges_[i]);
-    }
+  auto it = std::upper_bound(num_edges_.begin(), num_edges_.end(), e);
+  if (it == num_edges_.begin() || it == num_edges_.end()) {
+    throw Exception("Edge at position " + std::to_string(e) +
+                    " does not exist");
   }
 
-  throw Exception("Edge at position " + std::to_string(e) + " does not exist");
+  int i = static_cast<int>(it - num_edges_.begin()) - 1;
+  return ChainPosition(i, e - num_edges_[i]);
 }
 
 S2Shape::TypeTag GeoArrowLaxPolylineShape::type_tag() const { return kTypeTag; }
@@ -240,13 +242,14 @@ S2Shape::Edge GeoArrowLaxPolygonShape::chain_edge(int i, int j) const {
 }
 
 S2Shape::ChainPosition GeoArrowLaxPolygonShape::chain_position(int e) const {
-  for (int i = 0; i < num_loops_; i++) {
-    if (e < num_vertices_[i + 1]) {
-      return ChainPosition(i, e - num_vertices_[i]);
-    }
+  auto it = std::upper_bound(num_vertices_.begin(), num_vertices_.end(), e);
+  if (it == num_vertices_.begin() || it == num_vertices_.end()) {
+    throw Exception("Edge at position " + std::to_string(e) +
+                    " does not exist");
   }
 
-  throw Exception("Edge at position " + std::to_string(e) + " does not exist");
+  int i = static_cast<int>(it - num_vertices_.begin()) - 1;
+  return ChainPosition(i, e - num_vertices_[i]);
 }
 
 S2Shape::TypeTag GeoArrowLaxPolygonShape::type_tag() const { return kTypeTag; }
