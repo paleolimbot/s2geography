@@ -7,6 +7,8 @@ on:
 permissions:
   contents: read
 
+name: brew
+
 jobs:
   test:
     runs-on: macos-latest
