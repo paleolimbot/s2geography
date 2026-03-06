@@ -333,6 +333,51 @@ TEST(GeoArrowLaxPolygonShape, ShapeIndexContains) {
                                               far_index.ShapeIndex(), options));
 }
 
+TEST(GeoArrowLaxPolygonShape, ShapeIndexContainsMultiPolygonWithHoles) {
+  // Two polygons, each with a hole
+  TestGeometry poly_geom(
+      "MULTIPOLYGON (((-20 -20, -10 -20, -10 -10, -20 -10, -20 -20), "
+      "(-17 -17, -17 -13, -13 -13, -13 -17, -17 -17)), "
+      "((10 10, 20 10, 20 20, 10 20, 10 10), "
+      "(13 13, 13 17, 17 17, 17 13, 13 13)))");
+
+  MutableS2ShapeIndex poly_index;
+  poly_index.Add(std::make_unique<GeoArrowLaxPolygonShape>(poly_geom.geom()));
+
+  WKTReader reader;
+  S2BooleanOperation::Options options;
+
+  // Inside first shell (between shell and hole)
+  auto in_shell1 = reader.read_feature("POINT (-11 -11)");
+  ShapeIndexGeography in_shell1_index(*in_shell1);
+  EXPECT_TRUE(S2BooleanOperation::Intersects(
+      poly_index, in_shell1_index.ShapeIndex(), options));
+
+  // Inside first hole
+  auto in_hole1 = reader.read_feature("POINT (-15 -15)");
+  ShapeIndexGeography in_hole1_index(*in_hole1);
+  EXPECT_FALSE(S2BooleanOperation::Intersects(
+      poly_index, in_hole1_index.ShapeIndex(), options));
+
+  // Inside second shell (between shell and hole)
+  auto in_shell2 = reader.read_feature("POINT (11 11)");
+  ShapeIndexGeography in_shell2_index(*in_shell2);
+  EXPECT_TRUE(S2BooleanOperation::Intersects(
+      poly_index, in_shell2_index.ShapeIndex(), options));
+
+  // Inside second hole
+  auto in_hole2 = reader.read_feature("POINT (15 15)");
+  ShapeIndexGeography in_hole2_index(*in_hole2);
+  EXPECT_FALSE(S2BooleanOperation::Intersects(
+      poly_index, in_hole2_index.ShapeIndex(), options));
+
+  // Outside both polygons
+  auto outside = reader.read_feature("POINT (50 50)");
+  ShapeIndexGeography outside_index(*outside);
+  EXPECT_FALSE(S2BooleanOperation::Intersects(
+      poly_index, outside_index.ShapeIndex(), options));
+}
+
 TEST(GeoArrowLaxPolygonShape, BigEndianWKBPolygon) {
   // clang-format off
   // Big-endian WKB for POLYGON ((0 0, 1 0, 0 1, 0 0))
