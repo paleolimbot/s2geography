@@ -182,6 +182,7 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
   num_loops_ = 0;
   num_vertices_.clear();
   num_vertices_.push_back(0);
+  loops_.clear();
   int64_t total_vertices = 0;
 
   VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
@@ -193,6 +194,7 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
             "INT_MAX vertices");
       }
       num_vertices_.push_back(static_cast<int>(total_vertices));
+      loops_.push_back(node);
       ++num_loops_;
     }
   });
@@ -205,32 +207,11 @@ int GeoArrowLaxPolygonShape::num_loop_vertices(int i) const {
 }
 
 S2Point GeoArrowLaxPolygonShape::loop_vertex(int i, int j) const {
-  // Find the i-th LINESTRING node
-  int ring_idx = 0;
-  S2Point result;
-  bool found = false;
-  VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
-    if (found) return;
-    if (node->geometry_type == GEOARROW_GEOMETRY_TYPE_LINESTRING) {
-      if (ring_idx == i) {
-        S2LatLng ll;
-        VisitLngLat(node, j, j + 1, [&](double lng, double lat) {
-          ll = S2LatLng::FromDegrees(lat, lng);
-        });
-        result = ll.ToPoint();
-        found = true;
-        return;
-      }
-      ++ring_idx;
-    }
+  S2LatLng ll;
+  VisitLngLat(loops_[i], j, j + 1, [&](double lng, double lat) {
+    ll = S2LatLng::FromDegrees(lat, lng);
   });
-
-  if (!found) {
-    throw Exception("Loop " + std::to_string(i) + " vertex " +
-                    std::to_string(j) + " does not exist");
-  }
-
-  return result;
+  return ll.ToPoint();
 }
 
 int GeoArrowLaxPolygonShape::num_edges() const { return num_vertices_.back(); }

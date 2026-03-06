@@ -71,6 +71,8 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   // Cumulative vertex counts: num_vertices_[0] = 0,
   // num_vertices_[i+1] = total vertices in loops 0..i
   std::vector<int> num_vertices_;
+  // Pointers to each loop's LINESTRING node for O(1) lookup
+  std::vector<const struct GeoArrowGeometryNode*> loops_;
 };
 
 }  // namespace s2geography
