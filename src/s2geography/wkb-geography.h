@@ -12,7 +12,10 @@ class GeoArrowLaxPolylineShape : public S2Shape {
  public:
   static constexpr TypeTag kTypeTag = 48493;
 
-  GeoArrowLaxPolylineShape() = default;
+  GeoArrowLaxPolylineShape() {
+    num_vertices_.push_back(0);
+    num_edges_.push_back(0);
+  }
   explicit GeoArrowLaxPolylineShape(struct GeoArrowGeometryView geom);
 
   void Init(struct GeoArrowGeometryView geom);
@@ -32,7 +35,7 @@ class GeoArrowLaxPolylineShape : public S2Shape {
 
  private:
   struct GeoArrowGeometryView geom_{};
-  int num_chains_;
+  int num_chains_{};
   std::vector<int> num_vertices_;
   std::vector<int> num_edges_;
 };

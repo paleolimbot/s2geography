@@ -83,18 +83,15 @@ void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
         "INT_MAX parts");
   }
 
-  if (geom_.size_nodes == 0) {
-  }
-
   num_chains_ = geom_.size_nodes;
   num_vertices_.resize(num_chains_ + 1);
   num_edges_.resize(num_chains_ + 1);
   int64_t num_vertices = 0;
   int64_t num_edges = 0;
-  int64_t i = 0;
 
   num_vertices_[0] = 0;
   num_edges_[0] = 0;
+  int64_t i = 1;
   VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
     num_vertices += node->size;
     num_edges += 0 ? node->size == 0 : node->size - 1;
