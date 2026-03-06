@@ -26,8 +26,8 @@ void VisitNodes(struct GeoArrowGeometryView geom, Visit&& visit) {
 template <typename Visit>
 void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
                  int64_t n, Visit&& visit) {
-  const uint8_t* lngs = node->coords[0];
-  const uint8_t* lats = node->coords[1];
+  const uint8_t* lngs = node->coords[0] + offset * node->coord_stride[0];
+  const uint8_t* lats = node->coords[1] + offset * node->coord_stride[1];
   double lng, lat;
 
   if (node->flags & GEOARROW_GEOMETRY_NODE_FLAG_SWAP_ENDIAN) {
@@ -184,9 +184,7 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
   num_vertices_.push_back(0);
   int64_t total_vertices = 0;
 
-  const struct GeoArrowGeometryNode* end = geom_.root + geom_.size_nodes;
-  for (const struct GeoArrowGeometryNode* node = geom_.root; node < end;
-       ++node) {
+  VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
     if (node->geometry_type == GEOARROW_GEOMETRY_TYPE_LINESTRING) {
       total_vertices += node->size;
       if (total_vertices > std::numeric_limits<int>::max()) {
@@ -197,7 +195,7 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
       num_vertices_.push_back(static_cast<int>(total_vertices));
       ++num_loops_;
     }
-  }
+  });
 }
 
 int GeoArrowLaxPolygonShape::num_loops() const { return num_loops_; }
@@ -209,41 +207,30 @@ int GeoArrowLaxPolygonShape::num_loop_vertices(int i) const {
 S2Point GeoArrowLaxPolygonShape::loop_vertex(int i, int j) const {
   // Find the i-th LINESTRING node
   int ring_idx = 0;
-  const struct GeoArrowGeometryNode* end = geom_.root + geom_.size_nodes;
-  for (const struct GeoArrowGeometryNode* node = geom_.root; node < end;
-       ++node) {
+  S2Point result;
+  bool found = false;
+  VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
+    if (found) return;
     if (node->geometry_type == GEOARROW_GEOMETRY_TYPE_LINESTRING) {
       if (ring_idx == i) {
-        double lng, lat;
-        const uint8_t* lngs = node->coords[0];
-        const uint8_t* lats = node->coords[1];
-
-        if (node->flags & GEOARROW_GEOMETRY_NODE_FLAG_SWAP_ENDIAN) {
-          uint64_t tmp;
-          lngs += j * node->coord_stride[0];
-          lats += j * node->coord_stride[1];
-          memcpy(&tmp, lngs, sizeof(double));
-          tmp = GEOARROW_BSWAP64(tmp);
-          memcpy(&lng, &tmp, sizeof(double));
-          memcpy(&tmp, lats, sizeof(double));
-          tmp = GEOARROW_BSWAP64(tmp);
-          memcpy(&lat, &tmp, sizeof(double));
-        } else {
-          lngs += j * node->coord_stride[0];
-          lats += j * node->coord_stride[1];
-          memcpy(&lng, lngs, sizeof(double));
-          memcpy(&lat, lats, sizeof(double));
-        }
-
-        S2LatLng ll = S2LatLng::FromDegrees(lat, lng);
-        return ll.ToPoint();
+        S2LatLng ll;
+        VisitLngLat(node, j, j + 1, [&](double lng, double lat) {
+          ll = S2LatLng::FromDegrees(lat, lng);
+        });
+        result = ll.ToPoint();
+        found = true;
+        return;
       }
       ++ring_idx;
     }
+  });
+
+  if (!found) {
+    throw Exception("Loop " + std::to_string(i) + " vertex " +
+                    std::to_string(j) + " does not exist");
   }
 
-  throw Exception("Loop " + std::to_string(i) + " vertex " + std::to_string(j) +
-                  " does not exist");
+  return result;
 }
 
 int GeoArrowLaxPolygonShape::num_edges() const { return num_vertices_.back(); }
