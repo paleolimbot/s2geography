@@ -54,23 +54,21 @@ jobs:
           rm -rf vcpkg/buildtrees
           rm -rf vcpkg/downloads
 
-      - name: Clean previous coverage
-        run: |
-          rm `find . -name "*.gcno"` || true
-          rm `find . -name "*.gcda"` || true
-          rm -rf build/cov || true
-
       - name: Build s2geography
         run: |
-          cd build
-          cmake .. -Dabsl_DIR=`pwd`/../dist/lib/cmake/absl -DS2GEOGRAPHY_BUILD_EXAMPLES=ON -DS2GEOGRAPHY_BUILD_TESTS=ON -DS2GEOGRAPHY_CODE_COVERAGE=ON -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=OFF
+          mkdir build && cd build
+          cmake .. -DS2GEOGRAPHY_BUILD_EXAMPLES=ON -DS2GEOGRAPHY_BUILD_TESTS=ON -DS2GEOGRAPHY_CODE_COVERAGE=ON -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=OFF
           cmake --build .
-          cmake --install . --prefix ../dist
 
       - name: Run tests
         run: |
           cd build
           ctest -T test --output-on-failure .
+
+      - name: Install
+        run: |
+          cd build
+          cmake --install . --prefix ../dist
 
       - name: Calculate coverage
         run: |
