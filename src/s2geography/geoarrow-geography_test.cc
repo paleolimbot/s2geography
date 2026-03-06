@@ -1,4 +1,4 @@
-#include "s2geography/wkb-geography.h"
+#include "s2geography/geoarrow-geography.h"
 
 #include <gtest/gtest.h>
 
@@ -272,7 +272,7 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygon3Components) {
       "((20 20, 21 20, 20 21, 20 20)))");
   GeoArrowLaxPolygonShape shape(geom.geom());
   EXPECT_EQ(shape.num_loops(), 3);
-  EXPECT_EQ(shape.num_edges(), 12);    // 4 + 4 + 4
+  EXPECT_EQ(shape.num_edges(), 12);  // 4 + 4 + 4
   EXPECT_EQ(shape.num_chains(), 3);
 }
 
@@ -283,7 +283,7 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygonWithHoles) {
       "(2 2, 8 2, 8 8, 2 8, 2 2)), "
       "((20 20, 21 20, 20 21, 20 20)))");
   GeoArrowLaxPolygonShape shape(geom.geom());
-  EXPECT_EQ(shape.num_loops(), 3);   // shell + hole + second polygon shell
+  EXPECT_EQ(shape.num_loops(), 3);  // shell + hole + second polygon shell
   EXPECT_EQ(shape.num_loop_vertices(0), 5);
   EXPECT_EQ(shape.num_loop_vertices(1), 5);
   EXPECT_EQ(shape.num_loop_vertices(2), 4);
@@ -303,28 +303,34 @@ TEST(GeoArrowLaxPolygonShape, ChainEdgeWrapsAround) {
 }
 
 TEST(GeoArrowLaxPolygonShape, ShapeIndexContains) {
-  // Create a polygon and check that a point inside is contained
+  // Create a polygon with a hole
   TestGeometry poly_geom(
-      "POLYGON ((-10 -10, 10 -10, 10 10, -10 10, -10 -10))");
+      "POLYGON ((-10 -10, 10 -10, 10 10, -10 10, -10 -10), "
+      "(-5 -5, -5 5, 5 5, 5 -5, -5 -5))");
 
   MutableS2ShapeIndex poly_index;
-  poly_index.Add(
-      std::make_unique<GeoArrowLaxPolygonShape>(poly_geom.geom()));
+  poly_index.Add(std::make_unique<GeoArrowLaxPolygonShape>(poly_geom.geom()));
 
-  // Create a point inside the polygon
   WKTReader reader;
-  auto point_geog = reader.read_feature("POINT (0 0)");
-  ShapeIndexGeography point_index(*point_geog);
-
   S2BooleanOperation::Options options;
-  EXPECT_TRUE(S2BooleanOperation::Intersects(poly_index,
-                                             point_index.ShapeIndex(), options));
+
+  // Point inside the shell but outside the hole
+  auto shell_geog = reader.read_feature("POINT (8 8)");
+  ShapeIndexGeography shell_index(*shell_geog);
+  EXPECT_TRUE(S2BooleanOperation::Intersects(
+      poly_index, shell_index.ShapeIndex(), options));
+
+  // Point inside the hole should not intersect
+  auto hole_geog = reader.read_feature("POINT (0 0)");
+  ShapeIndexGeography hole_index(*hole_geog);
+  EXPECT_FALSE(S2BooleanOperation::Intersects(
+      poly_index, hole_index.ShapeIndex(), options));
 
   // Point outside should not intersect
-  auto far_point_geog = reader.read_feature("POINT (50 50)");
-  ShapeIndexGeography far_point_index(*far_point_geog);
-  EXPECT_FALSE(S2BooleanOperation::Intersects(
-      poly_index, far_point_index.ShapeIndex(), options));
+  auto far_geog = reader.read_feature("POINT (50 50)");
+  ShapeIndexGeography far_index(*far_geog);
+  EXPECT_FALSE(S2BooleanOperation::Intersects(poly_index,
+                                              far_index.ShapeIndex(), options));
 }
 
 TEST(GeoArrowLaxPolygonShape, BigEndianWKBPolygon) {

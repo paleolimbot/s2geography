@@ -1,5 +1,5 @@
 
-#include "s2geography/wkb-geography.h"
+#include "s2geography/geoarrow-geography.h"
 
 #include <s2/s2point.h>
 #include <s2/s2projections.h>
