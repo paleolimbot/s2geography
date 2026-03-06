@@ -135,39 +135,6 @@ macro(find_s2 ARG)
   endif()
 endmacro()
 
-macro(build_s2)
-  message(STATUS "Building s2geometry from source (version 0.11.1)")
-
-  FetchContent_Declare(
-    s2
-    GIT_REPOSITORY https://github.com/google/s2geometry.git
-    GIT_TAG tags/v0.11.1
-    GIT_SHALLOW TRUE)
-
-  set(BUILD_EXAMPLES
-      OFF
-      CACHE BOOL "Build s2 documentation examples." FORCE)
-  set(BUILD_TESTS
-      OFF
-      CACHE BOOL "Build s2 unittests." FORCE)
-
-  FetchContent_MakeAvailable(s2)
-
-  # silence warnings in s2 headers (note: the S2_USE_SYSTEM_INCLUDES=ON option
-  # doesn't seem to work with FetchContent) (TODO: remove this and instead add
-  # SYSTEM in FetchContent_Declare - requires CMake >=3.25)
-  get_target_property(S2_IID s2 INTERFACE_INCLUDE_DIRECTORIES)
-  set_target_properties(s2 PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
-                                      "${S2_IID}")
-
-  set_property(TARGET s2 PROPERTY CXX_STANDARD ${CMAKE_CXX_STANDARD})
-
-  get_target_property(S2_VERSION_STRING s2 VERSION)
-  extract_s2_version(${S2_VERSION_STRING})
-  set(s2_NOALIAS_TARGET "s2")
-  add_library(s2::s2 ALIAS s2)
-endmacro()
-
 if(${S2GEOGRAPHY_S2_SOURCE} STREQUAL "CONDA")
   set(S2_ROOT_DIR "$ENV{CONDA_PREFIX}")
   set(S2_SOURCE "SYSTEM")
@@ -182,19 +149,26 @@ if(${S2_SOURCE} STREQUAL "AUTO")
   if(${s2_FOUND})
     message(STATUS "Found s2: ${s2_INCLUDE_DIRS}")
   else()
-    build_s2()
+    message(FATAL_ERROR "Couldn't find s2geometry")
   endif()
-elseif(${S2_SOURCE} STREQUAL "BUNDLED")
-  build_s2()
 elseif(${S2_SOURCE} STREQUAL "SYSTEM")
   find_s2(REQUIRED)
   if(NOT ${s2_FOUND})
     message(FATAL_ERROR "Couldn't find s2geometry")
   endif()
+elseif(${S2_SOURCE} STREQUAL "NONE")
+  # This branch assumes allows a previously existing s2 target to be used (e.g.,
+  # when using s2geography via add_subdirectory())
+  message(STATUS "Using previously defined s2 target")
+else()
+  message(FATAL_ERROR "Invalid value for S2_SOURCE: '${S2_SOURCE}'")
 endif()
 
 # --- OpenSSL
 find_package(OpenSSL REQUIRED)
+get_target_property(OPENSSL_INCLUDE_DIRS OpenSSL::SSL
+                    INTERFACE_INCLUDE_DIRECTORIES)
+message(STATUS "Found OpenSSL: ${OPENSSL_INCLUDE_DIRS}")
 
 # --- Abseil (bundled build not supported)
 
@@ -207,48 +181,33 @@ else()
   message(FATAL_ERROR "Couldn't find absl")
 endif()
 
-# --- nanoarrow (no longer bundled with geoarrow...could be bundled here, or
-# bundled as a fallback)
+# --- nanoarrow
 if(NOT TARGET nanoarrow)
   find_package(nanoarrow QUIET)
   if(nanoarrow_FOUND)
-    # nanoarrow::nanoarrow may be an ALIAS target (e.g., to
-    # nanoarrow::nanoarrow_shared or nanoarrow::nanoarrow_static), and CMake
-    # does not allow creating an alias of an alias. Resolve to the underlying
-    # IMPORTED target.
-    if(TARGET nanoarrow::nanoarrow_shared)
-      add_library(nanoarrow ALIAS nanoarrow::nanoarrow_shared)
-    elseif(TARGET nanoarrow::nanoarrow_static)
-      add_library(nanoarrow ALIAS nanoarrow::nanoarrow_static)
+    set(S2GEOGRAPHY_NANOARROW_TARGET nanoarrow::nanoarrow)
+    get_target_property(NANOARROW_INCLUDE_DIRS nanoarrow::nanoarrow
+                        INTERFACE_INCLUDE_DIRECTORIES)
+    message(STATUS "Found nanoarrow: ${NANOARROW_INCLUDE_DIRS}")
+  else()
+    message(STATUS "Using vendored nanoarrow")
+    set(NANOARROW_SOURCES src/vendored/nanoarrow/nanoarrow.c)
+    set(NANOARROW_INCLUDE_DIRECTORY src/vendored)
+    if(NANOARROW_NAMESPACE)
+      set(NANOARROW_COMPILE_DEFINITIONS
+          NANOARROW_NAMESPACE=${NANOARROW_NAMESPACE})
     else()
-      add_library(nanoarrow ALIAS nanoarrow::nanoarrow)
+      set(NANOARROW_COMPILE_DEFINITIONS NANOARROW_NAMESPACE=S2Geography)
     endif()
-    message(STATUS "Found system nanoarrow")
   endif()
-endif()
-
-if(NOT TARGET nanoarrow)
-  FetchContent_Declare(
-    nanoarrow
-    URL https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.8.0.zip
-    URL_HASH
-      SHA256=97923d39eb60149117ca48dde547b14689b943ee84983883f3cbff87315717a3)
-
-  FetchContent_MakeAvailable(nanoarrow)
-
-  # Create a plain "nanoarrow" alias so test targets can link against it
-  if(TARGET nanoarrow_shared)
-    add_library(nanoarrow ALIAS nanoarrow_shared)
-  elseif(TARGET nanoarrow_static)
-    add_library(nanoarrow ALIAS nanoarrow_static)
-  endif()
-
-  # do not install nanoarrow by default when running cmake --install
-  set_property(DIRECTORY ${nanoarrow_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
+else()
+  message(STATUS "Using previously defined nanoarrow target")
+  set(S2GEOGRAPHY_NANOARROW_TARGET geoarrow::geoarrow)
 endif()
 
 # --- geoarrow (vendored, but we can use an external version of it)
 if(NOT TARGET geoarrow)
+  message(STATUS "Using vendored geoarrow")
   set(GEOARROW_SOURCES src/vendored/geoarrow/geoarrow.c src/vendored/ryu/d2s.c
                        src/vendored/geoarrow/double_parse_fast_float.cc)
   set(GEOARROW_INCLUDE_DIRECTORY src/vendored)
@@ -263,6 +222,7 @@ if(NOT TARGET geoarrow)
         GEOARROW_NAMESPACE=S2Geography)
   endif()
 else()
+  message(STATUS "Using previously defined geoarrow target")
   set(S2GEOGRAPHY_GEOARROW_TARGET geoarrow::geoarrow)
 endif()
 
@@ -311,7 +271,8 @@ add_library(
   src/s2geography/wkb.cc
   src/s2geography/op/cell.cc
   src/s2geography/op/point.cc
-  ${GEOARROW_SOURCES})
+  ${GEOARROW_SOURCES}
+  ${NANOARROW_SOURCES})
 
 if(NOT BUILD_SHARED_LIBS)
   set_target_properties(s2geography PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -321,7 +282,7 @@ target_include_directories(
   s2geography
   PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
          $<INSTALL_INTERFACE:include>
-  PRIVATE ${GEOARROW_INCLUDE_DIRECTORY})
+  PRIVATE ${GEOARROW_INCLUDE_DIRECTORY} ${NANOARROW_INCLUDE_DIRECTORY})
 
 target_compile_definitions(
   s2geography
@@ -342,7 +303,7 @@ endif()
 target_link_libraries(
   s2geography
   PUBLIC s2::s2 absl::memory absl::str_format OpenSSL::SSL OpenSSL::Crypto
-  PRIVATE nanoarrow::nanoarrow ${S2GEOGRAPHY_GEOARROW_TARGET})
+  PRIVATE ${S2GEOGRAPHY_NANOARROW_TARGET} ${S2GEOGRAPHY_GEOARROW_TARGET})
 
 # Set somewhat aggressive compiler warning flags
 if(S2GEOGRAPHY_EXTRA_WARNINGS)
@@ -377,6 +338,8 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   enable_testing()
 
   target_compile_definitions(s2geography PUBLIC ${GEOARROW_COMPILE_DEFINITIONS})
+  target_compile_definitions(s2geography
+                             PUBLIC ${NANOARROW_COMPILE_DEFINITIONS})
 
   add_executable(sedona_udf_internal_test
                  src/s2geography/sedona_udf/sedona_udf_internal_test.cc)
@@ -398,23 +361,30 @@ if(S2GEOGRAPHY_BUILD_TESTS)
     target_link_libraries(s2geography PUBLIC coverage_config)
   endif()
 
-  target_link_libraries(sedona_udf_internal_test s2geography nanoarrow
+  target_link_libraries(
+    sedona_udf_internal_test s2geography ${S2GEOGRAPHY_NANOARROW_TARGET}
+    GTest::gtest_main GTest::gmock)
+  target_link_libraries(
+    accessors_geog_test s2geography ${S2GEOGRAPHY_NANOARROW_TARGET}
+    GTest::gtest_main GTest::gmock)
+  target_link_libraries(build_test s2geography ${S2GEOGRAPHY_NANOARROW_TARGET}
                         GTest::gtest_main GTest::gmock)
-  target_link_libraries(accessors_geog_test s2geography nanoarrow
-                        GTest::gtest_main GTest::gmock)
-  target_link_libraries(build_test s2geography nanoarrow GTest::gtest_main
-                        GTest::gmock)
-  target_link_libraries(distance_test s2geography nanoarrow GTest::gtest_main
-                        GTest::gmock)
-  target_link_libraries(geoarrow_test s2geography nanoarrow GTest::gtest_main
-                        GTest::gmock)
-  target_link_libraries(geography_test s2geography nanoarrow GTest::gtest_main
-                        GTest::gmock)
-  target_link_libraries(linear_referencing_test s2geography nanoarrow
-                        GTest::gtest_main GTest::gmock)
+  target_link_libraries(
+    distance_test s2geography ${S2GEOGRAPHY_NANOARROW_TARGET} GTest::gtest_main
+    GTest::gmock)
+  target_link_libraries(
+    geoarrow_test s2geography ${S2GEOGRAPHY_NANOARROW_TARGET} GTest::gtest_main
+    GTest::gmock)
+  target_link_libraries(
+    geography_test s2geography ${S2GEOGRAPHY_NANOARROW_TARGET}
+    GTest::gtest_main GTest::gmock)
+  target_link_libraries(
+    linear_referencing_test s2geography ${S2GEOGRAPHY_NANOARROW_TARGET}
+    GTest::gtest_main GTest::gmock)
   target_link_libraries(op_cell_test s2geography GTest::gtest_main)
-  target_link_libraries(predicates_test s2geography nanoarrow GTest::gtest_main
-                        GTest::gmock)
+  target_link_libraries(
+    predicates_test s2geography ${S2GEOGRAPHY_NANOARROW_TARGET}
+    GTest::gtest_main GTest::gmock)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
   target_link_libraries(wkb_test s2geography GTest::gtest_main)
 
