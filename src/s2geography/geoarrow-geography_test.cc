@@ -18,6 +18,7 @@ class TestGeometry {
   }
 
   explicit TestGeometry(std::string_view wkt) : TestGeometry() {
+    label_ = wkt;
     struct GeoArrowStringView wkt_view{wkt.data(),
                                        static_cast<int64_t>(wkt.size())};
 
@@ -59,12 +60,17 @@ class TestGeometry {
     return result;
   }
 
-  struct GeoArrowGeometryView geom() { return GeoArrowGeometryAsView(&geom_); }
+  struct GeoArrowGeometryView geom() const {
+    return GeoArrowGeometryAsView(&geom_);
+  }
+
+  std::string_view label() const { return label_; }
 
   ~TestGeometry() { GeoArrowGeometryReset(&geom_); }
 
  private:
   struct GeoArrowGeometry geom_;
+  std::string label_;
 };
 
 TEST(GeoArrowLaxPolylineShape, DefaultConstructor) {
@@ -341,41 +347,51 @@ TEST(GeoArrowLaxPolygonShape, ShapeIndexContainsMultiPolygonWithHoles) {
       "((10 10, 20 10, 20 20, 10 20, 10 10), "
       "(13 13, 13 17, 17 17, 17 13, 13 13)))");
 
-  MutableS2ShapeIndex poly_index;
-  poly_index.Add(std::make_unique<GeoArrowLaxPolygonShape>(poly_geom.geom()));
+  TestGeometry poly_geom_bad_winding(
+      "MULTIPOLYGON (((-20 -20, -20 -10, -10 -10, -10 -20, -20 -20), "
+      "(-17 -17, -13 -17, -13 -13, -17 -13, -17 -17)), "
+      "((10 10, 10 20, 20 20, 20 10, 10 10), "
+      "(13 13, 17 13, 17 17, 13 17, 13 13)))");
 
-  WKTReader reader;
-  S2BooleanOperation::Options options;
+  for (auto& test_geom : {poly_geom, poly_geom_bad_winding}) {
+    SCOPED_TRACE(test_geom.label());
 
-  // Inside first shell (between shell and hole)
-  auto in_shell1 = reader.read_feature("POINT (-11 -11)");
-  ShapeIndexGeography in_shell1_index(*in_shell1);
-  EXPECT_TRUE(S2BooleanOperation::Intersects(
-      poly_index, in_shell1_index.ShapeIndex(), options));
+    MutableS2ShapeIndex poly_index;
+    poly_index.Add(std::make_unique<GeoArrowLaxPolygonShape>(test_geom.geom()));
 
-  // Inside first hole
-  auto in_hole1 = reader.read_feature("POINT (-15 -15)");
-  ShapeIndexGeography in_hole1_index(*in_hole1);
-  EXPECT_FALSE(S2BooleanOperation::Intersects(
-      poly_index, in_hole1_index.ShapeIndex(), options));
+    WKTReader reader;
+    S2BooleanOperation::Options options;
 
-  // Inside second shell (between shell and hole)
-  auto in_shell2 = reader.read_feature("POINT (11 11)");
-  ShapeIndexGeography in_shell2_index(*in_shell2);
-  EXPECT_TRUE(S2BooleanOperation::Intersects(
-      poly_index, in_shell2_index.ShapeIndex(), options));
+    // Inside first shell (between shell and hole)
+    auto in_shell1 = reader.read_feature("POINT (-11 -11)");
+    ShapeIndexGeography in_shell1_index(*in_shell1);
+    EXPECT_TRUE(S2BooleanOperation::Intersects(
+        poly_index, in_shell1_index.ShapeIndex(), options));
 
-  // Inside second hole
-  auto in_hole2 = reader.read_feature("POINT (15 15)");
-  ShapeIndexGeography in_hole2_index(*in_hole2);
-  EXPECT_FALSE(S2BooleanOperation::Intersects(
-      poly_index, in_hole2_index.ShapeIndex(), options));
+    // Inside first hole
+    auto in_hole1 = reader.read_feature("POINT (-15 -15)");
+    ShapeIndexGeography in_hole1_index(*in_hole1);
+    EXPECT_FALSE(S2BooleanOperation::Intersects(
+        poly_index, in_hole1_index.ShapeIndex(), options));
 
-  // Outside both polygons
-  auto outside = reader.read_feature("POINT (50 50)");
-  ShapeIndexGeography outside_index(*outside);
-  EXPECT_FALSE(S2BooleanOperation::Intersects(
-      poly_index, outside_index.ShapeIndex(), options));
+    // Inside second shell (between shell and hole)
+    auto in_shell2 = reader.read_feature("POINT (11 11)");
+    ShapeIndexGeography in_shell2_index(*in_shell2);
+    EXPECT_TRUE(S2BooleanOperation::Intersects(
+        poly_index, in_shell2_index.ShapeIndex(), options));
+
+    // Inside second hole
+    auto in_hole2 = reader.read_feature("POINT (15 15)");
+    ShapeIndexGeography in_hole2_index(*in_hole2);
+    EXPECT_FALSE(S2BooleanOperation::Intersects(
+        poly_index, in_hole2_index.ShapeIndex(), options));
+
+    // Outside both polygons
+    auto outside = reader.read_feature("POINT (50 50)");
+    ShapeIndexGeography outside_index(*outside);
+    EXPECT_FALSE(S2BooleanOperation::Intersects(
+        poly_index, outside_index.ShapeIndex(), options));
+  }
 }
 
 TEST(GeoArrowLaxPolygonShape, BigEndianWKBPolygon) {
