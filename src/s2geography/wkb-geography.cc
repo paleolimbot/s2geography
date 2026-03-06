@@ -94,7 +94,7 @@ void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
   int64_t i = 1;
   VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
     num_vertices += node->size;
-    num_edges += 0 ? node->size == 0 : node->size - 1;
+    num_edges += node->size == 0 ? 0 : node->size - 1;
     if (num_edges > std::numeric_limits<int>::max()) {
       throw Exception(
           "Can't create GeoArrowLaxPpolylineShape from geometry with > "
