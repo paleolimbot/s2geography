@@ -198,3 +198,157 @@ TEST(GeoArrowLaxPolylineShape, ShapeIndexIntersection) {
   EXPECT_FALSE(S2BooleanOperation::Intersects(line_index,
                                               far_index.ShapeIndex(), options));
 }
+
+// --- GeoArrowLaxPolygonShape tests ---
+
+TEST(GeoArrowLaxPolygonShape, DefaultConstructor) {
+  GeoArrowLaxPolygonShape shape;
+  EXPECT_EQ(shape.num_edges(), 0);
+  EXPECT_EQ(shape.dimension(), 2);
+  EXPECT_EQ(shape.num_chains(), 0);
+  EXPECT_EQ(shape.num_loops(), 0);
+}
+
+TEST(GeoArrowLaxPolygonShape, SimpleTriangle) {
+  TestGeometry geom("POLYGON ((0 0, 1 0, 0 1, 0 0))");
+  GeoArrowLaxPolygonShape shape(geom.geom());
+  EXPECT_EQ(shape.num_loops(), 1);
+  EXPECT_EQ(shape.num_loop_vertices(0), 4);
+  // num_edges == total vertices (each ring is closed)
+  EXPECT_EQ(shape.num_edges(), 4);
+  EXPECT_EQ(shape.num_chains(), 1);
+  EXPECT_EQ(shape.dimension(), 2);
+
+  auto chain0 = shape.chain(0);
+  EXPECT_EQ(chain0.start, 0);
+  EXPECT_EQ(chain0.length, 4);
+}
+
+TEST(GeoArrowLaxPolygonShape, PolygonWithHole) {
+  TestGeometry geom(
+      "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0), "
+      "(2 2, 8 2, 8 8, 2 8, 2 2))");
+  GeoArrowLaxPolygonShape shape(geom.geom());
+  EXPECT_EQ(shape.num_loops(), 2);
+  EXPECT_EQ(shape.num_loop_vertices(0), 5);
+  EXPECT_EQ(shape.num_loop_vertices(1), 5);
+  EXPECT_EQ(shape.num_edges(), 10);
+  EXPECT_EQ(shape.num_chains(), 2);
+
+  auto chain0 = shape.chain(0);
+  EXPECT_EQ(chain0.start, 0);
+  EXPECT_EQ(chain0.length, 5);
+
+  auto chain1 = shape.chain(1);
+  EXPECT_EQ(chain1.start, 5);
+  EXPECT_EQ(chain1.length, 5);
+
+  // chain_position for edge in second ring
+  auto pos = shape.chain_position(7);
+  EXPECT_EQ(pos.chain_id, 1);
+  EXPECT_EQ(pos.offset, 2);
+}
+
+TEST(GeoArrowLaxPolygonShape, MultiPolygon2Components) {
+  TestGeometry geom(
+      "MULTIPOLYGON (((0 0, 1 0, 0 1, 0 0)), "
+      "((10 10, 11 10, 10 11, 10 10)))");
+  GeoArrowLaxPolygonShape shape(geom.geom());
+  EXPECT_EQ(shape.num_loops(), 2);
+  EXPECT_EQ(shape.num_loop_vertices(0), 4);
+  EXPECT_EQ(shape.num_loop_vertices(1), 4);
+  EXPECT_EQ(shape.num_edges(), 8);
+  EXPECT_EQ(shape.num_chains(), 2);
+
+  auto pos = shape.chain_position(5);
+  EXPECT_EQ(pos.chain_id, 1);
+  EXPECT_EQ(pos.offset, 1);
+}
+
+TEST(GeoArrowLaxPolygonShape, MultiPolygon3Components) {
+  TestGeometry geom(
+      "MULTIPOLYGON (((0 0, 1 0, 0 1, 0 0)), "
+      "((10 10, 11 10, 10 11, 10 10)), "
+      "((20 20, 21 20, 20 21, 20 20)))");
+  GeoArrowLaxPolygonShape shape(geom.geom());
+  EXPECT_EQ(shape.num_loops(), 3);
+  EXPECT_EQ(shape.num_edges(), 12);    // 4 + 4 + 4
+  EXPECT_EQ(shape.num_chains(), 3);
+}
+
+TEST(GeoArrowLaxPolygonShape, MultiPolygonWithHoles) {
+  // 2 polygons, first has a hole
+  TestGeometry geom(
+      "MULTIPOLYGON (((0 0, 10 0, 10 10, 0 10, 0 0), "
+      "(2 2, 8 2, 8 8, 2 8, 2 2)), "
+      "((20 20, 21 20, 20 21, 20 20)))");
+  GeoArrowLaxPolygonShape shape(geom.geom());
+  EXPECT_EQ(shape.num_loops(), 3);   // shell + hole + second polygon shell
+  EXPECT_EQ(shape.num_loop_vertices(0), 5);
+  EXPECT_EQ(shape.num_loop_vertices(1), 5);
+  EXPECT_EQ(shape.num_loop_vertices(2), 4);
+  EXPECT_EQ(shape.num_edges(), 14);  // 5 + 5 + 4
+}
+
+TEST(GeoArrowLaxPolygonShape, ChainEdgeWrapsAround) {
+  // Triangle: vertices 0,1,2 -> edges (0,1), (1,2), (2,0)
+  TestGeometry geom("POLYGON ((0 0, 1 0, 0 1, 0 0))");
+  GeoArrowLaxPolygonShape shape(geom.geom());
+
+  // Last edge in the chain should wrap from vertex 3 back to vertex 0
+  auto last_edge = shape.chain_edge(0, 3);
+  auto first_edge = shape.chain_edge(0, 0);
+  // The last edge's endpoint should be the first edge's start
+  EXPECT_EQ(last_edge.v1, first_edge.v0);
+}
+
+TEST(GeoArrowLaxPolygonShape, ShapeIndexContains) {
+  // Create a polygon and check that a point inside is contained
+  TestGeometry poly_geom(
+      "POLYGON ((-10 -10, 10 -10, 10 10, -10 10, -10 -10))");
+
+  MutableS2ShapeIndex poly_index;
+  poly_index.Add(
+      std::make_unique<GeoArrowLaxPolygonShape>(poly_geom.geom()));
+
+  // Create a point inside the polygon
+  WKTReader reader;
+  auto point_geog = reader.read_feature("POINT (0 0)");
+  ShapeIndexGeography point_index(*point_geog);
+
+  S2BooleanOperation::Options options;
+  EXPECT_TRUE(S2BooleanOperation::Intersects(poly_index,
+                                             point_index.ShapeIndex(), options));
+
+  // Point outside should not intersect
+  auto far_point_geog = reader.read_feature("POINT (50 50)");
+  ShapeIndexGeography far_point_index(*far_point_geog);
+  EXPECT_FALSE(S2BooleanOperation::Intersects(
+      poly_index, far_point_index.ShapeIndex(), options));
+}
+
+TEST(GeoArrowLaxPolygonShape, BigEndianWKBPolygon) {
+  // clang-format off
+  // Big-endian WKB for POLYGON ((0 0, 1 0, 0 1, 0 0))
+  std::vector<uint8_t> wkb = {
+    0x00,                                      // big endian
+    0x00, 0x00, 0x00, 0x03,                    // type: Polygon
+    0x00, 0x00, 0x00, 0x01,                    // num rings: 1
+    0x00, 0x00, 0x00, 0x04,                    // num points: 4
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // x: 0.0
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // y: 0.0
+    0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // x: 1.0
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // y: 0.0
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // x: 0.0
+    0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // y: 1.0
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // x: 0.0
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // y: 0.0
+  };
+  // clang-format on
+
+  auto geom = TestGeometry::FromWKB(wkb);
+  GeoArrowLaxPolygonShape shape(geom.geom());
+  EXPECT_EQ(shape.num_loops(), 1);
+  EXPECT_EQ(shape.num_loop_vertices(0), 4);
+  EXPECT_EQ(shape.num_edges(), 4);
+}

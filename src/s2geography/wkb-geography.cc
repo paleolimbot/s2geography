@@ -3,6 +3,7 @@
 
 #include <s2/s2point.h>
 #include <s2/s2projections.h>
+#include <s2/s2shapeutil_get_reference_point.h>
 
 #include <cstring>
 #include <limits>
@@ -166,5 +167,120 @@ S2Shape::ChainPosition GeoArrowLaxPolylineShape::chain_position(int e) const {
 }
 
 S2Shape::TypeTag GeoArrowLaxPolylineShape::type_tag() const { return kTypeTag; }
+
+// --- GeoArrowLaxPolygonShape ---
+
+GeoArrowLaxPolygonShape::GeoArrowLaxPolygonShape(
+    struct GeoArrowGeometryView geom) {
+  Init(geom);
+}
+
+void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
+  geom_ = geom;
+
+  // Collect all ring (LINESTRING) nodes
+  num_loops_ = 0;
+  num_vertices_.clear();
+  num_vertices_.push_back(0);
+  int64_t total_vertices = 0;
+
+  const struct GeoArrowGeometryNode* end = geom_.root + geom_.size_nodes;
+  for (const struct GeoArrowGeometryNode* node = geom_.root; node < end;
+       ++node) {
+    if (node->geometry_type == GEOARROW_GEOMETRY_TYPE_LINESTRING) {
+      total_vertices += node->size;
+      if (total_vertices > std::numeric_limits<int>::max()) {
+        throw Exception(
+            "Can't create GeoArrowLaxPolygonShape from geometry with > "
+            "INT_MAX vertices");
+      }
+      num_vertices_.push_back(static_cast<int>(total_vertices));
+      ++num_loops_;
+    }
+  }
+}
+
+int GeoArrowLaxPolygonShape::num_loops() const { return num_loops_; }
+
+int GeoArrowLaxPolygonShape::num_loop_vertices(int i) const {
+  return num_vertices_[i + 1] - num_vertices_[i];
+}
+
+S2Point GeoArrowLaxPolygonShape::loop_vertex(int i, int j) const {
+  // Find the i-th LINESTRING node
+  int ring_idx = 0;
+  const struct GeoArrowGeometryNode* end = geom_.root + geom_.size_nodes;
+  for (const struct GeoArrowGeometryNode* node = geom_.root; node < end;
+       ++node) {
+    if (node->geometry_type == GEOARROW_GEOMETRY_TYPE_LINESTRING) {
+      if (ring_idx == i) {
+        double lng, lat;
+        const uint8_t* lngs = node->coords[0];
+        const uint8_t* lats = node->coords[1];
+
+        if (node->flags & GEOARROW_GEOMETRY_NODE_FLAG_SWAP_ENDIAN) {
+          uint64_t tmp;
+          lngs += j * node->coord_stride[0];
+          lats += j * node->coord_stride[1];
+          memcpy(&tmp, lngs, sizeof(double));
+          tmp = GEOARROW_BSWAP64(tmp);
+          memcpy(&lng, &tmp, sizeof(double));
+          memcpy(&tmp, lats, sizeof(double));
+          tmp = GEOARROW_BSWAP64(tmp);
+          memcpy(&lat, &tmp, sizeof(double));
+        } else {
+          lngs += j * node->coord_stride[0];
+          lats += j * node->coord_stride[1];
+          memcpy(&lng, lngs, sizeof(double));
+          memcpy(&lat, lats, sizeof(double));
+        }
+
+        S2LatLng ll = S2LatLng::FromDegrees(lat, lng);
+        return ll.ToPoint();
+      }
+      ++ring_idx;
+    }
+  }
+
+  throw Exception("Loop " + std::to_string(i) + " vertex " + std::to_string(j) +
+                  " does not exist");
+}
+
+int GeoArrowLaxPolygonShape::num_edges() const { return num_vertices_.back(); }
+
+S2Shape::Edge GeoArrowLaxPolygonShape::edge(int e) const {
+  ChainPosition pos = GeoArrowLaxPolygonShape::chain_position(e);
+  return GeoArrowLaxPolygonShape::chain_edge(pos.chain_id, pos.offset);
+}
+
+int GeoArrowLaxPolygonShape::dimension() const { return 2; }
+
+S2Shape::ReferencePoint GeoArrowLaxPolygonShape::GetReferencePoint() const {
+  return s2shapeutil::GetReferencePoint(*this);
+}
+
+int GeoArrowLaxPolygonShape::num_chains() const { return num_loops_; }
+
+S2Shape::Chain GeoArrowLaxPolygonShape::chain(int i) const {
+  return Chain(num_vertices_[i], num_loop_vertices(i));
+}
+
+S2Shape::Edge GeoArrowLaxPolygonShape::chain_edge(int i, int j) const {
+  int n = num_loop_vertices(i);
+  int k = (j + 1 == n) ? 0 : j + 1;
+  return Edge(loop_vertex(i, j), loop_vertex(i, k));
+}
+
+S2Shape::ChainPosition GeoArrowLaxPolygonShape::chain_position(int e) const {
+  for (int i = 0; i < num_loops_; i++) {
+    if (e < num_vertices_[i + 1]) {
+      return ChainPosition(i, e - num_vertices_[i]);
+    }
+  }
+
+  throw Exception("Edge at position " + std::to_string(e) + " does not exist");
+}
+
+S2Shape::TypeTag GeoArrowLaxPolygonShape::type_tag() const { return kTypeTag; }
 
 }  // namespace s2geography
