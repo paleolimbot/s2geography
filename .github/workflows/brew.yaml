@@ -1,0 +1,41 @@
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+name: Run tests
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: "macos-latest"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install abseil s2geometry nanoarrow
+
+      - name: Configure s2geography
+        shell: bash -l {0}
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_CXX_STANDARD=17 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DS2GEOGRAPHY_BUILD_TESTS=ON \
+            -DS2GEOGRAPHY_S2_SOURCE=BREW
+
+      - name: Build s2geography
+        shell: bash -l {0}
+        run: |
+          cmake --build build --config Release
+      - name: Run tests
+        shell: bash -l {0}
+        run: |
+          cd build
+          ctest -T test --output-on-failure .
