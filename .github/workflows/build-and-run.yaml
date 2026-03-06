@@ -9,52 +9,50 @@ name: Build and Run (Linux)
 permissions:
   contents: read
 
+env:
+  VCPKG_REF: 5a01de756c28279ddfdd2b061d1c75710a6255fa
+
 jobs:
   build-and-run:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Clone vcpkg
+        uses: actions/checkout@v6
         with:
-          fetch-depth: 0
-          submodules: 'true'
+          repository: microsoft/vcpkg
+          ref: ${{ env.VCPKG_REF }}
+          path: vcpkg
 
-      - name: Install dependencies
+      - name: Set up environment variables and bootstrap vcpkg
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+          CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
         run: |
-          sudo apt-get install -y cmake libssl-dev
+          cd vcpkg
+          ./bootstrap-vcpkg.sh
+          cd ..
 
-      - name: Cache Build Directory
-        id: cache-build
-        uses: actions/cache@v4
+          echo "VCPKG_ROOT=$VCPKG_ROOT" >> $GITHUB_ENV
+          echo "PATH=$VCPKG_ROOT:$PATH" >> $GITHUB_ENV
+          echo "CMAKE_TOOLCHAIN_FILE=$CMAKE_TOOLCHAIN_FILE" >> $GITHUB_ENV
+
+      - name: Cache vcpkg binaries
+        id: cache-vcpkg
+        uses: actions/cache@v5
         with:
-          path: build
-          key: ${{ runner.os }}-0
+          path: vcpkg/packages
+          # Bump the number at the end of this line to force a new dependency build
+          key: vcpkg-installed-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REF }}-1
 
-      - name: Init build dir
-        if: steps.cache-build.outputs.cache-hit != 'true'
-        run: mkdir build
-
-      - name: Fetch abseil
-        if: steps.cache-build.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: abseil/abseil-cpp
-          ref: "20240722.0"
-          path: build/absl-src
-          fetch-depth: 0
-
-      - name: Configure and Build Abseil
-        if: steps.cache-build.outputs.cache-hit != 'true'
+      - name: Install vcpkg dependencies
+        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
         run: |
-          cd build/absl-src
-          cmake . -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_CXX_STANDARD=17 -DABSL_ENABLE_INSTALL=ON
-          cmake --build .
-          cmake --install . --prefix ../dist
-
-      - name: Install Abseil
-        run: |
-          cd build
-          cmake --install absl-src --prefix ../dist
+          ./vcpkg/vcpkg install nanoarrow s2geometry abseil openssl
+          # Clean up vcpkg buildtrees and downloads to save space
+          rm -rf vcpkg/buildtrees
+          rm -rf vcpkg/downloads
 
       - name: Clean previous coverage
         run: |
