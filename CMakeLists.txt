@@ -257,20 +257,21 @@ endif()
 add_library(
   s2geography
   src/s2geography/accessors-geog.cc
-  src/s2geography/coverings.cc
-  src/s2geography/linear-referencing.cc
   src/s2geography/accessors.cc
-  src/s2geography/distance.cc
-  src/s2geography/predicates.cc
-  src/s2geography/projections.cc
   src/s2geography/build.cc
-  src/s2geography/geography.cc
+  src/s2geography/coverings.cc
+  src/s2geography/distance.cc
   src/s2geography/geoarrow.cc
-  src/s2geography/wkt-reader.cc
-  src/s2geography/wkt-writer.cc
-  src/s2geography/wkb.cc
+  src/s2geography/geography.cc
+  src/s2geography/linear-referencing.cc
   src/s2geography/op/cell.cc
   src/s2geography/op/point.cc
+  src/s2geography/predicates.cc
+  src/s2geography/projections.cc
+  src/s2geography/wkb-geography.cc
+  src/s2geography/wkb.cc
+  src/s2geography/wkt-reader.cc
+  src/s2geography/wkt-writer.cc
   ${GEOARROW_SOURCES}
   ${NANOARROW_SOURCES})
 
