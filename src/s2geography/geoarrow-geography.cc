@@ -120,17 +120,21 @@ S2Shape::ReferencePoint GeoArrowPointShape::GetReferencePoint() const {
   return ReferencePoint::Contained(false);
 }
 
-int GeoArrowPointShape::num_chains() const { return num_vertices(); }
+int GeoArrowPointShape::num_chains() const {
+  return num_vertices() == 0 ? 0 : 1;
+}
 
-S2Shape::Chain GeoArrowPointShape::chain(int i) const { return Chain(i, 1); }
+S2Shape::Chain GeoArrowPointShape::chain(int i) const {
+  return Chain(0, num_vertices());
+}
 
 S2Shape::Edge GeoArrowPointShape::chain_edge(int i, int j) const {
-  S2Point p = vertex(i);
+  S2Point p = vertex(j);
   return Edge(p, p);
 }
 
 S2Shape::ChainPosition GeoArrowPointShape::chain_position(int e) const {
-  return ChainPosition(e, 0);
+  return ChainPosition(0, e);
 }
 
 S2Shape::TypeTag GeoArrowPointShape::type_tag() const { return kTypeTag; }

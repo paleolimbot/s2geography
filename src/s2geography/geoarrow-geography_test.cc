@@ -113,6 +113,9 @@ TEST(GeoArrowPointShape, SinglePoint) {
   auto pos = shape.chain_position(0);
   EXPECT_EQ(pos.chain_id, 0);
   EXPECT_EQ(pos.offset, 0);
+
+  auto ce = shape.chain_edge(0, 0);
+  EXPECT_EQ(ce.v0, ce.v1);
 }
 
 TEST(GeoArrowPointShape, MultiPoint) {
@@ -120,21 +123,25 @@ TEST(GeoArrowPointShape, MultiPoint) {
   GeoArrowPointShape shape(geom.geom());
   EXPECT_EQ(shape.num_vertices(), 3);
   EXPECT_EQ(shape.num_edges(), 3);
-  EXPECT_EQ(shape.num_chains(), 3);
+  EXPECT_EQ(shape.num_chains(), 1);
   EXPECT_EQ(shape.dimension(), 0);
 
-  // Each point is its own chain
-  for (int i = 0; i < 3; ++i) {
-    auto c = shape.chain(i);
-    EXPECT_EQ(c.start, i);
-    EXPECT_EQ(c.length, 1);
+  // Single chain containing all points
+  auto c = shape.chain(0);
+  EXPECT_EQ(c.start, 0);
+  EXPECT_EQ(c.length, 3);
 
+  for (int i = 0; i < 3; ++i) {
     auto pos = shape.chain_position(i);
-    EXPECT_EQ(pos.chain_id, i);
-    EXPECT_EQ(pos.offset, 0);
+    EXPECT_EQ(pos.chain_id, 0);
+    EXPECT_EQ(pos.offset, i);
 
     auto e = shape.edge(i);
     EXPECT_EQ(e.v0, e.v1);  // degenerate edge
+
+    auto ce = shape.chain_edge(0, i);
+    EXPECT_EQ(ce.v0, ce.v1);
+    EXPECT_EQ(ce.v0, e.v0);
   }
 }
 
@@ -159,7 +166,7 @@ TEST(GeoArrowPointShape, BigEndianWKB) {
 TEST(GeoArrowPointShape, ShapeIndexIntersection) {
   TestGeometry point_geom("MULTIPOINT ((0 0), (1 1), (50 50))");
   GeoArrowPointShape shape(point_geom.geom());
-  EXPECT_EQ(shape.num_chains(), 3);
+  EXPECT_EQ(shape.num_chains(), 1);
 
   MutableS2ShapeIndex point_index;
   point_index.Add(std::make_unique<GeoArrowPointShape>(point_geom.geom()));
