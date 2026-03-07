@@ -87,6 +87,101 @@ class TestGeometry {
   bool oriented_;
 };
 
+TEST(GeoArrowPointShape, DefaultConstructor) {
+  GeoArrowPointShape shape;
+  EXPECT_EQ(shape.num_edges(), 0);
+  EXPECT_EQ(shape.dimension(), 0);
+  EXPECT_EQ(shape.num_chains(), 0);
+  EXPECT_EQ(shape.num_vertices(), 0);
+}
+
+TEST(GeoArrowPointShape, SinglePoint) {
+  TestGeometry geom("POINT (30 10)");
+  GeoArrowPointShape shape(geom.geom());
+  EXPECT_EQ(shape.num_vertices(), 1);
+  EXPECT_EQ(shape.num_edges(), 1);
+  EXPECT_EQ(shape.num_chains(), 1);
+  EXPECT_EQ(shape.dimension(), 0);
+
+  auto e = shape.edge(0);
+  EXPECT_EQ(e.v0, e.v1);  // degenerate edge
+
+  auto c = shape.chain(0);
+  EXPECT_EQ(c.start, 0);
+  EXPECT_EQ(c.length, 1);
+
+  auto pos = shape.chain_position(0);
+  EXPECT_EQ(pos.chain_id, 0);
+  EXPECT_EQ(pos.offset, 0);
+}
+
+TEST(GeoArrowPointShape, MultiPoint) {
+  TestGeometry geom("MULTIPOINT ((0 0), (1 1), (2 2))");
+  GeoArrowPointShape shape(geom.geom());
+  EXPECT_EQ(shape.num_vertices(), 3);
+  EXPECT_EQ(shape.num_edges(), 3);
+  EXPECT_EQ(shape.num_chains(), 3);
+  EXPECT_EQ(shape.dimension(), 0);
+
+  // Each point is its own chain
+  for (int i = 0; i < 3; ++i) {
+    auto c = shape.chain(i);
+    EXPECT_EQ(c.start, i);
+    EXPECT_EQ(c.length, 1);
+
+    auto pos = shape.chain_position(i);
+    EXPECT_EQ(pos.chain_id, i);
+    EXPECT_EQ(pos.offset, 0);
+
+    auto e = shape.edge(i);
+    EXPECT_EQ(e.v0, e.v1);  // degenerate edge
+  }
+}
+
+TEST(GeoArrowPointShape, BigEndianWKB) {
+  // clang-format off
+  // Big-endian WKB for POINT (30 10)
+  std::vector<uint8_t> wkb = {
+    0x00,                                      // big endian
+    0x00, 0x00, 0x00, 0x01,                    // type: Point
+    0x40, 0x3e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // x: 30.0
+    0x40, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // y: 10.0
+  };
+  // clang-format on
+
+  auto geom = TestGeometry::FromWKB(wkb);
+  GeoArrowPointShape shape(geom.geom());
+  EXPECT_EQ(shape.num_vertices(), 1);
+  EXPECT_EQ(shape.num_edges(), 1);
+  EXPECT_EQ(shape.num_chains(), 1);
+}
+
+TEST(GeoArrowPointShape, ShapeIndexIntersection) {
+  TestGeometry point_geom("MULTIPOINT ((0 0), (1 1), (50 50))");
+  GeoArrowPointShape shape(point_geom.geom());
+  EXPECT_EQ(shape.num_chains(), 3);
+
+  MutableS2ShapeIndex point_index;
+  point_index.Add(std::make_unique<GeoArrowPointShape>(point_geom.geom()));
+
+  WKTReader reader;
+  S2BooleanOperation::Options options;
+
+  // Polygon overlapping the first two points
+  auto poly_geog = reader.read_feature(
+      "POLYGON ((-1 -1, 2 -1, 2 2, -1 2, -1 -1))");
+  ShapeIndexGeography poly_index(*poly_geog);
+  EXPECT_TRUE(S2BooleanOperation::Intersects(
+      point_index, poly_index.ShapeIndex(), options));
+
+  // Polygon far from all points
+  auto far_geog = reader.read_feature(
+      "POLYGON ((80 80, 81 80, 81 81, 80 81, 80 80))");
+  ShapeIndexGeography far_index(*far_geog);
+  EXPECT_FALSE(S2BooleanOperation::Intersects(
+      point_index, far_index.ShapeIndex(), options));
+}
+
 TEST(GeoArrowLaxPolylineShape, DefaultConstructor) {
   GeoArrowLaxPolylineShape shape;
   EXPECT_EQ(shape.num_edges(), 0);

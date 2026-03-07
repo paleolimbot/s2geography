@@ -71,6 +71,70 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
 
 }  // namespace
 
+GeoArrowPointShape::GeoArrowPointShape(struct GeoArrowGeometryView geom) {
+  Init(geom);
+}
+
+void GeoArrowPointShape::Init(struct GeoArrowGeometryView geom) {
+  switch (geom.root->geometry_type) {
+    case GEOARROW_GEOMETRY_TYPE_POINT:
+      geom_ = geom;
+      break;
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+      geom_ = {geom.root + 1, geom.size_nodes - 1};
+      break;
+    default:
+      throw Exception(
+          "Can't create GeoArrowPointShape() from geometry of unknown type ");
+  }
+
+  if (geom_.size_nodes > std::numeric_limits<int>::max()) {
+    throw Exception(
+        "Can't create GeoArrowPointShape() from geometry with > INT_MAX "
+        "points");
+  }
+}
+
+int GeoArrowPointShape::num_vertices() const {
+  return static_cast<int>(geom_.size_nodes);
+}
+
+S2Point GeoArrowPointShape::vertex(int v) const {
+  S2LatLng ll;
+  VisitLngLat(geom_.root + v, 0, 1, [&](double lng, double lat) {
+    ll = S2LatLng::FromDegrees(lat, lng);
+  });
+  return ll.ToPoint();
+}
+
+int GeoArrowPointShape::num_edges() const { return num_vertices(); }
+
+S2Shape::Edge GeoArrowPointShape::edge(int e) const {
+  S2Point p = vertex(e);
+  return Edge(p, p);
+}
+
+int GeoArrowPointShape::dimension() const { return 0; }
+
+S2Shape::ReferencePoint GeoArrowPointShape::GetReferencePoint() const {
+  return ReferencePoint::Contained(false);
+}
+
+int GeoArrowPointShape::num_chains() const { return num_vertices(); }
+
+S2Shape::Chain GeoArrowPointShape::chain(int i) const { return Chain(i, 1); }
+
+S2Shape::Edge GeoArrowPointShape::chain_edge(int i, int j) const {
+  S2Point p = vertex(i);
+  return Edge(p, p);
+}
+
+S2Shape::ChainPosition GeoArrowPointShape::chain_position(int e) const {
+  return ChainPosition(e, 0);
+}
+
+S2Shape::TypeTag GeoArrowPointShape::type_tag() const { return kTypeTag; }
+
 GeoArrowLaxPolylineShape::GeoArrowLaxPolylineShape(
     struct GeoArrowGeometryView geom) {
   Init(geom);
