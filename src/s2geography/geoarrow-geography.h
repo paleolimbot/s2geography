@@ -16,7 +16,8 @@ class GeoArrowLaxPolylineShape : public S2Shape {
     num_vertices_.push_back(0);
     num_edges_.push_back(0);
   }
-  explicit GeoArrowLaxPolylineShape(struct GeoArrowGeometryView geom);
+
+  GeoArrowLaxPolylineShape(struct GeoArrowGeometryView geom);
 
   void Init(struct GeoArrowGeometryView geom);
 
@@ -44,12 +45,12 @@ class GeoArrowLaxPolygonShape : public S2Shape {
  public:
   static constexpr TypeTag kTypeTag = 48494;
 
-  GeoArrowLaxPolygonShape() {
-    num_vertices_.push_back(0);
-  }
+  GeoArrowLaxPolygonShape() { num_vertices_.push_back(0); }
   explicit GeoArrowLaxPolygonShape(struct GeoArrowGeometryView geom);
 
   void Init(struct GeoArrowGeometryView geom);
+
+  void NormalizeOrientation();
 
   int num_loops() const;
   int num_loop_vertices(int i) const;
@@ -71,8 +72,9 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   // Cumulative vertex counts: num_vertices_[0] = 0,
   // num_vertices_[i+1] = total vertices in loops 0..i
   std::vector<int> num_vertices_;
-  // Pointers to each loop's LINESTRING node for O(1) lookup
-  std::vector<const struct GeoArrowGeometryNode*> loops_;
+  // Owned loops for O(1) lookup
+  std::vector<struct GeoArrowGeometryNode> loops_;
+  std::vector<S2Point> point_scratch_;
 };
 
 }  // namespace s2geography

@@ -15,6 +15,17 @@ namespace s2geography {
 
 namespace {
 
+static constexpr int64_t kFlagS2GeographyIsHole =
+    (static_cast<int64_t>(1) << 32);
+
+void ReverseNodeInPlace(struct GeoArrowGeometryNode* node) {
+  if (node->size <= 1) return;
+  for (int i = 0; i < 4; ++i) {
+    node->coords[i] += (node->size - 1) * node->coord_stride[i];
+    node->coord_stride[i] = -node->coord_stride[i];
+  }
+}
+
 template <typename Visit>
 void VisitNodes(struct GeoArrowGeometryView geom, Visit&& visit) {
   const struct GeoArrowGeometryNode* end = geom.root + geom.size_nodes;
@@ -44,7 +55,7 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
       visit(lng, lat);
 
       lngs += node->coord_stride[0];
-      lngs += node->coord_stride[1];
+      lats += node->coord_stride[1];
     }
   } else {
     for (int64_t i = offset; i < n; ++i) {
@@ -53,7 +64,7 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
       visit(lng, lat);
 
       lngs += node->coord_stride[0];
-      lngs += node->coord_stride[1];
+      lats += node->coord_stride[1];
     }
   }
 }
@@ -132,7 +143,8 @@ S2Point GeoArrowLaxPolylineShape::vertex(int v) const {
 int GeoArrowLaxPolylineShape::num_edges() const { return num_edges_.back(); }
 
 S2Shape::Edge GeoArrowLaxPolylineShape::edge(int e) const {
-  return Edge(vertex(e), vertex(e + 1));
+  ChainPosition pos = GeoArrowLaxPolylineShape::chain_position(e);
+  return GeoArrowLaxPolylineShape::chain_edge(pos.chain_id, pos.offset);
 }
 
 int GeoArrowLaxPolylineShape::dimension() const { return 1; }
@@ -144,7 +156,7 @@ S2Shape::ReferencePoint GeoArrowLaxPolylineShape::GetReferencePoint() const {
 int GeoArrowLaxPolylineShape::num_chains() const { return num_chains_; }
 
 S2Shape::Chain GeoArrowLaxPolylineShape::chain(int i) const {
-  return Chain(0, num_edges());
+  return Chain(num_edges_[i], num_edges_[i + 1] - num_edges_[i]);
 }
 
 S2Shape::Edge GeoArrowLaxPolylineShape::chain_edge(int i, int j) const {
@@ -178,28 +190,60 @@ GeoArrowLaxPolygonShape::GeoArrowLaxPolygonShape(
 }
 
 void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
-  geom_ = geom;
-
   // Collect all ring (LINESTRING) nodes
   num_loops_ = 0;
   num_vertices_.clear();
   num_vertices_.push_back(0);
   loops_.clear();
   int64_t total_vertices = 0;
+  bool is_hole = false;
 
-  VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
-    if (node->geometry_type == GEOARROW_GEOMETRY_TYPE_LINESTRING) {
-      total_vertices += node->size;
-      if (total_vertices > std::numeric_limits<int>::max()) {
+  VisitNodes(geom, [&](const struct GeoArrowGeometryNode* node) {
+    switch (node->geometry_type) {
+      case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
+        break;
+      case GEOARROW_GEOMETRY_TYPE_POLYGON:
+        is_hole = false;
+        break;
+      case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+        total_vertices += node->size;
+        if (total_vertices > std::numeric_limits<int>::max()) {
+          throw Exception(
+              "Can't create GeoArrowLaxPolygonShape from geometry with > "
+              "INT_MAX vertices");
+        }
+        num_vertices_.push_back(static_cast<int>(total_vertices));
+        loops_.push_back(*node);
+
+        if (is_hole) {
+          loops_.back().flags |= kFlagS2GeographyIsHole;
+        }
+
+        ++num_loops_;
+        is_hole = true;
+        break;
+      default:
         throw Exception(
-            "Can't create GeoArrowLaxPolygonShape from geometry with > "
-            "INT_MAX vertices");
-      }
-      num_vertices_.push_back(static_cast<int>(total_vertices));
-      loops_.push_back(node);
-      ++num_loops_;
+            "Can't create GeoArrowLaxPolylineShape() from geometry of unknown "
+            "type ");
     }
   });
+
+  geom_ = {loops_.data(), static_cast<int64_t>(loops_.size())};
+}
+
+void GeoArrowLaxPolygonShape::NormalizeOrientation() {
+  for (auto& node : loops_) {
+    point_scratch_.clear();
+    VisitLngLat(&node, 0, node.size, [&](double lng, double lat) {
+      point_scratch_.push_back(S2LatLng::FromDegrees(lat, lng).ToPoint());
+    });
+
+    double signed_area = S2::GetSignedArea(S2PointLoopSpan(point_scratch_));
+    if ((node.flags & kFlagS2GeographyIsHole) != (signed_area < 0)) {
+      ReverseNodeInPlace(&node);
+    }
+  }
 }
 
 int GeoArrowLaxPolygonShape::num_loops() const { return num_loops_; }
@@ -210,7 +254,7 @@ int GeoArrowLaxPolygonShape::num_loop_vertices(int i) const {
 
 S2Point GeoArrowLaxPolygonShape::loop_vertex(int i, int j) const {
   S2LatLng ll;
-  VisitLngLat(loops_[i], j, j + 1, [&](double lng, double lat) {
+  VisitLngLat(&loops_[i], j, j + 1, [&](double lng, double lat) {
     ll = S2LatLng::FromDegrees(lat, lng);
   });
   return ll.ToPoint();

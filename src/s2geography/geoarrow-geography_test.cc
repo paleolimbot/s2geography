@@ -13,7 +13,7 @@ using namespace s2geography;
 
 class TestGeometry {
  public:
-  TestGeometry() {
+  TestGeometry() : oriented_(false) {
     GEOARROW_THROW_NOT_OK(nullptr, GeoArrowGeometryInit(&geom_));
   }
 
@@ -64,13 +64,27 @@ class TestGeometry {
     return GeoArrowGeometryAsView(&geom_);
   }
 
+  bool oriented() const { return oriented_; }
+
+  void set_oriented(bool oriented) { oriented_ = oriented; }
+
   std::string_view label() const { return label_; }
+
+  std::unique_ptr<GeoArrowLaxPolygonShape> ToPolygonShape() const {
+    auto out = std::make_unique<GeoArrowLaxPolygonShape>(geom());
+    if (!oriented()) {
+      out->NormalizeOrientation();
+    }
+
+    return out;
+  }
 
   ~TestGeometry() { GeoArrowGeometryReset(&geom_); }
 
  private:
   struct GeoArrowGeometry geom_;
   std::string label_;
+  bool oriented_;
 };
 
 TEST(GeoArrowLaxPolylineShape, DefaultConstructor) {
@@ -315,7 +329,7 @@ TEST(GeoArrowLaxPolygonShape, ShapeIndexContains) {
       "(-5 -5, -5 5, 5 5, 5 -5, -5 -5))");
 
   MutableS2ShapeIndex poly_index;
-  poly_index.Add(std::make_unique<GeoArrowLaxPolygonShape>(poly_geom.geom()));
+  poly_index.Add(poly_geom.ToPolygonShape());
 
   WKTReader reader;
   S2BooleanOperation::Options options;
@@ -353,11 +367,11 @@ TEST(GeoArrowLaxPolygonShape, ShapeIndexContainsMultiPolygonWithHoles) {
       "((10 10, 10 20, 20 20, 20 10, 10 10), "
       "(13 13, 17 13, 17 17, 13 17, 13 13)))");
 
-  for (auto& test_geom : {poly_geom, poly_geom_bad_winding}) {
-    SCOPED_TRACE(test_geom.label());
+  for (auto* test_geom : {&poly_geom, &poly_geom_bad_winding}) {
+    SCOPED_TRACE(test_geom->label());
 
     MutableS2ShapeIndex poly_index;
-    poly_index.Add(std::make_unique<GeoArrowLaxPolygonShape>(test_geom.geom()));
+    poly_index.Add(test_geom->ToPolygonShape());
 
     WKTReader reader;
     S2BooleanOperation::Options options;

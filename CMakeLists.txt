@@ -355,7 +355,8 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   add_executable(predicates_test src/s2geography/predicates_test.cc)
   add_executable(wkt_writer_test src/s2geography/wkt-writer_test.cc)
   add_executable(wkb_test src/s2geography/wkb_test.cc)
-  add_executable(geoarrow_geography_test src/s2geography/geoarrow-geography_test.cc)
+  add_executable(geoarrow_geography_test
+                 src/s2geography/geoarrow-geography_test.cc)
 
   if(S2GEOGRAPHY_CODE_COVERAGE)
     target_compile_options(coverage_config INTERFACE -O0 -g --coverage)
