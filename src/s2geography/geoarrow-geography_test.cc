@@ -175,18 +175,18 @@ TEST(GeoArrowPointShape, ShapeIndexIntersection) {
   S2BooleanOperation::Options options;
 
   // Polygon overlapping the first two points
-  auto poly_geog = reader.read_feature(
-      "POLYGON ((-1 -1, 2 -1, 2 2, -1 2, -1 -1))");
+  auto poly_geog =
+      reader.read_feature("POLYGON ((-1 -1, 2 -1, 2 2, -1 2, -1 -1))");
   ShapeIndexGeography poly_index(*poly_geog);
-  EXPECT_TRUE(S2BooleanOperation::Intersects(
-      point_index, poly_index.ShapeIndex(), options));
+  EXPECT_TRUE(S2BooleanOperation::Intersects(point_index,
+                                             poly_index.ShapeIndex(), options));
 
   // Polygon far from all points
-  auto far_geog = reader.read_feature(
-      "POLYGON ((80 80, 81 80, 81 81, 80 81, 80 80))");
+  auto far_geog =
+      reader.read_feature("POLYGON ((80 80, 81 80, 81 81, 80 81, 80 80))");
   ShapeIndexGeography far_index(*far_geog);
-  EXPECT_FALSE(S2BooleanOperation::Intersects(
-      point_index, far_index.ShapeIndex(), options));
+  EXPECT_FALSE(S2BooleanOperation::Intersects(point_index,
+                                              far_index.ShapeIndex(), options));
 }
 
 TEST(GeoArrowLaxPolylineShape, DefaultConstructor) {

@@ -8,7 +8,6 @@
 
 namespace s2geography {
 
-
 class GeoArrowPointShape : public S2Shape {
  public:
   static constexpr TypeTag kTypeTag = 48492;
