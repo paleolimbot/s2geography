@@ -11,6 +11,8 @@
 
 using namespace s2geography;
 
+/// \brief An owning wrapper around a GeoArrowGeometry with utilities to
+/// construct from WKT or WKB
 class TestGeometry {
  public:
   TestGeometry() : oriented_(false) {
@@ -73,8 +75,7 @@ class TestGeometry {
 
     // Copy the parsed geometry into our owned GeoArrowGeometry
     struct GeoArrowVisitor v{};
-    GeoArrowGeometryInitVisitor(&result.geom_, &v);
-    code = GeoArrowGeometryViewVisit(view, &v);
+    code = GeoArrowGeometryShallowCopy(view, &result.geom_);
     GeoArrowWKBReaderReset(&reader);
     if (code != GEOARROW_OK) {
       throw Exception("Failed to copy WKB geometry");
@@ -112,6 +113,15 @@ class TestGeometry {
 
 TEST(GeoArrowPointShape, DefaultConstructor) {
   GeoArrowPointShape shape;
+  EXPECT_EQ(shape.num_edges(), 0);
+  EXPECT_EQ(shape.dimension(), 0);
+  EXPECT_EQ(shape.num_chains(), 0);
+  EXPECT_EQ(shape.num_vertices(), 0);
+}
+
+TEST(GeoArrowPointShape, EmptyPoint) {
+  auto geom = TestGeometry::FromWKT("POINT EMPTY");
+  GeoArrowPointShape shape(geom.geom());
   EXPECT_EQ(shape.num_edges(), 0);
   EXPECT_EQ(shape.dimension(), 0);
   EXPECT_EQ(shape.num_chains(), 0);
@@ -217,6 +227,24 @@ TEST(GeoArrowLaxPolylineShape, DefaultConstructor) {
   EXPECT_EQ(shape.num_edges(), 0);
   EXPECT_EQ(shape.dimension(), 1);
   EXPECT_EQ(shape.num_chains(), 0);
+}
+
+TEST(GeoArrowLaxPolylineShape, EmptyLinestring) {
+  auto geom = TestGeometry::FromWKT("LINESTRING EMPTY");
+  GeoArrowLaxPolylineShape shape(geom.geom());
+  EXPECT_EQ(shape.num_edges(), 0);
+  EXPECT_EQ(shape.dimension(), 1);
+  EXPECT_EQ(shape.num_chains(), 0);
+  EXPECT_EQ(shape.num_vertices(), 0);
+}
+
+TEST(GeoArrowLaxPolylineShape, EmptyMultiLinestring) {
+  auto geom = TestGeometry::FromWKT("MULTILINESTRING EMPTY");
+  GeoArrowLaxPolylineShape shape(geom.geom());
+  EXPECT_EQ(shape.num_edges(), 0);
+  EXPECT_EQ(shape.dimension(), 1);
+  EXPECT_EQ(shape.num_chains(), 0);
+  EXPECT_EQ(shape.num_vertices(), 0);
 }
 
 TEST(GeoArrowLaxPolylineShape, Linestring) {
@@ -352,6 +380,22 @@ TEST(GeoArrowLaxPolygonShape, DefaultConstructor) {
   EXPECT_EQ(shape.dimension(), 2);
   EXPECT_EQ(shape.num_chains(), 0);
   EXPECT_EQ(shape.num_loops(), 0);
+}
+
+TEST(GeoArrowLaxPolygonShape, EmptyPolygon) {
+  auto geom = TestGeometry::FromWKT("POLYGON EMPTY");
+  GeoArrowLaxPolygonShape shape(geom.geom());
+  EXPECT_EQ(shape.num_edges(), 0);
+  EXPECT_EQ(shape.dimension(), 2);
+  EXPECT_EQ(shape.num_chains(), 0);
+}
+
+TEST(GeoArrowLaxPolygonShape, EmptyMultiPolygon) {
+  auto geom = TestGeometry::FromWKT("MULTIPOLYGON EMPTY");
+  GeoArrowLaxPolygonShape shape(geom.geom());
+  EXPECT_EQ(shape.num_edges(), 0);
+  EXPECT_EQ(shape.dimension(), 2);
+  EXPECT_EQ(shape.num_chains(), 0);
 }
 
 TEST(GeoArrowLaxPolygonShape, SimpleTriangle) {

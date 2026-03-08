@@ -78,7 +78,12 @@ GeoArrowPointShape::GeoArrowPointShape(struct GeoArrowGeometryView geom) {
 void GeoArrowPointShape::Init(struct GeoArrowGeometryView geom) {
   switch (geom.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
-      geom_ = geom;
+      // Treat an empty point as MULTIPOINT EMPTY
+      if (geom.root->size == 0) {
+        geom_ = {nullptr, 0};
+      } else {
+        geom_ = geom;
+      }
       break;
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
       geom_ = {geom.root + 1, geom.size_nodes - 1};
@@ -147,7 +152,11 @@ GeoArrowLaxPolylineShape::GeoArrowLaxPolylineShape(
 void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
   switch (geom.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
-      geom_ = geom;
+      if (geom.root->size == 0) {
+        geom_ = {nullptr, 0};
+      } else {
+        geom_ = geom;
+      }
       break;
     case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
       geom_ = {geom.root + 1, geom.size_nodes - 1};
