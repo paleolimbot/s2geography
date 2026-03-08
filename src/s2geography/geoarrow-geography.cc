@@ -21,9 +21,8 @@ static constexpr uint8_t kFlagS2GeographyIsHole =
 void ReverseNodeInPlace(struct GeoArrowGeometryNode* node) {
   if (node->size <= 1) return;
   for (int i = 0; i < 4; ++i) {
-    int64_t offset =
-        (static_cast<int64_t>(node->size) - 1) *
-        static_cast<int64_t>(node->coord_stride[i]);
+    int64_t offset = (static_cast<int64_t>(node->size) - 1) *
+                     static_cast<int64_t>(node->coord_stride[i]);
     node->coords[i] += offset;
     node->coord_stride[i] = -node->coord_stride[i];
   }
