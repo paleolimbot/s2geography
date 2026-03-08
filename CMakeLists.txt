@@ -257,20 +257,21 @@ endif()
 add_library(
   s2geography
   src/s2geography/accessors-geog.cc
-  src/s2geography/coverings.cc
-  src/s2geography/linear-referencing.cc
   src/s2geography/accessors.cc
-  src/s2geography/distance.cc
-  src/s2geography/predicates.cc
-  src/s2geography/projections.cc
   src/s2geography/build.cc
-  src/s2geography/geography.cc
+  src/s2geography/coverings.cc
+  src/s2geography/distance.cc
+  src/s2geography/geoarrow-geography.cc
   src/s2geography/geoarrow.cc
-  src/s2geography/wkt-reader.cc
-  src/s2geography/wkt-writer.cc
-  src/s2geography/wkb.cc
+  src/s2geography/geography.cc
+  src/s2geography/linear-referencing.cc
   src/s2geography/op/cell.cc
   src/s2geography/op/point.cc
+  src/s2geography/predicates.cc
+  src/s2geography/projections.cc
+  src/s2geography/wkb.cc
+  src/s2geography/wkt-reader.cc
+  src/s2geography/wkt-writer.cc
   ${GEOARROW_SOURCES}
   ${NANOARROW_SOURCES})
 
@@ -354,6 +355,8 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   add_executable(predicates_test src/s2geography/predicates_test.cc)
   add_executable(wkt_writer_test src/s2geography/wkt-writer_test.cc)
   add_executable(wkb_test src/s2geography/wkb_test.cc)
+  add_executable(geoarrow_geography_test
+                 src/s2geography/geoarrow-geography_test.cc)
 
   if(S2GEOGRAPHY_CODE_COVERAGE)
     target_compile_options(coverage_config INTERFACE -O0 -g --coverage)
@@ -387,6 +390,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
     GTest::gtest_main GTest::gmock)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
   target_link_libraries(wkb_test s2geography GTest::gtest_main)
+  target_link_libraries(geoarrow_geography_test s2geography GTest::gtest_main)
 
   target_include_directories(sedona_udf_internal_test PRIVATE src/vendored)
   target_include_directories(accessors_geog_test PRIVATE src/vendored)
@@ -395,6 +399,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   target_include_directories(geoarrow_test PRIVATE src/vendored)
   target_include_directories(linear_referencing_test PRIVATE src/vendored)
   target_include_directories(predicates_test PRIVATE src/vendored)
+  target_include_directories(geoarrow_geography_test PRIVATE src/vendored)
 
   include(GoogleTest)
   gtest_discover_tests(sedona_udf_internal_test)
@@ -408,6 +413,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   gtest_discover_tests(geography_test)
   gtest_discover_tests(wkt_writer_test)
   gtest_discover_tests(wkb_test)
+  gtest_discover_tests(geoarrow_geography_test)
 endif()
 
 if(S2GEOGRAPHY_BUILD_EXAMPLES)
