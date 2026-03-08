@@ -123,8 +123,8 @@ class GeoArrowLaxPolygonShape : public S2Shape {
  private:
   struct GeoArrowGeometryView geom_{};
   int num_loops_{};
-  // Cumulative vertex counts: num_vertices_[0] = 0,
-  // num_vertices_[i+1] = total vertices in loops 0..i
+  // Cumulative edge counts per loop: num_edges_[0] = 0,
+  // num_edges_[i+1] = total edges in loops 0..i
   std::vector<int> num_edges_;
   // Owned loops for O(1) lookup
   std::vector<struct GeoArrowGeometryNode> loops_;
