@@ -73,7 +73,7 @@ class GeoArrowPointShape : public S2Shape {
 /// from a LINESTRING or MULTILINESTRING. It is based on the S2LaxPolylineShape.
 /// The shape is only valid for the lifetime of the data pointed to
 /// by the wrapped GeoArrowGeometryView (e.g., the WKB buffer containing
-/// points).
+/// LINESTRING/MULTILINESTRING geometries).
 class GeoArrowLaxPolylineShape : public S2Shape {
  public:
   static constexpr TypeTag kTypeTag = 48493;
