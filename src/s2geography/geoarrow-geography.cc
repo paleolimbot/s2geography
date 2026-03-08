@@ -15,8 +15,8 @@ namespace s2geography {
 
 namespace {
 
-static constexpr int64_t kFlagS2GeographyIsHole =
-    (static_cast<int64_t>(1) << 32);
+static constexpr uint8_t kFlagS2GeographyIsHole =
+    (static_cast<uint8_t>(1) << 7);
 
 void ReverseNodeInPlace(struct GeoArrowGeometryNode* node) {
   if (node->size <= 1) return;
