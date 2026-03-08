@@ -76,7 +76,6 @@ class TestGeometry {
     }
 
     // Copy the parsed geometry into our owned GeoArrowGeometry
-    struct GeoArrowVisitor v{};
     code = GeoArrowGeometryShallowCopy(view, &result.geom_);
     GeoArrowWKBReaderReset(&reader);
     if (code != GEOARROW_OK) {
