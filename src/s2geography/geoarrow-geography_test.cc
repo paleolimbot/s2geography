@@ -17,14 +17,35 @@ class TestGeometry {
     GEOARROW_THROW_NOT_OK(nullptr, GeoArrowGeometryInit(&geom_));
   }
 
-  explicit TestGeometry(std::string_view wkt) : TestGeometry() {
-    label_ = wkt;
+  TestGeometry(const TestGeometry&) = delete;
+  TestGeometry& operator=(const TestGeometry&) = delete;
+
+  TestGeometry(TestGeometry&& other) noexcept
+      : geom_(other.geom_),
+        label_(std::move(other.label_)),
+        oriented_(other.oriented_) {
+    GeoArrowGeometryInit(&other.geom_);
+  }
+
+  TestGeometry& operator=(TestGeometry&& other) noexcept {
+    if (this != &other) {
+      GeoArrowGeometryReset(&geom_);
+      geom_ = other.geom_;
+      GeoArrowGeometryInit(&other.geom_);
+      label_ = std::move(other.label_);
+      oriented_ = other.oriented_;
+    }
+    return *this;
+  }
+
+  static TestGeometry FromWKT(std::string_view wkt) {
+    TestGeometry result;
+
     struct GeoArrowStringView wkt_view{wkt.data(),
                                        static_cast<int64_t>(wkt.size())};
 
-    struct GeoArrowVisitor v;
-    GeoArrowVisitorInitVoid(&v);
-    GeoArrowGeometryInitVisitor(&geom_, &v);
+    struct GeoArrowVisitor v{};
+    GeoArrowGeometryInitVisitor(&result.geom_, &v);
 
     struct GeoArrowWKTReader reader;
     GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKTReaderInit(&reader));
@@ -33,6 +54,8 @@ class TestGeometry {
     if (code != GEOARROW_OK) {
       throw Exception("Invalid WKT");
     }
+
+    return result;
   }
 
   static TestGeometry FromWKB(const std::vector<uint8_t>& wkb) {
@@ -41,22 +64,22 @@ class TestGeometry {
     GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBReaderInit(&reader));
     struct GeoArrowBufferView src{wkb.data(), static_cast<int64_t>(wkb.size())};
     struct GeoArrowGeometryView view;
-    struct GeoArrowError error;
-    GeoArrowErrorCode code = GeoArrowWKBReaderRead(&reader, src, &view, &error);
+    GeoArrowErrorCode code =
+        GeoArrowWKBReaderRead(&reader, src, &view, nullptr);
     if (code != GEOARROW_OK) {
       GeoArrowWKBReaderReset(&reader);
       throw Exception("Invalid WKB");
     }
 
     // Copy the parsed geometry into our owned GeoArrowGeometry
-    struct GeoArrowVisitor v;
-    GeoArrowVisitorInitVoid(&v);
+    struct GeoArrowVisitor v{};
     GeoArrowGeometryInitVisitor(&result.geom_, &v);
     code = GeoArrowGeometryViewVisit(view, &v);
     GeoArrowWKBReaderReset(&reader);
     if (code != GEOARROW_OK) {
       throw Exception("Failed to copy WKB geometry");
     }
+
     return result;
   }
 
@@ -96,7 +119,7 @@ TEST(GeoArrowPointShape, DefaultConstructor) {
 }
 
 TEST(GeoArrowPointShape, SinglePoint) {
-  TestGeometry geom("POINT (30 10)");
+  auto geom = TestGeometry::FromWKT("POINT (30 10)");
   GeoArrowPointShape shape(geom.geom());
   EXPECT_EQ(shape.num_vertices(), 1);
   EXPECT_EQ(shape.num_edges(), 1);
@@ -119,7 +142,7 @@ TEST(GeoArrowPointShape, SinglePoint) {
 }
 
 TEST(GeoArrowPointShape, MultiPoint) {
-  TestGeometry geom("MULTIPOINT ((0 0), (1 1), (2 2))");
+  auto geom = TestGeometry::FromWKT("MULTIPOINT ((0 0), (1 1), (2 2))");
   GeoArrowPointShape shape(geom.geom());
   EXPECT_EQ(shape.num_vertices(), 3);
   EXPECT_EQ(shape.num_edges(), 3);
@@ -164,7 +187,7 @@ TEST(GeoArrowPointShape, BigEndianWKB) {
 }
 
 TEST(GeoArrowPointShape, ShapeIndexIntersection) {
-  TestGeometry point_geom("MULTIPOINT ((0 0), (1 1), (50 50))");
+  auto point_geom = TestGeometry::FromWKT("MULTIPOINT ((0 0), (1 1), (50 50))");
   GeoArrowPointShape shape(point_geom.geom());
   EXPECT_EQ(shape.num_chains(), 1);
 
@@ -197,7 +220,7 @@ TEST(GeoArrowLaxPolylineShape, DefaultConstructor) {
 }
 
 TEST(GeoArrowLaxPolylineShape, Linestring) {
-  TestGeometry geom("LINESTRING (0 0, 0 1, 1 0)");
+  auto geom = TestGeometry::FromWKT("LINESTRING (0 0, 0 1, 1 0)");
   GeoArrowLaxPolylineShape shape(geom.geom());
   EXPECT_EQ(shape.num_edges(), 2);
   EXPECT_EQ(shape.dimension(), 1);
@@ -231,7 +254,8 @@ TEST(GeoArrowLaxPolylineShape, BigEndianWKB) {
 }
 
 TEST(GeoArrowLaxPolylineShape, MultiLinestring2Components) {
-  TestGeometry geom("MULTILINESTRING ((0 0, 1 1, 2 2), (10 10, 11 11))");
+  auto geom = TestGeometry::FromWKT(
+      "MULTILINESTRING ((0 0, 1 1, 2 2), (10 10, 11 11))");
   GeoArrowLaxPolylineShape shape(geom.geom());
   EXPECT_EQ(shape.num_chains(), 2);
   EXPECT_EQ(shape.num_edges(), 3);  // 2 + 1
@@ -248,7 +272,7 @@ TEST(GeoArrowLaxPolylineShape, MultiLinestring2Components) {
 }
 
 TEST(GeoArrowLaxPolylineShape, MultiLinestring3Components) {
-  TestGeometry geom(
+  auto geom = TestGeometry::FromWKT(
       "MULTILINESTRING ((0 0, 1 0), (2 0, 3 0, 4 0), (5 0, 6 0))");
   GeoArrowLaxPolylineShape shape(geom.geom());
   EXPECT_EQ(shape.num_chains(), 3);
@@ -261,7 +285,7 @@ TEST(GeoArrowLaxPolylineShape, MultiLinestring3Components) {
 }
 
 TEST(GeoArrowLaxPolylineShape, MultiLinestring4Components) {
-  TestGeometry geom(
+  auto geom = TestGeometry::FromWKT(
       "MULTILINESTRING ((0 0, 1 0), (2 0, 3 0), (4 0, 5 0), (6 0, 7 0))");
   GeoArrowLaxPolylineShape shape(geom.geom());
   EXPECT_EQ(shape.num_chains(), 4);
@@ -278,7 +302,8 @@ TEST(GeoArrowLaxPolylineShape, MultiLinestring4Components) {
 }
 
 TEST(GeoArrowLaxPolylineShape, MultiLinestring3ComponentsOneEmpty) {
-  TestGeometry geom("MULTILINESTRING ((0 0, 1 0, 2 0), EMPTY, (3 0, 4 0))");
+  auto geom = TestGeometry::FromWKT(
+      "MULTILINESTRING ((0 0, 1 0, 2 0), EMPTY, (3 0, 4 0))");
   GeoArrowLaxPolylineShape shape(geom.geom());
   EXPECT_EQ(shape.num_chains(), 3);
   // The EMPTY linestring contributes 0 vertices and 0 edges, so the total
@@ -289,7 +314,7 @@ TEST(GeoArrowLaxPolylineShape, MultiLinestring3ComponentsOneEmpty) {
 
 TEST(GeoArrowLaxPolylineShape, ShapeIndexIntersection) {
   // Create a multilinestring with 4 components that cross over a region
-  TestGeometry line_geom(
+  auto line_geom = TestGeometry::FromWKT(
       "MULTILINESTRING ((-1 0, 1 0), (0 -1, 0 1), "
       "(-1 -1, 1 1), (-1 1, 1 -1))");
   GeoArrowLaxPolylineShape shape(line_geom.geom());
@@ -330,7 +355,7 @@ TEST(GeoArrowLaxPolygonShape, DefaultConstructor) {
 }
 
 TEST(GeoArrowLaxPolygonShape, SimpleTriangle) {
-  TestGeometry geom("POLYGON ((0 0, 1 0, 0 1, 0 0))");
+  auto geom = TestGeometry::FromWKT("POLYGON ((0 0, 1 0, 0 1, 0 0))");
   GeoArrowLaxPolygonShape shape(geom.geom());
   EXPECT_EQ(shape.num_loops(), 1);
   EXPECT_EQ(shape.num_loop_vertices(0), 4);
@@ -345,7 +370,7 @@ TEST(GeoArrowLaxPolygonShape, SimpleTriangle) {
 }
 
 TEST(GeoArrowLaxPolygonShape, PolygonWithHole) {
-  TestGeometry geom(
+  auto geom = TestGeometry::FromWKT(
       "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0), "
       "(2 2, 8 2, 8 8, 2 8, 2 2))");
   GeoArrowLaxPolygonShape shape(geom.geom());
@@ -370,7 +395,7 @@ TEST(GeoArrowLaxPolygonShape, PolygonWithHole) {
 }
 
 TEST(GeoArrowLaxPolygonShape, MultiPolygon2Components) {
-  TestGeometry geom(
+  auto geom = TestGeometry::FromWKT(
       "MULTIPOLYGON (((0 0, 1 0, 0 1, 0 0)), "
       "((10 10, 11 10, 10 11, 10 10)))");
   GeoArrowLaxPolygonShape shape(geom.geom());
@@ -386,7 +411,7 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygon2Components) {
 }
 
 TEST(GeoArrowLaxPolygonShape, MultiPolygon3Components) {
-  TestGeometry geom(
+  auto geom = TestGeometry::FromWKT(
       "MULTIPOLYGON (((0 0, 1 0, 0 1, 0 0)), "
       "((10 10, 11 10, 10 11, 10 10)), "
       "((20 20, 21 20, 20 21, 20 20)))");
@@ -398,7 +423,7 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygon3Components) {
 
 TEST(GeoArrowLaxPolygonShape, MultiPolygonWithHoles) {
   // 2 polygons, first has a hole
-  TestGeometry geom(
+  auto geom = TestGeometry::FromWKT(
       "MULTIPOLYGON (((0 0, 10 0, 10 10, 0 10, 0 0), "
       "(2 2, 8 2, 8 8, 2 8, 2 2)), "
       "((20 20, 21 20, 20 21, 20 20)))");
@@ -412,7 +437,7 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygonWithHoles) {
 
 TEST(GeoArrowLaxPolygonShape, ChainEdgeWrapsAround) {
   // Triangle: vertices 0,1,2 -> edges (0,1), (1,2), (2,0)
-  TestGeometry geom("POLYGON ((0 0, 1 0, 0 1, 0 0))");
+  auto geom = TestGeometry::FromWKT("POLYGON ((0 0, 1 0, 0 1, 0 0))");
   GeoArrowLaxPolygonShape shape(geom.geom());
 
   // Last edge in the chain should wrap from vertex 3 back to vertex 0
@@ -424,7 +449,7 @@ TEST(GeoArrowLaxPolygonShape, ChainEdgeWrapsAround) {
 
 TEST(GeoArrowLaxPolygonShape, ShapeIndexContains) {
   // Create a polygon with a hole
-  TestGeometry poly_geom(
+  auto poly_geom = TestGeometry::FromWKT(
       "POLYGON ((-10 -10, 10 -10, 10 10, -10 10, -10 -10), "
       "(-5 -5, -5 5, 5 5, 5 -5, -5 -5))");
 
@@ -455,13 +480,13 @@ TEST(GeoArrowLaxPolygonShape, ShapeIndexContains) {
 
 TEST(GeoArrowLaxPolygonShape, ShapeIndexContainsMultiPolygonWithHoles) {
   // Two polygons, each with a hole
-  TestGeometry poly_geom(
+  auto poly_geom = TestGeometry::FromWKT(
       "MULTIPOLYGON (((-20 -20, -10 -20, -10 -10, -20 -10, -20 -20), "
       "(-17 -17, -17 -13, -13 -13, -13 -17, -17 -17)), "
       "((10 10, 20 10, 20 20, 10 20, 10 10), "
       "(13 13, 13 17, 17 17, 17 13, 13 13)))");
 
-  TestGeometry poly_geom_bad_winding(
+  auto poly_geom_bad_winding = TestGeometry::FromWKT(
       "MULTIPOLYGON (((-20 -20, -20 -10, -10 -10, -10 -20, -20 -20), "
       "(-17 -17, -13 -17, -13 -13, -17 -13, -17 -17)), "
       "((10 10, 10 20, 20 20, 20 10, 10 10), "
