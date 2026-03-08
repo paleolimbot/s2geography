@@ -75,6 +75,22 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
   }
 }
 
+const char* GeometryTypeString(uint8_t geometry_type) {
+  switch (geometry_type) {
+    case GEOARROW_GEOMETRY_TYPE_POINT:
+    case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+    case GEOARROW_GEOMETRY_TYPE_POLYGON:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+    case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
+    case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
+      return GeoArrowGeometryTypeString(
+          static_cast<enum GeoArrowGeometryType>(geometry_type));
+    default:
+      return "Unknown";
+  }
+}
+
 }  // namespace
 
 GeoArrowPointShape::GeoArrowPointShape(struct GeoArrowGeometryView geom) {
@@ -96,7 +112,8 @@ void GeoArrowPointShape::Init(struct GeoArrowGeometryView geom) {
       break;
     default:
       throw Exception(
-          "Can't create GeoArrowPointShape() from geometry of unknown type ");
+          "Can't create GeoArrowPointShape() from geometry type " +
+          std::string(GeometryTypeString(geom.root->geometry_type)));
   }
 
   if (geom_.size_nodes > std::numeric_limits<int>::max()) {
@@ -166,6 +183,11 @@ GeoArrowLaxPolylineShape::GeoArrowLaxPolylineShape(
 }
 
 void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
+  if (geom.size_nodes == 0) {
+    throw Exception(
+        "Can't create GeoArrowLaxPolylineShape from input with zero nodes");
+  }
+
   switch (geom.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
       if (geom.root->size == 0) {
@@ -179,8 +201,8 @@ void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
       break;
     default:
       throw Exception(
-          "Can't create GeoArrowLaxPolylineShape() from geometry of unknown "
-          "type ");
+          "Can't create GeoArrowLaxPolylineShape() from geometry type " +
+          std::string(GeometryTypeString(geom.root->geometry_type)));
   }
 
   if (geom_.size_nodes > std::numeric_limits<int>::max()) {
@@ -257,6 +279,11 @@ GeoArrowLaxPolygonShape::GeoArrowLaxPolygonShape(
 }
 
 void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
+  if (geom.size_nodes == 0) {
+    throw Exception(
+        "Can't create GeoArrowLaxPolylineShape from input with zero nodes");
+  }
+
   // Collect all ring (LINESTRING) nodes
   num_loops_ = 0;
   num_edges_.clear();
@@ -292,8 +319,8 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
         break;
       default:
         throw Exception(
-            "Can't create GeoArrowLaxPolygonShape() from geometry of unknown "
-            "type ");
+            "Can't create GeoArrowLaxPolygonShape() from geometry type" +
+            std::string(GeometryTypeString(geom.root->geometry_type)));
     }
   });
 
