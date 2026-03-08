@@ -44,6 +44,7 @@ class TestGeometry {
 
   static TestGeometry FromWKT(std::string_view wkt) {
     TestGeometry result;
+    result.label_ = wkt;
 
     struct GeoArrowStringView wkt_view{wkt.data(),
                                        static_cast<int64_t>(wkt.size())};
