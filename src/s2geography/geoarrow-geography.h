@@ -17,6 +17,11 @@ namespace s2geography {
 /// into S2-native types. Each shape is only valid for the lifetime of the
 /// underlying data pointed to by the wrapped GeoArrowGeometryView.
 ///
+/// These structures are intended to be reused: the `Init()` method can be
+/// called again once any derivative data structure is no longer needed. Using
+/// this pattern should effectively reuse internal scratch space allocated
+/// during initialization.
+///
 /// @{
 
 /// \brief Point S2Shape implementation backed by a GeoArrowGeometryView
@@ -30,10 +35,19 @@ class GeoArrowPointShape : public S2Shape {
  public:
   static constexpr TypeTag kTypeTag = 48492;
 
+  /// \brief Create an empty point shape representing zero points
   GeoArrowPointShape() = default;
 
-  GeoArrowPointShape(struct GeoArrowGeometryView geom);
+  /// \brief Convenience constructor that initializes a point shape
+  ///
+  /// Throws if geom neither a POINT nor a MULTIPOINT, or is a MULTIPOINT
+  /// that contains EMPTY children.
+  explicit GeoArrowPointShape(struct GeoArrowGeometryView geom);
 
+  /// \brief (Re)Initialize an existing shape
+  ///
+  /// Throws if geom neither a POINT nor a MULTIPOINT, or is a MULTIPOINT
+  /// that contains EMPTY children.
   void Init(struct GeoArrowGeometryView geom);
 
   int num_vertices() const;
@@ -64,10 +78,17 @@ class GeoArrowLaxPolylineShape : public S2Shape {
  public:
   static constexpr TypeTag kTypeTag = 48493;
 
+  /// \brief Create an empty polyline shape containing zero polylines
   GeoArrowLaxPolylineShape() { num_edges_.push_back(0); }
 
-  GeoArrowLaxPolylineShape(struct GeoArrowGeometryView geom);
+  /// \brief Convenience constructor that initializes a linestring shape
+  ///
+  /// Throws if geom neither a LINESTRING nor a MULTILINESTRING.
+  explicit GeoArrowLaxPolylineShape(struct GeoArrowGeometryView geom);
 
+  /// \brief (Re)initialize an existing linestring shape
+  ///
+  /// Throws if geom neither a LINESTRING nor a MULTILINESTRING.
   void Init(struct GeoArrowGeometryView geom);
 
   int num_edges() const override;
@@ -99,15 +120,39 @@ class GeoArrowLaxPolylineShape : public S2Shape {
 /// winding order might be invalid; this ensures that "shell"s are oriented
 /// counterclockwise and "holes" are oriented clockwise. This check may be
 /// expensive.
+///
+/// Note that S2's internal representation of a polygon is substantially
+/// different than the simple features idiom. Briefly, polygons are composed
+/// of zero or more "loops" whose vertex order defines which points are
+/// contained by the loop. The NormalizeOrientation() helper is intended to
+/// bridge these two idioms.
 class GeoArrowLaxPolygonShape : public S2Shape {
  public:
   static constexpr TypeTag kTypeTag = 48494;
 
+  /// \brief Create an empty polygon shape containing zero loops
   GeoArrowLaxPolygonShape() { num_edges_.push_back(0); }
+
+  /// \brief Convenience constructor that initializes a polygon shape
+  ///
+  /// Throws if geometry is not a POLYGON or MULTIPOLYGON.
   explicit GeoArrowLaxPolygonShape(struct GeoArrowGeometryView geom);
 
+  /// \brief (Re)initialize a polygon shape
+  ///
+  /// Throws if geometry is not a POLYGON or MULTIPOLYGON.
   void Init(struct GeoArrowGeometryView geom);
 
+  /// \brief Update loop orientations to ensure that "shell"s are wound
+  /// counterclockwise and "hole"s are wound clockwise.
+  ///
+  /// The "shell" or "hole" of each loop is derived from its position
+  /// within each input POLYGON, where the first child ring is considered a
+  /// shell and subsequent child rings are considered holes.
+  ///
+  /// This does not modify the input geometry nodes nor does it force a copy
+  /// of the data (but does force a copy of the entire GeoArrowGeometryNode
+  /// array).
   void NormalizeOrientation();
 
   int num_edges() const override;
