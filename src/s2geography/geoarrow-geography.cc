@@ -174,12 +174,10 @@ void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
   }
 
   num_chains_ = geom_.size_nodes;
-  num_vertices_.resize(num_chains_ + 1);
   num_edges_.resize(num_chains_ + 1);
   int64_t num_vertices = 0;
   int64_t num_edges = 0;
 
-  num_vertices_[0] = 0;
   num_edges_[0] = 0;
   int64_t i = 1;
   VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
@@ -191,30 +189,9 @@ void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
           "INT_MAX edges");
     }
 
-    num_vertices_[i] = num_vertices;
     num_edges_[i] = num_edges;
     ++i;
   });
-}
-
-int GeoArrowLaxPolylineShape::num_vertices() const {
-  return num_vertices_.back();
-}
-
-S2Point GeoArrowLaxPolylineShape::vertex(int v) const {
-  auto it = std::upper_bound(num_vertices_.begin(), num_vertices_.end(), v);
-  if (it == num_vertices_.begin() || it == num_vertices_.end()) {
-    throw Exception("Vertex at position " + std::to_string(v) +
-                    " does not exist");
-  }
-
-  int i = static_cast<int>(it - num_vertices_.begin()) - 1;
-  S2LatLng ll;
-  VisitLngLat(
-      geom_.root + i, v - num_vertices_[i], 1,
-      [&](double lng, double lat) { ll = S2LatLng::FromDegrees(lat, lng); });
-
-  return ll.ToPoint();
 }
 
 int GeoArrowLaxPolylineShape::num_edges() const { return num_edges_.back(); }

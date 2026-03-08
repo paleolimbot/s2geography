@@ -40,16 +40,12 @@ class GeoArrowLaxPolylineShape : public S2Shape {
   static constexpr TypeTag kTypeTag = 48493;
 
   GeoArrowLaxPolylineShape() {
-    num_vertices_.push_back(0);
     num_edges_.push_back(0);
   }
 
   GeoArrowLaxPolylineShape(struct GeoArrowGeometryView geom);
 
   void Init(struct GeoArrowGeometryView geom);
-
-  int num_vertices() const;
-  S2Point vertex(int v) const;
 
   int num_edges() const override;
   Edge edge(int e) const override;
@@ -64,7 +60,6 @@ class GeoArrowLaxPolylineShape : public S2Shape {
  private:
   struct GeoArrowGeometryView geom_{};
   int num_chains_{};
-  std::vector<int> num_vertices_;
   std::vector<int> num_edges_;
 };
 

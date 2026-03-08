@@ -235,7 +235,6 @@ TEST(GeoArrowLaxPolylineShape, EmptyLinestring) {
   EXPECT_EQ(shape.num_edges(), 0);
   EXPECT_EQ(shape.dimension(), 1);
   EXPECT_EQ(shape.num_chains(), 0);
-  EXPECT_EQ(shape.num_vertices(), 0);
 }
 
 TEST(GeoArrowLaxPolylineShape, EmptyMultiLinestring) {
@@ -244,7 +243,6 @@ TEST(GeoArrowLaxPolylineShape, EmptyMultiLinestring) {
   EXPECT_EQ(shape.num_edges(), 0);
   EXPECT_EQ(shape.dimension(), 1);
   EXPECT_EQ(shape.num_chains(), 0);
-  EXPECT_EQ(shape.num_vertices(), 0);
 }
 
 TEST(GeoArrowLaxPolylineShape, Linestring) {
@@ -278,7 +276,6 @@ TEST(GeoArrowLaxPolylineShape, BigEndianWKB) {
   GeoArrowLaxPolylineShape shape(geom.geom());
   EXPECT_EQ(shape.num_edges(), 2);
   EXPECT_EQ(shape.num_chains(), 1);
-  EXPECT_EQ(shape.num_vertices(), 3);
 }
 
 TEST(GeoArrowLaxPolylineShape, MultiLinestring2Components) {
@@ -287,7 +284,6 @@ TEST(GeoArrowLaxPolylineShape, MultiLinestring2Components) {
   GeoArrowLaxPolylineShape shape(geom.geom());
   EXPECT_EQ(shape.num_chains(), 2);
   EXPECT_EQ(shape.num_edges(), 3);  // 2 + 1
-  EXPECT_EQ(shape.num_vertices(), 5);
 
   // chain_position maps global edge ids to (chain, offset)
   auto pos0 = shape.chain_position(0);
@@ -305,7 +301,6 @@ TEST(GeoArrowLaxPolylineShape, MultiLinestring3Components) {
   GeoArrowLaxPolylineShape shape(geom.geom());
   EXPECT_EQ(shape.num_chains(), 3);
   EXPECT_EQ(shape.num_edges(), 4);  // 1 + 2 + 1
-  EXPECT_EQ(shape.num_vertices(), 7);
 
   auto pos3 = shape.chain_position(3);
   EXPECT_EQ(pos3.chain_id, 2);
@@ -318,7 +313,6 @@ TEST(GeoArrowLaxPolylineShape, MultiLinestring4Components) {
   GeoArrowLaxPolylineShape shape(geom.geom());
   EXPECT_EQ(shape.num_chains(), 4);
   EXPECT_EQ(shape.num_edges(), 4);
-  EXPECT_EQ(shape.num_vertices(), 8);
 
   auto pos0 = shape.chain_position(0);
   EXPECT_EQ(pos0.chain_id, 0);
@@ -337,7 +331,6 @@ TEST(GeoArrowLaxPolylineShape, MultiLinestring3ComponentsOneEmpty) {
   // The EMPTY linestring contributes 0 vertices and 0 edges, so the total
   // edge count should be (3 - 1) + 0 + (2 - 1) = 2 + 0 + 1 = 3.
   EXPECT_EQ(shape.num_edges(), 3);
-  EXPECT_EQ(shape.num_vertices(), 5);
 }
 
 TEST(GeoArrowLaxPolylineShape, ShapeIndexIntersection) {
