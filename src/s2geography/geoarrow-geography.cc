@@ -44,7 +44,7 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
 
   if (node->flags & GEOARROW_GEOMETRY_NODE_FLAG_SWAP_ENDIAN) {
     uint64_t tmp;
-    for (int64_t i = offset; i < n; ++i) {
+    for (int64_t i = 0; i < n; ++i) {
       memcpy(&tmp, lngs, sizeof(double));
       tmp = GEOARROW_BSWAP64(tmp);
       memcpy(&lng, &tmp, sizeof(double));
@@ -58,7 +58,7 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
       lats += node->coord_stride[1];
     }
   } else {
-    for (int64_t i = offset; i < n; ++i) {
+    for (int64_t i = 0; i < n; ++i) {
       memcpy(&lng, lngs, sizeof(double));
       memcpy(&lat, lats, sizeof(double));
       visit(lng, lat);
@@ -202,7 +202,7 @@ S2Point GeoArrowLaxPolylineShape::vertex(int v) const {
   int i = static_cast<int>(it - num_vertices_.begin()) - 1;
   S2LatLng ll;
   VisitLngLat(
-      geom_.root + i, v - num_vertices_[i], 2,
+      geom_.root + i, v - num_vertices_[i], 1,
       [&](double lng, double lat) { ll = S2LatLng::FromDegrees(lat, lng); });
 
   return ll.ToPoint();
@@ -308,7 +308,8 @@ void GeoArrowLaxPolygonShape::NormalizeOrientation() {
     });
 
     double signed_area = S2::GetSignedArea(S2PointLoopSpan(point_scratch_));
-    if ((node.flags & kFlagS2GeographyIsHole) != (signed_area < 0)) {
+    bool is_hole = (node.flags & kFlagS2GeographyIsHole) != 0;
+    if (is_hole != (signed_area < 0)) {
       ReverseNodeInPlace(&node);
     }
   }
@@ -322,7 +323,7 @@ int GeoArrowLaxPolygonShape::num_loop_vertices(int i) const {
 
 S2Point GeoArrowLaxPolygonShape::loop_vertex(int i, int j) const {
   S2LatLng ll;
-  VisitLngLat(&loops_[i], j, j + 1, [&](double lng, double lat) {
+  VisitLngLat(&loops_[i], j, 1, [&](double lng, double lat) {
     ll = S2LatLng::FromDegrees(lat, lng);
   });
   return ll.ToPoint();
