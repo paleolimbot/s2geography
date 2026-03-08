@@ -28,6 +28,10 @@ void ReverseNodeInPlace(struct GeoArrowGeometryNode* node) {
 
 template <typename Visit>
 void VisitNodes(struct GeoArrowGeometryView geom, Visit&& visit) {
+  if (geom.size_nodes == 0) {
+    return;
+  }
+
   const struct GeoArrowGeometryNode* end = geom.root + geom.size_nodes;
   for (const struct GeoArrowGeometryNode* node = geom.root; node < end;
        ++node) {
