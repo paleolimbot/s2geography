@@ -128,6 +128,20 @@ TEST(GeoArrowPointShape, EmptyPoint) {
   EXPECT_EQ(shape.num_vertices(), 0);
 }
 
+TEST(GeoArrowPointShape, EmptyMultiPoint) {
+  auto geom = TestGeometry::FromWKT("MULTIPOINT EMPTY");
+  GeoArrowPointShape shape(geom.geom());
+  EXPECT_EQ(shape.num_edges(), 0);
+  EXPECT_EQ(shape.dimension(), 0);
+  EXPECT_EQ(shape.num_chains(), 0);
+  EXPECT_EQ(shape.num_vertices(), 0);
+}
+
+TEST(GeoArrowPointShape, MultiPointWithEmpty) {
+  auto geom = TestGeometry::FromWKT("MULTIPOINT ((0 1), EMPTY)");
+  EXPECT_THROW(GeoArrowPointShape shape(geom.geom()), Exception);
+}
+
 TEST(GeoArrowPointShape, SinglePoint) {
   auto geom = TestGeometry::FromWKT("POINT (30 10)");
   GeoArrowPointShape shape(geom.geom());
@@ -372,7 +386,6 @@ TEST(GeoArrowLaxPolygonShape, DefaultConstructor) {
   EXPECT_EQ(shape.num_edges(), 0);
   EXPECT_EQ(shape.dimension(), 2);
   EXPECT_EQ(shape.num_chains(), 0);
-  EXPECT_EQ(shape.num_loops(), 0);
 }
 
 TEST(GeoArrowLaxPolygonShape, EmptyPolygon) {
@@ -394,16 +407,15 @@ TEST(GeoArrowLaxPolygonShape, EmptyMultiPolygon) {
 TEST(GeoArrowLaxPolygonShape, SimpleTriangle) {
   auto geom = TestGeometry::FromWKT("POLYGON ((0 0, 1 0, 0 1, 0 0))");
   GeoArrowLaxPolygonShape shape(geom.geom());
-  EXPECT_EQ(shape.num_loops(), 1);
-  EXPECT_EQ(shape.num_loop_vertices(0), 4);
+  EXPECT_EQ(shape.chain(0).length, 3);
   // num_edges == total vertices (each ring is closed)
-  EXPECT_EQ(shape.num_edges(), 4);
+  EXPECT_EQ(shape.num_edges(), 3);
   EXPECT_EQ(shape.num_chains(), 1);
   EXPECT_EQ(shape.dimension(), 2);
 
   auto chain0 = shape.chain(0);
   EXPECT_EQ(chain0.start, 0);
-  EXPECT_EQ(chain0.length, 4);
+  EXPECT_EQ(chain0.length, 3);
 }
 
 TEST(GeoArrowLaxPolygonShape, PolygonWithHole) {
@@ -411,22 +423,21 @@ TEST(GeoArrowLaxPolygonShape, PolygonWithHole) {
       "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0), "
       "(2 2, 8 2, 8 8, 2 8, 2 2))");
   GeoArrowLaxPolygonShape shape(geom.geom());
-  EXPECT_EQ(shape.num_loops(), 2);
-  EXPECT_EQ(shape.num_loop_vertices(0), 5);
-  EXPECT_EQ(shape.num_loop_vertices(1), 5);
-  EXPECT_EQ(shape.num_edges(), 10);
+  EXPECT_EQ(shape.chain(0).length, 4);
+  EXPECT_EQ(shape.chain(1).length, 4);
+  EXPECT_EQ(shape.num_edges(), 8);
   EXPECT_EQ(shape.num_chains(), 2);
 
   auto chain0 = shape.chain(0);
   EXPECT_EQ(chain0.start, 0);
-  EXPECT_EQ(chain0.length, 5);
+  EXPECT_EQ(chain0.length, 4);
 
   auto chain1 = shape.chain(1);
-  EXPECT_EQ(chain1.start, 5);
-  EXPECT_EQ(chain1.length, 5);
+  EXPECT_EQ(chain1.start, 4);
+  EXPECT_EQ(chain1.length, 4);
 
   // chain_position for edge in second ring
-  auto pos = shape.chain_position(7);
+  auto pos = shape.chain_position(6);
   EXPECT_EQ(pos.chain_id, 1);
   EXPECT_EQ(pos.offset, 2);
 }
@@ -436,15 +447,14 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygon2Components) {
       "MULTIPOLYGON (((0 0, 1 0, 0 1, 0 0)), "
       "((10 10, 11 10, 10 11, 10 10)))");
   GeoArrowLaxPolygonShape shape(geom.geom());
-  EXPECT_EQ(shape.num_loops(), 2);
-  EXPECT_EQ(shape.num_loop_vertices(0), 4);
-  EXPECT_EQ(shape.num_loop_vertices(1), 4);
-  EXPECT_EQ(shape.num_edges(), 8);
+  EXPECT_EQ(shape.chain(0).length, 3);
+  EXPECT_EQ(shape.chain(1).length, 3);
+  EXPECT_EQ(shape.num_edges(), 6);
   EXPECT_EQ(shape.num_chains(), 2);
 
   auto pos = shape.chain_position(5);
   EXPECT_EQ(pos.chain_id, 1);
-  EXPECT_EQ(pos.offset, 1);
+  EXPECT_EQ(pos.offset, 2);
 }
 
 TEST(GeoArrowLaxPolygonShape, MultiPolygon3Components) {
@@ -453,8 +463,7 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygon3Components) {
       "((10 10, 11 10, 10 11, 10 10)), "
       "((20 20, 21 20, 20 21, 20 20)))");
   GeoArrowLaxPolygonShape shape(geom.geom());
-  EXPECT_EQ(shape.num_loops(), 3);
-  EXPECT_EQ(shape.num_edges(), 12);  // 4 + 4 + 4
+  EXPECT_EQ(shape.num_edges(), 9);  // 3 + 3 + 3
   EXPECT_EQ(shape.num_chains(), 3);
 }
 
@@ -465,11 +474,11 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygonWithHoles) {
       "(2 2, 8 2, 8 8, 2 8, 2 2)), "
       "((20 20, 21 20, 20 21, 20 20)))");
   GeoArrowLaxPolygonShape shape(geom.geom());
-  EXPECT_EQ(shape.num_loops(), 3);  // shell + hole + second polygon shell
-  EXPECT_EQ(shape.num_loop_vertices(0), 5);
-  EXPECT_EQ(shape.num_loop_vertices(1), 5);
-  EXPECT_EQ(shape.num_loop_vertices(2), 4);
-  EXPECT_EQ(shape.num_edges(), 14);  // 5 + 5 + 4
+  EXPECT_EQ(shape.num_chains(), 3);  // shell + hole + second polygon shell
+  EXPECT_EQ(shape.chain(0).length, 4);
+  EXPECT_EQ(shape.chain(1).length, 4);
+  EXPECT_EQ(shape.chain(2).length, 3);
+  EXPECT_EQ(shape.num_edges(), 11);  // 4 + 4 + 3
 }
 
 TEST(GeoArrowLaxPolygonShape, ChainEdgeWrapsAround) {
@@ -478,7 +487,7 @@ TEST(GeoArrowLaxPolygonShape, ChainEdgeWrapsAround) {
   GeoArrowLaxPolygonShape shape(geom.geom());
 
   // Last edge in the chain should wrap from vertex 3 back to vertex 0
-  auto last_edge = shape.chain_edge(0, 3);
+  auto last_edge = shape.chain_edge(0, 2);
   auto first_edge = shape.chain_edge(0, 0);
   // The last edge's endpoint should be the first edge's start
   EXPECT_EQ(last_edge.v1, first_edge.v0);
@@ -591,7 +600,7 @@ TEST(GeoArrowLaxPolygonShape, BigEndianWKBPolygon) {
 
   auto geom = TestGeometry::FromWKB(wkb);
   GeoArrowLaxPolygonShape shape(geom.geom());
-  EXPECT_EQ(shape.num_loops(), 1);
-  EXPECT_EQ(shape.num_loop_vertices(0), 4);
-  EXPECT_EQ(shape.num_edges(), 4);
+  EXPECT_EQ(shape.num_chains(), 1);
+  EXPECT_EQ(shape.chain(0).length, 3);
+  EXPECT_EQ(shape.num_edges(), 3);
 }

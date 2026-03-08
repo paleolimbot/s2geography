@@ -98,6 +98,16 @@ void GeoArrowPointShape::Init(struct GeoArrowGeometryView geom) {
         "Can't create GeoArrowPointShape() from geometry with > INT_MAX "
         "points");
   }
+
+  // This is rare but for now we check, as otherwise we might get an attempt to
+  // visit the coordinate of a node that doesn't have any.
+  VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
+    if (node->size == 0) {
+      throw Exception(
+          "Can't create GeoArrowPointShape() from MULTIPOINT with EMPTY "
+          "components");
+    }
+  });
 }
 
 int GeoArrowPointShape::num_vertices() const {
@@ -175,13 +185,11 @@ void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
 
   num_chains_ = geom_.size_nodes;
   num_edges_.resize(num_chains_ + 1);
-  int64_t num_vertices = 0;
   int64_t num_edges = 0;
 
   num_edges_[0] = 0;
   int64_t i = 1;
   VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
-    num_vertices += node->size;
     num_edges += node->size == 0 ? 0 : node->size - 1;
     if (num_edges > std::numeric_limits<int>::max()) {
       throw Exception(
@@ -189,8 +197,7 @@ void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
           "INT_MAX edges");
     }
 
-    num_edges_[i] = num_edges;
-    ++i;
+    num_edges_[i++] = num_edges;
   });
 }
 
@@ -246,10 +253,10 @@ GeoArrowLaxPolygonShape::GeoArrowLaxPolygonShape(
 void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
   // Collect all ring (LINESTRING) nodes
   num_loops_ = 0;
-  num_vertices_.clear();
-  num_vertices_.push_back(0);
+  num_edges_.clear();
+  num_edges_.push_back(0);
   loops_.clear();
-  int64_t total_vertices = 0;
+  int64_t num_edges = 0;
   bool is_hole = false;
 
   VisitNodes(geom, [&](const struct GeoArrowGeometryNode* node) {
@@ -260,13 +267,14 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
         is_hole = false;
         break;
       case GEOARROW_GEOMETRY_TYPE_LINESTRING:
-        total_vertices += node->size;
-        if (total_vertices > std::numeric_limits<int>::max()) {
+        num_edges += node->size == 0 ? 0 : node->size - 1;
+        if (num_edges > std::numeric_limits<int>::max()) {
           throw Exception(
               "Can't create GeoArrowLaxPolygonShape from geometry with > "
               "INT_MAX vertices");
         }
-        num_vertices_.push_back(static_cast<int>(total_vertices));
+
+        num_edges_.push_back(static_cast<int>(num_edges));
         loops_.push_back(*node);
 
         if (is_hole) {
@@ -301,21 +309,7 @@ void GeoArrowLaxPolygonShape::NormalizeOrientation() {
   }
 }
 
-int GeoArrowLaxPolygonShape::num_loops() const { return num_loops_; }
-
-int GeoArrowLaxPolygonShape::num_loop_vertices(int i) const {
-  return num_vertices_[i + 1] - num_vertices_[i];
-}
-
-S2Point GeoArrowLaxPolygonShape::loop_vertex(int i, int j) const {
-  S2LatLng ll;
-  VisitLngLat(&loops_[i], j, 1, [&](double lng, double lat) {
-    ll = S2LatLng::FromDegrees(lat, lng);
-  });
-  return ll.ToPoint();
-}
-
-int GeoArrowLaxPolygonShape::num_edges() const { return num_vertices_.back(); }
+int GeoArrowLaxPolygonShape::num_edges() const { return num_edges_.back(); }
 
 S2Shape::Edge GeoArrowLaxPolygonShape::edge(int e) const {
   ChainPosition pos = GeoArrowLaxPolygonShape::chain_position(e);
@@ -331,24 +325,27 @@ S2Shape::ReferencePoint GeoArrowLaxPolygonShape::GetReferencePoint() const {
 int GeoArrowLaxPolygonShape::num_chains() const { return num_loops_; }
 
 S2Shape::Chain GeoArrowLaxPolygonShape::chain(int i) const {
-  return Chain(num_vertices_[i], num_loop_vertices(i));
+  return Chain(num_edges_[i], num_edges_[i + 1] - num_edges_[i]);
 }
 
 S2Shape::Edge GeoArrowLaxPolygonShape::chain_edge(int i, int j) const {
-  int n = num_loop_vertices(i);
-  int k = (j + 1 == n) ? 0 : j + 1;
-  return Edge(loop_vertex(i, j), loop_vertex(i, k));
+  S2LatLng v[2];
+  int vi = 0;
+  VisitLngLat(&loops_[i], j, 2, [&](double lng, double lat) {
+    v[vi++] = S2LatLng::FromDegrees(lat, lng);
+  });
+  return Edge(v[0].ToPoint(), v[1].ToPoint());
 }
 
 S2Shape::ChainPosition GeoArrowLaxPolygonShape::chain_position(int e) const {
-  auto it = std::upper_bound(num_vertices_.begin(), num_vertices_.end(), e);
-  if (it == num_vertices_.begin() || it == num_vertices_.end()) {
+  auto it = std::upper_bound(num_edges_.begin(), num_edges_.end(), e);
+  if (it == num_edges_.begin() || it == num_edges_.end()) {
     throw Exception("Edge at position " + std::to_string(e) +
                     " does not exist");
   }
 
-  int i = static_cast<int>(it - num_vertices_.begin()) - 1;
-  return ChainPosition(i, e - num_vertices_[i]);
+  int i = static_cast<int>(it - num_edges_.begin()) - 1;
+  return ChainPosition(i, e - num_edges_[i]);
 }
 
 S2Shape::TypeTag GeoArrowLaxPolygonShape::type_tag() const { return kTypeTag; }
