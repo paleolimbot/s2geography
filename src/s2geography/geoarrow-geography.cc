@@ -292,7 +292,7 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
         break;
       default:
         throw Exception(
-            "Can't create GeoArrowLaxPolylineShape() from geometry of unknown "
+            "Can't create GeoArrowLaxPolygonShape() from geometry of unknown "
             "type ");
     }
   });
