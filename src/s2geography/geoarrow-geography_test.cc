@@ -281,11 +281,9 @@ TEST(GeoArrowLaxPolylineShape, MultiLinestring3ComponentsOneEmpty) {
   TestGeometry geom("MULTILINESTRING ((0 0, 1 0, 2 0), EMPTY, (3 0, 4 0))");
   GeoArrowLaxPolylineShape shape(geom.geom());
   EXPECT_EQ(shape.num_chains(), 3);
-  // The EMPTY linestring contributes 0 vertices and -1 edges (clamped behavior
-  // depends on implementation), but the total edges should be 2 + 0 + 1 = 3
-  // unless the empty component contributes a negative edge count.
-  // With the current implementation: edges = (3-1) + (0-1) + (2-1) = 2 - 1 + 1
-  // = 2 This tests the current behavior.
+  // The EMPTY linestring contributes 0 vertices and 0 edges, so the total
+  // edge count should be (3 - 1) + 0 + (2 - 1) = 2 + 0 + 1 = 3.
+  EXPECT_EQ(shape.num_edges(), 3);
   EXPECT_EQ(shape.num_vertices(), 5);
 }
 
