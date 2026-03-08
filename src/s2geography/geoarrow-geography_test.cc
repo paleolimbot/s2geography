@@ -19,6 +19,8 @@ class TestGeometry {
     GEOARROW_THROW_NOT_OK(nullptr, GeoArrowGeometryInit(&geom_));
   }
 
+  ~TestGeometry() { GeoArrowGeometryReset(&geom_); }
+
   TestGeometry(const TestGeometry&) = delete;
   TestGeometry& operator=(const TestGeometry&) = delete;
 
@@ -103,13 +105,46 @@ class TestGeometry {
     return out;
   }
 
-  ~TestGeometry() { GeoArrowGeometryReset(&geom_); }
-
  private:
   struct GeoArrowGeometry geom_;
   std::string label_;
   bool oriented_;
 };
+
+/// \brief Utility to sanity check an S2Shape, which has global edge ids
+/// but also has edges organized into chains.
+void ValidateShape(const S2Shape& shape) {
+  int num_edges = shape.num_edges();
+  int num_chains = shape.num_chains();
+
+  // Sum of chain lengths must equal num_edges
+  int edge_sum = 0;
+  for (int c = 0; c < num_chains; ++c) {
+    auto chain = shape.chain(c);
+    EXPECT_EQ(chain.start, edge_sum) << "chain " << c;
+    EXPECT_GE(chain.length, 0) << "chain " << c;
+    edge_sum += chain.length;
+  }
+  EXPECT_EQ(edge_sum, num_edges);
+
+  // For each edge, verify edge() == chain_edge() at the position given by
+  // chain_position(), and that chain_position() is consistent with chain()
+  for (int e = 0; e < num_edges; ++e) {
+    auto pos = shape.chain_position(e);
+    EXPECT_GE(pos.chain_id, 0) << "edge " << e;
+    EXPECT_LT(pos.chain_id, num_chains) << "edge " << e;
+
+    auto chain = shape.chain(pos.chain_id);
+    EXPECT_GE(pos.offset, 0) << "edge " << e;
+    EXPECT_LT(pos.offset, chain.length) << "edge " << e;
+    EXPECT_EQ(chain.start + pos.offset, e) << "edge " << e;
+
+    auto edge = shape.edge(e);
+    auto ce = shape.chain_edge(pos.chain_id, pos.offset);
+    EXPECT_EQ(edge.v0, ce.v0) << "edge " << e;
+    EXPECT_EQ(edge.v1, ce.v1) << "edge " << e;
+  }
+}
 
 TEST(GeoArrowPointShape, DefaultConstructor) {
   GeoArrowPointShape shape;
@@ -117,6 +152,7 @@ TEST(GeoArrowPointShape, DefaultConstructor) {
   EXPECT_EQ(shape.dimension(), 0);
   EXPECT_EQ(shape.num_chains(), 0);
   EXPECT_EQ(shape.num_vertices(), 0);
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowPointShape, EmptyPoint) {
@@ -126,6 +162,7 @@ TEST(GeoArrowPointShape, EmptyPoint) {
   EXPECT_EQ(shape.dimension(), 0);
   EXPECT_EQ(shape.num_chains(), 0);
   EXPECT_EQ(shape.num_vertices(), 0);
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowPointShape, EmptyMultiPoint) {
@@ -135,6 +172,7 @@ TEST(GeoArrowPointShape, EmptyMultiPoint) {
   EXPECT_EQ(shape.dimension(), 0);
   EXPECT_EQ(shape.num_chains(), 0);
   EXPECT_EQ(shape.num_vertices(), 0);
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowPointShape, MultiPointWithEmpty) {
@@ -163,6 +201,8 @@ TEST(GeoArrowPointShape, SinglePoint) {
 
   auto ce = shape.chain_edge(0, 0);
   EXPECT_EQ(ce.v0, ce.v1);
+
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowPointShape, MultiPoint) {
@@ -190,6 +230,8 @@ TEST(GeoArrowPointShape, MultiPoint) {
     EXPECT_EQ(ce.v0, ce.v1);
     EXPECT_EQ(ce.v0, e.v0);
   }
+
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowPointShape, BigEndianWKB) {
@@ -208,12 +250,15 @@ TEST(GeoArrowPointShape, BigEndianWKB) {
   EXPECT_EQ(shape.num_vertices(), 1);
   EXPECT_EQ(shape.num_edges(), 1);
   EXPECT_EQ(shape.num_chains(), 1);
+
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowPointShape, ShapeIndexIntersection) {
   auto point_geom = TestGeometry::FromWKT("MULTIPOINT ((0 0), (1 1), (50 50))");
   GeoArrowPointShape shape(point_geom.geom());
   EXPECT_EQ(shape.num_chains(), 1);
+  ValidateShape(shape);
 
   MutableS2ShapeIndex point_index;
   point_index.Add(std::make_unique<GeoArrowPointShape>(point_geom.geom()));
@@ -241,6 +286,7 @@ TEST(GeoArrowLaxPolylineShape, DefaultConstructor) {
   EXPECT_EQ(shape.num_edges(), 0);
   EXPECT_EQ(shape.dimension(), 1);
   EXPECT_EQ(shape.num_chains(), 0);
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolylineShape, EmptyLinestring) {
@@ -249,6 +295,7 @@ TEST(GeoArrowLaxPolylineShape, EmptyLinestring) {
   EXPECT_EQ(shape.num_edges(), 0);
   EXPECT_EQ(shape.dimension(), 1);
   EXPECT_EQ(shape.num_chains(), 0);
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolylineShape, EmptyMultiLinestring) {
@@ -257,6 +304,7 @@ TEST(GeoArrowLaxPolylineShape, EmptyMultiLinestring) {
   EXPECT_EQ(shape.num_edges(), 0);
   EXPECT_EQ(shape.dimension(), 1);
   EXPECT_EQ(shape.num_chains(), 0);
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolylineShape, Linestring) {
@@ -265,6 +313,7 @@ TEST(GeoArrowLaxPolylineShape, Linestring) {
   EXPECT_EQ(shape.num_edges(), 2);
   EXPECT_EQ(shape.dimension(), 1);
   EXPECT_EQ(shape.num_chains(), 1);
+  ValidateShape(shape);
 }
 
 // Big-endian WKB for LINESTRING (30 10, 10 30, 40 40)
@@ -290,6 +339,7 @@ TEST(GeoArrowLaxPolylineShape, BigEndianWKB) {
   GeoArrowLaxPolylineShape shape(geom.geom());
   EXPECT_EQ(shape.num_edges(), 2);
   EXPECT_EQ(shape.num_chains(), 1);
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolylineShape, MultiLinestring2Components) {
@@ -307,6 +357,8 @@ TEST(GeoArrowLaxPolylineShape, MultiLinestring2Components) {
   auto pos2 = shape.chain_position(2);
   EXPECT_EQ(pos2.chain_id, 1);
   EXPECT_EQ(pos2.offset, 0);
+
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolylineShape, MultiLinestring3Components) {
@@ -319,6 +371,8 @@ TEST(GeoArrowLaxPolylineShape, MultiLinestring3Components) {
   auto pos3 = shape.chain_position(3);
   EXPECT_EQ(pos3.chain_id, 2);
   EXPECT_EQ(pos3.offset, 0);
+
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolylineShape, MultiLinestring4Components) {
@@ -335,6 +389,8 @@ TEST(GeoArrowLaxPolylineShape, MultiLinestring4Components) {
   auto pos3 = shape.chain_position(3);
   EXPECT_EQ(pos3.chain_id, 3);
   EXPECT_EQ(pos3.offset, 0);
+
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolylineShape, MultiLinestring3ComponentsOneEmpty) {
@@ -345,6 +401,8 @@ TEST(GeoArrowLaxPolylineShape, MultiLinestring3ComponentsOneEmpty) {
   // The EMPTY linestring contributes 0 vertices and 0 edges, so the total
   // edge count should be (3 - 1) + 0 + (2 - 1) = 2 + 0 + 1 = 3.
   EXPECT_EQ(shape.num_edges(), 3);
+
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolylineShape, ShapeIndexIntersection) {
@@ -354,6 +412,7 @@ TEST(GeoArrowLaxPolylineShape, ShapeIndexIntersection) {
       "(-1 -1, 1 1), (-1 1, 1 -1))");
   GeoArrowLaxPolylineShape shape(line_geom.geom());
   EXPECT_EQ(shape.num_chains(), 4);
+  ValidateShape(shape);
 
   // Build a ShapeIndexGeography from a polygon that overlaps the lines
   WKTReader reader;
@@ -386,6 +445,7 @@ TEST(GeoArrowLaxPolygonShape, DefaultConstructor) {
   EXPECT_EQ(shape.num_edges(), 0);
   EXPECT_EQ(shape.dimension(), 2);
   EXPECT_EQ(shape.num_chains(), 0);
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolygonShape, EmptyPolygon) {
@@ -394,6 +454,7 @@ TEST(GeoArrowLaxPolygonShape, EmptyPolygon) {
   EXPECT_EQ(shape.num_edges(), 0);
   EXPECT_EQ(shape.dimension(), 2);
   EXPECT_EQ(shape.num_chains(), 0);
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolygonShape, EmptyMultiPolygon) {
@@ -402,6 +463,7 @@ TEST(GeoArrowLaxPolygonShape, EmptyMultiPolygon) {
   EXPECT_EQ(shape.num_edges(), 0);
   EXPECT_EQ(shape.dimension(), 2);
   EXPECT_EQ(shape.num_chains(), 0);
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolygonShape, SimpleTriangle) {
@@ -416,6 +478,8 @@ TEST(GeoArrowLaxPolygonShape, SimpleTriangle) {
   auto chain0 = shape.chain(0);
   EXPECT_EQ(chain0.start, 0);
   EXPECT_EQ(chain0.length, 3);
+
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolygonShape, PolygonWithHole) {
@@ -440,6 +504,8 @@ TEST(GeoArrowLaxPolygonShape, PolygonWithHole) {
   auto pos = shape.chain_position(6);
   EXPECT_EQ(pos.chain_id, 1);
   EXPECT_EQ(pos.offset, 2);
+
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolygonShape, MultiPolygon2Components) {
@@ -455,6 +521,8 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygon2Components) {
   auto pos = shape.chain_position(5);
   EXPECT_EQ(pos.chain_id, 1);
   EXPECT_EQ(pos.offset, 2);
+
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolygonShape, MultiPolygon3Components) {
@@ -465,6 +533,8 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygon3Components) {
   GeoArrowLaxPolygonShape shape(geom.geom());
   EXPECT_EQ(shape.num_edges(), 9);  // 3 + 3 + 3
   EXPECT_EQ(shape.num_chains(), 3);
+
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolygonShape, MultiPolygonWithHoles) {
@@ -479,6 +549,8 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygonWithHoles) {
   EXPECT_EQ(shape.chain(1).length, 4);
   EXPECT_EQ(shape.chain(2).length, 3);
   EXPECT_EQ(shape.num_edges(), 11);  // 4 + 4 + 3
+
+  ValidateShape(shape);
 }
 
 TEST(GeoArrowLaxPolygonShape, ChainEdgeWrapsAround) {
@@ -542,7 +614,9 @@ TEST(GeoArrowLaxPolygonShape, ShapeIndexContainsMultiPolygonWithHoles) {
     SCOPED_TRACE(test_geom->label());
 
     MutableS2ShapeIndex poly_index;
-    poly_index.Add(test_geom->ToPolygonShape());
+    auto shape = test_geom->ToPolygonShape();
+    ValidateShape(*shape);
+    poly_index.Add(std::move(shape));
 
     WKTReader reader;
     S2BooleanOperation::Options options;
@@ -603,4 +677,6 @@ TEST(GeoArrowLaxPolygonShape, BigEndianWKBPolygon) {
   EXPECT_EQ(shape.num_chains(), 1);
   EXPECT_EQ(shape.chain(0).length, 3);
   EXPECT_EQ(shape.num_edges(), 3);
+
+  ValidateShape(shape);
 }
