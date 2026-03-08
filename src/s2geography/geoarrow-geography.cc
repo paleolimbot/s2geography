@@ -139,11 +139,11 @@ int GeoArrowPointShape::num_chains() const {
   return num_vertices() == 0 ? 0 : 1;
 }
 
-S2Shape::Chain GeoArrowPointShape::chain(int i) const {
+S2Shape::Chain GeoArrowPointShape::chain(int /*i*/) const {
   return Chain(0, num_vertices());
 }
 
-S2Shape::Edge GeoArrowPointShape::chain_edge(int i, int j) const {
+S2Shape::Edge GeoArrowPointShape::chain_edge(int /*i*/, int j) const {
   S2Point p = vertex(j);
   return Edge(p, p);
 }
