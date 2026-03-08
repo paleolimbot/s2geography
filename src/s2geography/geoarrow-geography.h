@@ -151,7 +151,7 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   /// shell and subsequent child rings are considered holes.
   ///
   /// This does not modify the input geometry nodes nor does it force a copy
-  /// of the data (but does force a copy of the entire GeoArrowGeometryNode
+  /// of the data (but may force a copy of the entire GeoArrowGeometryNode
   /// array).
   void NormalizeOrientation();
 
