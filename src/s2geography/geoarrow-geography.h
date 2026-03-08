@@ -89,14 +89,14 @@ class GeoArrowLaxPolylineShape : public S2Shape {
 /// \brief Polygon S2Shape implementation backed by a GeoArrowGeometryView
 ///
 /// This shape represents zero or more polygons and can be initialized
-/// from a POINT or MULTPOINT. It is based on the S2LaxPolygonLayer.
+/// from a POLYGON or MULTIPOLYGON. It is based on the S2LaxPolygonShape.
 /// The shape is only valid for the lifetime of the data pointed to
 /// by the wrapped GeoArrowGeometryView (e.g., the WKB buffer containing
-/// points).
+/// polygons).
 ///
-/// Like the S2LaxPolygonLayer, this class depends on the rings being
+/// Like the S2LaxPolygonShape, this class depends on the rings being
 /// oriented. Use NormalizeOrientation() after Init() for input where the
-/// winding order might be invalid, which ensures that "shell"s are oriented
+/// winding order might be invalid; this ensures that "shell"s are oriented
 /// counterclockwise and "holes" are oriented clockwise. This check may be
 /// expensive.
 class GeoArrowLaxPolygonShape : public S2Shape {
