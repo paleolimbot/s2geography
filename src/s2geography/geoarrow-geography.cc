@@ -447,17 +447,14 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
       points_.Init(geom);
-      index_.Add(std::make_unique<S2ShapeWrapper>(&points_));
       break;
     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
     case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
       lines_.Init(geom);
-      index_.Add(std::make_unique<S2ShapeWrapper>(&lines_));
       break;
     case GEOARROW_GEOMETRY_TYPE_POLYGON:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
       polygons_.Init(geom);
-      index_.Add(std::make_unique<S2ShapeWrapper>(&polygons_));
       break;
     // GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
     // Can be supported by walking the list and separating geometry types
@@ -467,6 +464,8 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
           "Can't create GeoArrowGeography from geometry type " +
           std::string(GeometryTypeString(geom.root->geometry_type)));
   }
+
+  AddShapesToIndex();
 }
 
 const S2ShapeIndex& GeoArrowGeography::ShapeIndex() const { return index_; }
