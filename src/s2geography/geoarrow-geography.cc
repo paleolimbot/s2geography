@@ -300,7 +300,7 @@ void GeoArrowLaxPolygonShape::Clear() {
 void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
   if (geom.size_nodes == 0) {
     throw Exception(
-        "Can't create GeoArrowLaxPolylineShape from input with zero nodes");
+        "Can't create GeoArrowLaxPolygonShape from input with zero nodes");
   }
 
   // Collect all ring (LINESTRING) nodes
@@ -401,6 +401,32 @@ S2Shape::TypeTag GeoArrowLaxPolygonShape::type_tag() const { return kTypeTag; }
 
 /// GeoArrowGeography
 
+GeoArrowGeography::GeoArrowGeography(GeoArrowGeography&& other)
+    : Geography(std::move(other)),
+      geom_(other.geom_),
+      points_(std::move(other.points_)),
+      lines_(std::move(other.lines_)),
+      polygons_(std::move(other.polygons_)),
+      index_() {
+  // Rebuild index_ so that any internal wrappers point to this object's
+  // members rather than to the moved-from object.
+  AddShapesToIndex();
+}
+
+GeoArrowGeography& GeoArrowGeography::operator=(GeoArrowGeography&& other) {
+  if (this != &other) {
+    Geography::operator=(std::move(other));
+    geom_ = other.geom_;
+    points_ = std::move(other.points_);
+    lines_ = std::move(other.lines_);
+    polygons_ = std::move(other.polygons_);
+    index_.Clear();
+    // Rebuild index_ with wrappers bound to this object's members.
+    AddShapesToIndex();
+  }
+  return *this;
+}
+
 void GeoArrowGeography::Init(struct GeoArrowGeometryView geom) {
   InitOriented(geom);
   polygons_.NormalizeOrientation();
@@ -412,6 +438,10 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
   polygons_.Clear();
   index_.Clear();
   geom_ = geom;
+
+  if (geom.size_nodes == 0) {
+    return;
+  }
 
   switch (geom.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
@@ -442,6 +472,10 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
 const S2ShapeIndex& GeoArrowGeography::ShapeIndex() const { return index_; }
 
 int GeoArrowGeography::dimension() const {
+  if (geom_.size_nodes == 0) {
+    return -1;
+  }
+
   switch (geom_.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
@@ -458,6 +492,10 @@ int GeoArrowGeography::dimension() const {
 }
 
 int GeoArrowGeography::num_shapes() const {
+  if (geom_.size_nodes == 0) {
+    return 0;
+  }
+
   switch (geom_.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
@@ -494,9 +532,37 @@ std::unique_ptr<S2Region> GeoArrowGeography::Region() const {
   return std::make_unique<S2ShapeIndexRegion<MutableS2ShapeIndex>>(&index_);
 }
 
-void GeoArrowGeography::Encode(Encoder* encoder,
-                               const EncodeOptions& options) const {
+void GeoArrowGeography::Encode(Encoder* /*encoder*/,
+                               const EncodeOptions& /*options*/) const {
   throw Exception("Encode() not implemented for GeoArrowGeography");
+}
+
+void GeoArrowGeography::AddShapesToIndex() {
+  if (geom_.size_nodes == 0) {
+    return;
+  }
+
+  switch (geom_.root->geometry_type) {
+    case GEOARROW_GEOMETRY_TYPE_POINT:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+      index_.Add(std::make_unique<S2ShapeWrapper>(&points_));
+      break;
+    case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+    case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
+      index_.Add(std::make_unique<S2ShapeWrapper>(&lines_));
+      break;
+    case GEOARROW_GEOMETRY_TYPE_POLYGON:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
+      index_.Add(std::make_unique<S2ShapeWrapper>(&polygons_));
+      break;
+    // GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
+    // Can be supported by walking the list and separating geometry types
+    // but not yet.
+    default:
+      throw Exception(
+          "Can't create index from geometry type " +
+          std::string(GeometryTypeString(geom_.root->geometry_type)));
+  }
 }
 
 }  // namespace s2geography

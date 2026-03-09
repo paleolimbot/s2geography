@@ -703,6 +703,19 @@ class GeoArrowGeographyTest : public ::testing::Test {
   std::vector<TestGeometry> geoms_;
 };
 
+TEST_F(GeoArrowGeographyTest, DefaultConstructor) {
+  GeoArrowGeography geog;
+  EXPECT_EQ(geog.num_shapes(), 0);
+
+  auto point = MakeGeography("POINT (0 0)");
+  EXPECT_FALSE(
+      S2BooleanOperation::Intersects(geog.ShapeIndex(), point.ShapeIndex()));
+
+  auto region = geog.Region();
+  ASSERT_NE(region, nullptr);
+  EXPECT_FALSE(region->Contains(S2LatLng::FromDegrees(0, 0).ToPoint()));
+}
+
 TEST_F(GeoArrowGeographyTest, Point) {
   auto geog = MakeGeography("POINT (1 2)");
   EXPECT_EQ(geog.dimension(), 0);
@@ -811,8 +824,8 @@ TEST_F(GeoArrowGeographyTest, ShapeIndexIntersection) {
   // Polygon far from all points
   auto poly_far =
       MakeGeography("POLYGON ((80 80, 81 80, 81 81, 80 81, 80 80))");
-  EXPECT_TRUE(S2BooleanOperation::Intersects(points.ShapeIndex(),
-                                             poly_near.ShapeIndex()));
+  EXPECT_FALSE(S2BooleanOperation::Intersects(points.ShapeIndex(),
+                                              poly_far.ShapeIndex()));
 }
 
 TEST_F(GeoArrowGeographyTest, Region) {
@@ -833,8 +846,20 @@ TEST_F(GeoArrowGeographyTest, RegionReversedWinding) {
 }
 
 TEST_F(GeoArrowGeographyTest, MoveConstructor) {
-  auto geog = MakeGeography("POINT (1 2)");
+  auto geog = MakeGeography("POLYGON ((-1 -1, 2 -1, 2 2, -1 2, -1 -1))");
+  auto point = MakeGeography("POINT (0 0)");
+
   GeoArrowGeography moved(std::move(geog));
-  EXPECT_EQ(moved.dimension(), 0);
-  EXPECT_EQ(moved.num_shapes(), 1);
+  EXPECT_TRUE(
+      S2BooleanOperation::Intersects(moved.ShapeIndex(), point.ShapeIndex()));
+}
+
+TEST_F(GeoArrowGeographyTest, MoveAssignment) {
+  auto geog = MakeGeography("POLYGON ((-1 -1, 2 -1, 2 2, -1 2, -1 -1))");
+  auto point = MakeGeography("POINT (0 0)");
+
+  GeoArrowGeography assigned;
+  assigned = std::move(geog);
+  EXPECT_TRUE(S2BooleanOperation::Intersects(assigned.ShapeIndex(),
+                                             point.ShapeIndex()));
 }

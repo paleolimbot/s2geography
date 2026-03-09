@@ -194,8 +194,9 @@ class GeoArrowGeography : public Geography {
 
   GeoArrowGeography(const GeoArrowGeography&) = delete;
   GeoArrowGeography& operator=(const GeoArrowGeography&) = delete;
-  GeoArrowGeography(GeoArrowGeography&&) = default;
-  GeoArrowGeography& operator=(GeoArrowGeography&&) = default;
+  GeoArrowGeography(GeoArrowGeography&& other);
+
+  GeoArrowGeography& operator=(GeoArrowGeography&& other);
 
   void Init(struct GeoArrowGeometryView geom);
   void InitOriented(struct GeoArrowGeometryView geom);
@@ -215,7 +216,7 @@ class GeoArrowGeography : public Geography {
   GeoArrowLaxPolygonShape polygons_;
   MutableS2ShapeIndex index_;
 
-  void InitIndex();
+  void AddShapesToIndex();
 };
 
 /// @}
