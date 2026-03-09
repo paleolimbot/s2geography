@@ -9,109 +9,12 @@
 #include <s2/s2region.h>
 #include <s2/s2shape.h>
 #include <s2/s2shape_index.h>
-#include <stdint.h>
 
-#include <stdexcept>
-#include <string>
 #include <vector>
 
+#include "s2geography/geography_interface.h"
+
 namespace s2geography {
-
-class Exception : public std::runtime_error {
- public:
-  Exception(std::string what) : std::runtime_error(what.c_str()) {}
-};
-
-// enum to tag concrete Geography implementations. Note that
-// CELL_CENTER does not currently represent a concrete subclass
-// but is used to mark a compact encoding method for small numbers of points.
-enum class GeographyKind {
-  UNINITIALIZED = 0,
-  POINT = 1,
-  POLYLINE = 2,
-  POLYGON = 3,
-  GEOGRAPHY_COLLECTION = 4,
-  SHAPE_INDEX = 5,
-  ENCODED_SHAPE_INDEX = 6,
-  CELL_CENTER = 7,
-};
-
-class EncodeOptions;
-struct EncodeTag;
-
-// An Geography is an abstraction of S2 types that is designed to closely
-// match the scope of a GEOS Geometry. Its methods are limited to those needed
-// to implement C API functions. From an S2 perspective, an Geography is an
-// S2Region that can be represented by zero or more S2Shape objects. Current
-// implementations of Geography own their data (i.e., the coordinate vectors
-// and underlying S2 objects), however, the interface is designed to allow
-// future abstractions where this is not the case.
-class Geography {
- public:
-  Geography(GeographyKind kind) : kind_(kind) {}
-  virtual ~Geography() {}
-
-  GeographyKind kind() const { return kind_; }
-
-  // Returns 0, 1, or 2 if all Shape()s that are returned will have
-  // the same dimension (i.e., they are all points, all lines, or
-  // all polygons).
-  virtual int dimension() const {
-    if (num_shapes() == 0) {
-      return -1;
-    }
-
-    int dim = Shape(0)->dimension();
-    for (int i = 1; i < num_shapes(); i++) {
-      if (dim != Shape(i)->dimension()) {
-        return -1;
-      }
-    }
-
-    return dim;
-  }
-
-  // The number of S2Shape objects needed to represent this Geography
-  virtual int num_shapes() const = 0;
-
-  // Returns the given S2Shape (where 0 <= id < num_shapes()). The
-  // caller retains ownership of the S2Shape but the data pointed to
-  // by the object requires that the underlying Geography outlives
-  // the returned object.
-  virtual std::unique_ptr<S2Shape> Shape(int id) const = 0;
-
-  // Returns an S2Region that represents the object. The caller retains
-  // ownership of the S2Region but the data pointed to by the object
-  // requires that the underlying Geography outlives the returned
-  // object.
-  virtual std::unique_ptr<S2Region> Region() const = 0;
-
-  // Adds an unnormalized set of S2CellIDs to `cell_ids`. This is intended
-  // to be faster than using Region().GetCovering() directly and to
-  // return a small number of cells that can be used to compute a possible
-  // intersection quickly.
-  virtual void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const;
-
-  // Serialize this geography to an encoder. This does not include any
-  // encapsulating information (e.g., which geography type or flags).
-  virtual void Encode(Encoder* encoder, const EncodeOptions& options) const = 0;
-
-  // Serialize this geography to an encoder such that it can roundtrip
-  // with DecodeTagged(). EXPERIMENTAL.
-  virtual void EncodeTagged(Encoder* encoder,
-                            const EncodeOptions& options) const;
-
-  // Create a geography from output written with EncodeTagged. EXPERIMENTAL.
-  static std::unique_ptr<Geography> DecodeTagged(Decoder* decoder);
-
- protected:
-  // Helper for subclasses to write a covering. Subclasses must call this
-  // or encode their own covering when implementing Encode().
-  void EncodeCoveringDefault(Encoder* encoder);
-
- private:
-  GeographyKind kind_;
-};
 
 // An Geography representing zero or more points using a std::vector<S2Point>
 // as the underlying representation.
@@ -292,76 +195,6 @@ class EncodedShapeIndexGeography : public Geography {
  private:
   std::unique_ptr<S2ShapeIndex> shape_index_;
   std::unique_ptr<S2ShapeIndex::ShapeFactory> shape_factory_;
-};
-
-// Options for serializing geographies using Geography::EncodeTagged()
-class EncodeOptions {
- public:
-  // Create options with default values, which optimize for the
-  // scenario where a geography is about to be fully deserialized
-  // in another process. Set the appropriate options for smaller
-  // encoded size and/or better query performance when running queries
-  // directly on encoded data.
-  EncodeOptions() = default;
-
-  // Control whether to optimize for speed (by writing vertices as
-  // doubles) or space (by writing cell identifiers for vertices that
-  // are snapped to a cell center). For vertices that are snapped to a
-  // cell center at a lower zoom level, the encoder can encode each
-  // vertex with 4 or fewer bytes.
-  void set_coding_hint(s2coding::CodingHint hint) { hint_ = hint; }
-  s2coding::CodingHint coding_hint() const { return hint_; }
-
-  // Control whether to spend extra effort converting shapes that
-  // aren't able to be lazily decoded (e.g., S2Polyline::Shape and
-  // S2Polygon::Shape to S2LaxPolylineShape and S2LaxPolygonShape,
-  // respectively).
-  void set_enable_lazy_decode(bool enable_lazy_decode) {
-    enable_lazy_decode_ = enable_lazy_decode;
-  }
-  bool enable_lazy_decode() const { return enable_lazy_decode_; }
-
-  // Control whether to prefix the serialized geography with a covering
-  // to more rapidy check for possible intersection. The covering that is
-  // written is currently the normalized result of GetCellUnionBound().
-  void set_include_covering(bool include_covering) {
-    include_covering_ = include_covering;
-  }
-  bool include_covering() const { return include_covering_; }
-
- private:
-  s2coding::CodingHint hint_{s2coding::CodingHint::FAST};
-  bool enable_lazy_decode_{false};
-  bool include_covering_{false};
-};
-
-// A 4 byte prefix for encoded geographies. 4 bytes is essential so that
-// German-style strings store these bytes in their prefix (i.e., don't have
-// to load any auxiliary buffers to inspect this information).
-struct EncodeTag {
-  // Geography subclass whose Decode() method will be called.
-  // Encoded as a uint8_t.
-  GeographyKind kind{GeographyKind::UNINITIALIZED};
-
-  // Flags. Currently supported are kFlagEmpty (set if and only if there
-  // are zero shapes in the geography).
-  uint8_t flags{};
-
-  // Number of cells identifiers that follow this tag. Note that zero cells
-  // (i.e., an empty covering) indicates that no covering was written and does
-  // NOT imply an empty geography.
-  uint8_t covering_size{};
-
-  // Reserved byte (must be 0)
-  uint8_t reserved{};
-
-  void Encode(Encoder* encoder) const;
-  void Decode(Decoder* decoder);
-  void DecodeCovering(Decoder* decoder, std::vector<S2CellId>* cell_ids) const;
-  void SkipCovering(Decoder* decoder) const;
-  void Validate();
-
-  static constexpr uint8_t kFlagEmpty = 1;
 };
 
 }  // namespace s2geography

@@ -17,64 +17,10 @@
 
 #include <sstream>
 
+#include "s2geography/geography_interface.h"
 #include "s2geography/macros.h"
 
 using namespace s2geography;
-
-// This class is a shim to allow a class to return a std::unique_ptr<S2Shape>(),
-// which is required by MutableS2ShapeIndex::Add(), without copying the
-// underlying data. S2Shape instances do not typically own their data (e.g.,
-// S2Polygon::Shape), so this does not change the general relationship (that
-// anything returned by Geography::Shape() is only valid within the scope of
-// the Geography). Note that this class is also available (but not exposed) in
-// s2/s2shapeutil_coding.cc.
-class S2ShapeWrapper : public S2Shape {
- public:
-  S2ShapeWrapper(const S2Shape* shape) : shape_(shape) {}
-  int num_edges() const { return shape_->num_edges(); }
-  Edge edge(int edge_id) const { return shape_->edge(edge_id); }
-  int dimension() const { return shape_->dimension(); }
-  ReferencePoint GetReferencePoint() const {
-    return shape_->GetReferencePoint();
-  }
-  int num_chains() const { return shape_->num_chains(); }
-  Chain chain(int chain_id) const { return shape_->chain(chain_id); }
-  Edge chain_edge(int chain_id, int offset) const {
-    return shape_->chain_edge(chain_id, offset);
-  }
-  ChainPosition chain_position(int edge_id) const {
-    return shape_->chain_position(edge_id);
-  }
-
- private:
-  const S2Shape* shape_;
-};
-
-// Just like the S2ShapeWrapper, the S2RegionWrapper helps reconcile the
-// differences in lifecycle expectation between S2 and Geography. We often
-// need access to a S2Region to generalize algorithms; however, there are some
-// operations that need ownership of the region (e.g., the S2RegionUnion). In
-// Geography the assumption is that anything returned by a Geography is only
-// valid for the lifetime of the underlying Geography. A different design of
-// the algorithms implemented here might well make this unnecessary.
-class S2RegionWrapper : public S2Region {
- public:
-  S2RegionWrapper(S2Region* region) : region_(region) {}
-  S2Region* Clone() const { return region_->Clone(); }
-  S2Cap GetCapBound() const { return region_->GetCapBound(); }
-  S2LatLngRect GetRectBound() const { return region_->GetRectBound(); }
-  void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
-    return region_->GetCellUnionBound(cell_ids);
-  }
-  bool Contains(const S2Cell& cell) const { return region_->Contains(cell); }
-  bool MayIntersect(const S2Cell& cell) const {
-    return region_->MayIntersect(cell);
-  }
-  bool Contains(const S2Point& p) const { return region_->Contains(p); }
-
- private:
-  S2Region* region_;
-};
 
 void Geography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
   MutableS2ShapeIndex index;
@@ -575,81 +521,5 @@ std::unique_ptr<Geography> Geography::DecodeTagged(Decoder* decoder) {
     default: {
       throw Exception("DecodeTagged(): kind not implemented");
     }
-  }
-}
-
-void EncodeTag::Encode(Encoder* encoder) const {
-  encoder->Ensure(4 * sizeof(uint8_t));
-  encoder->put8(static_cast<uint8_t>(kind));
-  encoder->put8(flags);
-  encoder->put8(covering_size);
-  encoder->put8(reserved);
-}
-
-void EncodeTag::Decode(Decoder* decoder) {
-  if (decoder->avail() < 4 * sizeof(uint8_t)) {
-    throw Exception(
-        "EncodeTag::Decode() fewer than 4 bytes available in decoder");
-  }
-
-  uint8_t geography_type = decoder->get8();
-
-  if (geography_type == static_cast<uint8_t>(GeographyKind::POINT)) {
-    kind = GeographyKind::POINT;
-  } else if (geography_type == static_cast<uint8_t>(GeographyKind::POLYLINE)) {
-    kind = GeographyKind::POLYLINE;
-  } else if (geography_type == static_cast<uint8_t>(GeographyKind::POLYGON)) {
-    kind = GeographyKind::POLYGON;
-  } else if (geography_type ==
-             static_cast<uint8_t>(GeographyKind::GEOGRAPHY_COLLECTION)) {
-    kind = GeographyKind::GEOGRAPHY_COLLECTION;
-  } else if (geography_type ==
-             static_cast<uint8_t>(GeographyKind::SHAPE_INDEX)) {
-    kind = GeographyKind::SHAPE_INDEX;
-  } else if (geography_type ==
-             static_cast<uint8_t>(GeographyKind::CELL_CENTER)) {
-    kind = GeographyKind::CELL_CENTER;
-
-  } else {
-    throw Exception("EncodeTag::Decode(): Unknown geography kind identifier " +
-                    std::to_string(geography_type));
-  }
-
-  flags = decoder->get8();
-  covering_size = decoder->get8();
-  reserved = decoder->get8();
-  Validate();
-}
-
-void EncodeTag::DecodeCovering(Decoder* decoder,
-                               std::vector<S2CellId>* cell_ids) const {
-  if (decoder->avail() < (covering_size * sizeof(uint64_t))) {
-    throw Exception("Insufficient size in decoder for " +
-                    std::to_string(covering_size) + " cell ids");
-  }
-
-  cell_ids->resize(covering_size);
-  for (uint8_t i = 0; i < covering_size; i++) {
-    cell_ids->at(i) = S2CellId(decoder->get64());
-  }
-}
-
-void s2geography::EncodeTag::SkipCovering(Decoder* decoder) const {
-  if (decoder->avail() < (covering_size * sizeof(uint64_t))) {
-    throw Exception("Insufficient size in decoder for " +
-                    std::to_string(covering_size) + " cell ids");
-  }
-
-  decoder->skip(covering_size * sizeof(uint64_t));
-}
-
-void EncodeTag::Validate() {
-  if (reserved != 0) {
-    throw Exception("EncodeTag: reserved byte must be zero");
-  }
-
-  uint8_t flags_validate = flags & ~kFlagEmpty;
-  if (flags_validate != 0) {
-    throw Exception("EncodeTag: Unknown flag(s)");
   }
 }
