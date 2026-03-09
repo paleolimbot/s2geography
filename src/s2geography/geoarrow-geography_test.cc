@@ -706,6 +706,22 @@ class GeoArrowGeographyTest : public ::testing::Test {
 TEST_F(GeoArrowGeographyTest, DefaultConstructor) {
   GeoArrowGeography geog;
   EXPECT_EQ(geog.num_shapes(), 0);
+  EXPECT_EQ(geog.dimension(), -1);
+
+  auto point = MakeGeography("POINT (0 0)");
+  EXPECT_FALSE(
+      S2BooleanOperation::Intersects(geog.ShapeIndex(), point.ShapeIndex()));
+
+  auto region = geog.Region();
+  ASSERT_NE(region, nullptr);
+  EXPECT_FALSE(region->Contains(S2LatLng::FromDegrees(0, 0).ToPoint()));
+}
+
+TEST_F(GeoArrowGeographyTest, InitGeometryZeroNodes) {
+  GeoArrowGeography geog;
+  geog.Init({nullptr, 0});
+  EXPECT_EQ(geog.num_shapes(), 0);
+  EXPECT_EQ(geog.dimension(), -1);
 
   auto point = MakeGeography("POINT (0 0)");
   EXPECT_FALSE(
