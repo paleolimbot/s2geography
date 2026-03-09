@@ -384,4 +384,36 @@ S2Shape::ChainPosition GeoArrowLaxPolygonShape::chain_position(int e) const {
 
 S2Shape::TypeTag GeoArrowLaxPolygonShape::type_tag() const { return kTypeTag; }
 
+/// GeoArrowGeography
+
+void GeoArrowGeography::Init(struct GeoArrowGeometryView geom) {
+  points_.Clear();
+  lines_.Clear();
+  polygons_.Clear();
+  geom_ = geom;
+
+  switch (geom.root->geometry_type) {
+    case GEOARROW_GEOMETRY_TYPE_POINT:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+      points_.Init(geom);
+      break;
+    case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+    case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
+      lines_.Init(geom);
+      break;
+    case GEOARROW_GEOMETRY_TYPE_POLYGON:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
+      polygons_.Init(geom);
+      break;
+    // GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
+    // Can be supported by walking the list and separating geometry types
+    // but not yet.
+    default:
+      throw Exception(
+          "Can't create GeoArrowGeography from geometry type " +
+          std::string(GeometryTypeString(geom.root->geometry_type)));
+  }
+}
+
+
 }  // namespace s2geography
