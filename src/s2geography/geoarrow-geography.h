@@ -2,6 +2,7 @@
 
 #include <s2/s2shape.h>
 #include <s2/s2shape_index.h>
+#include <s2/mutable_s2shape_index.h>
 
 #include <vector>
 
@@ -198,13 +199,22 @@ class GeoArrowGeography : public Geography {
 
   void Init(struct GeoArrowGeometryView geom);
 
+  const S2ShapeIndex& ShapeIndex() const;
 
+  int dimension() const override;
+  int num_shapes() const override;
+  std::unique_ptr<S2Shape> Shape(int id) const override;
+  std::unique_ptr<S2Region> Region() const override;
+  void Encode(Encoder* encoder, const EncodeOptions& options) const override;
 
  private:
   struct GeoArrowGeometryView geom_{};
   GeoArrowPointShape points_;
   GeoArrowLaxPolylineShape lines_;
   GeoArrowLaxPolygonShape polygons_;
+  MutableS2ShapeIndex index_;
+
+  void InitIndex();
 };
 
 /// @}
