@@ -29,6 +29,11 @@ class PointGeography : public Geography {
   explicit PointGeography(std::vector<S2Point> points)
       : Geography(GeographyKind::POINT), points_(std::move(points)) {}
 
+  PointGeography(const PointGeography&) = delete;
+  PointGeography& operator=(const PointGeography&) = delete;
+  PointGeography(PointGeography&&) = default;
+  PointGeography& operator=(PointGeography&&) = default;
+
   const std::vector<S2Point>& Points() const { return points_; }
 
   void Decode(Decoder* decoder, const EncodeTag& tag);
@@ -66,6 +71,11 @@ class PolylineGeography : public Geography {
   explicit PolylineGeography(std::vector<std::unique_ptr<S2Polyline>> polylines)
       : Geography(GeographyKind::POLYLINE), polylines_(std::move(polylines)) {}
 
+  PolylineGeography(const PolylineGeography&) = delete;
+  PolylineGeography& operator=(const PolylineGeography&) = delete;
+  PolylineGeography(PolylineGeography&&) = default;
+  PolylineGeography& operator=(PolylineGeography&&) = default;
+
   void Decode(Decoder* decoder, const EncodeTag& tag);
 
   const std::vector<std::unique_ptr<S2Polyline>>& Polylines() const {
@@ -94,6 +104,11 @@ class PolygonGeography : public Geography {
   PolygonGeography();
   explicit PolygonGeography(std::unique_ptr<S2Polygon> polygon)
       : Geography(GeographyKind::POLYGON), polygon_(std::move(polygon)) {}
+
+  PolygonGeography(const PolygonGeography&) = delete;
+  PolygonGeography& operator=(const PolygonGeography&) = delete;
+  PolygonGeography(PolygonGeography&&) = default;
+  PolygonGeography& operator=(PolygonGeography&&) = default;
 
   void Decode(Decoder* decoder, const EncodeTag& tag);
 
@@ -125,6 +140,11 @@ class GeographyCollection : public Geography {
         total_shapes_(0) {
     CountShapes();
   }
+
+  GeographyCollection(const GeographyCollection&) = delete;
+  GeographyCollection& operator=(const GeographyCollection&) = delete;
+  GeographyCollection(GeographyCollection&&) = default;
+  GeographyCollection& operator=(GeographyCollection&&) = default;
 
   void Decode(Decoder* decoder, const EncodeTag& tag);
 
@@ -166,6 +186,11 @@ class ShapeIndexGeography : public Geography {
 
   explicit ShapeIndexGeography(const Geography& geog);
 
+  ShapeIndexGeography(const ShapeIndexGeography&) = delete;
+  ShapeIndexGeography& operator=(const ShapeIndexGeography&) = delete;
+  ShapeIndexGeography(ShapeIndexGeography&&) = default;
+  ShapeIndexGeography& operator=(ShapeIndexGeography&&) = default;
+
   /// \brief Add a Geography to the index
   ///
   /// Returns the last shape_id that was added to the index or -1 if no shapes
@@ -192,6 +217,12 @@ class ShapeIndexGeography : public Geography {
 class EncodedShapeIndexGeography : public Geography {
  public:
   EncodedShapeIndexGeography();
+
+  EncodedShapeIndexGeography(const EncodedShapeIndexGeography&) = delete;
+  EncodedShapeIndexGeography& operator=(const EncodedShapeIndexGeography&) =
+      delete;
+  EncodedShapeIndexGeography(EncodedShapeIndexGeography&&) = default;
+  EncodedShapeIndexGeography& operator=(EncodedShapeIndexGeography&&) = default;
 
   void Decode(Decoder* decoder, const EncodeTag& tag);
 
