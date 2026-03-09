@@ -259,6 +259,26 @@ TEST(GeoArrowPointShape, ShapeIndexIntersection) {
   GeoArrowPointShape shape(point_geom.geom());
   EXPECT_EQ(shape.num_chains(), 1);
   ValidateShape(shape);
+
+  MutableS2ShapeIndex point_index;
+  point_index.Add(std::make_unique<GeoArrowPointShape>(point_geom.geom()));
+
+  WKTReader reader;
+  S2BooleanOperation::Options options;
+
+  // Polygon overlapping the first two points
+  auto poly_geog =
+      reader.read_feature("POLYGON ((-1 -1, 2 -1, 2 2, -1 2, -1 -1))");
+  ShapeIndexGeography poly_index(*poly_geog);
+  EXPECT_TRUE(S2BooleanOperation::Intersects(point_index,
+                                             poly_index.ShapeIndex(), options));
+
+  // Polygon far from all points
+  auto far_geog =
+      reader.read_feature("POLYGON ((80 80, 81 80, 81 81, 80 81, 80 80))");
+  ShapeIndexGeography far_index(*far_geog);
+  EXPECT_FALSE(S2BooleanOperation::Intersects(point_index,
+                                              far_index.ShapeIndex(), options));
 }
 
 TEST(GeoArrowLaxPolylineShape, DefaultConstructor) {
@@ -393,6 +413,29 @@ TEST(GeoArrowLaxPolylineShape, ShapeIndexIntersection) {
   GeoArrowLaxPolylineShape shape(line_geom.geom());
   EXPECT_EQ(shape.num_chains(), 4);
   ValidateShape(shape);
+
+  // Build a ShapeIndexGeography from a polygon that overlaps the lines
+  WKTReader reader;
+  auto poly_geog = reader.read_feature(
+      "POLYGON ((-0.5 -0.5, 0.5 -0.5, 0.5 0.5, "
+      "-0.5 0.5, -0.5 -0.5))");
+  ShapeIndexGeography poly_index(*poly_geog);
+
+  // Build a MutableS2ShapeIndex containing our shape
+  MutableS2ShapeIndex line_index;
+  line_index.Add(std::make_unique<GeoArrowLaxPolylineShape>(line_geom.geom()));
+
+  // Check intersection using S2BooleanOperation
+  S2BooleanOperation::Options options;
+  EXPECT_TRUE(S2BooleanOperation::Intersects(line_index,
+                                             poly_index.ShapeIndex(), options));
+
+  // Also check that a distant polygon does NOT intersect
+  auto far_geog =
+      reader.read_feature("POLYGON ((50 50, 51 50, 51 51, 50 51, 50 50))");
+  ShapeIndexGeography far_index(*far_geog);
+  EXPECT_FALSE(S2BooleanOperation::Intersects(line_index,
+                                              far_index.ShapeIndex(), options));
 }
 
 // --- GeoArrowLaxPolygonShape tests ---
@@ -520,6 +563,37 @@ TEST(GeoArrowLaxPolygonShape, ChainEdgeWrapsAround) {
   auto first_edge = shape.chain_edge(0, 0);
   // The last edge's endpoint should be the first edge's start
   EXPECT_EQ(last_edge.v1, first_edge.v0);
+}
+
+TEST(GeoArrowLaxPolygonShape, ShapeIndexContains) {
+  // Create a polygon with a hole
+  auto poly_geom = TestGeometry::FromWKT(
+      "POLYGON ((-10 -10, 10 -10, 10 10, -10 10, -10 -10), "
+      "(-5 -5, -5 5, 5 5, 5 -5, -5 -5))");
+
+  MutableS2ShapeIndex poly_index;
+  poly_index.Add(poly_geom.ToPolygonShape());
+
+  WKTReader reader;
+  S2BooleanOperation::Options options;
+
+  // Point inside the shell but outside the hole
+  auto shell_geog = reader.read_feature("POINT (8 8)");
+  ShapeIndexGeography shell_index(*shell_geog);
+  EXPECT_TRUE(S2BooleanOperation::Intersects(
+      poly_index, shell_index.ShapeIndex(), options));
+
+  // Point inside the hole should not intersect
+  auto hole_geog = reader.read_feature("POINT (0 0)");
+  ShapeIndexGeography hole_index(*hole_geog);
+  EXPECT_FALSE(S2BooleanOperation::Intersects(
+      poly_index, hole_index.ShapeIndex(), options));
+
+  // Point outside should not intersect
+  auto far_geog = reader.read_feature("POINT (50 50)");
+  ShapeIndexGeography far_index(*far_geog);
+  EXPECT_FALSE(S2BooleanOperation::Intersects(poly_index,
+                                              far_index.ShapeIndex(), options));
 }
 
 TEST(GeoArrowLaxPolygonShape, ShapeIndexContainsMultiPolygonWithHoles) {
