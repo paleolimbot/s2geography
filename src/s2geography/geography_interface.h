@@ -30,6 +30,7 @@ enum class GeographyKind {
   SHAPE_INDEX = 5,
   ENCODED_SHAPE_INDEX = 6,
   CELL_CENTER = 7,
+  GEOARROW = 8,
 };
 
 class EncodeOptions;

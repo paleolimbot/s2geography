@@ -1,10 +1,13 @@
 #pragma once
 
+#include <s2/mutable_s2shape_index.h>
 #include <s2/s2shape.h>
+#include <s2/s2shape_index.h>
 
 #include <vector>
 
 #include "geoarrow/geoarrow.hpp"
+#include "s2geography/geography_interface.h"
 
 namespace s2geography {
 
@@ -43,6 +46,9 @@ class GeoArrowPointShape : public S2Shape {
   /// Throws if geom neither a POINT nor a MULTIPOINT, or is a MULTIPOINT
   /// that contains EMPTY children.
   explicit GeoArrowPointShape(struct GeoArrowGeometryView geom);
+
+  /// \brief Reset internal state such that this shape represents zero edges
+  void Clear();
 
   /// \brief (Re)Initialize an existing shape
   ///
@@ -85,6 +91,9 @@ class GeoArrowLaxPolylineShape : public S2Shape {
   ///
   /// Throws if geom neither a LINESTRING nor a MULTILINESTRING.
   explicit GeoArrowLaxPolylineShape(struct GeoArrowGeometryView geom);
+
+  /// \brief Reset internal state such that this shape represents zero edges
+  void Clear();
 
   /// \brief (Re)initialize an existing linestring shape
   ///
@@ -138,6 +147,9 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   /// Throws if geometry is not a POLYGON or MULTIPOLYGON.
   explicit GeoArrowLaxPolygonShape(struct GeoArrowGeometryView geom);
 
+  /// \brief Reset internal state such that this shape represents zero edges
+  void Clear();
+
   /// \brief (Re)initialize a polygon shape
   ///
   /// Throws if geometry is not a POLYGON or MULTIPOLYGON.
@@ -174,6 +186,37 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   // Owned loops for O(1) lookup
   std::vector<struct GeoArrowGeometryNode> loops_;
   std::vector<S2Point> point_scratch_;
+};
+
+class GeoArrowGeography : public Geography {
+ public:
+  GeoArrowGeography() : Geography(GeographyKind::GEOARROW) {}
+
+  GeoArrowGeography(const GeoArrowGeography&) = delete;
+  GeoArrowGeography& operator=(const GeoArrowGeography&) = delete;
+  GeoArrowGeography(GeoArrowGeography&& other);
+
+  GeoArrowGeography& operator=(GeoArrowGeography&& other);
+
+  void Init(struct GeoArrowGeometryView geom);
+  void InitOriented(struct GeoArrowGeometryView geom);
+
+  const S2ShapeIndex& ShapeIndex() const;
+
+  int dimension() const override;
+  int num_shapes() const override;
+  std::unique_ptr<S2Shape> Shape(int id) const override;
+  std::unique_ptr<S2Region> Region() const override;
+  void Encode(Encoder* encoder, const EncodeOptions& options) const override;
+
+ private:
+  struct GeoArrowGeometryView geom_{};
+  GeoArrowPointShape points_;
+  GeoArrowLaxPolylineShape lines_;
+  GeoArrowLaxPolygonShape polygons_;
+  MutableS2ShapeIndex index_;
+
+  void AddShapesToIndex();
 };
 
 /// @}

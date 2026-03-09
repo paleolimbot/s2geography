@@ -680,3 +680,202 @@ TEST(GeoArrowLaxPolygonShape, BigEndianWKBPolygon) {
 
   ValidateShape(shape);
 }
+
+// --- GeoArrowGeography tests ---
+
+class GeoArrowGeographyTest : public ::testing::Test {
+ protected:
+  /// Helper: create a GeoArrowGeography from WKT backed by an owning
+  /// TestGeometry (stored in geoms_ so the memory outlives the geography).
+  GeoArrowGeography MakeGeography(std::string_view wkt, bool oriented = false) {
+    geoms_.push_back(TestGeometry::FromWKT(wkt));
+    GeoArrowGeography geog;
+
+    if (oriented) {
+      geog.InitOriented(geoms_.back().geom());
+    } else {
+      geog.Init(geoms_.back().geom());
+    }
+
+    return geog;
+  }
+
+  std::vector<TestGeometry> geoms_;
+};
+
+TEST_F(GeoArrowGeographyTest, DefaultConstructor) {
+  GeoArrowGeography geog;
+  EXPECT_EQ(geog.num_shapes(), 0);
+  EXPECT_EQ(geog.dimension(), -1);
+
+  auto point = MakeGeography("POINT (0 0)");
+  EXPECT_FALSE(
+      S2BooleanOperation::Intersects(geog.ShapeIndex(), point.ShapeIndex()));
+
+  auto region = geog.Region();
+  ASSERT_NE(region, nullptr);
+  EXPECT_FALSE(region->Contains(S2LatLng::FromDegrees(0, 0).ToPoint()));
+}
+
+TEST_F(GeoArrowGeographyTest, InitGeometryZeroNodes) {
+  GeoArrowGeography geog;
+  geog.Init({nullptr, 0});
+  EXPECT_EQ(geog.num_shapes(), 0);
+  EXPECT_EQ(geog.dimension(), -1);
+
+  auto point = MakeGeography("POINT (0 0)");
+  EXPECT_FALSE(
+      S2BooleanOperation::Intersects(geog.ShapeIndex(), point.ShapeIndex()));
+
+  auto region = geog.Region();
+  ASSERT_NE(region, nullptr);
+  EXPECT_FALSE(region->Contains(S2LatLng::FromDegrees(0, 0).ToPoint()));
+}
+
+TEST_F(GeoArrowGeographyTest, Point) {
+  auto geog = MakeGeography("POINT (1 2)");
+  EXPECT_EQ(geog.dimension(), 0);
+  EXPECT_EQ(geog.num_shapes(), 1);
+  EXPECT_EQ(geog.kind(), GeographyKind::GEOARROW);
+
+  auto shape = geog.Shape(0);
+  ASSERT_NE(shape, nullptr);
+  EXPECT_EQ(shape->dimension(), 0);
+  EXPECT_EQ(shape->num_edges(), 1);
+
+  EXPECT_GE(geog.ShapeIndex().num_shape_ids(), 1);
+}
+
+TEST_F(GeoArrowGeographyTest, MultiPoint) {
+  auto geog = MakeGeography("MULTIPOINT ((0 0), (1 1), (2 2))");
+  EXPECT_EQ(geog.dimension(), 0);
+  EXPECT_EQ(geog.num_shapes(), 1);
+
+  auto shape = geog.Shape(0);
+  ASSERT_NE(shape, nullptr);
+  EXPECT_EQ(shape->num_edges(), 3);
+}
+
+TEST_F(GeoArrowGeographyTest, EmptyPoint) {
+  auto geog = MakeGeography("POINT EMPTY");
+  EXPECT_EQ(geog.dimension(), 0);
+  EXPECT_EQ(geog.num_shapes(), 1);
+
+  auto shape = geog.Shape(0);
+  ASSERT_NE(shape, nullptr);
+  EXPECT_EQ(shape->num_edges(), 0);
+}
+
+TEST_F(GeoArrowGeographyTest, Linestring) {
+  auto geog = MakeGeography("LINESTRING (0 0, 1 1, 2 2)");
+  EXPECT_EQ(geog.dimension(), 1);
+  EXPECT_EQ(geog.num_shapes(), 1);
+
+  auto shape = geog.Shape(0);
+  ASSERT_NE(shape, nullptr);
+  EXPECT_EQ(shape->dimension(), 1);
+  EXPECT_EQ(shape->num_edges(), 2);
+}
+
+TEST_F(GeoArrowGeographyTest, MultiLinestring) {
+  auto geog = MakeGeography("MULTILINESTRING ((0 0, 1 1), (2 2, 3 3, 4 4))");
+  EXPECT_EQ(geog.dimension(), 1);
+  EXPECT_EQ(geog.num_shapes(), 1);
+
+  auto shape = geog.Shape(0);
+  ASSERT_NE(shape, nullptr);
+  EXPECT_EQ(shape->num_edges(), 3);  // 1 + 2
+}
+
+TEST_F(GeoArrowGeographyTest, Polygon) {
+  auto geog = MakeGeography("POLYGON ((0 0, 1 0, 0 1, 0 0))");
+  EXPECT_EQ(geog.dimension(), 2);
+  EXPECT_EQ(geog.num_shapes(), 1);
+
+  auto shape = geog.Shape(0);
+  ASSERT_NE(shape, nullptr);
+  EXPECT_EQ(shape->dimension(), 2);
+  EXPECT_EQ(shape->num_edges(), 3);
+}
+
+TEST_F(GeoArrowGeographyTest, MultiPolygon) {
+  auto geog = MakeGeography(
+      "MULTIPOLYGON (((0 0, 1 0, 0 1, 0 0)), "
+      "((10 10, 11 10, 10 11, 10 10)))");
+  EXPECT_EQ(geog.dimension(), 2);
+  EXPECT_EQ(geog.num_shapes(), 1);
+
+  auto shape = geog.Shape(0);
+  ASSERT_NE(shape, nullptr);
+  EXPECT_EQ(shape->num_edges(), 6);  // 3 + 3
+}
+
+TEST_F(GeoArrowGeographyTest, GeometryCollectionThrows) {
+  auto gc_geom = TestGeometry::FromWKT("GEOMETRYCOLLECTION (POINT (0 0))");
+  GeoArrowGeography geog;
+  EXPECT_THROW(geog.Init(gc_geom.geom()), Exception);
+}
+
+TEST_F(GeoArrowGeographyTest, RegionNotNull) {
+  auto geog = MakeGeography("POLYGON ((0 0, 1 0, 0 1, 0 0))");
+  auto region = geog.Region();
+  EXPECT_NE(region, nullptr);
+}
+
+TEST_F(GeoArrowGeographyTest, EncodeThrows) {
+  auto geog = MakeGeography("POINT (0 0)");
+  Encoder encoder;
+  EncodeOptions options;
+  EXPECT_THROW(geog.Encode(&encoder, options), Exception);
+}
+
+TEST_F(GeoArrowGeographyTest, ShapeIndexIntersection) {
+  auto points = MakeGeography("MULTIPOINT ((0 0), (1 1), (50 50))");
+
+  // Polygon overlapping the first two points
+  auto poly_near = MakeGeography("POLYGON ((-1 -1, 2 -1, 2 2, -1 2, -1 -1))");
+  EXPECT_TRUE(S2BooleanOperation::Intersects(points.ShapeIndex(),
+                                             poly_near.ShapeIndex()));
+
+  // Polygon far from all points
+  auto poly_far =
+      MakeGeography("POLYGON ((80 80, 81 80, 81 81, 80 81, 80 80))");
+  EXPECT_FALSE(S2BooleanOperation::Intersects(points.ShapeIndex(),
+                                              poly_far.ShapeIndex()));
+}
+
+TEST_F(GeoArrowGeographyTest, Region) {
+  auto geog = MakeGeography("POLYGON ((-1 -1, 2 -1, 2 2, -1 2, -1 -1))");
+  auto region = geog.Region();
+  EXPECT_TRUE(region->Contains(S2LatLng::FromDegrees(0, 0).ToPoint()));
+}
+
+TEST_F(GeoArrowGeographyTest, RegionReversedWinding) {
+  auto geog = MakeGeography("POLYGON ((-1 -1, -1 2, 2 2, 2 -1, -1 -1))");
+  auto region = geog.Region();
+  EXPECT_TRUE(region->Contains(S2LatLng::FromDegrees(0, 0).ToPoint()));
+
+  auto geog_oriented =
+      MakeGeography("POLYGON ((-1 -1, -1 2, 2 2, 2 -1, -1 -1))", true);
+  region = geog_oriented.Region();
+  EXPECT_FALSE(region->Contains(S2LatLng::FromDegrees(0, 0).ToPoint()));
+}
+
+TEST_F(GeoArrowGeographyTest, MoveConstructor) {
+  auto geog = MakeGeography("POLYGON ((-1 -1, 2 -1, 2 2, -1 2, -1 -1))");
+  auto point = MakeGeography("POINT (0 0)");
+
+  GeoArrowGeography moved(std::move(geog));
+  EXPECT_TRUE(
+      S2BooleanOperation::Intersects(moved.ShapeIndex(), point.ShapeIndex()));
+}
+
+TEST_F(GeoArrowGeographyTest, MoveAssignment) {
+  auto geog = MakeGeography("POLYGON ((-1 -1, 2 -1, 2 2, -1 2, -1 -1))");
+  auto point = MakeGeography("POINT (0 0)");
+
+  GeoArrowGeography assigned;
+  assigned = std::move(geog);
+  EXPECT_TRUE(S2BooleanOperation::Intersects(assigned.ShapeIndex(),
+                                             point.ShapeIndex()));
+}
