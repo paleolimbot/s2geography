@@ -409,6 +409,7 @@ class GeoArrowGeographyInputView {
   std::string GetCrs() { return type_.crs(); }
 
   void SetArray(const struct ArrowArray* array, int64_t num_rows) {
+    inner_.SetArray(array, num_rows);
     current_array_length_ = array->length;
     stashed_index_ = -1;
   }

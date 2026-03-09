@@ -84,14 +84,15 @@ bool s2_intersects_box(const ShapeIndexGeography& geog1,
 namespace sedona_udf {
 
 struct S2Intersects {
-  using arg0_t = GeographyIndexInputView;
-  using arg1_t = GeographyIndexInputView;
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
   using out_t = BoolOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    return s2_intersects(value0, value1, options_);
+    return S2BooleanOperation::Intersects(value0.ShapeIndex(),
+                                          value1.ShapeIndex(), options_);
   }
 
   S2BooleanOperation::Options options_;
