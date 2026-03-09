@@ -4,7 +4,7 @@
 #include <s2/s2earth.h>
 
 #include "s2geography/build.h"
-#include "s2geography/geography.h"
+#include "s2geography/geography_interface.h"
 #include "s2geography/sedona_udf/sedona_udf_internal.h"
 
 namespace s2geography {

@@ -15,8 +15,6 @@
 #include <s2/s2shape_index_region.h>
 #include <s2/s2shapeutil_coding.h>
 
-#include <sstream>
-
 #include "s2geography/geography_interface.h"
 #include "s2geography/macros.h"
 

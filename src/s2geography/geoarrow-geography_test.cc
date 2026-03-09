@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "geoarrow/geoarrow.hpp"
-#include "s2geography/geography.h"
+#include "s2geography/geography_interface.h"
 #include "s2geography/wkt-reader.h"
 
 using namespace s2geography;

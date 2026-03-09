@@ -7,7 +7,7 @@
 #include "s2/s1angle.h"
 #include "s2/s2projections.h"
 #include "s2geography/arrow_abi.h"
-#include "s2geography/geography.h"
+#include "s2geography/geography_interface.h"
 #include "s2geography/projections.h"
 
 namespace s2geography {

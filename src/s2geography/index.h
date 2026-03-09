@@ -3,7 +3,7 @@
 
 #include <unordered_set>
 
-#include "s2geography/geography.h"
+#include "s2geography/geography_interface.h"
 
 // S2ShapeIndex::CellRelation was renamed to S2CellRelation
 // in S2 version 0.11
