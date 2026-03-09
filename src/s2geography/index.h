@@ -1,6 +1,8 @@
 
 #pragma once
 
+#include <s2/mutable_s2shape_index.h>
+
 #include <unordered_set>
 
 #include "s2geography/geography_interface.h"

@@ -3,7 +3,6 @@
 
 #include <cstdlib>
 #include <cstring>
-#include <sstream>
 
 #include "s2geography/geoarrow.h"
 #include "s2geography/geography_interface.h"
