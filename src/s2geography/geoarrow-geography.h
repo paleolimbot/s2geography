@@ -1,8 +1,8 @@
 #pragma once
 
+#include <s2/mutable_s2shape_index.h>
 #include <s2/s2shape.h>
 #include <s2/s2shape_index.h>
-#include <s2/mutable_s2shape_index.h>
 
 #include <vector>
 
@@ -198,6 +198,7 @@ class GeoArrowGeography : public Geography {
   GeoArrowGeography& operator=(GeoArrowGeography&&) = default;
 
   void Init(struct GeoArrowGeometryView geom);
+  void InitOriented(struct GeoArrowGeometryView geom);
 
   const S2ShapeIndex& ShapeIndex() const;
 

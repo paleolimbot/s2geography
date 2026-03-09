@@ -402,6 +402,11 @@ S2Shape::TypeTag GeoArrowLaxPolygonShape::type_tag() const { return kTypeTag; }
 /// GeoArrowGeography
 
 void GeoArrowGeography::Init(struct GeoArrowGeometryView geom) {
+  InitOriented(geom);
+  polygons_.NormalizeOrientation();
+}
+
+void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
   points_.Clear();
   lines_.Clear();
   polygons_.Clear();
