@@ -2,10 +2,9 @@
 #pragma once
 
 #include <memory>
-#include <sstream>
 
 #include "s2geography/geoarrow.h"
-#include "s2geography/geography.h"
+#include "s2geography/geography_interface.h"
 
 namespace s2geography {
 

@@ -1,6 +1,7 @@
 
 #include "s2geography/geoarrow-geography.h"
 
+#include <s2/s2loop_measures.h>
 #include <s2/s2point.h>
 #include <s2/s2projections.h>
 #include <s2/s2shapeutil_get_reference_point.h>
@@ -9,7 +10,7 @@
 #include <cstring>
 #include <limits>
 
-#include "s2geography/geography.h"
+#include "s2geography/geography_interface.h"
 
 namespace s2geography {
 

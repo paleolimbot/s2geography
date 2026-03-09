@@ -84,7 +84,7 @@ struct S2LineInterpolatePointExec {
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    stashed_ = s2_interpolate_normalized(value0, value1);
+    stashed_ = PointGeography(s2_interpolate_normalized(value0, value1));
     return stashed_;
   }
 

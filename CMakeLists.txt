@@ -263,6 +263,7 @@ add_library(
   src/s2geography/distance.cc
   src/s2geography/geoarrow-geography.cc
   src/s2geography/geoarrow.cc
+  src/s2geography/geography_interface.cc
   src/s2geography/geography.cc
   src/s2geography/linear-referencing.cc
   src/s2geography/op/cell.cc
