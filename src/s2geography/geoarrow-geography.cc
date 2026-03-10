@@ -437,6 +437,7 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
   lines_.Clear();
   polygons_.Clear();
   index_.Clear();
+  covering_.clear();
   geom_ = geom;
 
   if (geom.size_nodes == 0) {
@@ -487,6 +488,14 @@ void GeoArrowGeography::GetCellUnionBound(
   }
 
   return Geography::GetCellUnionBound(cell_ids);
+}
+
+const std::vector<S2CellId>& GeoArrowGeography::GetStashedCovering() {
+  if (covering_.empty()) {
+    GetCellUnionBound(&covering_);
+  }
+
+  return covering_;
 }
 
 const S2ShapeIndex& GeoArrowGeography::ShapeIndex() const { return index_; }

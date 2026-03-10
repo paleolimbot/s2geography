@@ -201,6 +201,8 @@ class GeoArrowGeography : public Geography {
   void Init(struct GeoArrowGeometryView geom);
   void InitOriented(struct GeoArrowGeometryView geom);
 
+  const std::vector<S2CellId>& GetStashedCovering();
+
   const S2ShapeIndex& ShapeIndex() const;
 
   void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const override;
@@ -217,6 +219,7 @@ class GeoArrowGeography : public Geography {
   GeoArrowLaxPolylineShape lines_;
   GeoArrowLaxPolygonShape polygons_;
   MutableS2ShapeIndex index_;
+  std::vector<S2CellId> covering_;
 
   void AddShapesToIndex();
 };

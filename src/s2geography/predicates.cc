@@ -115,10 +115,17 @@ struct S2Intersects {
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    S2CellUnion::GetIntersection(value0.GetStashedCovering(),
+                                 value1.GetStashedCovering(), &intersection_);
+    if (intersection_.empty()) {
+      return false;
+    }
+
     return s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(), options_);
   }
 
   S2BooleanOperation::Options options_;
+  std::vector<S2CellId> intersection_;
 };
 
 struct S2Contains {
