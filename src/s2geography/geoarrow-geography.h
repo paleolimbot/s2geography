@@ -203,6 +203,8 @@ class GeoArrowGeography : public Geography {
 
   const S2ShapeIndex& ShapeIndex() const;
 
+  void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const override;
+
   int dimension() const override;
   int num_shapes() const override;
   std::unique_ptr<S2Shape> Shape(int id) const override;

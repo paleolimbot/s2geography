@@ -468,6 +468,27 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
   AddShapesToIndex();
 }
 
+void GeoArrowGeography::GetCellUnionBound(
+    std::vector<S2CellId>* cell_ids) const {
+  if (geom_.size_nodes == 0) {
+    return;
+  }
+
+  switch (geom_.root->geometry_type) {
+    case GEOARROW_GEOMETRY_TYPE_POINT:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+      if (points_.num_vertices() <= 100) {
+        for (int i = 0; i < points_.num_edges(); ++i) {
+          cell_ids->push_back(S2CellId(points_.vertex(i)));
+        }
+      }
+    default:
+      break;
+  }
+
+  return Geography::GetCellUnionBound(cell_ids);
+}
+
 const S2ShapeIndex& GeoArrowGeography::ShapeIndex() const { return index_; }
 
 int GeoArrowGeography::dimension() const {
