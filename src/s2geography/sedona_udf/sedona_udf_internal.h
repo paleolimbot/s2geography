@@ -440,7 +440,7 @@ class GeoArrowGeographyInputView {
       GEOARROW_THROW_NOT_OK(
           nullptr, GeoArrowWKBReaderRead(&reader_, src, &geom, nullptr));
 
-      stashed_.InitOriented(geom);
+      stashed_.Init(geom);
       stashed_index_ = i;
     }
   }
