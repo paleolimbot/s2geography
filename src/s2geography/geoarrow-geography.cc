@@ -468,7 +468,16 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
   AddShapesToIndex();
 }
 
-const S2ShapeIndex& GeoArrowGeography::ShapeIndex() const { return index_; }
+const S2ShapeIndex& GeoArrowGeography::ShapeIndex() const {
+  switch (geom_.root->geometry_type) {
+    case GEOARROW_GEOMETRY_TYPE_POINT:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+      return point_index_;
+      break;
+    default:
+      return index_;
+  }
+}
 
 int GeoArrowGeography::dimension() const {
   if (geom_.size_nodes == 0) {
@@ -544,8 +553,9 @@ void GeoArrowGeography::AddShapesToIndex() {
   switch (geom_.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
-      index_.Add(std::make_unique<S2ShapeWrapper>(&points_));
-      break;
+      point_index_.Init(&points_);
+      point_index_.Build();
+      return;
     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
     case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
       index_.Add(std::make_unique<S2ShapeWrapper>(&lines_));

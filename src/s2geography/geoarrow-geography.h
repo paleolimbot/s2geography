@@ -111,8 +111,8 @@ class GeoArrowPointShapeIndex : public S2ShapeIndex {
       Encoder encoder;
       encoder.Ensure(4 + n * 5);  // conservative
       if (n == 1) {
-        encoder.put_varint64(
-            static_cast<uint64>(cells_[start].second) << 3 | 1);
+        encoder.put_varint64(static_cast<uint64>(cells_[start].second) << 3 |
+                             1);
       } else {
         encoder.put_varint64(static_cast<uint64>(n) << 3 | 3);
         // EncodeEdges: delta-encoded with run-length
@@ -150,8 +150,7 @@ class GeoArrowPointShapeIndex : public S2ShapeIndex {
   int num_shape_ids() const override { return 1; }
   S2Shape* shape(int id) const override { return shape_; }
   size_t SpaceUsed() const override {
-    return sizeof(*this) +
-           sizeof(S2CellId) * cell_ids_.capacity() +
+    return sizeof(*this) + sizeof(S2CellId) * cell_ids_.capacity() +
            sizeof(S2ShapeIndexCell*) * index_cells_.capacity() +
            sizeof(std::pair<S2CellId, int>) * cells_.capacity();
   }
@@ -195,7 +194,7 @@ class GeoArrowPointShapeIndex : public S2ShapeIndex {
 
     void Seek(S2CellId target) override {
       pos_ = std::lower_bound(index_->cell_ids_.begin(),
-                               index_->cell_ids_.end(), target) -
+                              index_->cell_ids_.end(), target) -
              index_->cell_ids_.begin();
       Refresh();
     }
@@ -391,6 +390,7 @@ class GeoArrowGeography : public Geography {
   GeoArrowLaxPolylineShape lines_;
   GeoArrowLaxPolygonShape polygons_;
   MutableS2ShapeIndex index_;
+  GeoArrowPointShapeIndex point_index_;
 
   void AddShapesToIndex();
 };
