@@ -446,55 +446,6 @@ class GeoArrowGeographyInputView {
   }
 };
 
-/// \brief View of geometry index input
-///
-/// This is used for operations like the S2BooleanOperation that require
-/// a ShapeIndexGeometry as input. Like the GeographyInputView, we stash
-/// the decoded value to avoid decoding and indexing a scalar input more
-/// than once.
-class GeographyIndexInputView {
- public:
-  using c_type = const ShapeIndexGeography&;
-
-  static bool Matches(const struct ArrowSchema* type) {
-    return GeographyInputView::Matches(type);
-  }
-
-  GeographyIndexInputView(const struct ArrowSchema* type)
-      : inner_(type), stashed_index_(-1) {}
-  GeographyIndexInputView(const GeographyIndexInputView&) = delete;
-  GeographyIndexInputView& operator=(const GeographyIndexInputView&) = delete;
-
-  std::string GetCrs() { return inner_.GetCrs(); }
-
-  void SetArray(const struct ArrowArray* array, int64_t num_rows) {
-    stashed_index_ = -1;
-    inner_.SetArray(array, num_rows);
-    current_array_length_ = array->length;
-  }
-
-  bool IsNull(int64_t i) { return inner_.IsNull(i); }
-
-  const ShapeIndexGeography& Get(int64_t i) {
-    StashIfNeeded(i % current_array_length_);
-    return stashed_;
-  }
-
- private:
-  GeographyInputView inner_;
-  int64_t current_array_length_;
-  int64_t stashed_index_;
-  ShapeIndexGeography stashed_;
-
-  void StashIfNeeded(int64_t i) {
-    if (i != stashed_index_) {
-      const auto& geog = inner_.Get(i);
-      stashed_ = ShapeIndexGeography(geog);
-      stashed_index_ = i;
-    }
-  }
-};
-
 /// @}
 
 /// \defgroup sedona-kernel-adapters Sedona C Scalar Kernel Adapters
