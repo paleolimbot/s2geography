@@ -11,6 +11,7 @@
 #include <cstring>
 #include <limits>
 
+#include "s2/s2point_region.h"
 #include "s2geography/geography_interface.h"
 
 namespace s2geography {
@@ -594,6 +595,11 @@ std::unique_ptr<S2Shape> GeoArrowGeography::Shape(int id) const {
 }
 
 std::unique_ptr<S2Region> GeoArrowGeography::Region() const {
+  auto maybe_point = Point();
+  if (maybe_point) {
+    return std::make_unique<S2PointRegion>(*maybe_point);
+  }
+
   return std::make_unique<S2ShapeIndexRegion<MutableS2ShapeIndex>>(&index_);
 }
 
