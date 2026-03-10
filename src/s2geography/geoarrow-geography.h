@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "geoarrow/geoarrow.hpp"
+#include "s2/s2cell_index.h"
 #include "s2geography/geography_interface.h"
 
 namespace s2geography {
@@ -71,6 +72,39 @@ class GeoArrowPointShape : public S2Shape {
 
  private:
   struct GeoArrowGeometryView geom_{};
+};
+
+class GeoArrowPointShapeIndex : public S2ShapeIndex {
+ public:
+  void Init(GeoArrowPointShape* shape) {
+    cells_.resize(shape->num_edges());
+    int i = 0;
+
+    // Visit nodes
+
+    shape_ = shape;
+  }
+
+  void Build() { std::sort(cells_.begin(), cells_.end()); }
+
+  int num_shape_ids() const override { return 1; }
+  S2Shape* shape(int id) const override { return shape_; }
+  size_t SpaceUsed() const override {
+    return sizeof(*this) + sizeof(std::pair<S2CellId, int>) * cells_.capacity();
+  }
+  void Minimize() override {}
+
+ protected:
+  std::unique_ptr<IteratorBase> NewIterator(
+      InitialPosition pos) const override {
+    return nullptr;
+  }
+
+ private:
+  GeoArrowPointShape* shape_;
+  std::vector<std::pair<S2CellId, int>> cells_;
+
+  friend class GeoArrowPointShape;
 };
 
 /// \brief Linestring S2Shape implementation backed by a GeoArrowGeometryView
