@@ -142,17 +142,22 @@ struct S2Intersects {
 
     auto maybe_point0 = value0.Point();
     auto maybe_point1 = value1.Point();
-
-    auto region1 = value1.Region();
-    if (maybe_point0 && region1->MayIntersect(S2Cell(*maybe_point0))) {
-      return region1->Contains(*maybe_point0) ||
-             s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(), options_);
-    }
-
-    auto region0 = value0.Region();
-    if (maybe_point1 && region0->MayIntersect(S2Cell(*maybe_point1))) {
-      return region0->Contains(*maybe_point1) ||
-             s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(), options_);
+    if (maybe_point0 && maybe_point1) {
+      return maybe_point0->Normalize() == maybe_point1->Normalize();
+    } else if (maybe_point0) {
+      auto region1 = value1.Region();
+      if (region1->MayIntersect(S2Cell(*maybe_point0))) {
+        return region1->Contains(*maybe_point0) ||
+               s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(),
+                             options_);
+      }
+    } else if (maybe_point1) {
+      auto region0 = value0.Region();
+      if (region0->MayIntersect(S2Cell(*maybe_point1))) {
+        return region0->Contains(*maybe_point1) ||
+               s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(),
+                             options_);
+      }
     }
 
     S2CellUnion::GetIntersection(value0.StashedCovering(),

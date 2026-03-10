@@ -411,6 +411,7 @@ GeoArrowGeography::GeoArrowGeography(GeoArrowGeography&& other)
       index_() {
   // index_ needs to be rebuilt
   index_.Clear();
+  indexed_ = false;
 }
 
 GeoArrowGeography& GeoArrowGeography::operator=(GeoArrowGeography&& other) {
@@ -422,6 +423,7 @@ GeoArrowGeography& GeoArrowGeography::operator=(GeoArrowGeography&& other) {
     polygons_ = std::move(other.polygons_);
     // index_ needs to be rebuilt
     index_.Clear();
+    indexed_ = false;
   }
   return *this;
 }
@@ -531,7 +533,9 @@ std::optional<S2Point> GeoArrowGeography::Point() const {
   switch (geom_.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
-      return points_.edge(0).v0;
+      if (points_.num_edges() == 1) {
+        return points_.edge(0).v0;
+      }
     default:
       return std::nullopt;
   }
