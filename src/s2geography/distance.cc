@@ -13,8 +13,12 @@ namespace s2geography {
 
 double s2_distance(const ShapeIndexGeography& geog1,
                    const ShapeIndexGeography& geog2) {
-  S2ClosestEdgeQuery query(&geog1.ShapeIndex());
-  S2ClosestEdgeQuery::ShapeIndexTarget target(&geog2.ShapeIndex());
+  return s2_distance(geog1.ShapeIndex(), geog2.ShapeIndex());
+}
+
+double s2_distance(const S2ShapeIndex& geog1, const S2ShapeIndex& geog2) {
+  S2ClosestEdgeQuery query(&geog1);
+  S2ClosestEdgeQuery::ShapeIndexTarget target(&geog2);
 
   const auto& result = query.FindClosestEdge(&target);
 
@@ -24,8 +28,12 @@ double s2_distance(const ShapeIndexGeography& geog1,
 
 double s2_max_distance(const ShapeIndexGeography& geog1,
                        const ShapeIndexGeography& geog2) {
-  S2FurthestEdgeQuery query(&geog1.ShapeIndex());
-  S2FurthestEdgeQuery::ShapeIndexTarget target(&geog2.ShapeIndex());
+  return s2_max_distance(geog1.ShapeIndex(), geog2.ShapeIndex());
+}
+
+double s2_max_distance(const S2ShapeIndex& geog1, const S2ShapeIndex& geog2) {
+  S2FurthestEdgeQuery query(&geog1);
+  S2FurthestEdgeQuery::ShapeIndexTarget target(&geog2);
 
   const auto& result = query.FindFurthestEdge(&target);
 
@@ -38,11 +46,21 @@ S2Point s2_closest_point(const ShapeIndexGeography& geog1,
   return s2_minimum_clearance_line_between(geog1, geog2).first;
 }
 
+S2Point s2_closest_point(const S2ShapeIndex& geog1, const S2ShapeIndex& geog2) {
+  return s2_minimum_clearance_line_between(geog1, geog2).first;
+}
+
 std::pair<S2Point, S2Point> s2_minimum_clearance_line_between(
     const ShapeIndexGeography& geog1, const ShapeIndexGeography& geog2) {
-  S2ClosestEdgeQuery query1(&geog1.ShapeIndex());
+  return s2_minimum_clearance_line_between(geog1.ShapeIndex(),
+                                           geog2.ShapeIndex());
+}
+
+std::pair<S2Point, S2Point> s2_minimum_clearance_line_between(
+    const S2ShapeIndex& geog1, const S2ShapeIndex& geog2) {
+  S2ClosestEdgeQuery query1(&geog1);
   query1.mutable_options()->set_include_interiors(false);
-  S2ClosestEdgeQuery::ShapeIndexTarget target(&geog2.ShapeIndex());
+  S2ClosestEdgeQuery::ShapeIndexTarget target(&geog2);
 
   const auto& result1 = query1.FindClosestEdge(&target);
 
@@ -54,7 +72,7 @@ std::pair<S2Point, S2Point> s2_minimum_clearance_line_between(
   S2Shape::Edge edge1 = query1.GetEdge(result1);
 
   // Now find the edge from index2 (edge2) that is closest to edge1.
-  S2ClosestEdgeQuery query2(&geog2.ShapeIndex());
+  S2ClosestEdgeQuery query2(&geog2);
   query2.mutable_options()->set_include_interiors(false);
   S2ClosestEdgeQuery::EdgeTarget target2(edge1.v0, edge1.v1);
   auto result2 = query2.FindClosestEdge(&target2);
@@ -72,40 +90,58 @@ std::pair<S2Point, S2Point> s2_minimum_clearance_line_between(
 
 namespace sedona_udf {
 
-struct S2DistanceExec {
-  using arg0_t = GeographyIndexInputView;
-  using arg1_t = GeographyIndexInputView;
-  using out_t = DoubleOutputBuilder;
-
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
-  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    return s2_distance(value0, value1) * S2Earth::RadiusMeters();
-  }
-};
-
-struct S2MaxDistanceExec {
-  using arg0_t = GeographyIndexInputView;
-  using arg1_t = GeographyIndexInputView;
-  using out_t = DoubleOutputBuilder;
-
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
-  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    return s2_max_distance(value0, value1) * S2Earth::RadiusMeters();
-  }
-};
-
-struct S2ShortestLineExec {
-  using arg0_t = GeographyIndexInputView;
-  using arg1_t = GeographyIndexInputView;
+struct S2ClosestPointExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
   using out_t = WkbGeographyOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    std::pair<S2Point, S2Point> out =
-        s2_minimum_clearance_line_between(value0, value1);
+    S2Point out = s2_closest_point(value0.ShapeIndex(), value1.ShapeIndex());
+    stashed_ = PointGeography(out);
+    return stashed_;
+  }
+
+  PointGeography stashed_;
+};
+
+struct S2DistanceExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
+  using out_t = DoubleOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    return s2_distance(value0.ShapeIndex(), value1.ShapeIndex()) *
+           S2Earth::RadiusMeters();
+  }
+};
+
+struct S2MaxDistanceExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
+  using out_t = DoubleOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    return s2_max_distance(value0.ShapeIndex(), value1.ShapeIndex()) *
+           S2Earth::RadiusMeters();
+  }
+};
+
+struct S2ShortestLineExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
+  using out_t = WkbGeographyOutputBuilder;
+
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
+
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    std::pair<S2Point, S2Point> out = s2_minimum_clearance_line_between(
+        value0.ShapeIndex(), value1.ShapeIndex());
     stashed_ = PolylineGeography(std::make_unique<S2Polyline>(
         std::vector<S2Point>{out.first, out.second}, S2Debug::DISABLE));
     return stashed_;
@@ -113,6 +149,10 @@ struct S2ShortestLineExec {
 
   PolylineGeography stashed_;
 };
+
+void ClosestPointKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<S2ClosestPointExec>(out, "st_closestpoint");
+}
 
 void DistanceKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<S2DistanceExec>(out, "st_distance");

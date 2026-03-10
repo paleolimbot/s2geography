@@ -12,12 +12,21 @@ bool s2_intersects(const ShapeIndexGeography& geog1,
                    const ShapeIndexGeography& geog2,
                    const S2BooleanOperation::Options& options);
 
+bool s2_intersects(const S2ShapeIndex& geog1, const S2ShapeIndex& geog2,
+                   const S2BooleanOperation::Options& options);
+
 bool s2_equals(const ShapeIndexGeography& geog1,
                const ShapeIndexGeography& geog2,
                const S2BooleanOperation::Options& options);
 
+bool s2_equals(const S2ShapeIndex& geog1, const S2ShapeIndex& geog2,
+               const S2BooleanOperation::Options& options);
+
 bool s2_contains(const ShapeIndexGeography& geog1,
                  const ShapeIndexGeography& geog2,
+                 const S2BooleanOperation::Options& options);
+
+bool s2_contains(const S2ShapeIndex& geog1, const S2ShapeIndex& geog2,
                  const S2BooleanOperation::Options& options);
 
 bool s2_touches(const ShapeIndexGeography& geog1,
@@ -26,6 +35,10 @@ bool s2_touches(const ShapeIndexGeography& geog1,
 
 bool s2_intersects_box(const ShapeIndexGeography& geog1,
                        const S2LatLngRect& rect,
+                       const S2BooleanOperation::Options& options,
+                       double tolerance);
+
+bool s2_intersects_box(const S2ShapeIndex& geog1, const S2LatLngRect& rect,
                        const S2BooleanOperation::Options& options,
                        double tolerance);
 

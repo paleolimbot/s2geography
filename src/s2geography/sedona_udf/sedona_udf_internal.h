@@ -5,6 +5,7 @@
 #include "geoarrow/geoarrow.hpp"
 #include "nanoarrow/nanoarrow.hpp"
 #include "s2geography.h"
+#include "s2geography/geoarrow-geography.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
 
 namespace s2geography {
@@ -71,6 +72,8 @@ class ArrowOutputBuilder {
   using c_type = c_type_t;
 
   ArrowOutputBuilder() = default;
+  ArrowOutputBuilder(const ArrowOutputBuilder&) = delete;
+  ArrowOutputBuilder& operator=(const ArrowOutputBuilder&) = delete;
 
   void InitOutputType(struct ArrowSchema* out) {
     NANOARROW_THROW_NOT_OK(ArrowSchemaInitFromType(out, arrow_type_val));
@@ -132,6 +135,9 @@ class WkbGeographyOutputBuilder {
   WkbGeographyOutputBuilder() {
     writer_.Init(geoarrow::Writer::OutputType::kWKB, geoarrow::ExportOptions());
   }
+  WkbGeographyOutputBuilder(const WkbGeographyOutputBuilder&) = delete;
+  WkbGeographyOutputBuilder& operator=(const WkbGeographyOutputBuilder&) =
+      delete;
 
   void InitOutputType(struct ArrowSchema* out) {
     ::geoarrow::Wkb()
@@ -225,6 +231,19 @@ class ArrowInputView {
         default:
           return false;
       }
+    } else if constexpr (std::is_same_v<c_type_t, std::string_view>) {
+      switch (schema_view.type) {
+        case NANOARROW_TYPE_STRING:
+        case NANOARROW_TYPE_STRING_VIEW:
+        case NANOARROW_TYPE_LARGE_STRING:
+        case NANOARROW_TYPE_BINARY:
+        case NANOARROW_TYPE_BINARY_VIEW:
+        case NANOARROW_TYPE_LARGE_BINARY:
+          return true;
+
+        default:
+          return false;
+      }
     } else {
       static_assert(always_false<c_type>::value, "value type not supported");
     }
@@ -236,6 +255,8 @@ class ArrowInputView {
     NANOARROW_THROW_NOT_OK(
         ArrowArrayViewInitFromSchema(view_.get(), type, nullptr));
   }
+  ArrowInputView(const ArrowInputView&) = delete;
+  ArrowInputView& operator=(const ArrowInputView&) = delete;
 
   void SetArray(const struct ArrowArray* array, int64_t num_rows) {
     NANOARROW_THROW_NOT_OK(ArrowArrayViewSetArray(view_.get(), array, nullptr));
@@ -256,6 +277,11 @@ class ArrowInputView {
       return ArrowArrayViewGetIntUnsafe(view_.get(), i % view_->length);
     } else if constexpr (std::is_same_v<c_type, double>) {
       return ArrowArrayViewGetDoubleUnsafe(view_.get(), i % view_->length);
+    } else if constexpr (std::is_same_v<c_type_t, std::string_view>) {
+      struct ArrowBufferView val =
+          ArrowArrayViewGetBytesUnsafe(view_.get(), i % view_->length);
+      return std::string_view(val.data.as_char,
+                              static_cast<size_t>(val.size_bytes));
     } else {
       static_assert(always_false<c_type>::value, "value type not supported");
     }
@@ -301,6 +327,8 @@ class GeographyInputView {
     type_ = ::geoarrow::GeometryDataType::Make(type);
     reader_.Init(type);
   }
+  GeographyInputView(const GeographyInputView&) = delete;
+  GeographyInputView& operator=(const GeographyInputView&) = delete;
 
   std::string GetCrs() { return type_.crs(); }
 
@@ -335,48 +363,84 @@ class GeographyInputView {
   }
 };
 
-/// \brief View of geometry index input
+/// \brief View of GeoArrow input
 ///
-/// This is used for operations like the S2BooleanOperation that require
-/// a ShapeIndexGeometry as input. Like the GeographyInputView, we stash
-/// the decoded value to avoid decoding and indexing a scalar input more
-/// than once.
-class GeographyIndexInputView {
+/// This currently handles geoarrow.wkb arrays, although in theory can
+/// represent any GeoArrow type when supported by geoarrow-c.
+class GeoArrowGeographyInputView {
  public:
-  using c_type = const ShapeIndexGeography&;
+  using c_type = const GeoArrowGeography&;
 
   static bool Matches(const struct ArrowSchema* type) {
-    return GeographyInputView::Matches(type);
+    struct GeoArrowSchemaView schema_view;
+    int err_code = GeoArrowSchemaViewInit(&schema_view, type, nullptr);
+    if (err_code != GEOARROW_OK) {
+      return false;
+    }
+
+    // Only handles WKB for now
+    switch (schema_view.type) {
+      case GEOARROW_TYPE_WKB:
+      case GEOARROW_TYPE_WKB_VIEW:
+      case GEOARROW_TYPE_LARGE_WKB:
+        break;
+      default:
+        return false;
+    }
+
+    struct GeoArrowMetadataView metadata_view;
+    err_code = GeoArrowMetadataViewInit(
+        &metadata_view, schema_view.extension_metadata, nullptr);
+    return err_code == GEOARROW_OK &&
+           metadata_view.edge_type == GEOARROW_EDGE_TYPE_SPHERICAL;
   }
 
-  GeographyIndexInputView(const struct ArrowSchema* type)
-      : inner_(type), stashed_index_(-1) {}
+  GeoArrowGeographyInputView(const struct ArrowSchema* type)
+      : inner_(type), current_array_length_(1), stashed_index_(-1) {
+    type_ = ::geoarrow::GeometryDataType::Make(type);
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBReaderInit(&reader_));
+  }
+  GeoArrowGeographyInputView(const GeoArrowGeographyInputView&) = delete;
+  GeoArrowGeographyInputView& operator=(const GeoArrowGeographyInputView&) =
+      delete;
 
-  std::string GetCrs() { return inner_.GetCrs(); }
+  ~GeoArrowGeographyInputView() { GeoArrowWKBReaderReset(&reader_); }
+
+  std::string GetCrs() { return type_.crs(); }
 
   void SetArray(const struct ArrowArray* array, int64_t num_rows) {
-    stashed_index_ = -1;
     inner_.SetArray(array, num_rows);
     current_array_length_ = array->length;
+    stashed_index_ = -1;
   }
 
   bool IsNull(int64_t i) { return inner_.IsNull(i); }
 
-  const ShapeIndexGeography& Get(int64_t i) {
+  const GeoArrowGeography& Get(int64_t i) {
     StashIfNeeded(i % current_array_length_);
     return stashed_;
   }
 
  private:
-  GeographyInputView inner_;
+  ::geoarrow::GeometryDataType type_;
+  struct GeoArrowWKBReader reader_;
+  ArrowInputView<std::string_view> inner_;
   int64_t current_array_length_;
   int64_t stashed_index_;
-  ShapeIndexGeography stashed_;
+  GeoArrowGeography stashed_;
 
   void StashIfNeeded(int64_t i) {
     if (i != stashed_index_) {
-      const auto& geog = inner_.Get(i);
-      stashed_ = ShapeIndexGeography(geog);
+      std::string_view inner = inner_.Get(i);
+      struct GeoArrowBufferView src = {
+          reinterpret_cast<const uint8_t*>(inner.data()),
+          static_cast<int64_t>(inner.size())};
+
+      struct GeoArrowGeometryView geom{};
+      GEOARROW_THROW_NOT_OK(
+          nullptr, GeoArrowWKBReaderRead(&reader_, src, &geom, nullptr));
+
+      stashed_.Init(geom);
       stashed_index_ = i;
     }
   }

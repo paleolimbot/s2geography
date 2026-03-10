@@ -5,7 +5,6 @@
 #include <s2/s2edge_tessellator.h>
 #include <s2/s2lax_loop_shape.h>
 
-#include "s2geography/accessors.h"
 #include "s2geography/sedona_udf/sedona_udf_internal.h"
 
 namespace s2geography {
@@ -13,26 +12,45 @@ namespace s2geography {
 bool s2_intersects(const ShapeIndexGeography& geog1,
                    const ShapeIndexGeography& geog2,
                    const S2BooleanOperation::Options& options) {
-  return S2BooleanOperation::Intersects(geog1.ShapeIndex(), geog2.ShapeIndex(),
-                                        options);
+  return s2_intersects(geog1.ShapeIndex(), geog2.ShapeIndex(), options);
+}
+
+bool s2_intersects(const S2ShapeIndex& geog1, const S2ShapeIndex& geog2,
+                   const S2BooleanOperation::Options& options) {
+  return S2BooleanOperation::Intersects(geog1, geog2, options);
 }
 
 bool s2_equals(const ShapeIndexGeography& geog1,
                const ShapeIndexGeography& geog2,
                const S2BooleanOperation::Options& options) {
-  return S2BooleanOperation::Equals(geog1.ShapeIndex(), geog2.ShapeIndex(),
-                                    options);
+  return s2_equals(geog1.ShapeIndex(), geog2.ShapeIndex(), options);
+}
+
+bool s2_equals(const S2ShapeIndex& geog1, const S2ShapeIndex& geog2,
+               const S2BooleanOperation::Options& options) {
+  return S2BooleanOperation::Equals(geog1, geog2, options);
 }
 
 bool s2_contains(const ShapeIndexGeography& geog1,
                  const ShapeIndexGeography& geog2,
                  const S2BooleanOperation::Options& options) {
-  if (s2_is_empty(geog2)) {
+  return s2_contains(geog1.ShapeIndex(), geog2.ShapeIndex(), options);
+}
+
+bool s2_contains(const S2ShapeIndex& geog1, const S2ShapeIndex& geog2,
+                 const S2BooleanOperation::Options& options) {
+  if (geog2.num_shape_ids() == 0) {
     return false;
-  } else {
-    return S2BooleanOperation::Contains(geog1.ShapeIndex(), geog2.ShapeIndex(),
-                                        options);
   }
+
+  for (int i = 0; i < geog2.num_shape_ids(); i++) {
+    const S2Shape* shape = geog2.shape(i);
+    if (shape != nullptr && !shape->is_empty()) {
+      return S2BooleanOperation::Contains(geog1, geog2, options);
+    }
+  }
+
+  return false;
 }
 
 // Note that 'touches' can be implemented using:
@@ -51,6 +69,12 @@ bool s2_contains(const ShapeIndexGeography& geog1,
 
 bool s2_intersects_box(const ShapeIndexGeography& geog1,
                        const S2LatLngRect& rect,
+                       const S2BooleanOperation::Options& options,
+                       double tolerance) {
+  return s2_intersects_box(geog1.ShapeIndex(), rect, options, tolerance);
+}
+
+bool s2_intersects_box(const S2ShapeIndex& geog1, const S2LatLngRect& rect,
                        const S2BooleanOperation::Options& options,
                        double tolerance) {
   // 99% of this is making a S2Loop out of a S2LatLngRect
@@ -78,48 +102,48 @@ bool s2_intersects_box(const ShapeIndexGeography& geog1,
   MutableS2ShapeIndex index;
   index.Add(std::move(loop));
 
-  return S2BooleanOperation::Intersects(geog1.ShapeIndex(), index, options);
+  return S2BooleanOperation::Intersects(geog1, index, options);
 }
 
 namespace sedona_udf {
 
 struct S2Intersects {
-  using arg0_t = GeographyIndexInputView;
-  using arg1_t = GeographyIndexInputView;
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
   using out_t = BoolOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    return s2_intersects(value0, value1, options_);
+    return s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(), options_);
   }
 
   S2BooleanOperation::Options options_;
 };
 
 struct S2Contains {
-  using arg0_t = GeographyIndexInputView;
-  using arg1_t = GeographyIndexInputView;
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
   using out_t = BoolOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    return s2_contains(value0, value1, options_);
+    return s2_contains(value0.ShapeIndex(), value1.ShapeIndex(), options_);
   }
 
   S2BooleanOperation::Options options_;
 };
 
 struct S2Equals {
-  using arg0_t = GeographyIndexInputView;
-  using arg1_t = GeographyIndexInputView;
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
   using out_t = BoolOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    return s2_equals(value0, value1, options_);
+    return s2_equals(value0.ShapeIndex(), value1.ShapeIndex(), options_);
   }
 
   S2BooleanOperation::Options options_;

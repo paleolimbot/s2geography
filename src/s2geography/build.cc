@@ -436,8 +436,8 @@ namespace sedona_udf {
 
 template <S2BooleanOperation::OpType op_type>
 struct BooleanOperationExec {
-  using arg0_t = GeographyIndexInputView;
-  using arg1_t = GeographyIndexInputView;
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
   using out_t = WkbGeographyOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
