@@ -107,6 +107,27 @@ bool s2_intersects_box(const S2ShapeIndex& geog1, const S2LatLngRect& rect,
 
 namespace sedona_udf {
 
+namespace {
+bool ContainsPoint(GeoArrowGeography& lhs, GeoArrowGeography& rhs) {
+  if (rhs.num_shapes() != 1) {
+    return false;
+  }
+
+  auto rhs_shape = rhs.Shape(0);
+  if (rhs_shape->num_edges() != 1) {
+    return false;
+  }
+
+  auto rhs_edge = rhs_shape->edge(0);
+  if (!rhs_edge.IsDegenerate()) {
+    return false;
+  }
+
+  auto lhs_region = lhs.Region();
+  return lhs_region->Contains(rhs_edge.v0);
+}
+}  // namespace
+
 struct S2Intersects {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
@@ -115,10 +136,20 @@ struct S2Intersects {
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    S2CellUnion::GetIntersection(value0.GetStashedCovering(),
-                                 value1.GetStashedCovering(), &intersection_);
-    if (intersection_.empty()) {
+    if (value0.is_empty() || value1.is_empty()) {
       return false;
+    }
+
+    auto maybe_point0 = value0.Point();
+    if (maybe_point0) {
+      return value1.Region()->Contains(*maybe_point0) ||
+             s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(), options_);
+    }
+
+    auto maybe_point1 = value1.Point();
+    if (maybe_point1) {
+      return value1.Region()->Contains(*maybe_point0) ||
+             s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(), options_);
     }
 
     return s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(), options_);

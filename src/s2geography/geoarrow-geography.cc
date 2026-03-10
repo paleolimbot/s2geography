@@ -408,9 +408,8 @@ GeoArrowGeography::GeoArrowGeography(GeoArrowGeography&& other)
       lines_(std::move(other.lines_)),
       polygons_(std::move(other.polygons_)),
       index_() {
-  // Rebuild index_ so that any internal wrappers point to this object's
-  // members rather than to the moved-from object.
-  AddShapesToIndex();
+  // index_ needs to be rebuilt
+  index_.Clear();
 }
 
 GeoArrowGeography& GeoArrowGeography::operator=(GeoArrowGeography&& other) {
@@ -420,9 +419,8 @@ GeoArrowGeography& GeoArrowGeography::operator=(GeoArrowGeography&& other) {
     points_ = std::move(other.points_);
     lines_ = std::move(other.lines_);
     polygons_ = std::move(other.polygons_);
+    // index_ needs to be rebuilt
     index_.Clear();
-    // Rebuild index_ with wrappers bound to this object's members.
-    AddShapesToIndex();
   }
   return *this;
 }
@@ -438,6 +436,7 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
   polygons_.Clear();
   index_.Clear();
   covering_.clear();
+  indexed_ = false;
   geom_ = geom;
 
   if (geom.size_nodes == 0) {
@@ -465,8 +464,6 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
           "Can't create GeoArrowGeography from geometry type " +
           std::string(GeometryTypeString(geom.root->geometry_type)));
   }
-
-  AddShapesToIndex();
 }
 
 void GeoArrowGeography::GetCellUnionBound(
@@ -490,7 +487,7 @@ void GeoArrowGeography::GetCellUnionBound(
   return Geography::GetCellUnionBound(cell_ids);
 }
 
-const std::vector<S2CellId>& GeoArrowGeography::GetStashedCovering() {
+const std::vector<S2CellId>& GeoArrowGeography::StashedCovering() {
   if (covering_.empty()) {
     GetCellUnionBound(&covering_);
   }
@@ -498,7 +495,46 @@ const std::vector<S2CellId>& GeoArrowGeography::GetStashedCovering() {
   return covering_;
 }
 
-const S2ShapeIndex& GeoArrowGeography::ShapeIndex() const { return index_; }
+const S2ShapeIndex& GeoArrowGeography::ShapeIndex() {
+  AddShapesToIndexIfNeeded();
+  return index_;
+}
+
+bool GeoArrowGeography::is_empty() const {
+  if (geom_.size_nodes == 0) {
+    return true;
+  }
+
+  switch (geom_.root->geometry_type) {
+    case GEOARROW_GEOMETRY_TYPE_POINT:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+      return points_.is_empty();
+    case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+    case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
+      return lines_.is_empty();
+    case GEOARROW_GEOMETRY_TYPE_POLYGON:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
+      return polygons_.is_empty();
+    default:
+      for (int i = 0; i < num_shapes(); ++i) {
+        if (!Shape(i)->is_empty()) {
+          return false;
+        }
+      }
+
+      return true;
+  }
+}
+
+std::optional<S2Point> GeoArrowGeography::Point() const {
+  switch (geom_.root->geometry_type) {
+    case GEOARROW_GEOMETRY_TYPE_POINT:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+      return points_.edge(0).v0;
+    default:
+      return std::nullopt;
+  }
+}
 
 int GeoArrowGeography::dimension() const {
   if (geom_.size_nodes == 0) {
@@ -566,8 +602,8 @@ void GeoArrowGeography::Encode(Encoder* /*encoder*/,
   throw Exception("Encode() not implemented for GeoArrowGeography");
 }
 
-void GeoArrowGeography::AddShapesToIndex() {
-  if (geom_.size_nodes == 0) {
+void GeoArrowGeography::AddShapesToIndexIfNeeded() {
+  if (indexed_ || geom_.size_nodes == 0) {
     return;
   }
 
@@ -592,6 +628,8 @@ void GeoArrowGeography::AddShapesToIndex() {
           "Can't create index from geometry type " +
           std::string(GeometryTypeString(geom_.root->geometry_type)));
   }
+
+  indexed_ = true;
 }
 
 }  // namespace s2geography

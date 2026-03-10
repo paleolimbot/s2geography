@@ -201,12 +201,12 @@ class GeoArrowGeography : public Geography {
   void Init(struct GeoArrowGeometryView geom);
   void InitOriented(struct GeoArrowGeometryView geom);
 
-  const std::vector<S2CellId>& GetStashedCovering();
-
-  const S2ShapeIndex& ShapeIndex() const;
+  const std::vector<S2CellId>& StashedCovering();
+  const S2ShapeIndex& ShapeIndex();
+  std::optional<S2Point> Point() const;
+  bool is_empty() const;
 
   void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const override;
-
   int dimension() const override;
   int num_shapes() const override;
   std::unique_ptr<S2Shape> Shape(int id) const override;
@@ -220,8 +220,9 @@ class GeoArrowGeography : public Geography {
   GeoArrowLaxPolygonShape polygons_;
   MutableS2ShapeIndex index_;
   std::vector<S2CellId> covering_;
+  bool indexed_{};
 
-  void AddShapesToIndex();
+  void AddShapesToIndexIfNeeded();
 };
 
 /// @}
