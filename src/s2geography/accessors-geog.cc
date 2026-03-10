@@ -217,22 +217,6 @@ struct S2CentroidExec {
   PointGeography stashed_;
 };
 
-struct S2ClosestPointExec {
-  using arg0_t = GeographyIndexInputView;
-  using arg1_t = GeographyIndexInputView;
-  using out_t = WkbGeographyOutputBuilder;
-
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
-  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    S2Point out = s2_closest_point(value0, value1);
-    stashed_ = PointGeography(out);
-    return stashed_;
-  }
-
-  PointGeography stashed_;
-};
-
 struct S2ConvexHullExec {
   using arg0_t = GeographyInputView;
   using out_t = WkbGeographyOutputBuilder;
@@ -275,9 +259,6 @@ void PointOnSurfaceKernel(struct SedonaCScalarKernel* out) {
   InitUnaryKernel<S2PointOnSurfaceExec>(out, "st_pointonsurface");
 }
 
-void ClosestPointKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2ClosestPointExec>(out, "st_closestpoint");
-}
 }  // namespace sedona_udf
 
 }  // namespace s2geography

@@ -99,28 +99,30 @@ struct S2Intersects {
 };
 
 struct S2Contains {
-  using arg0_t = GeographyIndexInputView;
-  using arg1_t = GeographyIndexInputView;
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
   using out_t = BoolOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    return s2_contains(value0, value1, options_);
+    return S2BooleanOperation::Contains(value0.ShapeIndex(),
+                                        value1.ShapeIndex(), options_);
   }
 
   S2BooleanOperation::Options options_;
 };
 
 struct S2Equals {
-  using arg0_t = GeographyIndexInputView;
-  using arg1_t = GeographyIndexInputView;
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
   using out_t = BoolOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    return s2_equals(value0, value1, options_);
+    return S2BooleanOperation::Equals(value0.ShapeIndex(), value1.ShapeIndex(),
+                                      options_);
   }
 
   S2BooleanOperation::Options options_;
