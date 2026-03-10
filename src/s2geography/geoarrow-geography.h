@@ -4,10 +4,11 @@
 #include <s2/s2shape.h>
 #include <s2/s2shape_index.h>
 
+#include <algorithm>
 #include <vector>
 
 #include "geoarrow/geoarrow.hpp"
-#include "s2/s2cell_index.h"
+#include "s2/util/coding/coder.h"
 #include "s2geography/geography_interface.h"
 
 namespace s2geography {
@@ -76,6 +77,10 @@ class GeoArrowPointShape : public S2Shape {
 
 class GeoArrowPointShapeIndex : public S2ShapeIndex {
  public:
+  ~GeoArrowPointShapeIndex() override {
+    for (auto* cell : index_cells_) delete cell;
+  }
+
   void Init(GeoArrowPointShape* shape) {
     cells_.resize(shape->num_edges());
     int i = 0;
@@ -85,24 +90,161 @@ class GeoArrowPointShapeIndex : public S2ShapeIndex {
     shape_ = shape;
   }
 
-  void Build() { std::sort(cells_.begin(), cells_.end()); }
+  void Build() {
+    std::sort(cells_.begin(), cells_.end());
+
+    for (auto* cell : index_cells_) delete cell;
+    cell_ids_.clear();
+    index_cells_.clear();
+
+    size_t i = 0;
+    while (i < cells_.size()) {
+      S2CellId cellid = cells_[i].first;
+      cell_ids_.push_back(cellid);
+
+      // Collect sorted edge ids for this cell
+      size_t start = i;
+      while (i < cells_.size() && cells_[i].first == cellid) ++i;
+      int n = static_cast<int>(i - start);
+
+      // Encode the cell (num_shape_ids==1, contains_center=false)
+      Encoder encoder;
+      encoder.Ensure(4 + n * 5);  // conservative
+      if (n == 1) {
+        encoder.put_varint64(
+            static_cast<uint64>(cells_[start].second) << 3 | 1);
+      } else {
+        encoder.put_varint64(static_cast<uint64>(n) << 3 | 3);
+        // EncodeEdges: delta-encoded with run-length
+        int edge_id_base = 0;
+        for (size_t j = start; j < start + n;) {
+          int edge_id = cells_[j].second;
+          int delta = edge_id - edge_id_base;
+          if (j + 1 == start + n) {
+            encoder.put_varint32(delta);
+            ++j;
+          } else {
+            int count = 1;
+            while (j + count < start + n &&
+                   cells_[j + count].second == edge_id + count)
+              ++count;
+            if (count < 8) {
+              encoder.put_varint32(delta << 3 | (count - 1));
+            } else {
+              encoder.put_varint32((count - 8) << 3 | 7);
+              encoder.put_varint32(delta);
+            }
+            j += count;
+            edge_id_base = edge_id + count;
+          }
+        }
+      }
+
+      auto* cell = new S2ShapeIndexCell;
+      Decoder decoder(encoder.base(), encoder.length());
+      cell->Decode(1, &decoder);
+      index_cells_.push_back(cell);
+    }
+  }
 
   int num_shape_ids() const override { return 1; }
   S2Shape* shape(int id) const override { return shape_; }
   size_t SpaceUsed() const override {
-    return sizeof(*this) + sizeof(std::pair<S2CellId, int>) * cells_.capacity();
+    return sizeof(*this) +
+           sizeof(S2CellId) * cell_ids_.capacity() +
+           sizeof(S2ShapeIndexCell*) * index_cells_.capacity() +
+           sizeof(std::pair<S2CellId, int>) * cells_.capacity();
   }
   void Minimize() override {}
+
+  class Iterator final : public IteratorBase {
+   public:
+    Iterator() = default;
+
+    explicit Iterator(const GeoArrowPointShapeIndex* index,
+                      InitialPosition pos = UNPOSITIONED)
+        : index_(index), pos_(0) {
+      if (pos == BEGIN) {
+        Begin();
+      } else {
+        Finish();
+      }
+    }
+
+    void Begin() override {
+      pos_ = 0;
+      Refresh();
+    }
+
+    void Finish() override {
+      pos_ = index_->cell_ids_.size();
+      set_finished();
+    }
+
+    void Next() override {
+      ++pos_;
+      Refresh();
+    }
+
+    bool Prev() override {
+      if (pos_ == 0) return false;
+      --pos_;
+      Refresh();
+      return true;
+    }
+
+    void Seek(S2CellId target) override {
+      pos_ = std::lower_bound(index_->cell_ids_.begin(),
+                               index_->cell_ids_.end(), target) -
+             index_->cell_ids_.begin();
+      Refresh();
+    }
+
+    bool Locate(const S2Point& target) override {
+      return LocateImpl(*this, target);
+    }
+
+    S2CellRelation Locate(S2CellId target) override {
+      return LocateImpl(*this, target);
+    }
+
+   protected:
+    const S2ShapeIndexCell* GetCell() const override {
+      return index_->index_cells_[pos_];
+    }
+
+    std::unique_ptr<IteratorBase> Clone() const override {
+      return std::make_unique<Iterator>(*this);
+    }
+
+    void Copy(const IteratorBase& other) override {
+      *this = static_cast<const Iterator&>(other);
+    }
+
+   private:
+    void Refresh() {
+      if (pos_ >= index_->cell_ids_.size()) {
+        set_finished();
+      } else {
+        set_state(index_->cell_ids_[pos_], index_->index_cells_[pos_]);
+      }
+    }
+
+    const GeoArrowPointShapeIndex* index_ = nullptr;
+    size_t pos_ = 0;
+  };
 
  protected:
   std::unique_ptr<IteratorBase> NewIterator(
       InitialPosition pos) const override {
-    return nullptr;
+    return std::make_unique<Iterator>(this, pos);
   }
 
  private:
-  GeoArrowPointShape* shape_;
+  GeoArrowPointShape* shape_ = nullptr;
   std::vector<std::pair<S2CellId, int>> cells_;
+  std::vector<S2CellId> cell_ids_;
+  std::vector<S2ShapeIndexCell*> index_cells_;
 
   friend class GeoArrowPointShape;
 };
