@@ -479,10 +479,9 @@ void GeoArrowGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) {
         for (int i = 0; i < points_.num_edges(); ++i) {
           cell_ids->push_back(S2CellId(points_.vertex(i)));
         }
+        return;
       }
-
-      return;
-
+      break;
     default:
       break;
   }
