@@ -480,6 +480,9 @@ void GeoArrowGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) {
           cell_ids->push_back(S2CellId(points_.vertex(i)));
         }
       }
+
+      return;
+
     default:
       break;
   }
