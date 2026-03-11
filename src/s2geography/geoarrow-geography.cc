@@ -403,8 +403,7 @@ S2Shape::TypeTag GeoArrowLaxPolygonShape::type_tag() const { return kTypeTag; }
 /// GeoArrowGeography
 
 GeoArrowGeography::GeoArrowGeography(GeoArrowGeography&& other)
-    : Geography(std::move(other)),
-      geom_(other.geom_),
+    : geom_(other.geom_),
       points_(std::move(other.points_)),
       lines_(std::move(other.lines_)),
       polygons_(std::move(other.polygons_)),
@@ -416,7 +415,6 @@ GeoArrowGeography::GeoArrowGeography(GeoArrowGeography&& other)
 
 GeoArrowGeography& GeoArrowGeography::operator=(GeoArrowGeography&& other) {
   if (this != &other) {
-    Geography::operator=(std::move(other));
     geom_ = other.geom_;
     points_ = std::move(other.points_);
     lines_ = std::move(other.lines_);
@@ -469,9 +467,8 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
   }
 }
 
-void GeoArrowGeography::GetCellUnionBound(
-    std::vector<S2CellId>* cell_ids) const {
-  if (geom_.size_nodes == 0) {
+void GeoArrowGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) {
+  if (geom_.size_nodes == 0 || is_empty()) {
     return;
   }
 
@@ -487,7 +484,7 @@ void GeoArrowGeography::GetCellUnionBound(
       break;
   }
 
-  return Geography::GetCellUnionBound(cell_ids);
+  Region()->GetCellUnionBound(cell_ids);
 }
 
 const std::vector<S2CellId>& GeoArrowGeography::StashedCovering() {
@@ -499,7 +496,7 @@ const std::vector<S2CellId>& GeoArrowGeography::StashedCovering() {
 }
 
 const S2ShapeIndex& GeoArrowGeography::ShapeIndex() {
-  AddShapesToIndexIfNeeded();
+  InitIndex();
   return index_;
 }
 
@@ -557,7 +554,7 @@ int GeoArrowGeography::dimension() const {
     case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
       return 2;
     default:
-      return Geography::dimension();
+      return -1;
   }
 }
 
@@ -579,40 +576,36 @@ int GeoArrowGeography::num_shapes() const {
   }
 }
 
-std::unique_ptr<S2Shape> GeoArrowGeography::Shape(int id) const {
+const S2Shape* GeoArrowGeography::Shape(int id) const {
   switch (geom_.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
-      return std::make_unique<S2ShapeWrapper>(&points_);
+      return &points_;
 
     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
     case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
-      return std::make_unique<S2ShapeWrapper>(&lines_);
+      return &lines_;
 
     case GEOARROW_GEOMETRY_TYPE_POLYGON:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
-      return std::make_unique<S2ShapeWrapper>(&polygons_);
+      return &polygons_;
 
     default:
       throw Exception("unsupported geometry type");
   }
 }
 
-std::unique_ptr<S2Region> GeoArrowGeography::Region() const {
+std::unique_ptr<S2Region> GeoArrowGeography::Region() {
   auto maybe_point = Point();
   if (maybe_point) {
     return std::make_unique<S2PointRegion>(*maybe_point);
   }
 
+  InitIndex();
   return std::make_unique<S2ShapeIndexRegion<MutableS2ShapeIndex>>(&index_);
 }
 
-void GeoArrowGeography::Encode(Encoder* /*encoder*/,
-                               const EncodeOptions& /*options*/) const {
-  throw Exception("Encode() not implemented for GeoArrowGeography");
-}
-
-void GeoArrowGeography::AddShapesToIndexIfNeeded() {
+void GeoArrowGeography::InitIndex() {
   if (indexed_ || geom_.size_nodes == 0) {
     return;
   }

@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "geoarrow/geoarrow.hpp"
-#include "s2geography/geography_interface.h"
 
 namespace s2geography {
 
@@ -188,9 +187,9 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   std::vector<S2Point> point_scratch_;
 };
 
-class GeoArrowGeography : public Geography {
+class GeoArrowGeography {
  public:
-  GeoArrowGeography() : Geography(GeographyKind::GEOARROW) {}
+  GeoArrowGeography() = default;
 
   GeoArrowGeography(const GeoArrowGeography&) = delete;
   GeoArrowGeography& operator=(const GeoArrowGeography&) = delete;
@@ -203,15 +202,13 @@ class GeoArrowGeography : public Geography {
 
   const std::vector<S2CellId>& StashedCovering();
   const S2ShapeIndex& ShapeIndex();
+  std::unique_ptr<S2Region> Region();
+
   std::optional<S2Point> Point() const;
   bool is_empty() const;
-
-  void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const override;
-  int dimension() const override;
-  int num_shapes() const override;
-  std::unique_ptr<S2Shape> Shape(int id) const override;
-  std::unique_ptr<S2Region> Region() const override;
-  void Encode(Encoder* encoder, const EncodeOptions& options) const override;
+  int dimension() const;
+  int num_shapes() const;
+  const S2Shape* Shape(int id) const;
 
  private:
   struct GeoArrowGeometryView geom_{};
@@ -222,7 +219,8 @@ class GeoArrowGeography : public Geography {
   std::vector<S2CellId> covering_;
   bool indexed_{};
 
-  void AddShapesToIndexIfNeeded();
+  void InitIndex();
+  void GetCellUnionBound(std::vector<S2CellId>* cell_ids);
 };
 
 /// @}
