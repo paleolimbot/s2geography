@@ -107,27 +107,6 @@ bool s2_intersects_box(const S2ShapeIndex& geog1, const S2LatLngRect& rect,
 
 namespace sedona_udf {
 
-namespace {
-bool ContainsPoint(GeoArrowGeography& lhs, GeoArrowGeography& rhs) {
-  if (rhs.num_shapes() != 1) {
-    return false;
-  }
-
-  auto rhs_shape = rhs.Shape(0);
-  if (rhs_shape->num_edges() != 1) {
-    return false;
-  }
-
-  auto rhs_edge = rhs_shape->edge(0);
-  if (!rhs_edge.IsDegenerate()) {
-    return false;
-  }
-
-  auto lhs_region = lhs.Region();
-  return lhs_region->Contains(rhs_edge.v0);
-}
-}  // namespace
-
 struct S2Intersects {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
@@ -136,10 +115,14 @@ struct S2Intersects {
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    // If either argument is EMPTY, the result is FALSE
     if (value0.is_empty() || value1.is_empty()) {
       return false;
     }
 
+    // The containment test for a S2Point is ~20x faster than building an index
+    // containing exactly one point for every element so we try very hard to
+    // avoid it.
     auto maybe_point0 = value0.Point();
     auto maybe_point1 = value1.Point();
     if (maybe_point0 && maybe_point1) {
@@ -160,6 +143,15 @@ struct S2Intersects {
              s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(), options_);
     }
 
+    // We could consider special casing more things here. S2Geometry special cases
+    // loops with less than 32 vertices to avoid building an index which is likely
+    // worth doing here based on some heuristics for other geometry types too.
+
+    // Next we try a covering intersection check. This is very cheap if an index
+    // has already been built. In the event that an index does have to be built
+    // to build the covering, it is effectively reused in the actual s2_intersection()
+    // check. This is 2x faster than an intersection check for selective
+    // point-in-polygon queries but may need to be reevaluted.
     S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
                                  &intersection_);
     if (intersection_.empty()) {
