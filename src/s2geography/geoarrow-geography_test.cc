@@ -859,7 +859,7 @@ TEST_F(GeoArrowGeographyTest, Region) {
 
   // Point regions are specialized to make them less expensive to create
   auto geog_point = MakeGeography("POINT (0 0)");
-  auto point_region = geog.Region();
+  auto point_region = geog_point.Region();
   EXPECT_TRUE(point_region->Contains(S2LatLng::FromDegrees(0, 0).ToPoint()));
 }
 
