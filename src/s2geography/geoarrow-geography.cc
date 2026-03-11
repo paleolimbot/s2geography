@@ -407,6 +407,7 @@ GeoArrowGeography::GeoArrowGeography(GeoArrowGeography&& other)
       points_(std::move(other.points_)),
       lines_(std::move(other.lines_)),
       polygons_(std::move(other.polygons_)),
+      covering_(std::move(other.covering_)),
       index_() {
   // index_ needs to be rebuilt
   index_.Clear();
@@ -419,6 +420,7 @@ GeoArrowGeography& GeoArrowGeography::operator=(GeoArrowGeography&& other) {
     points_ = std::move(other.points_);
     lines_ = std::move(other.lines_);
     polygons_ = std::move(other.polygons_);
+    covering_ = std::move(other.covering_);
     // index_ needs to be rebuilt
     index_.Clear();
     indexed_ = false;
@@ -475,7 +477,7 @@ void GeoArrowGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) {
   switch (geom_.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
-      if (points_.num_vertices() <= 100) {
+      if (points_.num_vertices() <= 32) {
         for (int i = 0; i < points_.num_edges(); ++i) {
           cell_ids->push_back(S2CellId(points_.vertex(i)));
         }
