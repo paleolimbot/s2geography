@@ -487,7 +487,7 @@ void GeoArrowGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) {
   Region()->GetCellUnionBound(cell_ids);
 }
 
-const std::vector<S2CellId>& GeoArrowGeography::StashedCovering() {
+const std::vector<S2CellId>& GeoArrowGeography::Covering() {
   if (covering_.empty()) {
     GetCellUnionBound(&covering_);
   }

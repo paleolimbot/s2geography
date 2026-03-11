@@ -187,27 +187,81 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   std::vector<S2Point> point_scratch_;
 };
 
+/// \brief Reusable Geography-like wrapper around a GeoArrowGeometryNode
+///
+/// This class is conceptually a union of zero or more of the
+/// GeoArrowPointShape, GeoArrowLaxPolylineShape, and/or the
+/// GeoArrowLaxPolygonShape. It is not currently a subclass of Geography because
+/// it intentionally defers creating its index and provides a few other features
+/// specifically targeted at rapid iteration over many GeoArrowGeometryViews
+/// (this makes it difficult to comply with the const requirements of the
+/// Geography which aren't necessary here).
 class GeoArrowGeography {
  public:
+  /// \brief Create an empty geography
   GeoArrowGeography() = default;
 
   GeoArrowGeography(const GeoArrowGeography&) = delete;
   GeoArrowGeography& operator=(const GeoArrowGeography&) = delete;
   GeoArrowGeography(GeoArrowGeography&& other);
-
   GeoArrowGeography& operator=(GeoArrowGeography&& other);
 
+  /// \brief (Re)Initialize this Geography from a GeoArrowGeometryView
+  ///
+  /// If this view contains polygons, the internals will ensure that shells are
+  /// treated as shells and holes are treated as holes regardless of winding
+  /// direction.
   void Init(struct GeoArrowGeometryView geom);
+
+  /// \brief (Re)Initialize this Geography from a GeoArrowGeometryView
+  ///
+  /// If this view contains polygons, the internals will assume that the winding
+  /// order is the sole determinant of containment.
   void InitOriented(struct GeoArrowGeometryView geom);
 
-  const std::vector<S2CellId>& StashedCovering();
+  /// \brief A collection of cells that completely cover this geography
+  ///
+  /// This may be used with S2CellUnion utilities to check potential
+  /// containment. This is lazily computed and may incur building an index. For
+  /// Small point or multipoint geographies this will not incur the cost of
+  /// building an index.
+  const std::vector<S2CellId>& Covering();
+
+  /// \brief Return a S2ShapeIndex representation of this geography
+  ///
+  /// This index is lazy: it will not be created until potentially this call,
+  /// and will not be built until it is queried (see MutableS2ShapeIndex). Note
+  /// that building an index of a small geography is comparatively very costly
+  /// to brute force iteration if that is an option for a given algorithm.
   const S2ShapeIndex& ShapeIndex();
+
+  /// \brief Return a Region representation of this geography
+  ///
+  /// This region is lazy: it will not be created until potentially this call.
+  /// For (single) point geographies the implementation avoids creating or
+  /// building an index.
   std::unique_ptr<S2Region> Region();
 
+  /// \brief If this geography represents a single point, compute and return it
+  ///
+  /// This allows callers to use potentially much faster implmentations of
+  /// various algorithms that take an S2Point.
   std::optional<S2Point> Point() const;
+
+  /// \brief Returns true if this geography has no edges
   bool is_empty() const;
+
+  /// \brief Returns the dimension (0 for point, 1 for linestring, 2 for polygon), or
+  /// -1 for geometry collections
   int dimension() const;
+
+  /// \brief The number of shapes
+  ///
+  /// This is usually one (exactly one of the point, line, or polygon shape
+  /// classes) but may be higher for geometrycollections.
   int num_shapes() const;
+
+  /// \brief Retreive a shape
   const S2Shape* Shape(int id) const;
 
  private:
