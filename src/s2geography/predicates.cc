@@ -160,8 +160,8 @@ struct S2Intersects {
              s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(), options_);
     }
 
-    S2CellUnion::GetIntersection(value0.Covering(),
-                                 value1.Covering(), &intersection_);
+    S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
+                                 &intersection_);
     if (intersection_.empty()) {
       return false;
     }

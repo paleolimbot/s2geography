@@ -244,15 +244,15 @@ class GeoArrowGeography {
 
   /// \brief If this geography represents a single point, compute and return it
   ///
-  /// This allows callers to use potentially much faster implmentations of
+  /// This allows callers to use potentially much faster implementations of
   /// various algorithms that take an S2Point.
   std::optional<S2Point> Point() const;
 
   /// \brief Returns true if this geography has no edges
   bool is_empty() const;
 
-  /// \brief Returns the dimension (0 for point, 1 for linestring, 2 for polygon), or
-  /// -1 for geometry collections
+  /// \brief Returns the dimension (0 for point, 1 for linestring, 2 for
+  /// polygon), or -1 for geometry collections
   int dimension() const;
 
   /// \brief The number of shapes
@@ -261,7 +261,7 @@ class GeoArrowGeography {
   /// classes) but may be higher for geometrycollections.
   int num_shapes() const;
 
-  /// \brief Retreive a shape
+  /// \brief Retrieve a shape
   const S2Shape* Shape(int id) const;
 
  private:
