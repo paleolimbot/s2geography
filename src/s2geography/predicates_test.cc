@@ -171,8 +171,9 @@ INSTANTIATE_TEST_SUITE_P(
         ScalarScalarParam{"boundary_point_intersects_polygon", "POINT (0 0)",
                           "intersects", "POLYGON ((0 0, 2 0, 0 2, 0 0))", true},
         // Boundary point x polygon
-        ScalarScalarParam{"polygon_intersects_boundary_point", "POINT (0 0)",
-                          "intersects", "POLYGON ((0 0, 2 0, 0 2, 0 0))", true},
+        ScalarScalarParam{"polygon_intersects_boundary_point",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "intersects",
+                          "POINT (0 0)", true},
 
         // Polygon in polygon
         ScalarScalarParam{"polygon_intersects_polygon",
