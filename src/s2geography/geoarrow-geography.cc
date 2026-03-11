@@ -527,6 +527,10 @@ bool GeoArrowGeography::is_empty() const {
 }
 
 std::optional<S2Point> GeoArrowGeography::Point() const {
+  if (geom_.size_nodes == 0) {
+    return std::nullopt;
+  }
+
   switch (geom_.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:

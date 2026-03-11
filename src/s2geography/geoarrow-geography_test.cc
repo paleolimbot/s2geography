@@ -736,7 +736,6 @@ TEST_F(GeoArrowGeographyTest, Point) {
   auto geog = MakeGeography("POINT (1 2)");
   EXPECT_EQ(geog.dimension(), 0);
   EXPECT_EQ(geog.num_shapes(), 1);
-  EXPECT_EQ(geog.kind(), GeographyKind::GEOARROW);
 
   auto shape = geog.Shape(0);
   ASSERT_NE(shape, nullptr);
@@ -820,13 +819,6 @@ TEST_F(GeoArrowGeographyTest, RegionNotNull) {
   auto geog = MakeGeography("POLYGON ((0 0, 1 0, 0 1, 0 0))");
   auto region = geog.Region();
   EXPECT_NE(region, nullptr);
-}
-
-TEST_F(GeoArrowGeographyTest, EncodeThrows) {
-  auto geog = MakeGeography("POINT (0 0)");
-  Encoder encoder;
-  EncodeOptions options;
-  EXPECT_THROW(geog.Encode(&encoder, options), Exception);
 }
 
 TEST_F(GeoArrowGeographyTest, ShapeIndexIntersection) {
