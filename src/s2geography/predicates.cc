@@ -155,7 +155,7 @@ struct S2Intersects {
     // has already been built. In the event that an index does have to be built
     // to build the covering, it is effectively reused in the actual
     // s2_intersection() check. This is 2x faster than an intersection check for
-    // selective point-in-polygon queries but may need to be reevaluted.
+    // selective point-in-polygon queries but may need to be reevaluated.
     S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
                                  &intersection_);
     if (intersection_.empty()) {
