@@ -145,19 +145,23 @@ struct S2Intersects {
     if (maybe_point0 && maybe_point1) {
       return maybe_point0->Normalize() == maybe_point1->Normalize();
     } else if (maybe_point0) {
+      // ShapeIndex() must be called first to populate the index; Region()
+      // wraps &index_ which would otherwise be empty.
+      const auto& index1 = value1.ShapeIndex();
       auto region1 = value1.Region();
-      if (region1->MayIntersect(S2Cell(*maybe_point0))) {
-        return region1->Contains(*maybe_point0) ||
-               s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(),
-                             options_);
+      if (!region1->MayIntersect(S2Cell(*maybe_point0))) {
+        return false;
       }
+      return region1->Contains(*maybe_point0) ||
+             s2_intersects(value0.ShapeIndex(), index1, options_);
     } else if (maybe_point1) {
+      const auto& index0 = value0.ShapeIndex();
       auto region0 = value0.Region();
-      if (region0->MayIntersect(S2Cell(*maybe_point1))) {
-        return region0->Contains(*maybe_point1) ||
-               s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(),
-                             options_);
+      if (!region0->MayIntersect(S2Cell(*maybe_point1))) {
+        return false;
       }
+      return region0->Contains(*maybe_point1) ||
+             s2_intersects(index0, value1.ShapeIndex(), options_);
     }
 
     S2CellUnion::GetIntersection(value0.StashedCovering(),
