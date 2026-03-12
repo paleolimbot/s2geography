@@ -244,7 +244,7 @@ struct S2Equals {
 
   bool GeographyIdentical(GeoArrowGeography& value0,
                           GeoArrowGeography& value1) {
-    if (value0.num_shapes() != value1.num_shapes() == 1) {
+    if (value0.num_shapes() != value1.num_shapes()) {
       return false;
     }
 
@@ -278,20 +278,24 @@ struct S2Equals {
         continue;
       }
 
-      S2Shape::Edge lhs_e = lhs->chain_edge(i, 0);
-      S2Shape::Edge rhs_e = rhs->chain_edge(i, 0);
-      S2Point lhs_v0 = lhs_e.v0;
-      S2Point rhs_v0 = rhs_e.v0;
-      if (lhs_v0 != rhs_v0) {
-        return false;
-      }
-
-      for (int j = 1; j < chain_lhs.length; j++) {
+      S2Shape::Edge lhs_e, rhs_e;
+      S2Point lhs_v, rhs_v;
+      for (int j = 0; j < chain_lhs.length; j++) {
         lhs_e = lhs->chain_edge(i, j);
         rhs_e = rhs->chain_edge(i, j);
-        S2Point lhs_v1 = lhs_e.v1;
-        S2Point rhs_v1 = rhs_e.v1;
-        if (lhs_v1 != rhs_v1) {
+
+        // Only for the first edge: check the start point
+        if (j == 0) {
+          lhs_v = lhs_e.v0;
+          rhs_v = rhs_e.v0;
+          if (lhs_v != rhs_v) {
+            return false;
+          }
+        }
+
+        lhs_v = lhs_e.v1;
+        rhs_v = rhs_e.v1;
+        if (lhs_v != rhs_v) {
           return false;
         }
       }
