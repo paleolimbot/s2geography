@@ -78,6 +78,22 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
   }
 }
 
+template <typename Visit>
+void VisitEdges(const struct GeoArrowGeometryNode* node, Visit&& visit) {
+  if (node->size < 2) {
+    return;
+  }
+
+  S2Shape::Edge e;
+  VisitLngLat(node, 0, node->size - 1, [&](double lng0, double lat0) {
+    VisitLngLat(node, 1, node->size, [&](double lng1, double lat1) {
+      e.v0 = S2LatLng::FromDegrees(lat0, lng0).ToPoint();
+      e.v1 = S2LatLng::FromDegrees(lat1, lng1).ToPoint();
+      visit(e);
+    });
+  });
+}
+
 bool AllLngLatNaN(struct GeoArrowGeometryView geom) {
   bool out = true;
   VisitNodes(geom, [&](const struct GeoArrowGeometryNode* node) {
@@ -105,6 +121,41 @@ const char* GeometryTypeString(uint8_t geometry_type) {
 }
 
 }  // namespace
+
+double GeoArrowChain::GetLength() const {
+  S1Angle length = S1Angle::Zero();
+  VisitEdges(node_,
+             [&](const S2Shape::Edge& e) { length += S1Angle(e.v0, e.v1); });
+  return length.radians();
+}
+
+double GeoArrowLoop::GetSignedArea() {
+  BuildScratch();
+  return S2::GetSignedArea(S2PointLoopSpan(*scratch_));
+}
+
+S2Point GeoArrowLoop::GetCentroid() {
+  BuildScratch();
+  return S2::GetCentroid(S2PointLoopSpan(*scratch_));
+}
+
+double GeoArrowLoop::GetCurvature() {
+  BuildScratch();
+  return S2::GetCurvature(S2PointLoopSpan(*scratch_));
+}
+
+double GeoArrowLoop::GetCurvatureMaxError() {
+  BuildScratch();
+  return S2::GetCurvatureMaxError(S2PointLoopSpan(*scratch_));
+}
+
+void GeoArrowLoop::BuildScratch() {
+  if (scratch_->empty()) {
+    VisitLngLat(node_, 0, node_->size, [&](double lng, double lat) {
+      scratch_->push_back(S2LatLng::FromDegrees(lat, lng).ToPoint());
+    });
+  }
+}
 
 GeoArrowPointShape::GeoArrowPointShape(struct GeoArrowGeometryView geom) {
   Init(geom);
@@ -358,14 +409,10 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
 
 void GeoArrowLaxPolygonShape::NormalizeOrientation() {
   for (auto& node : loops_) {
-    point_scratch_.clear();
-    VisitLngLat(&node, 0, node.size, [&](double lng, double lat) {
-      point_scratch_.push_back(S2LatLng::FromDegrees(lat, lng).ToPoint());
-    });
-
-    double signed_area = S2::GetSignedArea(S2PointLoopSpan(point_scratch_));
+    GeoArrowLoop loop(&node, &point_scratch_);
+    double curvature = loop.GetCurvature();
     bool is_hole = (node.flags & kFlagS2GeographyIsHole) != 0;
-    if (is_hole != (signed_area < 0)) {
+    if (is_hole != (curvature < 0)) {
       ReverseNodeInPlace(&node);
     }
   }

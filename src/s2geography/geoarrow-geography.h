@@ -26,6 +26,39 @@ namespace s2geography {
 ///
 /// @{
 
+class GeoArrowChain {
+ public:
+  explicit GeoArrowChain(const struct GeoArrowGeometryNode* node)
+      : node_(node) {}
+
+  double GetLength() const;
+
+ protected:
+  const struct GeoArrowGeometryNode* node_{};
+};
+
+class GeoArrowLoop : public GeoArrowChain {
+ public:
+  explicit GeoArrowLoop(const struct GeoArrowGeometryNode* node,
+                        std::vector<S2Point>* scratch)
+      : GeoArrowChain(node), scratch_(scratch) {
+    scratch_->clear();
+  }
+
+  double GetSignedArea();
+
+  S2Point GetCentroid();
+
+  double GetCurvature();
+
+  double GetCurvatureMaxError();
+
+ protected:
+  std::vector<S2Point>* scratch_{};
+
+  void BuildScratch();
+};
+
 /// \brief Point S2Shape implementation backed by a GeoArrowGeometryView
 ///
 /// This shape represents zero or more points and can be initialized
