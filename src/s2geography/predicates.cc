@@ -224,6 +224,11 @@ struct S2Equals {
   }
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    // Empties equal each other regardless of exactly how they are empty
+    if (value0.is_empty() && value1.is_empty()) {
+      return true;
+    }
+
     if (GeographyIdentical(value0, value1)) {
       return true;
     }

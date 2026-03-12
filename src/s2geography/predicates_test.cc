@@ -246,6 +246,16 @@ INSTANTIATE_TEST_SUITE_P(
         ScalarScalarParam{"null_equals_null", std::nullopt, "equals",
                           std::nullopt, std::nullopt},
 
+        // Empties
+        ScalarScalarParam{"equals_empty", "POINT (0 0)", "equals",
+                          "POINT EMPTY", false},
+        ScalarScalarParam{"empty_equals", "POINT EMPTY", "equals",
+                          "POINT (0 0)", false},
+        ScalarScalarParam{"empty_point_equals_empty_point", "POINT EMPTY", "equals",
+                          "POINT EMPTY", true},
+        ScalarScalarParam{"empty_point_equals_empty_linestring", "POINT EMPTY", "equals",
+                          "LINESTRING EMPTY", true},
+
         // Fast path for identical values
         ScalarScalarParam{"polygon_equals_identical_polygon",
                           "POLYGON ((0 0, 1 0, 0 1, 0 0))", "equals",
