@@ -151,6 +151,12 @@ INSTANTIATE_TEST_SUITE_P(
                           std::nullopt, std::nullopt},
 
         // Intersects cases that take one of the faster paths
+        // Empties
+        ScalarScalarParam{"intersects_empty", "POINT (0 0)", "intersects",
+                          "POINT EMPTY", false},
+        ScalarScalarParam{"empty_intersects", "POINT EMPTY", "intersects",
+                          "POINT (0 0)", false},
+
         // Point x polygon
         ScalarScalarParam{"polygon_intersects_point",
                           "POLYGON ((0 0, 2 0, 0 2, 0 0))", "intersects",
@@ -180,19 +186,104 @@ INSTANTIATE_TEST_SUITE_P(
                           "POLYGON ((0 0, 2 0, 0 2, 0 0))", "intersects",
                           "POLYGON ((0 0, 1 0, 0 1, 0 0))", true},
 
-        // Other predicates (currently there are no special cases here)
+        // Contains
+        // Nulls
+        ScalarScalarParam{"null_contains", std::nullopt, "contains",
+                          "POINT EMPTY", std::nullopt},
+        ScalarScalarParam{"contains_null", "POINT EMPTY", "contains",
+                          std::nullopt, std::nullopt},
+        ScalarScalarParam{"null_contains_null", std::nullopt, "contains",
+                          std::nullopt, std::nullopt},
+
+        // Contains cases that take one of the faster paths
+        // Empties
+        ScalarScalarParam{"contains_empty", "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                          "contains", "POINT EMPTY", false},
+        ScalarScalarParam{"empty_contains", "POINT EMPTY", "contains",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", false},
+
+        // Polygon contains interior point
         ScalarScalarParam{"polygon_contains_point",
                           "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
                           "POINT (0.25 0.25)", true},
-        ScalarScalarParam{"polygon_not_contains_point",
+        // Point does not contain anything
+        ScalarScalarParam{"point_not_contains_polygon", "POINT (0.25 0.25)",
+                          "contains", "POLYGON ((0 0, 2 0, 0 2, 0 0))", false},
+        // Point definitely not in polygon (outside the covering)
+        ScalarScalarParam{"polygon_not_contains_distant_point",
                           "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
-                          "POINT (-1 -1)", false},
+                          "POINT (-30 -30)", false},
+        // Point definitely not in polygon (probably inside the covering)
+        ScalarScalarParam{"polygon_not_contains_close_point",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
+                          "POINT (1.01 1.01)", false},
+        // Polygon does not contain boundary point
+        ScalarScalarParam{"polygon_not_contains_boundary_point",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
+                          "POINT (0 0)", false},
+
+        // Polygon contains interior sub-polygon
+        ScalarScalarParam{
+            "polygon_contains_polygon", "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            "contains", "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))", true},
+
+        // Polygon does not contain interior sub-polygon with shared boundary
+        ScalarScalarParam{"polygon_does_not_contain_polygon_boundary",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
+                          "POLYGON ((0 0, 0.5 0, 0 0.5, 0 0))", false},
+
+        // Interior polygon does not contain Polygon
+        ScalarScalarParam{"polygon_does_not_contain_polygon",
+                          "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
+                          "contains", "POLYGON ((0 0, 2 0, 0 2, 0 0))", false},
+
+        // Equals
+        // Nulls
+        ScalarScalarParam{"null_equals", std::nullopt, "equals", "POINT EMPTY",
+                          std::nullopt},
+        ScalarScalarParam{"equals_null", "POINT EMPTY", "equals", std::nullopt,
+                          std::nullopt},
+        ScalarScalarParam{"null_equals_null", std::nullopt, "equals",
+                          std::nullopt, std::nullopt},
+
+        // Empties
+        ScalarScalarParam{"equals_empty", "POINT (0 0)", "equals",
+                          "POINT EMPTY", false},
+        ScalarScalarParam{"empty_equals", "POINT EMPTY", "equals",
+                          "POINT (0 0)", false},
+        ScalarScalarParam{"empty_point_equals_empty_point", "POINT EMPTY",
+                          "equals", "POINT EMPTY", true},
+        ScalarScalarParam{"empty_point_equals_empty_linestring", "POINT EMPTY",
+                          "equals", "LINESTRING EMPTY", true},
+
+        // Fast path for identical values
+        ScalarScalarParam{"polygon_equals_identical_polygon",
+                          "POLYGON ((0 0, 1 0, 0 1, 0 0))", "equals",
+                          "POLYGON ((0 0, 1 0, 0 1, 0 0))", true},
+
+        // Rotated vertices
         ScalarScalarParam{"polygon_equals_polygon",
                           "POLYGON ((0 0, 1 0, 0 1, 0 0))", "equals",
                           "POLYGON ((1 0, 0 1, 0 0, 1 0))", true},
-        ScalarScalarParam{"polygon_not_equals_polygon",
+
+        // Potentially intersecting but not equal
+        ScalarScalarParam{"polygon_not_equals_close_polygon",
                           "POLYGON ((0 0, 1 0, 0 1, 0 0))", "equals",
-                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", false}
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", false},
+        // Not at all intersecting and not equal
+        ScalarScalarParam{"polygon_not_equals_distant_polygon",
+                          "POLYGON ((0 0, 1 0, 0 1, 0 0))", "equals",
+                          "POLYGON ((30 30, 32 30, 30 32, 30 30))", false},
+
+        // Different number of chains
+        ScalarScalarParam{"polygon_not_equals_chains_ne",
+                          "MULTIPOLYGON (((0 0, 1 0, 0 1, 0 0)), ((10 10, 11 "
+                          "10, 10 11, 10 10)))",
+                          "equals", "POLYGON ((0 0, 2 0, 0 2, 0 0))", false},
+        // Different number of edges
+        ScalarScalarParam{"polygon_not_equals_edges_ne",
+                          "POLYGON ((0 0, 1 0, 0 1, 0 0))", "equals",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 1, 0 0))", false}
 
         ),
     [](const ::testing::TestParamInfo<ScalarScalarParam>& info) {
