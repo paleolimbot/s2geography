@@ -1,6 +1,7 @@
 #pragma once
 
 #include <s2/mutable_s2shape_index.h>
+#include <s2/s2latlng.h>
 #include <s2/s2shape.h>
 #include <s2/s2shape_index.h>
 
@@ -287,38 +288,7 @@ class GeoArrowGeography {
   void GetCellUnionBound(std::vector<S2CellId>* cell_ids);
 };
 
-class GeoArrowChain {
- public:
-  explicit GeoArrowChain(const struct GeoArrowGeometryNode* node)
-      : node_(node) {}
-
-  double GetLength() const;
-
- protected:
-  const struct GeoArrowGeometryNode* node_{};
-};
-
-class GeoArrowLoop : public GeoArrowChain {
- public:
-  explicit GeoArrowLoop(const struct GeoArrowGeometryNode* node,
-                        std::vector<S2Point>* scratch)
-      : GeoArrowChain(node), scratch_(scratch) {
-    scratch_->clear();
-  }
-
-  double GetSignedArea();
-
-  S2Point GetCentroid();
-
-  double GetCurvature();
-
-  double GetCurvatureMaxError();
-
- protected:
-  std::vector<S2Point>* scratch_{};
-
-  void BuildScratch();
-};
+namespace internal {
 
 template <typename Visit>
 void VisitGeoArrowNodes(struct GeoArrowGeometryView geom, Visit&& visit) {
@@ -332,6 +302,136 @@ void VisitGeoArrowNodes(struct GeoArrowGeometryView geom, Visit&& visit) {
     visit(node);
   }
 }
+
+template <typename Visit>
+void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
+                 int64_t n, Visit&& visit) {
+  const uint8_t* lngs = node->coords[0] + offset * node->coord_stride[0];
+  const uint8_t* lats = node->coords[1] + offset * node->coord_stride[1];
+  double lng, lat;
+
+  if (node->flags & GEOARROW_GEOMETRY_NODE_FLAG_SWAP_ENDIAN) {
+    uint64_t tmp;
+    for (int64_t i = 0; i < n; ++i) {
+      memcpy(&tmp, lngs, sizeof(double));
+      tmp = GEOARROW_BSWAP64(tmp);
+      memcpy(&lng, &tmp, sizeof(double));
+
+      memcpy(&tmp, lats, sizeof(double));
+      tmp = GEOARROW_BSWAP64(tmp);
+      memcpy(&lat, &tmp, sizeof(double));
+      visit(lng, lat);
+
+      lngs += node->coord_stride[0];
+      lats += node->coord_stride[1];
+    }
+  } else {
+    for (int64_t i = 0; i < n; ++i) {
+      memcpy(&lng, lngs, sizeof(double));
+      memcpy(&lat, lats, sizeof(double));
+      visit(lng, lat);
+
+      lngs += node->coord_stride[0];
+      lats += node->coord_stride[1];
+    }
+  }
+}
+
+template <typename Visit>
+void VisitVertices(const struct GeoArrowGeometryNode* node, Visit&& visit) {
+  if (node->size < 2) {
+    return;
+  }
+
+  VisitLngLat(node, 0, node->size, [&](double lng0, double lat0) {
+    visit(S2LatLng::FromDegrees(lat0, lng0).ToPoint());
+  });
+}
+
+template <typename Visit>
+void VisitEdges(const struct GeoArrowGeometryNode* node, Visit&& visit) {
+  if (node->size < 2) {
+    return;
+  }
+
+  S2Shape::Edge e;
+  VisitLngLat(node, 0, node->size - 1, [&](double lng0, double lat0) {
+    VisitLngLat(node, 1, node->size, [&](double lng1, double lat1) {
+      e.v0 = S2LatLng::FromDegrees(lat0, lng0).ToPoint();
+      e.v1 = S2LatLng::FromDegrees(lat1, lng1).ToPoint();
+      visit(e);
+    });
+  });
+}
+
+}  // namespace internal
+
+class GeoArrowChain {
+ public:
+  explicit GeoArrowChain(const struct GeoArrowGeometryNode* node)
+      : node_(node) {}
+
+  template <typename Visit>
+  void VisitVertices(Visit&& visit) {
+    internal::VisitVertices(node_, visit);
+  }
+
+  template <typename Visit>
+  void VisitEdges(Visit&& visit) {
+    internal::VisitEdges(node_, visit);
+  }
+
+ protected:
+  const struct GeoArrowGeometryNode* node_{};
+};
+
+class GeoArrowLoop : public GeoArrowChain {
+ public:
+  explicit GeoArrowLoop(const struct GeoArrowGeometryNode* node,
+                        std::vector<S2Point>* scratch)
+      : GeoArrowChain(node), scratch_(scratch) {
+    scratch_->clear();
+  }
+
+  double GetCurvature();
+
+ protected:
+  std::vector<S2Point>* scratch_{};
+
+  void BuildScratch();
+};
+
+class GeoArrowGeom {
+ public:
+  explicit GeoArrowGeom(struct GeoArrowGeometryView geom) : geom_(geom) {}
+
+  template <typename Visit>
+  void VisitChains(Visit&& visit) {
+    internal::VisitGeoArrowNodes(geom_, [&](struct GeoArrowGeometryNode* node) {
+      visit(GeoArrowChain(node));
+    });
+  }
+
+  template <typename Visit>
+  void VisitLoops(std::vector<S2Point>* scratch, Visit&& visit) {
+    internal::VisitGeoArrowNodes(geom_, [&](struct GeoArrowGeometryNode* node) {
+      visit(GeoArrowLoop(node, scratch));
+    });
+  }
+
+  template <typename Visit>
+  void VisitVertices(Visit&& visit) {
+    VisitChains([&](GeoArrowChain chain) { chain.VisitVertices(visit); });
+  }
+
+  template <typename Visit>
+  void VisitEdges(Visit&& visit) {
+    VisitChains([&](GeoArrowChain chain) { chain.VisitEdges(visit); });
+  }
+
+ private:
+  struct GeoArrowGeometryView geom_;
+};
 
 /// @}
 
