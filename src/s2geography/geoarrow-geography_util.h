@@ -71,12 +71,18 @@ void VisitEdges(const struct GeoArrowGeometryNode* node, Visit&& visit) {
   }
 
   S2Shape::Edge e;
-  VisitLngLat(node, 0, node->size - 1, [&](double lng0, double lat0) {
-    VisitLngLat(node, 1, node->size, [&](double lng1, double lat1) {
-      e.v0 = S2LatLng::FromDegrees(lat0, lng0).ToPoint();
-      e.v1 = S2LatLng::FromDegrees(lat1, lng1).ToPoint();
-      visit(e);
-    });
+  double prev_lng, prev_lat;
+  VisitLngLat(node, 0, 1, [&](double lng, double lat) {
+    prev_lng = lng;
+    prev_lat = lat;
+  });
+
+  VisitLngLat(node, 1, node->size - 1, [&](double lng, double lat) {
+    e.v0 = S2LatLng::FromDegrees(prev_lat, prev_lng).ToPoint();
+    e.v1 = S2LatLng::FromDegrees(lat, lng).ToPoint();
+    visit(e);
+    prev_lng = lng;
+    prev_lat = lat;
   });
 }
 
@@ -138,15 +144,29 @@ class GeoArrowGeom {
   void VisitChains(Visit&& visit) {
     internal::VisitGeoArrowNodes(geom_,
                                  [&](const struct GeoArrowGeometryNode* node) {
-                                   visit(GeoArrowChain(node));
+                                   switch (node->geometry_type) {
+                                     case GEOARROW_GEOMETRY_TYPE_POINT:
+                                     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+                                       visit(GeoArrowChain(node));
+                                       break;
+                                     default:
+                                       break;
+                                   }
                                  });
   }
 
   template <typename Visit>
   void VisitLoops(std::vector<S2Point>* scratch, Visit&& visit) {
-    internal::VisitGeoArrowNodes(geom_, [&](struct GeoArrowGeometryNode* node) {
-      visit(GeoArrowLoop(node, scratch));
-    });
+    internal::VisitGeoArrowNodes(geom_,
+                                 [&](const struct GeoArrowGeometryNode* node) {
+                                   switch (node->geometry_type) {
+                                     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+                                       visit(GeoArrowLoop(node, scratch));
+                                       break;
+                                     default:
+                                       break;
+                                   }
+                                 });
   }
 
   template <typename Visit>

@@ -146,6 +146,120 @@ void ValidateShape(const S2Shape& shape) {
   }
 }
 
+// GeoArrowGeom / GeoArrowChain / GeoArrowLoop primitive tests
+
+TEST(GeoArrowGeom, VisitPoint) {
+  auto geom = TestGeometry::FromWKT("POINT (1 2)");
+  GeoArrowGeom g(geom.geom());
+
+  std::vector<S2Point> vertices;
+  g.VisitVertices([&](const S2Point& p) { vertices.push_back(p); });
+  ASSERT_EQ(vertices.size(), 1);
+  EXPECT_EQ(vertices[0], S2LatLng::FromDegrees(2, 1).ToPoint());
+}
+
+TEST(GeoArrowGeom, VisitVerticesLineString) {
+  auto geom = TestGeometry::FromWKT("LINESTRING (0 0, 1 1, 2 2)");
+  GeoArrowGeom g(geom.geom());
+
+  std::vector<S2Point> vertices;
+  g.VisitVertices([&](const S2Point& p) { vertices.push_back(p); });
+  ASSERT_EQ(vertices.size(), 3);
+  EXPECT_EQ(vertices[0], S2LatLng::FromDegrees(0, 0).ToPoint());
+  EXPECT_EQ(vertices[1], S2LatLng::FromDegrees(1, 1).ToPoint());
+  EXPECT_EQ(vertices[2], S2LatLng::FromDegrees(2, 2).ToPoint());
+}
+
+TEST(GeoArrowGeom, VisitEdgesLineString) {
+  auto geom = TestGeometry::FromWKT("LINESTRING (0 0, 1 1, 2 2)");
+  GeoArrowGeom g(geom.geom());
+
+  std::vector<S2Shape::Edge> edges;
+  g.VisitEdges([&](const S2Shape::Edge& e) { edges.push_back(e); });
+  ASSERT_EQ(edges.size(), 2);
+  EXPECT_EQ(edges[0].v0, S2LatLng::FromDegrees(0, 0).ToPoint());
+  EXPECT_EQ(edges[0].v1, S2LatLng::FromDegrees(1, 1).ToPoint());
+  EXPECT_EQ(edges[1].v0, S2LatLng::FromDegrees(1, 1).ToPoint());
+  EXPECT_EQ(edges[1].v1, S2LatLng::FromDegrees(2, 2).ToPoint());
+}
+
+TEST(GeoArrowGeom, VisitEdgesSingleVertex) {
+  auto geom = TestGeometry::FromWKT("POINT (5 10)");
+  GeoArrowGeom g(geom.geom());
+
+  int count = 0;
+  g.VisitEdges([&](const S2Shape::Edge&) { ++count; });
+  EXPECT_EQ(count, 0);
+}
+
+TEST(GeoArrowGeom, VisitChainsMultiLineString) {
+  auto geom =
+      TestGeometry::FromWKT("MULTILINESTRING ((0 0, 1 1), (2 2, 3 3, 4 4))");
+
+  GeoArrowGeom g(geom.geom());
+  std::vector<uint32_t> chain_sizes;
+  g.VisitChains(
+      [&](GeoArrowChain chain) { chain_sizes.push_back(chain.size()); });
+  ASSERT_EQ(chain_sizes.size(), 2);
+  EXPECT_EQ(chain_sizes[0], 2);
+  EXPECT_EQ(chain_sizes[1], 3);
+}
+
+TEST(GeoArrowGeom, VisitChainsEmpty) {
+  auto geom = TestGeometry::FromWKT("LINESTRING EMPTY");
+  // An empty linestring still has one node with size 0
+  GeoArrowGeom g(geom.geom());
+
+  int count = 0;
+  g.VisitChains([&](GeoArrowChain chain) {
+    EXPECT_EQ(chain.size(), 0);
+    ++count;
+  });
+  EXPECT_EQ(count, 1);
+}
+
+TEST(GeoArrowGeom, VisitLoopsPolygon) {
+  auto geom = TestGeometry::FromWKT("POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))");
+  GeoArrowGeom g(geom.geom());
+
+  std::vector<S2Point> scratch;
+  int loop_count = 0;
+  g.VisitLoops(&scratch, [&](GeoArrowLoop loop) {
+    ++loop_count;
+    EXPECT_EQ(loop.size(), 5);
+  });
+  EXPECT_EQ(loop_count, 1);
+}
+
+TEST(GeoArrowGeom, VisitEdgesPolygon) {
+  // Polygon ring with 5 coords (including closing vertex) / 4 edges
+  auto geom = TestGeometry::FromWKT("POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))");
+  GeoArrowGeom g(geom.geom());
+
+  std::vector<S2Shape::Edge> edges;
+  g.VisitEdges([&](const S2Shape::Edge& e) { edges.push_back(e); });
+  ASSERT_EQ(edges.size(), 4);
+
+  // First edge: (0,0) / (10,0)
+  EXPECT_EQ(edges[0].v0, S2LatLng::FromDegrees(0, 0).ToPoint());
+  EXPECT_EQ(edges[0].v1, S2LatLng::FromDegrees(0, 10).ToPoint());
+  // Last edge: (0,10) / (0,0)
+  EXPECT_EQ(edges[3].v0, S2LatLng::FromDegrees(10, 0).ToPoint());
+  EXPECT_EQ(edges[3].v1, S2LatLng::FromDegrees(0, 0).ToPoint());
+}
+
+TEST(GeoArrowGeom, DefaultConstructor) {
+  GeoArrowGeom g;
+  EXPECT_EQ(g.size(), 0);
+  EXPECT_EQ(g.root(), nullptr);
+
+  int count = 0;
+  g.VisitVertices([&](const S2Point&) { ++count; });
+  EXPECT_EQ(count, 0);
+}
+
+// Shape tests
+
 TEST(GeoArrowPointShape, DefaultConstructor) {
   GeoArrowPointShape shape;
   EXPECT_EQ(shape.num_edges(), 0);

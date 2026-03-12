@@ -289,12 +289,9 @@ class GeoArrowGeography {
 
   template <typename Visit>
   void VisitEdges(Visit&& visit) {
-    points()->geom().VisitEdges(
-        [&](GeoArrowChain chain) { chain.VisitEdges(visit); });
-    lines()->geom().VisitEdges(
-        [&](GeoArrowChain chain) { chain.VisitEdges(visit); });
-    polygons()->geom().VisitEdges(
-        [&](GeoArrowChain chain) { chain.VisitEdges(visit); });
+    points()->geom().VisitEdges(visit);
+    lines()->geom().VisitEdges(visit);
+    polygons()->geom().VisitEdges(visit);
   }
 
  private:
