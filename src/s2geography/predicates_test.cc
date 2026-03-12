@@ -86,25 +86,6 @@ TEST(Predicates, SedonaUdfContainsScalarArray) {
                                           {true, false, std::nullopt}));
 }
 
-TEST(Predicates, EmptyDebug) {
-  struct SedonaCScalarKernel kernel;
-  struct SedonaCScalarKernelImpl impl;
-  s2geography::sedona_udf::EqualsKernel(&kernel);
-
-  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
-      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
-
-  nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
-      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
-      {{"POINT EMPTY"}, {"POINT EMPTY"}}, {}, out_array.get()));
-  impl.release(&impl);
-  kernel.release(&kernel);
-
-  ASSERT_NO_FATAL_FAILURE(
-      TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL, {true}));
-}
-
 struct ScalarScalarParam {
   std::string name;
   std::optional<std::string> lhs;
@@ -226,7 +207,7 @@ INSTANTIATE_TEST_SUITE_P(
                           "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
                           "POINT (0.25 0.25)", true},
         // Point does not contain anything
-        ScalarScalarParam{"point_contains_polygon", "POINT (0.25 0.25)",
+        ScalarScalarParam{"point_not_contains_polygon", "POINT (0.25 0.25)",
                           "contains", "POLYGON ((0 0, 2 0, 0 2, 0 0))", false},
         // Point definitely not in polygon (outside the covering)
         ScalarScalarParam{"polygon_not_contains_distant_point",
