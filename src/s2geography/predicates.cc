@@ -178,13 +178,43 @@ struct S2Contains {
   using arg1_t = GeoArrowGeographyInputView;
   using out_t = BoolOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
+  void Init(const std::unordered_map<std::string, std::string>& options) {
+    // Use Simple Features compatibility options
+    options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
+  }
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    // If either argument is EMPTY, the result is FALSE
+    if (value0.is_empty() || value1.is_empty()) {
+      return false;
+    }
+
+    auto maybe_point0 = value0.Point();
+    auto maybe_point1 = value1.Point();
+    if (maybe_point0) {
+      // A point cannot contain anything
+      return false;
+    } else if (maybe_point1) {
+      auto region0 = value0.Region();
+      return region0->MayIntersect(S2Cell(*maybe_point1)) &&
+             region0->Contains(*maybe_point1);
+    }
+
+    S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
+                                 &intersection_);
+    if (intersection_.empty()) {
+      return false;
+    }
+
+    return ExecUsingShapeIndex(value0, value1);
+  }
+
+  bool ExecUsingShapeIndex(arg0_t::c_type value0, arg1_t::c_type value1) {
     return s2_contains(value0.ShapeIndex(), value1.ShapeIndex(), options_);
   }
 
   S2BooleanOperation::Options options_;
+  std::vector<S2CellId> intersection_;
 };
 
 struct S2Equals {
@@ -192,13 +222,84 @@ struct S2Equals {
   using arg1_t = GeoArrowGeographyInputView;
   using out_t = BoolOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
+  void Init(const std::unordered_map<std::string, std::string>& options) {
+    options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
+  }
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    if (GeographyIdentical(value0, value1)) {
+      return true;
+    }
+
+    S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
+                                 &intersection_);
+    if (intersection_.empty()) {
+      return false;
+    }
+
     return s2_equals(value0.ShapeIndex(), value1.ShapeIndex(), options_);
   }
 
+  bool GeographyIdentical(GeoArrowGeography& value0,
+                          GeoArrowGeography& value1) {
+    if (value0.num_shapes() != value1.num_shapes() == 1) {
+      return false;
+    }
+
+    for (int i = 0; i < value0.num_shapes(); ++i) {
+      if (!ShapeIdentical(value0.Shape(i), value1.Shape(i))) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  bool ShapeIdentical(const S2Shape* lhs, const S2Shape* rhs) {
+    if (lhs->dimension() != rhs->dimension()) {
+      return false;
+    }
+
+    if (lhs->num_chains() != rhs->num_chains()) {
+      return false;
+    }
+
+    for (int i = 0; i < lhs->num_chains(); i++) {
+      S2Shape::Chain chain_lhs = lhs->chain(i);
+      S2Shape::Chain chain_rhs = rhs->chain(i);
+
+      if (chain_lhs.length != chain_rhs.length) {
+        return false;
+      }
+
+      if (chain_lhs.length == 0) {
+        continue;
+      }
+
+      S2Shape::Edge lhs_e = lhs->chain_edge(i, 0);
+      S2Shape::Edge rhs_e = rhs->chain_edge(i, 0);
+      S2Point lhs_v0 = lhs_e.v0;
+      S2Point rhs_v0 = rhs_e.v0;
+      if (lhs_v0 != rhs_v0) {
+        return false;
+      }
+
+      for (int j = 1; j < chain_lhs.length; j++) {
+        lhs_e = lhs->chain_edge(i, j);
+        rhs_e = rhs->chain_edge(i, j);
+        S2Point lhs_v1 = lhs_e.v1;
+        S2Point rhs_v1 = rhs_e.v1;
+        if (lhs_v1 != rhs_v1) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
   S2BooleanOperation::Options options_;
+  std::vector<S2CellId> intersection_;
 };
 
 void IntersectsKernel(struct SedonaCScalarKernel* out) {
