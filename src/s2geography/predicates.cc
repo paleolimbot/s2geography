@@ -266,6 +266,10 @@ struct S2Equals {
       return false;
     }
 
+    if (lhs->num_edges() != rhs->num_edges()) {
+      return false;
+    }
+
     for (int i = 0; i < lhs->num_chains(); i++) {
       S2Shape::Chain chain_lhs = lhs->chain(i);
       S2Shape::Chain chain_rhs = rhs->chain(i);
