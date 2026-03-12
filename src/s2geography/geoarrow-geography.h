@@ -26,39 +26,6 @@ namespace s2geography {
 ///
 /// @{
 
-class GeoArrowChain {
- public:
-  explicit GeoArrowChain(const struct GeoArrowGeometryNode* node)
-      : node_(node) {}
-
-  double GetLength() const;
-
- protected:
-  const struct GeoArrowGeometryNode* node_{};
-};
-
-class GeoArrowLoop : public GeoArrowChain {
- public:
-  explicit GeoArrowLoop(const struct GeoArrowGeometryNode* node,
-                        std::vector<S2Point>* scratch)
-      : GeoArrowChain(node), scratch_(scratch) {
-    scratch_->clear();
-  }
-
-  double GetSignedArea();
-
-  S2Point GetCentroid();
-
-  double GetCurvature();
-
-  double GetCurvatureMaxError();
-
- protected:
-  std::vector<S2Point>* scratch_{};
-
-  void BuildScratch();
-};
-
 /// \brief Point S2Shape implementation backed by a GeoArrowGeometryView
 ///
 /// This shape represents zero or more points and can be initialized
@@ -72,6 +39,8 @@ class GeoArrowPointShape : public S2Shape {
 
   /// \brief Create an empty point shape representing zero points
   GeoArrowPointShape() = default;
+
+  struct GeoArrowGeometryView nodes() const { return geom_; }
 
   /// \brief Convenience constructor that initializes a point shape
   ///
@@ -123,6 +92,8 @@ class GeoArrowLaxPolylineShape : public S2Shape {
   ///
   /// Throws if geom neither a LINESTRING nor a MULTILINESTRING.
   explicit GeoArrowLaxPolylineShape(struct GeoArrowGeometryView geom);
+
+  struct GeoArrowGeometryView nodes() const { return geom_; }
 
   /// \brief Reset internal state such that this shape represents zero edges
   void Clear();
@@ -178,6 +149,8 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   ///
   /// Throws if geometry is not a POLYGON or MULTIPOLYGON.
   explicit GeoArrowLaxPolygonShape(struct GeoArrowGeometryView geom);
+
+  struct GeoArrowGeometryView nodes() const { return geom_; }
 
   /// \brief Reset internal state such that this shape represents zero edges
   void Clear();
@@ -312,6 +285,39 @@ class GeoArrowGeography {
 
   void InitIndex();
   void GetCellUnionBound(std::vector<S2CellId>* cell_ids);
+};
+
+class GeoArrowChain {
+ public:
+  explicit GeoArrowChain(const struct GeoArrowGeometryNode* node)
+      : node_(node) {}
+
+  double GetLength() const;
+
+ protected:
+  const struct GeoArrowGeometryNode* node_{};
+};
+
+class GeoArrowLoop : public GeoArrowChain {
+ public:
+  explicit GeoArrowLoop(const struct GeoArrowGeometryNode* node,
+                        std::vector<S2Point>* scratch)
+      : GeoArrowChain(node), scratch_(scratch) {
+    scratch_->clear();
+  }
+
+  double GetSignedArea();
+
+  S2Point GetCentroid();
+
+  double GetCurvature();
+
+  double GetCurvatureMaxError();
+
+ protected:
+  std::vector<S2Point>* scratch_{};
+
+  void BuildScratch();
 };
 
 /// @}
