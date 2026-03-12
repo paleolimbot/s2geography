@@ -254,8 +254,29 @@ TEST(GeoArrowGeom, DefaultConstructor) {
   EXPECT_EQ(g.root(), nullptr);
 
   int count = 0;
-  g.VisitVertices([&](const S2Point&) { ++count; });
+  g.VisitVertices([&](S2Point) { ++count; });
   EXPECT_EQ(count, 0);
+}
+
+// Specifically check loop functions
+
+TEST(GeoArrowLoop, LoopMetrics) {
+  std::vector<S2Point> scratch;
+
+  auto shell =
+      TestGeometry::FromWKT("LINESTRING (0 0, 10 0, 10 10, 0 10, 0 0)");
+  GeoArrowLoop shell_loop(shell.geom().root, &scratch);
+  ASSERT_GT(shell_loop.GetSignedArea(), 0);
+  ASSERT_GT(shell_loop.GetCurvature(), 0);
+  S2Point centroid = shell_loop.GetCentroid();
+  ASSERT_NEAR(centroid.Norm(), std::abs(shell_loop.GetSignedArea()), 1e-4);
+
+  auto hole = TestGeometry::FromWKT("LINESTRING (1 1, 5 1, 5 5, 1 5, 1 1)");
+  GeoArrowLoop hole_loop(hole.geom().root, &scratch);
+  ASSERT_GT(hole_loop.GetSignedArea(), 0);
+  ASSERT_GT(hole_loop.GetCurvature(), 0);
+  centroid = hole_loop.GetCentroid();
+  ASSERT_NEAR(centroid.Norm(), std::abs(hole_loop.GetSignedArea()), 1e-4);
 }
 
 // Shape tests

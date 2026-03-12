@@ -632,11 +632,6 @@ double GeoArrowLoop::GetCurvature() {
   return S2::GetCurvature(S2PointLoopSpan(*scratch_));
 }
 
-double GeoArrowLoop::GetCurvatureMaxError() {
-  BuildScratch();
-  return S2::GetCurvatureMaxError(S2PointLoopSpan(*scratch_));
-}
-
 void GeoArrowLoop::BuildScratch() {
   if (scratch_->empty()) {
     internal::VisitLngLat(node, 0, node->size - 1, [&](double lng, double lat) {

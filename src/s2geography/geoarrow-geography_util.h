@@ -122,8 +122,6 @@ struct GeoArrowLoop : public GeoArrowChain {
 
   S2Point GetCentroid();
 
-  double GetCurvatureMaxError();
-
  protected:
   std::vector<S2Point>* scratch_{};
 
