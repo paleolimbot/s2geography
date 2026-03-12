@@ -88,12 +88,20 @@ void VisitEdges(const struct GeoArrowGeometryNode* node, Visit&& visit) {
 
 }  // namespace internal
 
+/// \brief A sequence of coordinates
+///
+/// This utility wrapper is a wrapper around a sequence of coordinates whose
+/// view is defined by a GeoArrowGeometryNode. This wrapper facilitates visiting
+/// raw storage for algorithms that require it. The raw storage always has
+/// XY values corresponding to longitude and latitude.
 class GeoArrowChain {
  public:
   GeoArrowChain(const struct GeoArrowGeometryNode* node) : node(node) {}
 
+  /// \brief The number of coordinates in the sequence
   uint32_t size() const { return node->size; }
 
+  /// \brief Call a function for each S2Point
   template <typename Visit>
   void VisitVertices(Visit&& visit) {
     internal::VisitVertices(node, visit);
@@ -108,6 +116,13 @@ class GeoArrowChain {
   const struct GeoArrowGeometryNode* node{};
 };
 
+/// \brief A sequence of coordinates forming a closed loop
+///
+/// This utility wrapper is a wrapper around a sequence of coordinates whose
+/// view is defined by a GeoArrowGeometryNode where the sequence specifically
+/// defines a closed loop. This wrapper is specifically designed to provide
+/// access to the loop measures and brute force containment algorithms that
+/// are used across multiple functions.
 struct GeoArrowLoop : public GeoArrowChain {
  public:
   GeoArrowLoop(const struct GeoArrowGeometryNode* node,
@@ -116,10 +131,22 @@ struct GeoArrowLoop : public GeoArrowChain {
     scratch_->clear();
   }
 
+  /// \brief Get the sum of the turning angles
+  ///
+  /// Notably, this value is positive for counterclockwise loops and
+  /// negative for clockwise loops.
   double GetCurvature();
 
+  /// \brief Get the signed area of this loop in steradians
+  ///
+  /// Notably, this value is positive for counterclockwise loops and
+  /// negative for clockwise loops.
   double GetSignedArea();
 
+  /// \brief Get the centroid of this loop
+  ///
+  /// To make this value easier to compose with other centroids, it is
+  /// scaled to the signed area of this loop.
   S2Point GetCentroid();
 
  protected:
