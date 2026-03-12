@@ -262,9 +262,7 @@ class GeoArrowGeography {
   /// polygon), or -1 for geometry collections
   int dimension() const;
 
-  GeoArrowPointShape* points();
-  GeoArrowLaxPolylineShape* lines();
-  GeoArrowLaxPolygonShape* polygons();
+  int num_edges() const;
 
   /// \brief The number of shapes
   ///
@@ -274,6 +272,30 @@ class GeoArrowGeography {
 
   /// \brief Retrieve a shape
   const S2Shape* Shape(int id) const;
+
+  const GeoArrowPointShape* points() const;
+  const GeoArrowLaxPolylineShape* lines() const;
+  const GeoArrowLaxPolygonShape* polygons() const;
+
+  template <typename Visit>
+  void VisitVertices(Visit&& visit) {
+    points()->geom().VisitChains(
+        [&](GeoArrowChain chain) { chain.VisitVertices(visit); });
+    lines()->geom().VisitChains(
+        [&](GeoArrowChain chain) { chain.VisitVertices(visit); });
+    polygons()->geom().VisitChains(
+        [&](GeoArrowChain chain) { chain.VisitVertices(visit); });
+  }
+
+  template <typename Visit>
+  void VisitEdges(Visit&& visit) {
+    points()->geom().VisitEdges(
+        [&](GeoArrowChain chain) { chain.VisitEdges(visit); });
+    lines()->geom().VisitEdges(
+        [&](GeoArrowChain chain) { chain.VisitEdges(visit); });
+    polygons()->geom().VisitEdges(
+        [&](GeoArrowChain chain) { chain.VisitEdges(visit); });
+  }
 
  private:
   struct GeoArrowGeometryView geom_{};

@@ -441,9 +441,8 @@ void GeoArrowGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
       if (points_.num_vertices() <= 32) {
-        for (int i = 0; i < points_.num_edges(); ++i) {
-          cell_ids->push_back(S2CellId(points_.vertex(i)));
-        }
+        points_.geom().VisitVertices(
+            [&](S2Point v) { cell_ids->push_back(S2CellId(v)); });
         return;
       }
       break;
@@ -529,9 +528,17 @@ int GeoArrowGeography::dimension() const {
   }
 }
 
-GeoArrowPointShape* GeoArrowGeography::points() { return &points_; }
-GeoArrowLaxPolylineShape* GeoArrowGeography::lines() { return &lines_; }
-GeoArrowLaxPolygonShape* GeoArrowGeography::polygons() { return &polygons_; }
+int GeoArrowGeography::num_edges() const {
+  return points_.num_edges() + lines_.num_edges() + polygons_.num_edges();
+}
+
+const GeoArrowPointShape* GeoArrowGeography::points() const { return &points_; }
+const GeoArrowLaxPolylineShape* GeoArrowGeography::lines() const {
+  return &lines_;
+}
+const GeoArrowLaxPolygonShape* GeoArrowGeography::polygons() const {
+  return &polygons_;
+}
 
 int GeoArrowGeography::num_shapes() const {
   if (geom_.size_nodes == 0) {

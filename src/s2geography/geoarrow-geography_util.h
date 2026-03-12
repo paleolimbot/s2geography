@@ -59,10 +59,6 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
 
 template <typename Visit>
 void VisitVertices(const struct GeoArrowGeometryNode* node, Visit&& visit) {
-  if (node->size < 2) {
-    return;
-  }
-
   VisitLngLat(node, 0, node->size, [&](double lng0, double lat0) {
     visit(S2LatLng::FromDegrees(lat0, lng0).ToPoint());
   });
