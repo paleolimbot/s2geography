@@ -86,6 +86,25 @@ TEST(Predicates, SedonaUdfContainsScalarArray) {
                                           {true, false, std::nullopt}));
 }
 
+TEST(Predicates, EmptyDebug) {
+  struct SedonaCScalarKernel kernel;
+  struct SedonaCScalarKernelImpl impl;
+  s2geography::sedona_udf::EqualsKernel(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+      {{"POINT EMPTY"}, {"POINT EMPTY"}}, {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(
+      TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL, {true}));
+}
+
 struct ScalarScalarParam {
   std::string name;
   std::optional<std::string> lhs;
@@ -251,10 +270,10 @@ INSTANTIATE_TEST_SUITE_P(
                           "POINT EMPTY", false},
         ScalarScalarParam{"empty_equals", "POINT EMPTY", "equals",
                           "POINT (0 0)", false},
-        ScalarScalarParam{"empty_point_equals_empty_point", "POINT EMPTY", "equals",
-                          "POINT EMPTY", true},
-        ScalarScalarParam{"empty_point_equals_empty_linestring", "POINT EMPTY", "equals",
-                          "LINESTRING EMPTY", true},
+        ScalarScalarParam{"empty_point_equals_empty_point", "POINT EMPTY",
+                          "equals", "POINT EMPTY", true},
+        ScalarScalarParam{"empty_point_equals_empty_linestring", "POINT EMPTY",
+                          "equals", "LINESTRING EMPTY", true},
 
         // Fast path for identical values
         ScalarScalarParam{"polygon_equals_identical_polygon",

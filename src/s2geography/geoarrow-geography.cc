@@ -78,6 +78,16 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
   }
 }
 
+bool AllLngLatNaN(struct GeoArrowGeometryView geom) {
+  bool out = true;
+  VisitNodes(geom, [&](const struct GeoArrowGeometryNode* node) {
+    VisitLngLat(node, 0, node->size, [&](double lng, double lat) {
+      out = out && std::isnan(lng) && std::isnan(lat);
+    });
+  });
+  return out;
+}
+
 const char* GeometryTypeString(uint8_t geometry_type) {
   switch (geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
@@ -106,7 +116,9 @@ void GeoArrowPointShape::Init(struct GeoArrowGeometryView geom) {
   switch (geom.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
       // Treat an empty point as MULTIPOINT EMPTY
-      if (geom.root->size == 0) {
+      // geoarrow-c currently reads POINT EMPTY as nan nan instead of a
+      // proper EMPTY
+      if (geom.root->size == 0 || AllLngLatNaN(geom)) {
         geom_ = {nullptr, 0};
       } else {
         geom_ = geom;
