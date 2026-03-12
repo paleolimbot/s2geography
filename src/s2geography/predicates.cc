@@ -112,13 +112,65 @@ struct S2Intersects {
   using arg1_t = GeoArrowGeographyInputView;
   using out_t = BoolOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
+  void Init(const std::unordered_map<std::string, std::string>& options) {
+    // Use Simple Features compatibility options
+    options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
+  }
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    // If either argument is EMPTY, the result is FALSE
+    if (value0.is_empty() || value1.is_empty()) {
+      return false;
+    }
+
+    // The containment test for a S2Point is ~20x faster than building an index
+    // containing exactly one point for every element so we try very hard to
+    // avoid it.
+    auto maybe_point0 = value0.Point();
+    auto maybe_point1 = value1.Point();
+    if (maybe_point0 && maybe_point1) {
+      return maybe_point0->Normalize() == maybe_point1->Normalize();
+    } else if (maybe_point0) {
+      auto region1 = value1.Region();
+      if (!region1->MayIntersect(S2Cell(*maybe_point0))) {
+        return false;
+      }
+      return region1->Contains(*maybe_point0) ||
+             ExecUsingShapeIndex(value0, value1);
+    } else if (maybe_point1) {
+      auto region0 = value0.Region();
+      if (!region0->MayIntersect(S2Cell(*maybe_point1))) {
+        return false;
+      }
+      return region0->Contains(*maybe_point1) ||
+             ExecUsingShapeIndex(value0, value1);
+    }
+
+    // We could consider special casing more things here. S2Geometry special
+    // cases loops with less than 32 vertices to avoid building an index which
+    // is likely worth doing here based on some heuristics for other geometry
+    // types too.
+
+    // Next we try a covering intersection check. This is very cheap if an index
+    // has already been built. In the event that an index does have to be built
+    // to build the covering, it is effectively reused in the actual
+    // s2_intersection() check. This is 2x faster than an intersection check for
+    // selective point-in-polygon queries but may need to be reevaluated.
+    S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
+                                 &intersection_);
+    if (intersection_.empty()) {
+      return false;
+    }
+
+    return ExecUsingShapeIndex(value0, value1);
+  }
+
+  bool ExecUsingShapeIndex(arg0_t::c_type value0, arg1_t::c_type value1) {
     return s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(), options_);
   }
 
   S2BooleanOperation::Options options_;
+  std::vector<S2CellId> intersection_;
 };
 
 struct S2Contains {

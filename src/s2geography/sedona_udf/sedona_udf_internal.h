@@ -369,7 +369,7 @@ class GeographyInputView {
 /// represent any GeoArrow type when supported by geoarrow-c.
 class GeoArrowGeographyInputView {
  public:
-  using c_type = const GeoArrowGeography&;
+  using c_type = GeoArrowGeography&;
 
   static bool Matches(const struct ArrowSchema* type) {
     struct GeoArrowSchemaView schema_view;
@@ -416,7 +416,7 @@ class GeoArrowGeographyInputView {
 
   bool IsNull(int64_t i) { return inner_.IsNull(i); }
 
-  const GeoArrowGeography& Get(int64_t i) {
+  GeoArrowGeography& Get(int64_t i) {
     StashIfNeeded(i % current_array_length_);
     return stashed_;
   }

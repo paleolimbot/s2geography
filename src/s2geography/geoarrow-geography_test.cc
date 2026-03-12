@@ -705,8 +705,10 @@ class GeoArrowGeographyTest : public ::testing::Test {
 
 TEST_F(GeoArrowGeographyTest, DefaultConstructor) {
   GeoArrowGeography geog;
+  EXPECT_TRUE(geog.is_empty());
   EXPECT_EQ(geog.num_shapes(), 0);
   EXPECT_EQ(geog.dimension(), -1);
+  ASSERT_EQ(geog.Covering().size(), 0);
 
   auto point = MakeGeography("POINT (0 0)");
   EXPECT_FALSE(
@@ -720,8 +722,10 @@ TEST_F(GeoArrowGeographyTest, DefaultConstructor) {
 TEST_F(GeoArrowGeographyTest, InitGeometryZeroNodes) {
   GeoArrowGeography geog;
   geog.Init({nullptr, 0});
+  EXPECT_TRUE(geog.is_empty());
   EXPECT_EQ(geog.num_shapes(), 0);
   EXPECT_EQ(geog.dimension(), -1);
+  ASSERT_EQ(geog.Covering().size(), 0);
 
   auto point = MakeGeography("POINT (0 0)");
   EXPECT_FALSE(
@@ -736,7 +740,9 @@ TEST_F(GeoArrowGeographyTest, Point) {
   auto geog = MakeGeography("POINT (1 2)");
   EXPECT_EQ(geog.dimension(), 0);
   EXPECT_EQ(geog.num_shapes(), 1);
-  EXPECT_EQ(geog.kind(), GeographyKind::GEOARROW);
+  // Check twice because the value is cached
+  ASSERT_EQ(geog.Covering().size(), 1);
+  ASSERT_EQ(geog.Covering().size(), 1);
 
   auto shape = geog.Shape(0);
   ASSERT_NE(shape, nullptr);
@@ -750,6 +756,9 @@ TEST_F(GeoArrowGeographyTest, MultiPoint) {
   auto geog = MakeGeography("MULTIPOINT ((0 0), (1 1), (2 2))");
   EXPECT_EQ(geog.dimension(), 0);
   EXPECT_EQ(geog.num_shapes(), 1);
+  // Check twice because the value is cached
+  ASSERT_EQ(geog.Covering().size(), 3);
+  ASSERT_EQ(geog.Covering().size(), 3);
 
   auto shape = geog.Shape(0);
   ASSERT_NE(shape, nullptr);
@@ -760,6 +769,7 @@ TEST_F(GeoArrowGeographyTest, EmptyPoint) {
   auto geog = MakeGeography("POINT EMPTY");
   EXPECT_EQ(geog.dimension(), 0);
   EXPECT_EQ(geog.num_shapes(), 1);
+  ASSERT_EQ(geog.Covering().size(), 0);
 
   auto shape = geog.Shape(0);
   ASSERT_NE(shape, nullptr);
@@ -770,6 +780,7 @@ TEST_F(GeoArrowGeographyTest, Linestring) {
   auto geog = MakeGeography("LINESTRING (0 0, 1 1, 2 2)");
   EXPECT_EQ(geog.dimension(), 1);
   EXPECT_EQ(geog.num_shapes(), 1);
+  ASSERT_GT(geog.Covering().size(), 0);
 
   auto shape = geog.Shape(0);
   ASSERT_NE(shape, nullptr);
@@ -781,6 +792,7 @@ TEST_F(GeoArrowGeographyTest, MultiLinestring) {
   auto geog = MakeGeography("MULTILINESTRING ((0 0, 1 1), (2 2, 3 3, 4 4))");
   EXPECT_EQ(geog.dimension(), 1);
   EXPECT_EQ(geog.num_shapes(), 1);
+  ASSERT_GT(geog.Covering().size(), 0);
 
   auto shape = geog.Shape(0);
   ASSERT_NE(shape, nullptr);
@@ -791,6 +803,7 @@ TEST_F(GeoArrowGeographyTest, Polygon) {
   auto geog = MakeGeography("POLYGON ((0 0, 1 0, 0 1, 0 0))");
   EXPECT_EQ(geog.dimension(), 2);
   EXPECT_EQ(geog.num_shapes(), 1);
+  ASSERT_GT(geog.Covering().size(), 0);
 
   auto shape = geog.Shape(0);
   ASSERT_NE(shape, nullptr);
@@ -804,6 +817,7 @@ TEST_F(GeoArrowGeographyTest, MultiPolygon) {
       "((10 10, 11 10, 10 11, 10 10)))");
   EXPECT_EQ(geog.dimension(), 2);
   EXPECT_EQ(geog.num_shapes(), 1);
+  ASSERT_GT(geog.Covering().size(), 0);
 
   auto shape = geog.Shape(0);
   ASSERT_NE(shape, nullptr);
@@ -813,6 +827,7 @@ TEST_F(GeoArrowGeographyTest, MultiPolygon) {
 TEST_F(GeoArrowGeographyTest, GeometryCollectionThrows) {
   auto gc_geom = TestGeometry::FromWKT("GEOMETRYCOLLECTION (POINT (0 0))");
   GeoArrowGeography geog;
+  // Not yet supported
   EXPECT_THROW(geog.Init(gc_geom.geom()), Exception);
 }
 
@@ -820,13 +835,6 @@ TEST_F(GeoArrowGeographyTest, RegionNotNull) {
   auto geog = MakeGeography("POLYGON ((0 0, 1 0, 0 1, 0 0))");
   auto region = geog.Region();
   EXPECT_NE(region, nullptr);
-}
-
-TEST_F(GeoArrowGeographyTest, EncodeThrows) {
-  auto geog = MakeGeography("POINT (0 0)");
-  Encoder encoder;
-  EncodeOptions options;
-  EXPECT_THROW(geog.Encode(&encoder, options), Exception);
 }
 
 TEST_F(GeoArrowGeographyTest, ShapeIndexIntersection) {
@@ -848,6 +856,11 @@ TEST_F(GeoArrowGeographyTest, Region) {
   auto geog = MakeGeography("POLYGON ((-1 -1, 2 -1, 2 2, -1 2, -1 -1))");
   auto region = geog.Region();
   EXPECT_TRUE(region->Contains(S2LatLng::FromDegrees(0, 0).ToPoint()));
+
+  // Point regions are specialized to make them less expensive to create
+  auto geog_point = MakeGeography("POINT (0 0)");
+  auto point_region = geog_point.Region();
+  EXPECT_TRUE(point_region->Contains(S2LatLng::FromDegrees(0, 0).ToPoint()));
 }
 
 TEST_F(GeoArrowGeographyTest, RegionReversedWinding) {
