@@ -178,10 +178,7 @@ struct S2Contains {
   using arg1_t = GeoArrowGeographyInputView;
   using out_t = BoolOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {
-    // Use Simple Features compatibility options
-    options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
-  }
+  void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
     // If either argument is EMPTY, the result is FALSE

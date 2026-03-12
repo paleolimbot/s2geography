@@ -151,6 +151,12 @@ INSTANTIATE_TEST_SUITE_P(
                           std::nullopt, std::nullopt},
 
         // Intersects cases that take one of the faster paths
+        // Empties
+        ScalarScalarParam{"intersects_empty", "POINT (0 0)", "intersects",
+                          "POINT EMPTY", false},
+        ScalarScalarParam{"empty_intersects", "POINT EMPTY", "intersects",
+                          "POINT (0 0)", false},
+
         // Point x polygon
         ScalarScalarParam{"polygon_intersects_point",
                           "POLYGON ((0 0, 2 0, 0 2, 0 0))", "intersects",
@@ -180,13 +186,58 @@ INSTANTIATE_TEST_SUITE_P(
                           "POLYGON ((0 0, 2 0, 0 2, 0 0))", "intersects",
                           "POLYGON ((0 0, 1 0, 0 1, 0 0))", true},
 
-        // Other predicates (currently there are no special cases here)
+        // Contains
+        // Nulls
+        ScalarScalarParam{"null_contains", std::nullopt, "contains",
+                          "POINT EMPTY", std::nullopt},
+        ScalarScalarParam{"contains_null", "POINT EMPTY", "contains",
+                          std::nullopt, std::nullopt},
+        ScalarScalarParam{"null_contains_null", std::nullopt, "contains",
+                          std::nullopt, std::nullopt},
+
+        // Contains cases that take one of the faster paths
+        // Empties
+        ScalarScalarParam{"contains_empty", "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                          "contains", "POINT EMPTY", false},
+        ScalarScalarParam{"empty_contains", "POINT EMPTY", "contains",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", false},
+
+        // Polygon contains interior point
         ScalarScalarParam{"polygon_contains_point",
                           "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
                           "POINT (0.25 0.25)", true},
-        ScalarScalarParam{"polygon_not_contains_point",
+        // Point does not contain anything
+        ScalarScalarParam{"point_contains_polygon", "POINT (0.25 0.25)",
+                          "contains", "POLYGON ((0 0, 2 0, 0 2, 0 0))", false},
+        // Point definitely not in polygon (outside the covering)
+        ScalarScalarParam{"polygon_not_contains_distant_point",
                           "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
-                          "POINT (-1 -1)", false},
+                          "POINT (-30 -30)", false},
+        // Point definitely not in polygon (probably inside the covering)
+        ScalarScalarParam{"polygon_not_contains_close_point",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
+                          "POINT (1.01 1.01)", false},
+        // Polygon does not contain boundary point
+        ScalarScalarParam{"polygon_not_contains_boundary_point",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
+                          "POINT (0 0)", false},
+
+        // Polygon contains interior sub-polygon
+        ScalarScalarParam{
+            "polygon_contains_polygon", "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            "contains", "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))", true},
+
+        // Polygon does not contain interior sub-polygon with shared boundary
+        ScalarScalarParam{"polygon_does_not_contain_polygon_boundary",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
+                          "POLYGON ((0 0, 0.5 0, 0 0.5, 0 0))", false},
+
+        // Interior polygon does not contain Polygon
+        ScalarScalarParam{"polygon_does_not_contain_polygon",
+                          "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
+                          "contains", "POLYGON ((0 0, 2 0, 0 2, 0 0))", false},
+
+        // Others we haven't implemented yet
         ScalarScalarParam{"polygon_equals_polygon",
                           "POLYGON ((0 0, 1 0, 0 1, 0 0))", "equals",
                           "POLYGON ((1 0, 0 1, 0 0, 1 0))", true},
