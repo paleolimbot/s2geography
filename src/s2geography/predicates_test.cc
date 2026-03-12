@@ -237,13 +237,43 @@ INSTANTIATE_TEST_SUITE_P(
                           "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
                           "contains", "POLYGON ((0 0, 2 0, 0 2, 0 0))", false},
 
-        // Others we haven't implemented yet
+        // Equals
+        // Nulls
+        ScalarScalarParam{"null_equals", std::nullopt, "equals", "POINT EMPTY",
+                          std::nullopt},
+        ScalarScalarParam{"equals_null", "POINT EMPTY", "equals", std::nullopt,
+                          std::nullopt},
+        ScalarScalarParam{"null_equals_null", std::nullopt, "equals",
+                          std::nullopt, std::nullopt},
+
+        // Fast path for identical values
+        ScalarScalarParam{"polygon_equals_identical_polygon",
+                          "POLYGON ((0 0, 1 0, 0 1, 0 0))", "equals",
+                          "POLYGON ((0 0, 1 0, 0 1, 0 0))", true},
+
+        // Rotated vertices
         ScalarScalarParam{"polygon_equals_polygon",
                           "POLYGON ((0 0, 1 0, 0 1, 0 0))", "equals",
                           "POLYGON ((1 0, 0 1, 0 0, 1 0))", true},
-        ScalarScalarParam{"polygon_not_equals_polygon",
+
+        // Potentially intersecting but not equal
+        ScalarScalarParam{"polygon_not_equals_close_polygon",
                           "POLYGON ((0 0, 1 0, 0 1, 0 0))", "equals",
-                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", false}
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", false},
+        // Not at all intersecting and not equal
+        ScalarScalarParam{"polygon_not_equals_distant_polygon",
+                          "POLYGON ((0 0, 1 0, 0 1, 0 0))", "equals",
+                          "POLYGON ((30 30, 32 30, 30 32, 30 30))", false},
+
+        // Different number of chains
+        ScalarScalarParam{"polygon_not_equals_chains_ne",
+                          "MULTIPOLYGON (((0 0, 1 0, 0 1, 0 0)), ((10 10, 11 "
+                          "10, 10 11, 10 10)))",
+                          "equals", "POLYGON ((0 0, 2 0, 0 2, 0 0))", false},
+        // Different number of edges
+        ScalarScalarParam{"polygon_not_equals_edges_ne",
+                          "POLYGON ((0 0, 1 0, 0 1, 0 0))", "equals",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 1, 0 0))", false}
 
         ),
     [](const ::testing::TestParamInfo<ScalarScalarParam>& info) {
