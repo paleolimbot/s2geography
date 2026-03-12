@@ -288,6 +288,10 @@ class GeoArrowGeography {
   /// polygon), or -1 for geometry collections
   int dimension() const;
 
+  GeoArrowPointShape* points();
+  GeoArrowLaxPolylineShape* lines();
+  GeoArrowLaxPolygonShape* polygons();
+
   /// \brief The number of shapes
   ///
   /// This is usually one (exactly one of the point, line, or polygon shape

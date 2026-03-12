@@ -625,6 +625,10 @@ int GeoArrowGeography::dimension() const {
   }
 }
 
+GeoArrowPointShape* GeoArrowGeography::points() { return &points_; }
+GeoArrowLaxPolylineShape* GeoArrowGeography::lines() { return &lines_; }
+GeoArrowLaxPolygonShape* GeoArrowGeography::polygons() { return &polygons_; }
+
 int GeoArrowGeography::num_shapes() const {
   if (geom_.size_nodes == 0) {
     return 0;
