@@ -32,19 +32,6 @@ void ReverseNodeInPlace(struct GeoArrowGeometryNode* node) {
 }
 
 template <typename Visit>
-void VisitNodes(struct GeoArrowGeometryView geom, Visit&& visit) {
-  if (geom.size_nodes == 0) {
-    return;
-  }
-
-  const struct GeoArrowGeometryNode* end = geom.root + geom.size_nodes;
-  for (const struct GeoArrowGeometryNode* node = geom.root; node < end;
-       ++node) {
-    visit(node);
-  }
-}
-
-template <typename Visit>
 void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
                  int64_t n, Visit&& visit) {
   const uint8_t* lngs = node->coords[0] + offset * node->coord_stride[0];
@@ -96,7 +83,7 @@ void VisitEdges(const struct GeoArrowGeometryNode* node, Visit&& visit) {
 
 bool AllLngLatNaN(struct GeoArrowGeometryView geom) {
   bool out = true;
-  VisitNodes(geom, [&](const struct GeoArrowGeometryNode* node) {
+  VisitGeoArrowNodes(geom, [&](const struct GeoArrowGeometryNode* node) {
     VisitLngLat(node, 0, node->size, [&](double lng, double lat) {
       out = out && std::isnan(lng) && std::isnan(lat);
     });
@@ -192,7 +179,7 @@ void GeoArrowPointShape::Init(struct GeoArrowGeometryView geom) {
 
   // This is rare but for now we check, as otherwise we might get an attempt to
   // visit the coordinate of a node that doesn't have any.
-  VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
+  VisitGeoArrowNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
     if (node->size == 0) {
       throw Exception(
           "Can't create GeoArrowPointShape() from MULTIPOINT with EMPTY "
@@ -292,7 +279,7 @@ void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
 
   num_edges_[0] = 0;
   int64_t i = 1;
-  VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
+  VisitGeoArrowNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
     num_edges += node->size == 0 ? 0 : node->size - 1;
     if (num_edges > std::numeric_limits<int>::max()) {
       throw Exception(
@@ -372,7 +359,7 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
   int64_t num_edges = 0;
   bool is_hole = false;
 
-  VisitNodes(geom, [&](const struct GeoArrowGeometryNode* node) {
+  VisitGeoArrowNodes(geom, [&](const struct GeoArrowGeometryNode* node) {
     switch (node->geometry_type) {
       case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
         break;

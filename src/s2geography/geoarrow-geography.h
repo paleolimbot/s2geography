@@ -320,6 +320,19 @@ class GeoArrowLoop : public GeoArrowChain {
   void BuildScratch();
 };
 
+template <typename Visit>
+void VisitGeoArrowNodes(struct GeoArrowGeometryView geom, Visit&& visit) {
+  if (geom.size_nodes == 0) {
+    return;
+  }
+
+  const struct GeoArrowGeometryNode* end = geom.root + geom.size_nodes;
+  for (const struct GeoArrowGeometryNode* node = geom.root; node < end;
+       ++node) {
+    visit(node);
+  }
+}
+
 /// @}
 
 }  // namespace s2geography
