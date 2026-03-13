@@ -1,12 +1,12 @@
 
 #pragma once
 
-#include <vector>
-#include <cstring>
-#include <cstdint>
-
 #include <s2/s2latlng.h>
 #include <s2/s2shape.h>
+
+#include <cstdint>
+#include <cstring>
+#include <vector>
 
 #include "geoarrow/geoarrow.h"
 

@@ -655,8 +655,8 @@ TEST(GeoArrowLaxPolygonShape, SimpleTriangle) {
   // outside.
   S2Shape::ReferencePoint reference_out{S2LatLng::FromDegrees(-1, -1).ToPoint(),
                                         false};
-  S2Shape::ReferencePoint reference_in{S2LatLng::FromDegrees(2, 2).ToPoint(),
-                                       true};
+  S2Shape::ReferencePoint reference_in{
+      S2LatLng::FromDegrees(0.2, 0.2).ToPoint(), true};
 
   EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint(),
                                         reference_in));
@@ -693,16 +693,8 @@ TEST(GeoArrowLaxPolygonShape, PolygonWithHole) {
   EXPECT_EQ(pos.chain_id, 1);
   EXPECT_EQ(pos.offset, 2);
 
-  // Check brute force containment outside, inside, and inside a hole
-  // EXPECT_FALSE(
-  //     shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint()));
-  // EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1,
-  // 1).ToPoint()));
-  // EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3,
-  // 3).ToPoint()));
-
   // Check brute force containment outside and inside using the computed
-  // reference
+  // reference (including a point inside the hole)
   EXPECT_FALSE(
       shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint()));
   EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1, 1).ToPoint()));
@@ -774,6 +766,39 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygonWithHoles) {
   EXPECT_EQ(shape.chain(1).length, 4);
   EXPECT_EQ(shape.chain(2).length, 3);
   EXPECT_EQ(shape.num_edges(), 11);  // 4 + 4 + 3
+
+  // Check brute force containment outside, inside shell, inside hole, and
+  // inside the second polygon
+  EXPECT_FALSE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint()));
+  EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1, 1).ToPoint()));
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3, 3).ToPoint()));
+  EXPECT_TRUE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(20.1, 20.1).ToPoint()));
+
+  // Check with custom reference points
+  S2Shape::ReferencePoint reference_out{S2LatLng::FromDegrees(-1, -1).ToPoint(),
+                                        false};
+  S2Shape::ReferencePoint reference_in{
+      S2LatLng::FromDegrees(0.2, 0.2).ToPoint(), true};
+
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint(),
+                                        reference_in));
+  EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1, 1).ToPoint(),
+                                       reference_in));
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3, 3).ToPoint(),
+                                        reference_in));
+  EXPECT_TRUE(shape.BruteForceContains(
+      S2LatLng::FromDegrees(20.1, 20.1).ToPoint(), reference_in));
+
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint(),
+                                        reference_out));
+  EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1, 1).ToPoint(),
+                                       reference_out));
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3, 3).ToPoint(),
+                                        reference_out));
+  EXPECT_TRUE(shape.BruteForceContains(
+      S2LatLng::FromDegrees(20.1, 20.1).ToPoint(), reference_out));
 
   ValidateShape(shape);
 }
