@@ -349,10 +349,17 @@ S2Shape::ChainPosition GeoArrowLaxPolygonShape::chain_position(int e) const {
 S2Shape::TypeTag GeoArrowLaxPolygonShape::type_tag() const { return kTypeTag; }
 
 bool GeoArrowLaxPolygonShape::BruteForceContains(
-    const S2Point& pt, const S2Shape::ReferencePoint& reference) {
+    const S2Point& pt, const S2Shape::ReferencePoint& reference) const {
   bool inside = reference.contained;
+  if (is_empty() || is_full()) {
+    return inside;
+  }
 
   geom_.VisitChains([&](GeoArrowChain loop) {
+    if (loop.size() < 2) {
+      return;
+    }
+
     S2Point v0 = loop.vertex(0);
     S2CopyingEdgeCrosser crosser(reference.point, pt, v0);
     loop.VisitVertices(1, loop.size() - 1, [&](const S2Point& pt) {
@@ -363,7 +370,7 @@ bool GeoArrowLaxPolygonShape::BruteForceContains(
   return inside;
 }
 
-bool GeoArrowLaxPolygonShape::BruteForceContains(const S2Point& pt) {
+bool GeoArrowLaxPolygonShape::BruteForceContains(const S2Point& pt) const {
   return BruteForceContains(pt, GetReferencePoint());
 }
 

@@ -186,7 +186,7 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   /// \brief Check containment using a brute force edge crossing approach
   ///
   /// This may be faster for polygons with a small number of edges.
-  bool BruteForceContains(const S2Point& pt);
+  bool BruteForceContains(const S2Point& pt) const;
 
   /// \brief Check containment using a brute force edge crossing approach and a
   /// custom reference point
@@ -196,7 +196,7 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   /// point is known, there is no need to call NormalizeOrientation() (i.e., the
   /// orientation is only used to obtain the reference point).
   bool BruteForceContains(const S2Point& pt,
-                          const S2Shape::ReferencePoint& reference);
+                          const S2Shape::ReferencePoint& reference) const;
 
  private:
   GeoArrowGeom geom_{};

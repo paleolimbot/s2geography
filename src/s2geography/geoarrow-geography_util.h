@@ -57,6 +57,10 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
                  int64_t n, Visit&& visit) {
   S2GEOGRAPHY_DCHECK_GE(offset, 0);
   S2GEOGRAPHY_DCHECK_GE(n, 0);
+  if (n == 0) {
+    return;
+  }
+
   S2GEOGRAPHY_DCHECK_LE(offset + n, static_cast<int64_t>(node->size));
 
   const uint8_t* lngs = node->coords[0] + offset * node->coord_stride[0];
@@ -102,6 +106,7 @@ void VisitLngLatEdges(const struct GeoArrowGeometryNode* node, int64_t offset,
   if (n == 0) {
     return;
   }
+
   S2GEOGRAPHY_DCHECK_LT(offset + n, static_cast<int64_t>(node->size));
 
   const uint8_t* lngs = node->coords[0] + offset * node->coord_stride[0];
@@ -357,7 +362,7 @@ class GeoArrowGeom {
   /// Call a function of GeoArrowChain for each sequence (point or
   /// linestring) in this set of nodes. Other node types are ignored.
   template <typename Visit>
-  void VisitChains(Visit&& visit) {
+  void VisitChains(Visit&& visit) const {
     internal::VisitGeoArrowNodes(geom_,
                                  [&](const struct GeoArrowGeometryNode* node) {
                                    switch (node->geometry_type) {
@@ -373,8 +378,8 @@ class GeoArrowGeom {
 
   /// \brief Visit sequences of coordinates as GeoArrowLoop
   ///
-  /// Call a function of GeoArrowLoop for each sequence (point or
-  /// linestring) in this set of nodes. Other node types are ignored.
+  /// Call a function of GeoArrowLoop for each linestring sequence
+  /// in this set of nodes. Other node types are ignored.
   /// This function does not check if the nodes are actually part of
   /// a polygon or not (e.g., so that the GeoArrowGeom may be a sequence
   /// of loops).
