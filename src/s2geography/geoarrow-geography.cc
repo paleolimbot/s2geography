@@ -109,11 +109,7 @@ int GeoArrowPointShape::num_vertices() const {
 }
 
 S2Point GeoArrowPointShape::vertex(int v) const {
-  S2LatLng ll;
-  internal::VisitLngLat(geom_.root() + v, 0, 1, [&](double lng, double lat) {
-    ll = S2LatLng::FromDegrees(lat, lng);
-  });
-  return ll.ToPoint();
+  return GeoArrowChain(geom_.root() + v).vertex(0);
 }
 
 int GeoArrowPointShape::num_edges() const { return num_vertices(); }
@@ -227,13 +223,7 @@ S2Shape::Chain GeoArrowLaxPolylineShape::chain(int i) const {
 }
 
 S2Shape::Edge GeoArrowLaxPolylineShape::chain_edge(int i, int j) const {
-  S2LatLng v[2];
-  int vi = 0;
-  internal::VisitLngLat(geom_.root() + i, j, 2, [&](double lng, double lat) {
-    v[vi++] = S2LatLng::FromDegrees(lat, lng);
-  });
-
-  return Edge(v[0].ToPoint(), v[1].ToPoint());
+  return GeoArrowChain(geom_.root() + i).edge(j);
 }
 
 S2Shape::ChainPosition GeoArrowLaxPolylineShape::chain_position(int e) const {
@@ -342,12 +332,7 @@ S2Shape::Chain GeoArrowLaxPolygonShape::chain(int i) const {
 }
 
 S2Shape::Edge GeoArrowLaxPolygonShape::chain_edge(int i, int j) const {
-  S2LatLng v[2];
-  int vi = 0;
-  internal::VisitLngLat(&loops_[i], j, 2, [&](double lng, double lat) {
-    v[vi++] = S2LatLng::FromDegrees(lat, lng);
-  });
-  return Edge(v[0].ToPoint(), v[1].ToPoint());
+  return GeoArrowChain(&loops_[i]).edge(j);
 }
 
 S2Shape::ChainPosition GeoArrowLaxPolygonShape::chain_position(int e) const {

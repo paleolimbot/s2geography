@@ -58,6 +58,71 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
 }
 
 template <typename Visit>
+void VisitLngLatEdges(const struct GeoArrowGeometryNode* node, int64_t offset,
+                      int64_t n, Visit&& visit) {
+  const uint8_t* lngs = node->coords[0] + offset * node->coord_stride[0];
+  const uint8_t* lats = node->coords[1] + offset * node->coord_stride[1];
+  double lng0, lat0, lng1, lat1;
+
+  if (node->flags & GEOARROW_GEOMETRY_NODE_FLAG_SWAP_ENDIAN) {
+    uint64_t tmp;
+
+    // Extract the first vertex
+    memcpy(&tmp, lngs, sizeof(double));
+    tmp = GEOARROW_BSWAP64(tmp);
+    memcpy(&lng0, &tmp, sizeof(double));
+
+    memcpy(&tmp, lats, sizeof(double));
+    tmp = GEOARROW_BSWAP64(tmp);
+    memcpy(&lat0, &tmp, sizeof(double));
+
+    lngs += node->coord_stride[0];
+    lats += node->coord_stride[1];
+
+    for (int64_t i = 0; i < n; ++i) {
+      // Extract the next vertex
+      memcpy(&tmp, lngs, sizeof(double));
+      tmp = GEOARROW_BSWAP64(tmp);
+      memcpy(&lng1, &tmp, sizeof(double));
+
+      memcpy(&tmp, lats, sizeof(double));
+      tmp = GEOARROW_BSWAP64(tmp);
+      memcpy(&lat1, &tmp, sizeof(double));
+
+      // Visit
+      visit(lng0, lat0, lng1, lat1);
+
+      // Move this vertex to the previous vertex and advance
+      lng0 = lng1;
+      lat0 = lat1;
+      lngs += node->coord_stride[0];
+      lats += node->coord_stride[1];
+    }
+  } else {
+    // Extract the first vertex
+    memcpy(&lng0, lngs, sizeof(double));
+    memcpy(&lat0, lats, sizeof(double));
+    lngs += node->coord_stride[0];
+    lats += node->coord_stride[1];
+
+    for (int64_t i = 0; i < n; ++i) {
+      // Extract the next vertex
+      memcpy(&lng1, lngs, sizeof(double));
+      memcpy(&lat1, lats, sizeof(double));
+
+      // Visit
+      visit(lng0, lat0, lng1, lat1);
+
+      // Move this vertex to the previous vertex and advance
+      lng0 = lng1;
+      lat0 = lat1;
+      lngs += node->coord_stride[0];
+      lats += node->coord_stride[1];
+    }
+  }
+}
+
+template <typename Visit>
 void VisitVertices(const struct GeoArrowGeometryNode* node, int64_t offset,
                    int64_t n, Visit&& visit) {
   VisitLngLat(node, offset, n, [&](double lng0, double lat0) {
@@ -73,25 +138,24 @@ void VisitVertices(const struct GeoArrowGeometryNode* node, Visit&& visit) {
 }
 
 template <typename Visit>
-void VisitEdges(const struct GeoArrowGeometryNode* node, Visit&& visit) {
-  if (node->size < 2) {
+void VisitEdges(const struct GeoArrowGeometryNode* node, int64_t offset,
+                int64_t n, Visit&& visit) {
+  if (node->size < (offset + n - 1)) {
     return;
   }
 
   S2Shape::Edge e;
-  double prev_lng, prev_lat;
-  VisitLngLat(node, 0, 1, [&](double lng, double lat) {
-    prev_lng = lng;
-    prev_lat = lat;
-  });
+  VisitLngLatEdges(node, offset, n,
+                   [&](double lng0, double lat0, double lng1, double lat1) {
+                     e.v0 = S2LatLng::FromDegrees(lat0, lng0).ToPoint();
+                     e.v1 = S2LatLng::FromDegrees(lat1, lng1).ToPoint();
+                     visit(e);
+                   });
+}
 
-  VisitLngLat(node, 1, node->size - 1, [&](double lng, double lat) {
-    e.v0 = S2LatLng::FromDegrees(prev_lat, prev_lng).ToPoint();
-    e.v1 = S2LatLng::FromDegrees(lat, lng).ToPoint();
-    visit(e);
-    prev_lng = lng;
-    prev_lat = lat;
-  });
+template <typename Visit>
+void VisitEdges(const struct GeoArrowGeometryNode* node, Visit&& visit) {
+  VisitEdges(node, 0, node->size - 1, visit);
 }
 
 }  // namespace internal
@@ -126,10 +190,21 @@ class GeoArrowChain {
     internal::VisitEdges(node, visit);
   }
 
+  template <typename Visit>
+  void VisitEdges(int64_t offset, int64_t n, Visit&& visit) {
+    internal::VisitEdges(node, offset, n, visit);
+  }
+
   S2Point vertex(int64_t i) {
     S2Point v;
     this->VisitVertices(i, 1, [&](const S2Point& pt) { v = pt; });
     return v;
+  }
+
+  S2Shape::Edge edge(int64_t i) {
+    S2Shape::Edge e;
+    this->VisitEdges(i, 1, [&](const S2Shape::Edge& edge) { e = edge; });
+    return e;
   }
 
  protected:
