@@ -2,6 +2,7 @@
 #include "s2geography/predicates.h"
 
 #include <s2/s2boolean_operation.h>
+#include <s2/s2edge_crosser.h>
 #include <s2/s2edge_tessellator.h>
 #include <s2/s2lax_loop_shape.h>
 
@@ -109,6 +110,8 @@ namespace sedona_udf {
 
 static const int kMaxBruteForceEdges = 32;
 
+
+
 struct S2Intersects {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
@@ -148,10 +151,14 @@ struct S2Intersects {
              ExecUsingShapeIndex(value0, value1);
     }
 
-    // We could consider special casing more things here. S2Geometry special
-    // cases loops with less than 32 vertices to avoid building an index which
-    // is likely worth doing here based on some heuristics for other geometry
-    // types too.
+    // For small non-point geometries where no index has been built yet,
+    // use brute force edge crossing and containment checks to avoid the
+    // cost of building an index.
+    if (value0.is_fresh() && value1.is_fresh() &&
+        value0.num_edges() < kMaxBruteForceEdges &&
+        value1.num_edges() < kMaxBruteForceEdges) {
+      return BruteForceExec(value0, value1);
+    }
 
     // Next we try a covering intersection check. This is very cheap if an index
     // has already been built. In the event that an index does have to be built
@@ -167,12 +174,62 @@ struct S2Intersects {
     return ExecUsingShapeIndex(value0, value1);
   }
 
+  bool BruteForceExec(GeoArrowGeography& geog0, GeoArrowGeography& geog1) {
+    // Collect edges from geog1 for repeated iteration
+    edges_.clear();
+    geog1.VisitEdges(
+        [this](const S2Shape::Edge& e) { edges_.push_back(e); });
+
+    // Check edge-edge crossings. CrossingSign returns:
+    //   +1 if edges cross at an interior point
+    //    0 if edges share a vertex
+    //   -1 otherwise (no crossing)
+    // For the CLOSED polygon model, shared vertices count as intersection.
+    bool found = false;
+    geog0.VisitEdges([&](const S2Shape::Edge& e0) {
+      if (found) return;
+      S2CopyingEdgeCrosser crosser(e0.v0, e0.v1);
+      for (const auto& e1 : edges_) {
+        if (crosser.CrossingSign(e1.v0, e1.v1) >= 0) {
+          found = true;
+          return;
+        }
+      }
+    });
+    if (found) return true;
+
+    // Check if any vertex of geog1 is inside geog0's polygons
+    if (geog0.polygons()->num_edges() > 0) {
+      auto ref = geog0.polygons()->GetReferencePoint();
+      geog1.VisitVertices([&](const S2Point& pt) {
+        if (!found && geog0.polygons()->BruteForceContains(pt, ref)) {
+          found = true;
+        }
+      });
+      if (found) return true;
+    }
+
+    // Check if any vertex of geog0 is inside geog1's polygons
+    if (geog1.polygons()->num_edges() > 0) {
+      auto ref = geog1.polygons()->GetReferencePoint();
+      geog0.VisitVertices([&](const S2Point& pt) {
+        if (!found && geog1.polygons()->BruteForceContains(pt, ref)) {
+          found = true;
+        }
+      });
+      if (found) return true;
+    }
+
+    return false;
+  }
+
   bool ExecUsingShapeIndex(arg0_t::c_type value0, arg1_t::c_type value1) {
     return s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(), options_);
   }
 
   S2BooleanOperation::Options options_;
   std::vector<S2CellId> intersection_;
+  std::vector<S2Shape::Edge> edges_;
 };
 
 struct S2Contains {
@@ -204,6 +261,15 @@ struct S2Contains {
              region0->Contains(*maybe_point1);
     }
 
+    // For small non-point geometries where A has polygons and no index has
+    // been built yet, use brute force containment and edge crossing checks.
+    if (value0.is_fresh() && value1.is_fresh() &&
+        value0.num_edges() < kMaxBruteForceEdges &&
+        value1.num_edges() < kMaxBruteForceEdges &&
+        value0.polygons()->num_edges() > 0) {
+      return BruteForceExec(value0, value1);
+    }
+
     S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
                                  &intersection_);
     if (intersection_.empty()) {
@@ -213,12 +279,45 @@ struct S2Contains {
     return ExecUsingShapeIndex(value0, value1);
   }
 
+  bool BruteForceExec(GeoArrowGeography& geog0, GeoArrowGeography& geog1) {
+    // All vertices of geog1 must be inside geog0's polygons
+    auto ref = geog0.polygons()->GetReferencePoint();
+    bool all_inside = true;
+    geog1.VisitVertices([&](const S2Point& pt) {
+      if (all_inside && !geog0.polygons()->BruteForceContains(pt, ref)) {
+        all_inside = false;
+      }
+    });
+    if (!all_inside) return false;
+
+    // No edges of geog1 may properly cross edges of geog0
+    edges_.clear();
+    geog0.VisitEdges(
+        [this](const S2Shape::Edge& e) { edges_.push_back(e); });
+
+    bool crossing_found = false;
+    geog1.VisitEdges([&](const S2Shape::Edge& e1) {
+      if (crossing_found) return;
+      S2CopyingEdgeCrosser crosser(e1.v0, e1.v1);
+      for (const auto& e0 : edges_) {
+        if (crosser.CrossingSign(e0.v0, e0.v1) > 0) {
+          crossing_found = true;
+          return;
+        }
+      }
+    });
+    if (crossing_found) return false;
+
+    return true;
+  }
+
   bool ExecUsingShapeIndex(arg0_t::c_type value0, arg1_t::c_type value1) {
     return s2_contains(value0.ShapeIndex(), value1.ShapeIndex(), options_);
   }
 
   S2BooleanOperation::Options options_;
   std::vector<S2CellId> intersection_;
+  std::vector<S2Shape::Edge> edges_;
 };
 
 struct S2Equals {

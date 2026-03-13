@@ -186,6 +186,35 @@ INSTANTIATE_TEST_SUITE_P(
                           "POLYGON ((0 0, 2 0, 0 2, 0 0))", "intersects",
                           "POLYGON ((0 0, 1 0, 0 1, 0 0))", true},
 
+        // Polygon x linestring (linestring fully inside)
+        ScalarScalarParam{"polygon_intersects_interior_linestring",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "intersects",
+                          "LINESTRING (0.25 0.25, 0.5 0.5)", true},
+        // Linestring x polygon (linestring fully inside)
+        ScalarScalarParam{"interior_linestring_intersects_polygon",
+                          "LINESTRING (0.25 0.25, 0.5 0.5)", "intersects",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", true},
+
+        // Polygon x linestring (linestring partially crosses boundary)
+        ScalarScalarParam{"polygon_intersects_crossing_linestring",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "intersects",
+                          "LINESTRING (0.25 0.25, 3 3)", true},
+        // Linestring x polygon (linestring partially crosses boundary)
+        ScalarScalarParam{"crossing_linestring_intersects_polygon",
+                          "LINESTRING (0.25 0.25, 3 3)", "intersects",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", true},
+
+        // Polygon x linestring (linestring fully outside)
+        ScalarScalarParam{"polygon_not_intersects_exterior_linestring",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "intersects",
+                          "LINESTRING (3 3, 4 4)", false},
+
+        // Interior polygon fully inside (no shared vertices)
+        ScalarScalarParam{
+            "polygon_intersects_interior_polygon",
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))", "intersects",
+            "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))", true},
+
         // Contains
         // Nulls
         ScalarScalarParam{"null_contains", std::nullopt, "contains",
@@ -236,6 +265,19 @@ INSTANTIATE_TEST_SUITE_P(
         ScalarScalarParam{"polygon_does_not_contain_polygon",
                           "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
                           "contains", "POLYGON ((0 0, 2 0, 0 2, 0 0))", false},
+
+        // Polygon contains interior linestring
+        ScalarScalarParam{"polygon_contains_interior_linestring",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
+                          "LINESTRING (0.25 0.25, 0.5 0.5)", true},
+        // Polygon does not contain linestring that crosses boundary
+        ScalarScalarParam{"polygon_not_contains_crossing_linestring",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
+                          "LINESTRING (0.25 0.25, 3 3)", false},
+        // Polygon does not contain exterior linestring
+        ScalarScalarParam{"polygon_not_contains_exterior_linestring",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
+                          "LINESTRING (3 3, 4 4)", false},
 
         // Equals
         // Nulls
