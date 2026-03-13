@@ -647,6 +647,9 @@ bool GeoArrowLoop::BruteForceContains(
 }
 
 void GeoArrowLoop::BuildScratch() {
+  if (node->size == 0) {
+    return;
+  }
   if (scratch_->empty()) {
     this->VisitVertices(0, node->size - 1,
                         [&](const S2Point& pt) { scratch_->push_back(pt); });
