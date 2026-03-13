@@ -264,14 +264,14 @@ class GeoArrowChain {
 
   /// \brief Copy a single vertex out of this sequence
   S2Point vertex(int64_t i) {
-    S2Point v;
+    S2Point v{};
     this->VisitVertices(i, 1, [&](const S2Point& pt) { v = pt; });
     return v;
   }
 
   /// \brief Copy a single pair of vertices out of this sequence
   S2Shape::Edge edge(int64_t i) {
-    S2Shape::Edge e;
+    S2Shape::Edge e{};
     this->VisitEdges(i, 1, [&](const S2Shape::Edge& edge) { e = edge; });
     return e;
   }
