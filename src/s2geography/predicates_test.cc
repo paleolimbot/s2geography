@@ -86,6 +86,143 @@ TEST(Predicates, SedonaUdfContainsScalarArray) {
                                           {true, false, std::nullopt}));
 }
 
+// Semi-brute force tests: scalar side is indexed, array items are fresh.
+// These exercise the SemiBruteForce paths for non-point geometries.
+
+TEST(Predicates, SedonaUdfIntersectsScalarPolygonArrayLinestring) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::IntersectsKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+      {{"POLYGON ((0 0, 2 0, 0 2, 0 0))"},
+       {"LINESTRING (0.25 0.25, 0.5 0.5)", "LINESTRING (0.25 0.25, 3 3)",
+        "LINESTRING (3 3, 4 4)"}},
+      {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  // Interior linestring, crossing linestring, exterior linestring
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
+                                          {true, true, false}));
+}
+
+TEST(Predicates, SedonaUdfIntersectsArrayLinestringScalarPolygon) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::IntersectsKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+      {{"LINESTRING (0.25 0.25, 0.5 0.5)", "LINESTRING (0.25 0.25, 3 3)",
+        "LINESTRING (3 3, 4 4)"},
+       {"POLYGON ((0 0, 2 0, 0 2, 0 0))"}},
+      {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
+                                          {true, true, false}));
+}
+
+TEST(Predicates, SedonaUdfIntersectsScalarPolygonArrayPolygon) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::IntersectsKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+      {{"POLYGON ((0 0, 2 0, 0 2, 0 0))"},
+       {"POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
+        "POLYGON ((0 0, 1 0, 0 1, 0 0))",
+        "POLYGON ((30 30, 32 30, 30 32, 30 30))"}},
+      {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  // Interior polygon, shared-boundary polygon, distant polygon
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
+                                          {true, true, false}));
+}
+
+TEST(Predicates, SedonaUdfContainsScalarPolygonArrayLinestring) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::ContainsKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+      {{"POLYGON ((0 0, 2 0, 0 2, 0 0))"},
+       {"LINESTRING (0.25 0.25, 0.5 0.5)", "LINESTRING (0.25 0.25, 3 3)",
+        "LINESTRING (3 3, 4 4)"}},
+      {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  // Interior linestring, crossing linestring, exterior linestring
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
+                                          {true, false, false}));
+}
+
+TEST(Predicates, SedonaUdfContainsScalarPolygonArrayPolygon) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::ContainsKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+      {{"POLYGON ((0 0, 2 0, 0 2, 0 0))"},
+       {"POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
+        "POLYGON ((0 0, 0.5 0, 0 0.5, 0 0))",
+        "POLYGON ((30 30, 32 30, 30 32, 30 30))"}},
+      {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  // Interior sub-polygon, shared-boundary polygon (not contained), distant
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
+                                          {true, false, false}));
+}
+
+TEST(Predicates, SedonaUdfContainsArrayPolygonScalarLinestring) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::ContainsKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+      {{"POLYGON ((0 0, 2 0, 0 2, 0 0))",
+        "POLYGON ((0 0, 0.4 0, 0 0.4, 0 0))",
+        "POLYGON ((30 30, 32 30, 30 32, 30 30))"},
+       {"LINESTRING (0.25 0.25, 0.5 0.5)"}},
+      {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  // Big polygon contains it, small polygon doesn't, distant polygon doesn't
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
+                                          {true, false, false}));
+}
+
 struct ScalarScalarParam {
   std::string name;
   std::optional<std::string> lhs;
