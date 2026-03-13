@@ -1,6 +1,10 @@
 
 #pragma once
 
+#include <vector>
+#include <cstring>
+#include <cstdint>
+
 #include <s2/s2latlng.h>
 #include <s2/s2shape.h>
 
