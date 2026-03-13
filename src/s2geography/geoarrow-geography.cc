@@ -1,12 +1,12 @@
 
 #include "s2geography/geoarrow-geography.h"
 
+#include <s2/s2edge_crosser.h>
 #include <s2/s2loop_measures.h>
 #include <s2/s2point.h>
 #include <s2/s2projections.h>
 #include <s2/s2shape_index_region.h>
 #include <s2/s2shapeutil_get_reference_point.h>
-#include <s2/s2edge_crosser.h>
 
 #include <algorithm>
 #include <cstring>
