@@ -109,13 +109,13 @@ class GeoArrowChain {
   /// \brief The number of coordinates in the sequence
   uint32_t size() const { return node->size; }
 
-  /// \brief Call a function for each S2Point
+  /// \brief Call a function for each S2Point in this sequence
   template <typename Visit>
   void VisitVertices(Visit&& visit) {
     internal::VisitVertices(node, visit);
   }
 
-  /// \brief Call a function for each S2Point
+  /// \brief Call a function for each S2Point in a slice of this sequence
   template <typename Visit>
   void VisitVertices(int64_t offset, int64_t n, Visit&& visit) {
     internal::VisitVertices(node, offset, n, visit);
@@ -124,6 +124,12 @@ class GeoArrowChain {
   template <typename Visit>
   void VisitEdges(Visit&& visit) {
     internal::VisitEdges(node, visit);
+  }
+
+  S2Point vertex(int64_t i) {
+    S2Point v;
+    this->VisitVertices(i, 1, [&](const S2Point& pt) { v = pt; });
+    return v;
   }
 
  protected:
