@@ -294,7 +294,7 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
             break;
           default:
             throw Exception(
-                "Can't create GeoArrowLaxPolygonShape() from geometry type" +
+                "Can't create GeoArrowLaxPolygonShape() from geometry type " +
                 std::string(GeometryTypeString(geom.root->geometry_type)));
         }
       });
