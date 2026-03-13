@@ -262,21 +262,32 @@ TEST(GeoArrowGeom, DefaultConstructor) {
 
 TEST(GeoArrowLoop, LoopMetrics) {
   std::vector<S2Point> scratch;
+  S2Shape::ReferencePoint reference{S2LatLng::FromDegrees(-1, -1).ToPoint(),
+                                    false};
 
-  auto shell =
-      TestGeometry::FromWKT("LINESTRING (0 0, 10 0, 10 10, 0 10, 0 0)");
+  // Counterclockwise wound shell
+  auto shell = TestGeometry::FromWKT("LINESTRING (0 0, 10 0, 0 10, 0 0)");
   GeoArrowLoop shell_loop(shell.geom().root, &scratch);
   ASSERT_GT(shell_loop.GetSignedArea(), 0);
   ASSERT_GT(shell_loop.GetCurvature(), 0);
   S2Point centroid = shell_loop.GetCentroid();
   ASSERT_NEAR(centroid.Norm(), std::abs(shell_loop.GetSignedArea()), 1e-4);
+  EXPECT_TRUE(shell_loop.Contains(S2LatLng::FromDegrees(1.1, 1.1).ToPoint(),
+                                  reference));
+  EXPECT_FALSE(
+      shell_loop.Contains(S2LatLng::FromDegrees(10, 10).ToPoint(), reference));
 
-  auto hole = TestGeometry::FromWKT("LINESTRING (1 1, 5 1, 5 5, 1 5, 1 1)");
+  // Clockwise wound hole
+  auto hole = TestGeometry::FromWKT("LINESTRING (1 1, 1 5, 5 1, 1 1)");
   GeoArrowLoop hole_loop(hole.geom().root, &scratch);
-  ASSERT_GT(hole_loop.GetSignedArea(), 0);
-  ASSERT_GT(hole_loop.GetCurvature(), 0);
+  ASSERT_LT(hole_loop.GetSignedArea(), 0);
+  ASSERT_LT(hole_loop.GetCurvature(), 0);
   centroid = hole_loop.GetCentroid();
   ASSERT_NEAR(centroid.Norm(), std::abs(hole_loop.GetSignedArea()), 1e-4);
+  EXPECT_FALSE(
+      hole_loop.Contains(S2LatLng::FromDegrees(1.1, 1.1).ToPoint(), reference));
+  EXPECT_FALSE(
+      hole_loop.Contains(S2LatLng::FromDegrees(5, 5).ToPoint(), reference));
 }
 
 // Shape tests

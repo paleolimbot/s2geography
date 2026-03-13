@@ -58,6 +58,13 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
 }
 
 template <typename Visit>
+void VisitVertices(const struct GeoArrowGeometryNode* node, int64_t offset, int64_t n, Visit&& visit) {
+  VisitLngLat(node, offset, n, [&](double lng0, double lat0) {
+    visit(S2LatLng::FromDegrees(lat0, lng0).ToPoint());
+  });
+}
+
+template <typename Visit>
 void VisitVertices(const struct GeoArrowGeometryNode* node, Visit&& visit) {
   VisitLngLat(node, 0, node->size, [&](double lng0, double lat0) {
     visit(S2LatLng::FromDegrees(lat0, lng0).ToPoint());
@@ -107,6 +114,12 @@ class GeoArrowChain {
     internal::VisitVertices(node, visit);
   }
 
+  /// \brief Call a function for each S2Point
+  template <typename Visit>
+  void VisitVertices(int64_t offset, int64_t n, Visit&& visit) {
+    internal::VisitVertices(node, visit);
+  }
+
   template <typename Visit>
   void VisitEdges(Visit&& visit) {
     internal::VisitEdges(node, visit);
@@ -148,6 +161,8 @@ struct GeoArrowLoop : public GeoArrowChain {
   /// To make this value easier to compose with other centroids, it is
   /// scaled to the signed area of this loop.
   S2Point GetCentroid();
+
+  bool Contains(const S2Point& pt, const S2Shape::ReferencePoint& reference);
 
  protected:
   std::vector<S2Point>* scratch_{};
