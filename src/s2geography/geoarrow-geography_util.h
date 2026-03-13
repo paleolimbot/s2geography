@@ -14,6 +14,23 @@ namespace s2geography {
 
 namespace internal {
 
+/// \brief Visit "nodes" of a GeoArrowGeometryView
+///
+/// Briefly, a GeoArrowGeometryNode is either a sequence (if geometry_type
+/// is GEOARROW_GEOMETRY_TYPE_POINT or GEOARROW_GEOMETRY_TYPE_LINESTRING)
+/// whose size corresponds to the number of coordinates, or a container
+/// (e.g., a polygon) whose size corresponds to the number of children
+/// (e.g., the number of rings). The children always directly follow the
+/// parent. Coordinates are views represented by a start const uint8_t*
+/// and a stride for each dimension. This representation can express any
+/// GeoArrow element including native and serialize representations. It
+/// can also express most other geometry representations without copying
+/// coordinates, at the expense of relying on unaligned access (memcpy)
+/// and slightly inefficient representation of points. It optimizes for
+/// forward iteration over an entire geometry, which is arguably the most
+/// common access pattern. Among other things, it allows permuting axes
+/// and reversing the order of a sequence without modifying the underlying
+/// data.
 template <typename Visit>
 void VisitGeoArrowNodes(struct GeoArrowGeometryView geom, Visit&& visit) {
   if (geom.size_nodes == 0) {
@@ -27,6 +44,13 @@ void VisitGeoArrowNodes(struct GeoArrowGeometryView geom, Visit&& visit) {
   }
 }
 
+/// \brief Visit longitudes and latitudes of a single node
+///
+/// This is a building block for other visitors. All geometries are
+/// interpreted by s2geography as longitude, latitude (in that order).
+/// Visiting a single element is relatively cheap but not free: care
+/// is taken in downstream internals to visit all members of a sequence
+/// at once where possible.
 template <typename Visit>
 void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
                  int64_t n, Visit&& visit) {
@@ -65,6 +89,10 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
   }
 }
 
+/// \brief Visit sequential longitudes and latitudes of a single node
+///
+/// This is a building block for other visitors. This utility visits each
+/// pair of sequential vertices (i.e., "edges").
 template <typename Visit>
 void VisitLngLatEdges(const struct GeoArrowGeometryNode* node, int64_t offset,
                       int64_t n, Visit&& visit) {
@@ -137,6 +165,7 @@ void VisitLngLatEdges(const struct GeoArrowGeometryNode* node, int64_t offset,
   }
 }
 
+/// \brief Visit a subset of vertices in a sequence as S2Points
 template <typename Visit>
 void VisitVertices(const struct GeoArrowGeometryNode* node, int64_t offset,
                    int64_t n, Visit&& visit) {
@@ -145,6 +174,7 @@ void VisitVertices(const struct GeoArrowGeometryNode* node, int64_t offset,
   });
 }
 
+/// \brief Visit a all vertices in a sequence as S2Points
 template <typename Visit>
 void VisitVertices(const struct GeoArrowGeometryNode* node, Visit&& visit) {
   VisitLngLat(node, 0, node->size, [&](double lng0, double lat0) {
@@ -152,6 +182,7 @@ void VisitVertices(const struct GeoArrowGeometryNode* node, Visit&& visit) {
   });
 }
 
+/// \brief Visit a subset of edges in a sequence as S2Shape::Edges
 template <typename Visit>
 void VisitEdges(const struct GeoArrowGeometryNode* node, int64_t offset,
                 int64_t n, Visit&& visit) {
@@ -171,6 +202,7 @@ void VisitEdges(const struct GeoArrowGeometryNode* node, int64_t offset,
                    });
 }
 
+/// \brief Visit all edges in a sequence as S2Shape::Edges
 template <typename Visit>
 void VisitEdges(const struct GeoArrowGeometryNode* node, Visit&& visit) {
   if (node->size <= 1) {
