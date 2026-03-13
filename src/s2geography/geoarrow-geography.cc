@@ -653,8 +653,8 @@ bool GeoArrowLoop::BruteForceContains(
   S2Point v0 = vertex(0);
   S2CopyingEdgeCrosser crosser(reference.point, pt, v0);
   bool inside = reference.contained;
-  this->VisitVertices(1, size() - 1, [&](const S2Point& pt) {
-    inside ^= crosser.EdgeOrVertexCrossing(pt);
+  this->VisitVertices(1, size() - 1, [&](const S2Point& vertex_pt) {
+    inside ^= crosser.EdgeOrVertexCrossing(vertex_pt);
   });
 
   return inside;
