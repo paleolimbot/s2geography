@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "geoarrow/geoarrow.h"
+#include "s2geography/macros.h"
 
 namespace s2geography {
 
@@ -54,9 +55,9 @@ void VisitGeoArrowNodes(struct GeoArrowGeometryView geom, Visit&& visit) {
 template <typename Visit>
 void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
                  int64_t n, Visit&& visit) {
-  ABSL_DCHECK_GE(offset, 0);
-  ABSL_DCHECK_GE(n, 0);
-  ABSL_DCHECK_LE(offset + n, static_cast<int64_t>(node->size));
+  S2GEOGRAPHY_DCHECK_GE(offset, 0);
+  S2GEOGRAPHY_DCHECK_GE(n, 0);
+  S2GEOGRAPHY_DCHECK_LE(offset + n, static_cast<int64_t>(node->size));
 
   const uint8_t* lngs = node->coords[0] + offset * node->coord_stride[0];
   const uint8_t* lats = node->coords[1] + offset * node->coord_stride[1];
@@ -96,12 +97,12 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
 template <typename Visit>
 void VisitLngLatEdges(const struct GeoArrowGeometryNode* node, int64_t offset,
                       int64_t n, Visit&& visit) {
-  ABSL_DCHECK_GE(offset, 0);
-  ABSL_DCHECK_GE(n, 0);
+  S2GEOGRAPHY_DCHECK_GE(offset, 0);
+  S2GEOGRAPHY_DCHECK_GE(n, 0);
   if (n == 0) {
     return;
   }
-  ABSL_DCHECK_LT(offset + n, static_cast<int64_t>(node->size));
+  S2GEOGRAPHY_DCHECK_LT(offset + n, static_cast<int64_t>(node->size));
 
   const uint8_t* lngs = node->coords[0] + offset * node->coord_stride[0];
   const uint8_t* lats = node->coords[1] + offset * node->coord_stride[1];
@@ -186,8 +187,8 @@ void VisitVertices(const struct GeoArrowGeometryNode* node, Visit&& visit) {
 template <typename Visit>
 void VisitEdges(const struct GeoArrowGeometryNode* node, int64_t offset,
                 int64_t n, Visit&& visit) {
-  ABSL_DCHECK_GE(offset, 0);
-  ABSL_DCHECK_GE(n, 0);
+  S2GEOGRAPHY_DCHECK_GE(offset, 0);
+  S2GEOGRAPHY_DCHECK_GE(n, 0);
 
   if (static_cast<int64_t>(node->size) < offset + n + 1) {
     return;
