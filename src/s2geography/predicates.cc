@@ -112,8 +112,6 @@ namespace sedona_udf {
 
 static const int kMaxBruteForceEdges = 32;
 
-
-
 struct S2Intersects {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
@@ -192,8 +190,7 @@ struct S2Intersects {
   bool BruteForceExec(GeoArrowGeography& geog0, GeoArrowGeography& geog1) {
     // Collect edges from geog1 for repeated iteration
     edges_.clear();
-    geog1.VisitEdges(
-        [this](const S2Shape::Edge& e) { edges_.push_back(e); });
+    geog1.VisitEdges([this](const S2Shape::Edge& e) { edges_.push_back(e); });
 
     // Check edge-edge crossings. CrossingSign returns:
     //   +1 if edges cross at an interior point
@@ -248,9 +245,8 @@ struct S2Intersects {
     bool found = false;
     fresh_geog.VisitEdges([&](const S2Shape::Edge& e) {
       if (found) return;
-      crossing_query.GetCrossingEdges(e.v0, e.v1,
-                                      s2shapeutil::CrossingType::ALL,
-                                      &crossing_edges_);
+      crossing_query.GetCrossingEdges(
+          e.v0, e.v1, s2shapeutil::CrossingType::ALL, &crossing_edges_);
       if (!crossing_edges_.empty()) {
         found = true;
       }
@@ -259,8 +255,7 @@ struct S2Intersects {
 
     // Check if any vertex of the fresh geometry is contained by the index.
     auto contains_query = MakeS2ContainsPointQuery(
-        &indexed,
-        S2ContainsPointQueryOptions(S2VertexModel::CLOSED));
+        &indexed, S2ContainsPointQueryOptions(S2VertexModel::CLOSED));
     fresh_geog.VisitVertices([&](const S2Point& pt) {
       if (!found && contains_query.Contains(pt)) {
         found = true;
@@ -372,8 +367,7 @@ struct S2Contains {
 
     // No edges of geog1 may properly cross edges of geog0
     edges_.clear();
-    geog0.VisitEdges(
-        [this](const S2Shape::Edge& e) { edges_.push_back(e); });
+    geog0.VisitEdges([this](const S2Shape::Edge& e) { edges_.push_back(e); });
 
     bool crossing_found = false;
     geog1.VisitEdges([&](const S2Shape::Edge& e1) {
@@ -397,8 +391,7 @@ struct S2Contains {
                                      GeoArrowGeography& fresh_geog) {
     // All vertices of the fresh geometry must be contained by the index.
     auto contains_query = MakeS2ContainsPointQuery(
-        &indexed,
-        S2ContainsPointQueryOptions(S2VertexModel::SEMI_OPEN));
+        &indexed, S2ContainsPointQueryOptions(S2VertexModel::SEMI_OPEN));
     bool all_inside = true;
     fresh_geog.VisitVertices([&](const S2Point& pt) {
       if (all_inside && !contains_query.Contains(pt)) {
@@ -412,9 +405,8 @@ struct S2Contains {
     bool crossing_found = false;
     fresh_geog.VisitEdges([&](const S2Shape::Edge& e) {
       if (crossing_found) return;
-      crossing_query.GetCrossingEdges(e.v0, e.v1,
-                                      s2shapeutil::CrossingType::INTERIOR,
-                                      &crossing_edges_);
+      crossing_query.GetCrossingEdges(
+          e.v0, e.v1, s2shapeutil::CrossingType::INTERIOR, &crossing_edges_);
       if (!crossing_edges_.empty()) {
         crossing_found = true;
       }

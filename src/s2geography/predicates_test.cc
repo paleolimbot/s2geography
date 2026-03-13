@@ -140,13 +140,13 @@ TEST(Predicates, SedonaUdfIntersectsScalarPolygonArrayPolygon) {
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
-      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
-      {{"POLYGON ((0 0, 2 0, 0 2, 0 0))"},
-       {"POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
-        "POLYGON ((0 0, 1 0, 0 1, 0 0))",
-        "POLYGON ((30 30, 32 30, 30 32, 30 30))"}},
-      {}, out_array.get()));
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                        {{"POLYGON ((0 0, 2 0, 0 2, 0 0))"},
+                         {"POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
+                          "POLYGON ((0 0, 1 0, 0 1, 0 0))",
+                          "POLYGON ((30 30, 32 30, 30 32, 30 30))"}},
+                        {}, out_array.get()));
   impl.release(&impl);
   kernel.release(&kernel);
 
@@ -185,13 +185,13 @@ TEST(Predicates, SedonaUdfContainsScalarPolygonArrayPolygon) {
       &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
-      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
-      {{"POLYGON ((0 0, 2 0, 0 2, 0 0))"},
-       {"POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
-        "POLYGON ((0 0, 0.5 0, 0 0.5, 0 0))",
-        "POLYGON ((30 30, 32 30, 30 32, 30 30))"}},
-      {}, out_array.get()));
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                        {{"POLYGON ((0 0, 2 0, 0 2, 0 0))"},
+                         {"POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
+                          "POLYGON ((0 0, 0.5 0, 0 0.5, 0 0))",
+                          "POLYGON ((30 30, 32 30, 30 32, 30 30))"}},
+                        {}, out_array.get()));
   impl.release(&impl);
   kernel.release(&kernel);
 
@@ -210,8 +210,7 @@ TEST(Predicates, SedonaUdfContainsArrayPolygonScalarLinestring) {
   nanoarrow::UniqueArray out_array;
   ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
       &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
-      {{"POLYGON ((0 0, 2 0, 0 2, 0 0))",
-        "POLYGON ((0 0, 0.4 0, 0 0.4, 0 0))",
+      {{"POLYGON ((0 0, 2 0, 0 2, 0 0))", "POLYGON ((0 0, 0.4 0, 0 0.4, 0 0))",
         "POLYGON ((30 30, 32 30, 30 32, 30 30))"},
        {"LINESTRING (0.25 0.25, 0.5 0.5)"}},
       {}, out_array.get()));
@@ -347,10 +346,10 @@ INSTANTIATE_TEST_SUITE_P(
                           "LINESTRING (3 3, 4 4)", false},
 
         // Interior polygon fully inside (no shared vertices)
-        ScalarScalarParam{
-            "polygon_intersects_interior_polygon",
-            "POLYGON ((0 0, 2 0, 0 2, 0 0))", "intersects",
-            "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))", true},
+        ScalarScalarParam{"polygon_intersects_interior_polygon",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "intersects",
+                          "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
+                          true},
 
         // Contains
         // Nulls
