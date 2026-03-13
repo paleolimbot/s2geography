@@ -183,6 +183,10 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   ChainPosition chain_position(int e) const override;
   TypeTag type_tag() const override;
 
+  bool BruteForceContains(const S2Point& pt,
+                          const S2Shape::ReferencePoint& reference);
+  bool BruteForceContains(const S2Point& pt);
+
  private:
   GeoArrowGeom geom_{};
   int num_loops_{};

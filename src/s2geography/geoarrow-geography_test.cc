@@ -272,10 +272,10 @@ TEST(GeoArrowLoop, LoopMetrics) {
   ASSERT_GT(shell_loop.GetCurvature(), 0);
   S2Point centroid = shell_loop.GetCentroid();
   ASSERT_NEAR(centroid.Norm(), std::abs(shell_loop.GetSignedArea()), 1e-4);
-  EXPECT_TRUE(shell_loop.Contains(S2LatLng::FromDegrees(1.1, 1.2).ToPoint(),
-                                  reference));
-  EXPECT_FALSE(
-      shell_loop.Contains(S2LatLng::FromDegrees(10, 10).ToPoint(), reference));
+  EXPECT_TRUE(shell_loop.BruteForceContains(
+      S2LatLng::FromDegrees(1.1, 1.2).ToPoint(), reference));
+  EXPECT_FALSE(shell_loop.BruteForceContains(
+      S2LatLng::FromDegrees(10, 10).ToPoint(), reference));
 
   // Clockwise wound hole
   auto hole = TestGeometry::FromWKT("LINESTRING (1 1, 1 5, 5 1, 1 1)");
@@ -284,10 +284,10 @@ TEST(GeoArrowLoop, LoopMetrics) {
   ASSERT_LT(hole_loop.GetCurvature(), 0);
   centroid = hole_loop.GetCentroid();
   ASSERT_NEAR(centroid.Norm(), std::abs(hole_loop.GetSignedArea()), 1e-4);
-  EXPECT_TRUE(
-      hole_loop.Contains(S2LatLng::FromDegrees(1.1, 1.2).ToPoint(), reference));
-  EXPECT_FALSE(
-      hole_loop.Contains(S2LatLng::FromDegrees(5, 5).ToPoint(), reference));
+  EXPECT_TRUE(hole_loop.BruteForceContains(
+      S2LatLng::FromDegrees(1.1, 1.2).ToPoint(), reference));
+  EXPECT_FALSE(hole_loop.BruteForceContains(
+      S2LatLng::FromDegrees(5, 5).ToPoint(), reference));
 }
 
 // Shape tests
@@ -600,6 +600,7 @@ TEST(GeoArrowLaxPolygonShape, EmptyPolygon) {
   EXPECT_EQ(shape.num_edges(), 0);
   EXPECT_EQ(shape.dimension(), 2);
   EXPECT_EQ(shape.num_chains(), 0);
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(0, 0).ToPoint()));
   ValidateShape(shape);
 }
 
@@ -609,6 +610,7 @@ TEST(GeoArrowLaxPolygonShape, EmptyMultiPolygon) {
   EXPECT_EQ(shape.num_edges(), 0);
   EXPECT_EQ(shape.dimension(), 2);
   EXPECT_EQ(shape.num_chains(), 0);
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(0, 0).ToPoint()));
   ValidateShape(shape);
 }
 
@@ -624,6 +626,12 @@ TEST(GeoArrowLaxPolygonShape, SimpleTriangle) {
   auto chain0 = shape.chain(0);
   EXPECT_EQ(chain0.start, 0);
   EXPECT_EQ(chain0.length, 3);
+
+  // Check brute force containment outside and inside
+  EXPECT_FALSE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint()));
+  EXPECT_TRUE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(0.1, 0.1).ToPoint()));
 
   ValidateShape(shape);
 }
@@ -650,6 +658,12 @@ TEST(GeoArrowLaxPolygonShape, PolygonWithHole) {
   auto pos = shape.chain_position(6);
   EXPECT_EQ(pos.chain_id, 1);
   EXPECT_EQ(pos.offset, 2);
+
+  // Check brute force containment outside, inside, and inside a hole
+  EXPECT_FALSE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint()));
+  EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1, 1).ToPoint()));
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3, 3).ToPoint()));
 
   ValidateShape(shape);
 }

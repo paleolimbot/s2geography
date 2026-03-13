@@ -363,6 +363,19 @@ S2Shape::ChainPosition GeoArrowLaxPolygonShape::chain_position(int e) const {
 
 S2Shape::TypeTag GeoArrowLaxPolygonShape::type_tag() const { return kTypeTag; }
 
+bool GeoArrowLaxPolygonShape::BruteForceContains(
+    const S2Point& pt, const S2Shape::ReferencePoint& reference) {
+  bool contains = reference.contained;
+  geom_.VisitLoops(&point_scratch_, [&](GeoArrowLoop loop) {
+    contains ^= loop.BruteForceContains(pt, reference);
+  });
+  return contains;
+}
+
+bool GeoArrowLaxPolygonShape::BruteForceContains(const S2Point& pt) {
+  return BruteForceContains(pt, GetReferencePoint());
+}
+
 /// GeoArrowGeography
 
 GeoArrowGeography::GeoArrowGeography(GeoArrowGeography&& other)
@@ -632,8 +645,8 @@ double GeoArrowLoop::GetCurvature() {
   return S2::GetCurvature(S2PointLoopSpan(*scratch_));
 }
 
-bool GeoArrowLoop::Contains(const S2Point& pt,
-                            const S2Shape::ReferencePoint& reference) {
+bool GeoArrowLoop::BruteForceContains(
+    const S2Point& pt, const S2Shape::ReferencePoint& reference) {
   if (size() < 4) {
     return reference.contained;
   }

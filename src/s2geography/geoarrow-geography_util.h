@@ -163,7 +163,8 @@ struct GeoArrowLoop : public GeoArrowChain {
   /// scaled to the signed area of this loop.
   S2Point GetCentroid();
 
-  bool Contains(const S2Point& pt, const S2Shape::ReferencePoint& reference);
+  bool BruteForceContains(const S2Point& pt,
+                          const S2Shape::ReferencePoint& reference);
 
  protected:
   std::vector<S2Point>* scratch_{};
