@@ -363,8 +363,8 @@ bool GeoArrowLaxPolygonShape::BruteForceContains(
 
     S2Point v0 = loop.vertex(0);
     S2CopyingEdgeCrosser crosser(reference.point, pt, v0);
-    loop.VisitVertices(1, loop.size() - 1, [&](const S2Point& pt) {
-      inside ^= crosser.EdgeOrVertexCrossing(pt);
+    loop.VisitVertices(1, loop.size() - 1, [&](const S2Point& vertex) {
+      inside ^= crosser.EdgeOrVertexCrossing(vertex);
     });
   });
 
