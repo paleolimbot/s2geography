@@ -417,7 +417,12 @@ class GeoArrowGeographyInputView {
   bool IsNull(int64_t i) { return inner_.IsNull(i); }
 
   GeoArrowGeography& Get(int64_t i) {
-    StashIfNeeded(i % current_array_length_);
+    if (current_array_length_ == 1) {
+      StashIfNeeded(0, true);
+    } else {
+      StashIfNeeded(i);
+    }
+
     return stashed_;
   }
 
@@ -429,7 +434,7 @@ class GeoArrowGeographyInputView {
   int64_t stashed_index_;
   GeoArrowGeography stashed_;
 
-  void StashIfNeeded(int64_t i) {
+  void StashIfNeeded(int64_t i, bool prepare = false) {
     if (i != stashed_index_) {
       std::string_view inner = inner_.Get(i);
       struct GeoArrowBufferView src = {
@@ -442,6 +447,10 @@ class GeoArrowGeographyInputView {
 
       stashed_.Init(geom);
       stashed_index_ = i;
+
+      if (prepare) {
+        stashed_.ForceBuildIndex();
+      }
     }
   }
 };

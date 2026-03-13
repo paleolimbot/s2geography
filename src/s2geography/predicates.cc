@@ -107,6 +107,8 @@ bool s2_intersects_box(const S2ShapeIndex& geog1, const S2LatLngRect& rect,
 
 namespace sedona_udf {
 
+static const int kMaxBruteForceEdges = 32;
+
 struct S2Intersects {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
@@ -192,6 +194,11 @@ struct S2Contains {
       // A point cannot contain anything
       return false;
     } else if (maybe_point1) {
+      if (value0.is_fresh() && value0.num_edges() < kMaxBruteForceEdges &&
+          value0.dimension() == 2) {
+        return value0.polygons()->BruteForceContains(*maybe_point1);
+      }
+
       auto region0 = value0.Region();
       return region0->MayIntersect(S2Cell(*maybe_point1)) &&
              region0->Contains(*maybe_point1);
