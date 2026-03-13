@@ -6,6 +6,7 @@
 #include <s2/s2projections.h>
 #include <s2/s2shape_index_region.h>
 #include <s2/s2shapeutil_get_reference_point.h>
+#include <s2/s2edge_crosser.h>
 
 #include <algorithm>
 #include <cstring>
