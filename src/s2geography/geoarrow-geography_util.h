@@ -58,7 +58,8 @@ void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
 }
 
 template <typename Visit>
-void VisitVertices(const struct GeoArrowGeometryNode* node, int64_t offset, int64_t n, Visit&& visit) {
+void VisitVertices(const struct GeoArrowGeometryNode* node, int64_t offset,
+                   int64_t n, Visit&& visit) {
   VisitLngLat(node, offset, n, [&](double lng0, double lat0) {
     visit(S2LatLng::FromDegrees(lat0, lng0).ToPoint());
   });
@@ -117,7 +118,7 @@ class GeoArrowChain {
   /// \brief Call a function for each S2Point
   template <typename Visit>
   void VisitVertices(int64_t offset, int64_t n, Visit&& visit) {
-    internal::VisitVertices(node, visit);
+    internal::VisitVertices(node, offset, n, visit);
   }
 
   template <typename Visit>

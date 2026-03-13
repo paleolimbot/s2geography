@@ -272,7 +272,7 @@ TEST(GeoArrowLoop, LoopMetrics) {
   ASSERT_GT(shell_loop.GetCurvature(), 0);
   S2Point centroid = shell_loop.GetCentroid();
   ASSERT_NEAR(centroid.Norm(), std::abs(shell_loop.GetSignedArea()), 1e-4);
-  EXPECT_TRUE(shell_loop.Contains(S2LatLng::FromDegrees(1.1, 1.1).ToPoint(),
+  EXPECT_TRUE(shell_loop.Contains(S2LatLng::FromDegrees(1.1, 1.2).ToPoint(),
                                   reference));
   EXPECT_FALSE(
       shell_loop.Contains(S2LatLng::FromDegrees(10, 10).ToPoint(), reference));
@@ -284,8 +284,8 @@ TEST(GeoArrowLoop, LoopMetrics) {
   ASSERT_LT(hole_loop.GetCurvature(), 0);
   centroid = hole_loop.GetCentroid();
   ASSERT_NEAR(centroid.Norm(), std::abs(hole_loop.GetSignedArea()), 1e-4);
-  EXPECT_FALSE(
-      hole_loop.Contains(S2LatLng::FromDegrees(1.1, 1.1).ToPoint(), reference));
+  EXPECT_TRUE(
+      hole_loop.Contains(S2LatLng::FromDegrees(1.1, 1.2).ToPoint(), reference));
   EXPECT_FALSE(
       hole_loop.Contains(S2LatLng::FromDegrees(5, 5).ToPoint(), reference));
 }

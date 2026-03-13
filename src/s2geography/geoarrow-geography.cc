@@ -634,7 +634,6 @@ double GeoArrowLoop::GetCurvature() {
 
 bool GeoArrowLoop::Contains(const S2Point& pt,
                             const S2Shape::ReferencePoint& reference) {
-  BuildScratch();
   if (size() < 4) {
     return reference.contained;
   }
@@ -642,10 +641,10 @@ bool GeoArrowLoop::Contains(const S2Point& pt,
   S2Point v0;
   this->VisitVertices(0, 1, [&](const S2Point& pt) { v0 = pt; });
 
-  S2EdgeCrosser crosser(&reference.point, &pt, &v0);
+  S2CopyingEdgeCrosser crosser(reference.point, pt, v0);
   bool inside = reference.contained;
   this->VisitVertices(1, size() - 1, [&](const S2Point& pt) {
-    inside ^= crosser.EdgeOrVertexCrossing(&pt);
+    inside ^= crosser.EdgeOrVertexCrossing(pt);
   });
 
   return inside;
