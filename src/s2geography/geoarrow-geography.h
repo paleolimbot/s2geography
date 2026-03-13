@@ -277,6 +277,7 @@ class GeoArrowGeography {
   /// polygon), or -1 for geometry collections
   int dimension() const;
 
+  /// \brief Returns the total number of edges of all shapes in this geography
   int num_edges() const;
 
   /// \brief The number of shapes

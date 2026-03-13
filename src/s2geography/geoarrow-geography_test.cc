@@ -262,8 +262,12 @@ TEST(GeoArrowGeom, DefaultConstructor) {
 
 TEST(GeoArrowLoop, LoopMetrics) {
   std::vector<S2Point> scratch;
-  S2Shape::ReferencePoint reference{S2LatLng::FromDegrees(-1, -1).ToPoint(),
-                                    false};
+
+  // Check a positive reference and a negative reference
+  S2Shape::ReferencePoint reference_out{S2LatLng::FromDegrees(-1, -1).ToPoint(),
+                                        false};
+  S2Shape::ReferencePoint reference_in{S2LatLng::FromDegrees(2, 2).ToPoint(),
+                                       true};
 
   // Counterclockwise wound shell
   auto shell = TestGeometry::FromWKT("LINESTRING (0 0, 10 0, 0 10, 0 0)");
@@ -272,10 +276,16 @@ TEST(GeoArrowLoop, LoopMetrics) {
   ASSERT_GT(shell_loop.GetCurvature(), 0);
   S2Point centroid = shell_loop.GetCentroid();
   ASSERT_NEAR(centroid.Norm(), std::abs(shell_loop.GetSignedArea()), 1e-4);
+
+  // Containment
   EXPECT_TRUE(shell_loop.BruteForceContains(
-      S2LatLng::FromDegrees(1.1, 1.2).ToPoint(), reference));
+      S2LatLng::FromDegrees(1.1, 1.2).ToPoint(), reference_in));
   EXPECT_FALSE(shell_loop.BruteForceContains(
-      S2LatLng::FromDegrees(10, 10).ToPoint(), reference));
+      S2LatLng::FromDegrees(10, 10).ToPoint(), reference_in));
+  EXPECT_TRUE(shell_loop.BruteForceContains(
+      S2LatLng::FromDegrees(1.1, 1.2).ToPoint(), reference_out));
+  EXPECT_FALSE(shell_loop.BruteForceContains(
+      S2LatLng::FromDegrees(10, 10).ToPoint(), reference_out));
 
   // Clockwise wound hole
   auto hole = TestGeometry::FromWKT("LINESTRING (1 1, 1 5, 5 1, 1 1)");
@@ -283,11 +293,17 @@ TEST(GeoArrowLoop, LoopMetrics) {
   ASSERT_LT(hole_loop.GetSignedArea(), 0);
   ASSERT_LT(hole_loop.GetCurvature(), 0);
   centroid = hole_loop.GetCentroid();
+
+  // Containment
   ASSERT_NEAR(centroid.Norm(), std::abs(hole_loop.GetSignedArea()), 1e-4);
   EXPECT_TRUE(hole_loop.BruteForceContains(
-      S2LatLng::FromDegrees(1.1, 1.2).ToPoint(), reference));
+      S2LatLng::FromDegrees(1.1, 1.2).ToPoint(), reference_in));
   EXPECT_FALSE(hole_loop.BruteForceContains(
-      S2LatLng::FromDegrees(5, 5).ToPoint(), reference));
+      S2LatLng::FromDegrees(5, 5).ToPoint(), reference_in));
+  EXPECT_TRUE(hole_loop.BruteForceContains(
+      S2LatLng::FromDegrees(1.1, 1.2).ToPoint(), reference_out));
+  EXPECT_FALSE(hole_loop.BruteForceContains(
+      S2LatLng::FromDegrees(5, 5).ToPoint(), reference_out));
 }
 
 // Shape tests
@@ -627,11 +643,29 @@ TEST(GeoArrowLaxPolygonShape, SimpleTriangle) {
   EXPECT_EQ(chain0.start, 0);
   EXPECT_EQ(chain0.length, 3);
 
-  // Check brute force containment outside and inside
+  // Check brute force containment outside and inside using the computed
+  // reference
   EXPECT_FALSE(
       shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint()));
   EXPECT_TRUE(
       shape.BruteForceContains(S2LatLng::FromDegrees(0.1, 0.1).ToPoint()));
+
+  // Check with custom reference points. This is to ensure that the containment
+  // logic for multiple loops works whether the reference point is inside or
+  // outside.
+  S2Shape::ReferencePoint reference_out{S2LatLng::FromDegrees(-1, -1).ToPoint(),
+                                        false};
+  S2Shape::ReferencePoint reference_in{S2LatLng::FromDegrees(2, 2).ToPoint(),
+                                       true};
+
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint(),
+                                        reference_in));
+  EXPECT_TRUE(shape.BruteForceContains(
+      S2LatLng::FromDegrees(0.1, 0.1).ToPoint(), reference_in));
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint(),
+                                        reference_out));
+  EXPECT_TRUE(shape.BruteForceContains(
+      S2LatLng::FromDegrees(0.1, 0.1).ToPoint(), reference_out));
 
   ValidateShape(shape);
 }
@@ -660,10 +694,41 @@ TEST(GeoArrowLaxPolygonShape, PolygonWithHole) {
   EXPECT_EQ(pos.offset, 2);
 
   // Check brute force containment outside, inside, and inside a hole
+  // EXPECT_FALSE(
+  //     shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint()));
+  // EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1,
+  // 1).ToPoint()));
+  // EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3,
+  // 3).ToPoint()));
+
+  // Check brute force containment outside and inside using the computed
+  // reference
   EXPECT_FALSE(
       shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint()));
   EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1, 1).ToPoint()));
   EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3, 3).ToPoint()));
+
+  // Check with custom reference points. This is to ensure that the containment
+  // logic for multiple loops works whether the reference point is inside or
+  // outside.
+  S2Shape::ReferencePoint reference_out{S2LatLng::FromDegrees(-1, -1).ToPoint(),
+                                        false};
+  S2Shape::ReferencePoint reference_in{
+      S2LatLng::FromDegrees(0.2, 0.2).ToPoint(), true};
+
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint(),
+                                        reference_in));
+  EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1, 1).ToPoint(),
+                                       reference_in));
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3, 3).ToPoint(),
+                                        reference_in));
+
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint(),
+                                        reference_out));
+  EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1, 1).ToPoint(),
+                                       reference_out));
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3, 3).ToPoint(),
+                                        reference_out));
 
   ValidateShape(shape);
 }
