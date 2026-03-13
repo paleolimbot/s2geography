@@ -1,6 +1,7 @@
 
 #include "s2geography/geoarrow-geography.h"
 
+#include <s2/s2edge_crosser.h>
 #include <s2/s2loop_measures.h>
 #include <s2/s2point.h>
 #include <s2/s2projections.h>
@@ -31,60 +32,14 @@ void ReverseNodeInPlace(struct GeoArrowGeometryNode* node) {
   }
 }
 
-template <typename Visit>
-void VisitNodes(struct GeoArrowGeometryView geom, Visit&& visit) {
-  if (geom.size_nodes == 0) {
-    return;
-  }
-
-  const struct GeoArrowGeometryNode* end = geom.root + geom.size_nodes;
-  for (const struct GeoArrowGeometryNode* node = geom.root; node < end;
-       ++node) {
-    visit(node);
-  }
-}
-
-template <typename Visit>
-void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
-                 int64_t n, Visit&& visit) {
-  const uint8_t* lngs = node->coords[0] + offset * node->coord_stride[0];
-  const uint8_t* lats = node->coords[1] + offset * node->coord_stride[1];
-  double lng, lat;
-
-  if (node->flags & GEOARROW_GEOMETRY_NODE_FLAG_SWAP_ENDIAN) {
-    uint64_t tmp;
-    for (int64_t i = 0; i < n; ++i) {
-      memcpy(&tmp, lngs, sizeof(double));
-      tmp = GEOARROW_BSWAP64(tmp);
-      memcpy(&lng, &tmp, sizeof(double));
-
-      memcpy(&tmp, lats, sizeof(double));
-      tmp = GEOARROW_BSWAP64(tmp);
-      memcpy(&lat, &tmp, sizeof(double));
-      visit(lng, lat);
-
-      lngs += node->coord_stride[0];
-      lats += node->coord_stride[1];
-    }
-  } else {
-    for (int64_t i = 0; i < n; ++i) {
-      memcpy(&lng, lngs, sizeof(double));
-      memcpy(&lat, lats, sizeof(double));
-      visit(lng, lat);
-
-      lngs += node->coord_stride[0];
-      lats += node->coord_stride[1];
-    }
-  }
-}
-
 bool AllLngLatNaN(struct GeoArrowGeometryView geom) {
   bool out = true;
-  VisitNodes(geom, [&](const struct GeoArrowGeometryNode* node) {
-    VisitLngLat(node, 0, node->size, [&](double lng, double lat) {
-      out = out && std::isnan(lng) && std::isnan(lat);
-    });
-  });
+  internal::VisitGeoArrowNodes(
+      geom, [&](const struct GeoArrowGeometryNode* node) {
+        internal::VisitLngLat(node, 0, node->size, [&](double lng, double lat) {
+          out = out && std::isnan(lng) && std::isnan(lat);
+        });
+      });
   return out;
 }
 
@@ -133,7 +88,7 @@ void GeoArrowPointShape::Init(struct GeoArrowGeometryView geom) {
           std::string(GeometryTypeString(geom.root->geometry_type)));
   }
 
-  if (geom_.size_nodes > std::numeric_limits<int>::max()) {
+  if (geom_.size() > std::numeric_limits<int>::max()) {
     throw Exception(
         "Can't create GeoArrowPointShape() from geometry with > INT_MAX "
         "points");
@@ -141,8 +96,8 @@ void GeoArrowPointShape::Init(struct GeoArrowGeometryView geom) {
 
   // This is rare but for now we check, as otherwise we might get an attempt to
   // visit the coordinate of a node that doesn't have any.
-  VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
-    if (node->size == 0) {
+  geom_.VisitChains([&](GeoArrowChain chain) {
+    if (chain.size() == 0) {
       throw Exception(
           "Can't create GeoArrowPointShape() from MULTIPOINT with EMPTY "
           "components");
@@ -151,15 +106,11 @@ void GeoArrowPointShape::Init(struct GeoArrowGeometryView geom) {
 }
 
 int GeoArrowPointShape::num_vertices() const {
-  return static_cast<int>(geom_.size_nodes);
+  return static_cast<int>(geom_.size());
 }
 
 S2Point GeoArrowPointShape::vertex(int v) const {
-  S2LatLng ll;
-  VisitLngLat(geom_.root + v, 0, 1, [&](double lng, double lat) {
-    ll = S2LatLng::FromDegrees(lat, lng);
-  });
-  return ll.ToPoint();
+  return GeoArrowChain(geom_.root() + v).vertex(0);
 }
 
 int GeoArrowPointShape::num_edges() const { return num_vertices(); }
@@ -229,20 +180,20 @@ void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
           std::string(GeometryTypeString(geom.root->geometry_type)));
   }
 
-  if (geom_.size_nodes > std::numeric_limits<int>::max()) {
+  if (geom_.size() > std::numeric_limits<int>::max()) {
     throw Exception(
         "Can't create GeoArrowLaxPolylineShape() from geometry with > "
         "INT_MAX parts");
   }
 
-  num_chains_ = geom_.size_nodes;
+  num_chains_ = geom_.size();
   num_edges_.resize(num_chains_ + 1);
   int64_t num_edges = 0;
 
   num_edges_[0] = 0;
   int64_t i = 1;
-  VisitNodes(geom_, [&](const struct GeoArrowGeometryNode* node) {
-    num_edges += node->size == 0 ? 0 : node->size - 1;
+  geom_.VisitChains([&](GeoArrowChain chain) {
+    num_edges += chain.size() == 0 ? 0 : chain.size() - 1;
     if (num_edges > std::numeric_limits<int>::max()) {
       throw Exception(
           "Can't create GeoArrowLaxPolylineShape() from geometry with > "
@@ -273,13 +224,7 @@ S2Shape::Chain GeoArrowLaxPolylineShape::chain(int i) const {
 }
 
 S2Shape::Edge GeoArrowLaxPolylineShape::chain_edge(int i, int j) const {
-  S2LatLng v[2];
-  int vi = 0;
-  VisitLngLat(geom_.root + i, j, 2, [&](double lng, double lat) {
-    v[vi++] = S2LatLng::FromDegrees(lat, lng);
-  });
-
-  return Edge(v[0].ToPoint(), v[1].ToPoint());
+  return GeoArrowChain(geom_.root() + i).edge(j);
 }
 
 S2Shape::ChainPosition GeoArrowLaxPolylineShape::chain_position(int e) const {
@@ -321,51 +266,48 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
   int64_t num_edges = 0;
   bool is_hole = false;
 
-  VisitNodes(geom, [&](const struct GeoArrowGeometryNode* node) {
-    switch (node->geometry_type) {
-      case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
-        break;
-      case GEOARROW_GEOMETRY_TYPE_POLYGON:
-        is_hole = false;
-        break;
-      case GEOARROW_GEOMETRY_TYPE_LINESTRING:
-        num_edges += node->size == 0 ? 0 : node->size - 1;
-        if (num_edges > std::numeric_limits<int>::max()) {
-          throw Exception(
-              "Can't create GeoArrowLaxPolygonShape from geometry with > "
-              "INT_MAX vertices");
+  internal::VisitGeoArrowNodes(
+      geom, [&](const struct GeoArrowGeometryNode* node) {
+        switch (node->geometry_type) {
+          case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
+            break;
+          case GEOARROW_GEOMETRY_TYPE_POLYGON:
+            is_hole = false;
+            break;
+          case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+            num_edges += node->size == 0 ? 0 : node->size - 1;
+            if (num_edges > std::numeric_limits<int>::max()) {
+              throw Exception(
+                  "Can't create GeoArrowLaxPolygonShape from geometry with > "
+                  "INT_MAX vertices");
+            }
+
+            num_edges_.push_back(static_cast<int>(num_edges));
+            loops_.push_back(*node);
+
+            if (is_hole) {
+              loops_.back().flags |= kFlagS2GeographyIsHole;
+            }
+
+            ++num_loops_;
+            is_hole = true;
+            break;
+          default:
+            throw Exception(
+                "Can't create GeoArrowLaxPolygonShape() from geometry type " +
+                std::string(GeometryTypeString(geom.root->geometry_type)));
         }
-
-        num_edges_.push_back(static_cast<int>(num_edges));
-        loops_.push_back(*node);
-
-        if (is_hole) {
-          loops_.back().flags |= kFlagS2GeographyIsHole;
-        }
-
-        ++num_loops_;
-        is_hole = true;
-        break;
-      default:
-        throw Exception(
-            "Can't create GeoArrowLaxPolygonShape() from geometry type" +
-            std::string(GeometryTypeString(geom.root->geometry_type)));
-    }
-  });
+      });
 
   geom_ = {loops_.data(), static_cast<int64_t>(loops_.size())};
 }
 
 void GeoArrowLaxPolygonShape::NormalizeOrientation() {
   for (auto& node : loops_) {
-    point_scratch_.clear();
-    VisitLngLat(&node, 0, node.size, [&](double lng, double lat) {
-      point_scratch_.push_back(S2LatLng::FromDegrees(lat, lng).ToPoint());
-    });
-
-    double signed_area = S2::GetSignedArea(S2PointLoopSpan(point_scratch_));
+    GeoArrowLoop loop(&node, &point_scratch_);
+    double curvature = loop.GetCurvature();
     bool is_hole = (node.flags & kFlagS2GeographyIsHole) != 0;
-    if (is_hole != (signed_area < 0)) {
+    if (is_hole != (curvature < 0)) {
       ReverseNodeInPlace(&node);
     }
   }
@@ -391,12 +333,7 @@ S2Shape::Chain GeoArrowLaxPolygonShape::chain(int i) const {
 }
 
 S2Shape::Edge GeoArrowLaxPolygonShape::chain_edge(int i, int j) const {
-  S2LatLng v[2];
-  int vi = 0;
-  VisitLngLat(&loops_[i], j, 2, [&](double lng, double lat) {
-    v[vi++] = S2LatLng::FromDegrees(lat, lng);
-  });
-  return Edge(v[0].ToPoint(), v[1].ToPoint());
+  return GeoArrowChain(&loops_[i]).edge(j);
 }
 
 S2Shape::ChainPosition GeoArrowLaxPolygonShape::chain_position(int e) const {
@@ -411,6 +348,32 @@ S2Shape::ChainPosition GeoArrowLaxPolygonShape::chain_position(int e) const {
 }
 
 S2Shape::TypeTag GeoArrowLaxPolygonShape::type_tag() const { return kTypeTag; }
+
+bool GeoArrowLaxPolygonShape::BruteForceContains(
+    const S2Point& pt, const S2Shape::ReferencePoint& reference) const {
+  bool inside = reference.contained;
+  if (is_empty() || is_full()) {
+    return inside;
+  }
+
+  geom_.VisitChains([&](GeoArrowChain loop) {
+    if (loop.size() < 2) {
+      return;
+    }
+
+    S2Point v0 = loop.vertex(0);
+    S2CopyingEdgeCrosser crosser(reference.point, pt, v0);
+    loop.VisitVertices(1, loop.size() - 1, [&](const S2Point& vertex) {
+      inside ^= crosser.EdgeOrVertexCrossing(vertex);
+    });
+  });
+
+  return inside;
+}
+
+bool GeoArrowLaxPolygonShape::BruteForceContains(const S2Point& pt) const {
+  return BruteForceContains(pt, GetReferencePoint());
+}
 
 /// GeoArrowGeography
 
@@ -490,9 +453,8 @@ void GeoArrowGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
       if (points_.num_vertices() <= 32) {
-        for (int i = 0; i < points_.num_edges(); ++i) {
-          cell_ids->push_back(S2CellId(points_.vertex(i)));
-        }
+        points_.geom().VisitVertices(
+            [&](S2Point v) { cell_ids->push_back(S2CellId(v)); });
         return;
       }
       break;
@@ -578,6 +540,18 @@ int GeoArrowGeography::dimension() const {
   }
 }
 
+int GeoArrowGeography::num_edges() const {
+  return points_.num_edges() + lines_.num_edges() + polygons_.num_edges();
+}
+
+const GeoArrowPointShape* GeoArrowGeography::points() const { return &points_; }
+const GeoArrowLaxPolylineShape* GeoArrowGeography::lines() const {
+  return &lines_;
+}
+const GeoArrowLaxPolygonShape* GeoArrowGeography::polygons() const {
+  return &polygons_;
+}
+
 int GeoArrowGeography::num_shapes() const {
   if (geom_.size_nodes == 0) {
     return 0;
@@ -653,6 +627,48 @@ void GeoArrowGeography::InitIndex() {
   }
 
   indexed_ = true;
+}
+
+double GeoArrowLoop::GetSignedArea() {
+  BuildScratch();
+  return S2::GetSignedArea(S2PointLoopSpan(*scratch_));
+}
+
+S2Point GeoArrowLoop::GetCentroid() {
+  BuildScratch();
+  return S2::GetCentroid(S2PointLoopSpan(*scratch_));
+}
+
+double GeoArrowLoop::GetCurvature() {
+  BuildScratch();
+  return S2::GetCurvature(S2PointLoopSpan(*scratch_));
+}
+
+bool GeoArrowLoop::BruteForceContains(
+    const S2Point& pt, const S2Shape::ReferencePoint& reference) {
+  if (size() < 4) {
+    return reference.contained;
+  }
+
+  S2Point v0 = vertex(0);
+  S2CopyingEdgeCrosser crosser(reference.point, pt, v0);
+  bool inside = reference.contained;
+  this->VisitVertices(1, size() - 1, [&](const S2Point& vertex_pt) {
+    inside ^= crosser.EdgeOrVertexCrossing(vertex_pt);
+  });
+
+  return inside;
+}
+
+void GeoArrowLoop::BuildScratch() {
+  if (node->size == 0) {
+    return;
+  }
+
+  if (scratch_->empty()) {
+    this->VisitVertices(0, node->size - 1,
+                        [&](const S2Point& pt) { scratch_->push_back(pt); });
+  }
 }
 
 }  // namespace s2geography

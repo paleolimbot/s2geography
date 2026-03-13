@@ -1,12 +1,13 @@
 #pragma once
 
 #include <s2/mutable_s2shape_index.h>
+#include <s2/s2latlng.h>
 #include <s2/s2shape.h>
 #include <s2/s2shape_index.h>
 
 #include <vector>
 
-#include "geoarrow/geoarrow.hpp"
+#include "s2geography/geoarrow-geography_util.h"
 
 namespace s2geography {
 
@@ -46,6 +47,8 @@ class GeoArrowPointShape : public S2Shape {
   /// that contains EMPTY children.
   explicit GeoArrowPointShape(struct GeoArrowGeometryView geom);
 
+  GeoArrowGeom geom() const { return geom_; }
+
   /// \brief Reset internal state such that this shape represents zero edges
   void Clear();
 
@@ -69,7 +72,7 @@ class GeoArrowPointShape : public S2Shape {
   TypeTag type_tag() const override;
 
  private:
-  struct GeoArrowGeometryView geom_{};
+  GeoArrowGeom geom_;
 };
 
 /// \brief Linestring S2Shape implementation backed by a GeoArrowGeometryView
@@ -91,6 +94,8 @@ class GeoArrowLaxPolylineShape : public S2Shape {
   /// Throws if geom neither a LINESTRING nor a MULTILINESTRING.
   explicit GeoArrowLaxPolylineShape(struct GeoArrowGeometryView geom);
 
+  GeoArrowGeom geom() const { return geom_; }
+
   /// \brief Reset internal state such that this shape represents zero edges
   void Clear();
 
@@ -110,7 +115,7 @@ class GeoArrowLaxPolylineShape : public S2Shape {
   TypeTag type_tag() const override;
 
  private:
-  struct GeoArrowGeometryView geom_{};
+  GeoArrowGeom geom_{};
   int num_chains_{};
   std::vector<int> num_edges_;
 };
@@ -146,6 +151,8 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   /// Throws if geometry is not a POLYGON or MULTIPOLYGON.
   explicit GeoArrowLaxPolygonShape(struct GeoArrowGeometryView geom);
 
+  GeoArrowGeom geom() const { return geom_; }
+
   /// \brief Reset internal state such that this shape represents zero edges
   void Clear();
 
@@ -176,8 +183,23 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   ChainPosition chain_position(int e) const override;
   TypeTag type_tag() const override;
 
+  /// \brief Check containment using a brute force edge crossing approach
+  ///
+  /// This may be faster for polygons with a small number of edges.
+  bool BruteForceContains(const S2Point& pt) const;
+
+  /// \brief Check containment using a brute force edge crossing approach and a
+  /// custom reference point
+  ///
+  /// This may be used to avoid calling GetReferencePoint() more than once, or
+  /// by using outside information to calculate it. Note that if the reference
+  /// point is known, there is no need to call NormalizeOrientation() (i.e., the
+  /// orientation is only used to obtain the reference point).
+  bool BruteForceContains(const S2Point& pt,
+                          const S2Shape::ReferencePoint& reference) const;
+
  private:
-  struct GeoArrowGeometryView geom_{};
+  GeoArrowGeom geom_{};
   int num_loops_{};
   // Cumulative edge counts per loop: num_edges_[0] = 0,
   // num_edges_[i+1] = total edges in loops 0..i
@@ -255,6 +277,9 @@ class GeoArrowGeography {
   /// polygon), or -1 for geometry collections
   int dimension() const;
 
+  /// \brief Returns the total number of edges of all shapes in this geography
+  int num_edges() const;
+
   /// \brief The number of shapes
   ///
   /// This is usually one (exactly one of the point, line, or polygon shape
@@ -263,6 +288,45 @@ class GeoArrowGeography {
 
   /// \brief Retrieve a shape
   const S2Shape* Shape(int id) const;
+
+  /// \brief S2Shape containing all points in this geography
+  ///
+  /// This may be accessed even if the underlying geometry is non-point
+  /// (will represent a point shape with zero vertices).
+  const GeoArrowPointShape* points() const;
+
+  /// \brief S2Shape containing all linestrings in this geography
+  ///
+  /// This may be accessed even if the underlying geometry is non-linestring
+  /// (will represent a linestring shape with zero chains).
+  const GeoArrowLaxPolylineShape* lines() const;
+
+  /// \brief S2Shape containing all polygons in this geography
+  ///
+  /// This may be accessed even if the underlying geometry is non-polygon
+  /// (will represent a polygon with zero chains).
+  const GeoArrowLaxPolygonShape* polygons() const;
+
+  /// \brief Visit all vertices in this geography
+  template <typename Visit>
+  void VisitVertices(Visit&& visit) {
+    points()->geom().VisitChains(
+        [&](GeoArrowChain chain) { chain.VisitVertices(visit); });
+    lines()->geom().VisitChains(
+        [&](GeoArrowChain chain) { chain.VisitVertices(visit); });
+    polygons()->geom().VisitChains(
+        [&](GeoArrowChain chain) { chain.VisitVertices(visit); });
+  }
+
+  /// \brief Visit all pairs of vertices in this geography
+  ///
+  /// Note that this does not include point geometries (i.e., only sequences)
+  /// of 2 or more vertices are considered.
+  template <typename Visit>
+  void VisitEdges(Visit&& visit) {
+    lines()->geom().VisitEdges(visit);
+    polygons()->geom().VisitEdges(visit);
+  }
 
  private:
   struct GeoArrowGeometryView geom_{};

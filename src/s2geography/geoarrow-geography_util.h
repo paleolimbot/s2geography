@@ -1,0 +1,423 @@
+
+#pragma once
+
+#include <s2/s2latlng.h>
+#include <s2/s2shape.h>
+
+#include <cstdint>
+#include <cstring>
+#include <vector>
+
+#include "geoarrow/geoarrow.h"
+#include "s2geography/macros.h"
+
+namespace s2geography {
+
+namespace internal {
+
+/// \brief Visit "nodes" of a GeoArrowGeometryView
+///
+/// Briefly, a GeoArrowGeometryNode is either a sequence (if geometry_type
+/// is GEOARROW_GEOMETRY_TYPE_POINT or GEOARROW_GEOMETRY_TYPE_LINESTRING)
+/// whose size corresponds to the number of coordinates, or a container
+/// (e.g., a polygon) whose size corresponds to the number of children
+/// (e.g., the number of rings). The children always directly follow the
+/// parent. Coordinates are views represented by a start const uint8_t*
+/// and a stride for each dimension. This representation can express any
+/// GeoArrow element including native and serialize representations. It
+/// can also express most other geometry representations without copying
+/// coordinates, at the expense of relying on unaligned access (memcpy)
+/// and slightly inefficient representation of points. It optimizes for
+/// forward iteration over an entire geometry, which is arguably the most
+/// common access pattern. Among other things, it allows permuting axes
+/// and reversing the order of a sequence without modifying the underlying
+/// data.
+template <typename Visit>
+void VisitGeoArrowNodes(struct GeoArrowGeometryView geom, Visit&& visit) {
+  if (geom.size_nodes == 0) {
+    return;
+  }
+
+  const struct GeoArrowGeometryNode* end = geom.root + geom.size_nodes;
+  for (const struct GeoArrowGeometryNode* node = geom.root; node < end;
+       ++node) {
+    visit(node);
+  }
+}
+
+/// \brief Visit longitudes and latitudes of a single node
+///
+/// This is a building block for other visitors. All geometries are
+/// interpreted by s2geography as longitude, latitude (in that order).
+/// Visiting a single element is relatively cheap but not free: care
+/// is taken in downstream internals to visit all members of a sequence
+/// at once where possible.
+template <typename Visit>
+void VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
+                 int64_t n, Visit&& visit) {
+  S2GEOGRAPHY_DCHECK_GE(offset, 0);
+  S2GEOGRAPHY_DCHECK_GE(n, 0);
+  if (n == 0) {
+    return;
+  }
+
+  S2GEOGRAPHY_DCHECK_LE(offset + n, static_cast<int64_t>(node->size));
+
+  const uint8_t* lngs = node->coords[0] + offset * node->coord_stride[0];
+  const uint8_t* lats = node->coords[1] + offset * node->coord_stride[1];
+  double lng, lat;
+
+  if (node->flags & GEOARROW_GEOMETRY_NODE_FLAG_SWAP_ENDIAN) {
+    uint64_t tmp;
+    for (int64_t i = 0; i < n; ++i) {
+      memcpy(&tmp, lngs, sizeof(double));
+      tmp = GEOARROW_BSWAP64(tmp);
+      memcpy(&lng, &tmp, sizeof(double));
+
+      memcpy(&tmp, lats, sizeof(double));
+      tmp = GEOARROW_BSWAP64(tmp);
+      memcpy(&lat, &tmp, sizeof(double));
+      visit(lng, lat);
+
+      lngs += node->coord_stride[0];
+      lats += node->coord_stride[1];
+    }
+  } else {
+    for (int64_t i = 0; i < n; ++i) {
+      memcpy(&lng, lngs, sizeof(double));
+      memcpy(&lat, lats, sizeof(double));
+      visit(lng, lat);
+
+      lngs += node->coord_stride[0];
+      lats += node->coord_stride[1];
+    }
+  }
+}
+
+/// \brief Visit sequential longitudes and latitudes of a single node
+///
+/// This is a building block for other visitors. This utility visits each
+/// pair of sequential vertices (i.e., "edges").
+template <typename Visit>
+void VisitLngLatEdges(const struct GeoArrowGeometryNode* node, int64_t offset,
+                      int64_t n, Visit&& visit) {
+  S2GEOGRAPHY_DCHECK_GE(offset, 0);
+  S2GEOGRAPHY_DCHECK_GE(n, 0);
+  if (n == 0) {
+    return;
+  }
+
+  S2GEOGRAPHY_DCHECK_LT(offset + n, static_cast<int64_t>(node->size));
+
+  const uint8_t* lngs = node->coords[0] + offset * node->coord_stride[0];
+  const uint8_t* lats = node->coords[1] + offset * node->coord_stride[1];
+  double lng0, lat0, lng1, lat1;
+
+  if (node->flags & GEOARROW_GEOMETRY_NODE_FLAG_SWAP_ENDIAN) {
+    uint64_t tmp;
+
+    // Extract the first vertex
+    memcpy(&tmp, lngs, sizeof(double));
+    tmp = GEOARROW_BSWAP64(tmp);
+    memcpy(&lng0, &tmp, sizeof(double));
+
+    memcpy(&tmp, lats, sizeof(double));
+    tmp = GEOARROW_BSWAP64(tmp);
+    memcpy(&lat0, &tmp, sizeof(double));
+
+    lngs += node->coord_stride[0];
+    lats += node->coord_stride[1];
+
+    for (int64_t i = 0; i < n; ++i) {
+      // Extract the next vertex
+      memcpy(&tmp, lngs, sizeof(double));
+      tmp = GEOARROW_BSWAP64(tmp);
+      memcpy(&lng1, &tmp, sizeof(double));
+
+      memcpy(&tmp, lats, sizeof(double));
+      tmp = GEOARROW_BSWAP64(tmp);
+      memcpy(&lat1, &tmp, sizeof(double));
+
+      // Visit
+      visit(lng0, lat0, lng1, lat1);
+
+      // Move this vertex to the previous vertex and advance
+      lng0 = lng1;
+      lat0 = lat1;
+      lngs += node->coord_stride[0];
+      lats += node->coord_stride[1];
+    }
+  } else {
+    // Extract the first vertex
+    memcpy(&lng0, lngs, sizeof(double));
+    memcpy(&lat0, lats, sizeof(double));
+    lngs += node->coord_stride[0];
+    lats += node->coord_stride[1];
+
+    for (int64_t i = 0; i < n; ++i) {
+      // Extract the next vertex
+      memcpy(&lng1, lngs, sizeof(double));
+      memcpy(&lat1, lats, sizeof(double));
+
+      // Visit
+      visit(lng0, lat0, lng1, lat1);
+
+      // Move this vertex to the previous vertex and advance
+      lng0 = lng1;
+      lat0 = lat1;
+      lngs += node->coord_stride[0];
+      lats += node->coord_stride[1];
+    }
+  }
+}
+
+/// \brief Visit a subset of vertices in a sequence as S2Points
+template <typename Visit>
+void VisitVertices(const struct GeoArrowGeometryNode* node, int64_t offset,
+                   int64_t n, Visit&& visit) {
+  VisitLngLat(node, offset, n, [&](double lng0, double lat0) {
+    visit(S2LatLng::FromDegrees(lat0, lng0).ToPoint());
+  });
+}
+
+/// \brief Visit a all vertices in a sequence as S2Points
+template <typename Visit>
+void VisitVertices(const struct GeoArrowGeometryNode* node, Visit&& visit) {
+  VisitLngLat(node, 0, node->size, [&](double lng0, double lat0) {
+    visit(S2LatLng::FromDegrees(lat0, lng0).ToPoint());
+  });
+}
+
+/// \brief Visit a subset of edges in a sequence as S2Shape::Edges
+template <typename Visit>
+void VisitEdges(const struct GeoArrowGeometryNode* node, int64_t offset,
+                int64_t n, Visit&& visit) {
+  S2GEOGRAPHY_DCHECK_GE(offset, 0);
+  S2GEOGRAPHY_DCHECK_GE(n, 0);
+
+  if (static_cast<int64_t>(node->size) < offset + n + 1) {
+    return;
+  }
+
+  S2Shape::Edge e;
+  VisitLngLatEdges(node, offset, n,
+                   [&](double lng0, double lat0, double lng1, double lat1) {
+                     e.v0 = S2LatLng::FromDegrees(lat0, lng0).ToPoint();
+                     e.v1 = S2LatLng::FromDegrees(lat1, lng1).ToPoint();
+                     visit(e);
+                   });
+}
+
+/// \brief Visit all edges in a sequence as S2Shape::Edges
+template <typename Visit>
+void VisitEdges(const struct GeoArrowGeometryNode* node, Visit&& visit) {
+  if (node->size <= 1) {
+    return;
+  }
+
+  VisitEdges(node, 0, node->size - 1, visit);
+}
+
+}  // namespace internal
+
+/// \brief A sequence of coordinates
+///
+/// This utility wrapper is a wrapper around a sequence of coordinates whose
+/// view is defined by a GeoArrowGeometryNode. This wrapper facilitates visiting
+/// raw storage for algorithms that require it. The raw storage always has
+/// XY values corresponding to longitude and latitude. It is designed to be
+/// trivial/cheap to create.
+///
+/// In general, copying vertices and edges out of a sequence has a cost,
+/// although most of the things we use S2 to do have a much higher cost.
+class GeoArrowChain {
+ public:
+  GeoArrowChain(const struct GeoArrowGeometryNode* node) : node(node) {}
+
+  /// \brief The number of coordinates in the sequence
+  uint32_t size() const { return node->size; }
+
+  /// \brief Call a function for each S2Point in this sequence
+  template <typename Visit>
+  void VisitVertices(Visit&& visit) {
+    internal::VisitVertices(node, visit);
+  }
+
+  /// \brief Call a function for each S2Point in a slice of this sequence
+  template <typename Visit>
+  void VisitVertices(int64_t offset, int64_t n, Visit&& visit) {
+    internal::VisitVertices(node, offset, n, visit);
+  }
+
+  /// \brief Call a function for each pair of S2Points in this sequence
+  template <typename Visit>
+  void VisitEdges(Visit&& visit) {
+    internal::VisitEdges(node, visit);
+  }
+
+  /// \brief Call a function for each pair of S2Points in a slice of this
+  /// sequence
+  template <typename Visit>
+  void VisitEdges(int64_t offset, int64_t n, Visit&& visit) {
+    internal::VisitEdges(node, offset, n, visit);
+  }
+
+  /// \brief Copy a single vertex out of this sequence
+  S2Point vertex(int64_t i) {
+    S2Point v{};
+    this->VisitVertices(i, 1, [&](const S2Point& pt) { v = pt; });
+    return v;
+  }
+
+  /// \brief Copy a single pair of vertices out of this sequence
+  S2Shape::Edge edge(int64_t i) {
+    S2Shape::Edge e{};
+    this->VisitEdges(i, 1, [&](const S2Shape::Edge& edge) { e = edge; });
+    return e;
+  }
+
+ protected:
+  const struct GeoArrowGeometryNode* node{};
+};
+
+/// \brief A sequence of coordinates forming a closed loop
+///
+/// This utility wrapper is a wrapper around a sequence of coordinates whose
+/// view is defined by a GeoArrowGeometryNode where the sequence specifically
+/// defines a closed loop. This wrapper is specifically designed to provide
+/// access to the loop measures and brute force containment algorithms that
+/// are used across multiple functions.
+///
+/// This class must be constructed with some scratch space and intentionally
+/// does not define its own. This is because the S2Loop measures only operate on
+/// spans of S2Point. This scratch space is lazily initialized and reused if
+/// more than one method is called.
+struct GeoArrowLoop : public GeoArrowChain {
+ public:
+  /// \brief Construct a loop and clear the scratch space
+  GeoArrowLoop(const struct GeoArrowGeometryNode* node,
+               std::vector<S2Point>* scratch)
+      : GeoArrowChain(node), scratch_(scratch) {
+    scratch_->clear();
+  }
+
+  /// \brief Get the sum of the turning angles
+  ///
+  /// Notably, this value is positive for counterclockwise loops and
+  /// negative for clockwise loops.
+  double GetCurvature();
+
+  /// \brief Get the signed area of this loop in steradians
+  ///
+  /// Notably, this value is positive for counterclockwise loops and
+  /// negative for clockwise loops.
+  double GetSignedArea();
+
+  /// \brief Get the centroid of this loop
+  ///
+  /// To make this value easier to compose with other centroids, it is
+  /// scaled to the signed area of this loop.
+  S2Point GetCentroid();
+
+  /// \brief Check containment
+  ///
+  /// Checks containment based on a reference point (e.g., one obtained from an
+  /// S2Shape). Note that winding order doesn't matter here and is not checked
+  /// (the winding order is used by the S2Shape to calculate the reference
+  /// point).
+  bool BruteForceContains(const S2Point& pt,
+                          const S2Shape::ReferencePoint& reference);
+
+ protected:
+  std::vector<S2Point>* scratch_{};
+
+  void BuildScratch();
+};
+
+/// \brief Wrapper around a GeoArrowGeometryView
+///
+/// This is a utility wrapper around a sequence of nodes, used for
+/// to keep the GeoArrow C structures and iteration out of the interface
+/// except for this header.
+class GeoArrowGeom {
+ public:
+  /// \brief Construct an empty sequence of nodes
+  explicit GeoArrowGeom() = default;
+
+  /// \brief Construct from a GeoArrowGeometryView
+  GeoArrowGeom(struct GeoArrowGeometryView geom) : geom_(geom) {}
+
+  /// \brief Construct from a node and size
+  GeoArrowGeom(const struct GeoArrowGeometryNode* node, int64_t size)
+      : geom_{node, size} {}
+
+  /// \brief The root node
+  const struct GeoArrowGeometryNode* root() const { return geom_.root; }
+
+  /// \brief The number of nodes in this sequence
+  int64_t size() const { return geom_.size_nodes; }
+
+  /// \brief Visit sequences of coordinates
+  ///
+  /// Call a function of GeoArrowChain for each sequence (point or
+  /// linestring) in this set of nodes. Other node types are ignored.
+  template <typename Visit>
+  void VisitChains(Visit&& visit) const {
+    internal::VisitGeoArrowNodes(geom_,
+                                 [&](const struct GeoArrowGeometryNode* node) {
+                                   switch (node->geometry_type) {
+                                     case GEOARROW_GEOMETRY_TYPE_POINT:
+                                     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+                                       visit(GeoArrowChain(node));
+                                       break;
+                                     default:
+                                       break;
+                                   }
+                                 });
+  }
+
+  /// \brief Visit sequences of coordinates as GeoArrowLoop
+  ///
+  /// Call a function of GeoArrowLoop for each linestring sequence
+  /// in this set of nodes. Other node types are ignored.
+  /// This function does not check if the nodes are actually part of
+  /// a polygon or not (e.g., so that the GeoArrowGeom may be a sequence
+  /// of loops).
+  template <typename Visit>
+  void VisitLoops(std::vector<S2Point>* scratch, Visit&& visit) {
+    internal::VisitGeoArrowNodes(geom_,
+                                 [&](const struct GeoArrowGeometryNode* node) {
+                                   switch (node->geometry_type) {
+                                     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+                                       visit(GeoArrowLoop(node, scratch));
+                                       break;
+                                     default:
+                                       break;
+                                   }
+                                 });
+  }
+
+  /// \brief Call a function for each vertex in this node set
+  ///
+  /// This visits all chains and all vertices, including the duplicate closed
+  /// ring vertex in a polygon ring.
+  template <typename Visit>
+  void VisitVertices(Visit&& visit) {
+    VisitChains([&](GeoArrowChain chain) { chain.VisitVertices(visit); });
+  }
+
+  /// \brief Call a function for each pair of vertices in this node set
+  ///
+  /// This visits all chains and all edges. Note that point geometries are not
+  /// included in this visitation (i.e., only sequences with 2 or more
+  /// coordinates are visited).
+  template <typename Visit>
+  void VisitEdges(Visit&& visit) {
+    VisitChains([&](GeoArrowChain chain) { chain.VisitEdges(visit); });
+  }
+
+ private:
+  struct GeoArrowGeometryView geom_{};
+};
+
+}  // namespace s2geography

@@ -146,6 +146,168 @@ void ValidateShape(const S2Shape& shape) {
   }
 }
 
+// GeoArrowGeom / GeoArrowChain / GeoArrowLoop primitive tests
+
+TEST(GeoArrowGeom, VisitPoint) {
+  auto geom = TestGeometry::FromWKT("POINT (1 2)");
+  GeoArrowGeom g(geom.geom());
+
+  std::vector<S2Point> vertices;
+  g.VisitVertices([&](const S2Point& p) { vertices.push_back(p); });
+  ASSERT_EQ(vertices.size(), 1);
+  EXPECT_EQ(vertices[0], S2LatLng::FromDegrees(2, 1).ToPoint());
+}
+
+TEST(GeoArrowGeom, VisitVerticesLineString) {
+  auto geom = TestGeometry::FromWKT("LINESTRING (0 0, 1 1, 2 2)");
+  GeoArrowGeom g(geom.geom());
+
+  std::vector<S2Point> vertices;
+  g.VisitVertices([&](const S2Point& p) { vertices.push_back(p); });
+  ASSERT_EQ(vertices.size(), 3);
+  EXPECT_EQ(vertices[0], S2LatLng::FromDegrees(0, 0).ToPoint());
+  EXPECT_EQ(vertices[1], S2LatLng::FromDegrees(1, 1).ToPoint());
+  EXPECT_EQ(vertices[2], S2LatLng::FromDegrees(2, 2).ToPoint());
+}
+
+TEST(GeoArrowGeom, VisitEdgesLineString) {
+  auto geom = TestGeometry::FromWKT("LINESTRING (0 0, 1 1, 2 2)");
+  GeoArrowGeom g(geom.geom());
+
+  std::vector<S2Shape::Edge> edges;
+  g.VisitEdges([&](const S2Shape::Edge& e) { edges.push_back(e); });
+  ASSERT_EQ(edges.size(), 2);
+  EXPECT_EQ(edges[0].v0, S2LatLng::FromDegrees(0, 0).ToPoint());
+  EXPECT_EQ(edges[0].v1, S2LatLng::FromDegrees(1, 1).ToPoint());
+  EXPECT_EQ(edges[1].v0, S2LatLng::FromDegrees(1, 1).ToPoint());
+  EXPECT_EQ(edges[1].v1, S2LatLng::FromDegrees(2, 2).ToPoint());
+}
+
+TEST(GeoArrowGeom, VisitEdgesSingleVertex) {
+  auto geom = TestGeometry::FromWKT("POINT (5 10)");
+  GeoArrowGeom g(geom.geom());
+
+  int count = 0;
+  g.VisitEdges([&](const S2Shape::Edge&) { ++count; });
+  EXPECT_EQ(count, 0);
+}
+
+TEST(GeoArrowGeom, VisitChainsMultiLineString) {
+  auto geom =
+      TestGeometry::FromWKT("MULTILINESTRING ((0 0, 1 1), (2 2, 3 3, 4 4))");
+
+  GeoArrowGeom g(geom.geom());
+  std::vector<uint32_t> chain_sizes;
+  g.VisitChains(
+      [&](GeoArrowChain chain) { chain_sizes.push_back(chain.size()); });
+  ASSERT_EQ(chain_sizes.size(), 2);
+  EXPECT_EQ(chain_sizes[0], 2);
+  EXPECT_EQ(chain_sizes[1], 3);
+}
+
+TEST(GeoArrowGeom, VisitChainsEmpty) {
+  auto geom = TestGeometry::FromWKT("LINESTRING EMPTY");
+  // An empty linestring still has one node with size 0
+  GeoArrowGeom g(geom.geom());
+
+  int count = 0;
+  g.VisitChains([&](GeoArrowChain chain) {
+    EXPECT_EQ(chain.size(), 0);
+    ++count;
+  });
+  EXPECT_EQ(count, 1);
+}
+
+TEST(GeoArrowGeom, VisitLoopsPolygon) {
+  auto geom = TestGeometry::FromWKT("POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))");
+  GeoArrowGeom g(geom.geom());
+
+  std::vector<S2Point> scratch;
+  int loop_count = 0;
+  g.VisitLoops(&scratch, [&](GeoArrowLoop loop) {
+    ++loop_count;
+    EXPECT_EQ(loop.size(), 5);
+  });
+  EXPECT_EQ(loop_count, 1);
+}
+
+TEST(GeoArrowGeom, VisitEdgesPolygon) {
+  // Polygon ring with 5 coords (including closing vertex) / 4 edges
+  auto geom = TestGeometry::FromWKT("POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))");
+  GeoArrowGeom g(geom.geom());
+
+  std::vector<S2Shape::Edge> edges;
+  g.VisitEdges([&](const S2Shape::Edge& e) { edges.push_back(e); });
+  ASSERT_EQ(edges.size(), 4);
+
+  // First edge: (0,0) / (10,0)
+  EXPECT_EQ(edges[0].v0, S2LatLng::FromDegrees(0, 0).ToPoint());
+  EXPECT_EQ(edges[0].v1, S2LatLng::FromDegrees(0, 10).ToPoint());
+  // Last edge: (0,10) / (0,0)
+  EXPECT_EQ(edges[3].v0, S2LatLng::FromDegrees(10, 0).ToPoint());
+  EXPECT_EQ(edges[3].v1, S2LatLng::FromDegrees(0, 0).ToPoint());
+}
+
+TEST(GeoArrowGeom, DefaultConstructor) {
+  GeoArrowGeom g;
+  EXPECT_EQ(g.size(), 0);
+  EXPECT_EQ(g.root(), nullptr);
+
+  int count = 0;
+  g.VisitVertices([&](S2Point) { ++count; });
+  EXPECT_EQ(count, 0);
+}
+
+// Specifically check loop functions
+
+TEST(GeoArrowLoop, LoopMetrics) {
+  std::vector<S2Point> scratch;
+
+  // Check a positive reference and a negative reference
+  S2Shape::ReferencePoint reference_out{S2LatLng::FromDegrees(-1, -1).ToPoint(),
+                                        false};
+  S2Shape::ReferencePoint reference_in{S2LatLng::FromDegrees(2, 2).ToPoint(),
+                                       true};
+
+  // Counterclockwise wound shell
+  auto shell = TestGeometry::FromWKT("LINESTRING (0 0, 10 0, 0 10, 0 0)");
+  GeoArrowLoop shell_loop(shell.geom().root, &scratch);
+  ASSERT_GT(shell_loop.GetSignedArea(), 0);
+  ASSERT_GT(shell_loop.GetCurvature(), 0);
+  S2Point centroid = shell_loop.GetCentroid();
+  ASSERT_NEAR(centroid.Norm(), std::abs(shell_loop.GetSignedArea()), 1e-4);
+
+  // Containment
+  EXPECT_TRUE(shell_loop.BruteForceContains(
+      S2LatLng::FromDegrees(1.1, 1.2).ToPoint(), reference_in));
+  EXPECT_FALSE(shell_loop.BruteForceContains(
+      S2LatLng::FromDegrees(10, 10).ToPoint(), reference_in));
+  EXPECT_TRUE(shell_loop.BruteForceContains(
+      S2LatLng::FromDegrees(1.1, 1.2).ToPoint(), reference_out));
+  EXPECT_FALSE(shell_loop.BruteForceContains(
+      S2LatLng::FromDegrees(10, 10).ToPoint(), reference_out));
+
+  // Clockwise wound hole
+  auto hole = TestGeometry::FromWKT("LINESTRING (1 1, 1 5, 5 1, 1 1)");
+  GeoArrowLoop hole_loop(hole.geom().root, &scratch);
+  ASSERT_LT(hole_loop.GetSignedArea(), 0);
+  ASSERT_LT(hole_loop.GetCurvature(), 0);
+  centroid = hole_loop.GetCentroid();
+
+  // Containment
+  ASSERT_NEAR(centroid.Norm(), std::abs(hole_loop.GetSignedArea()), 1e-4);
+  EXPECT_TRUE(hole_loop.BruteForceContains(
+      S2LatLng::FromDegrees(1.1, 1.2).ToPoint(), reference_in));
+  EXPECT_FALSE(hole_loop.BruteForceContains(
+      S2LatLng::FromDegrees(5, 5).ToPoint(), reference_in));
+  EXPECT_TRUE(hole_loop.BruteForceContains(
+      S2LatLng::FromDegrees(1.1, 1.2).ToPoint(), reference_out));
+  EXPECT_FALSE(hole_loop.BruteForceContains(
+      S2LatLng::FromDegrees(5, 5).ToPoint(), reference_out));
+}
+
+// Shape tests
+
 TEST(GeoArrowPointShape, DefaultConstructor) {
   GeoArrowPointShape shape;
   EXPECT_EQ(shape.num_edges(), 0);
@@ -454,6 +616,7 @@ TEST(GeoArrowLaxPolygonShape, EmptyPolygon) {
   EXPECT_EQ(shape.num_edges(), 0);
   EXPECT_EQ(shape.dimension(), 2);
   EXPECT_EQ(shape.num_chains(), 0);
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(0, 0).ToPoint()));
   ValidateShape(shape);
 }
 
@@ -463,6 +626,7 @@ TEST(GeoArrowLaxPolygonShape, EmptyMultiPolygon) {
   EXPECT_EQ(shape.num_edges(), 0);
   EXPECT_EQ(shape.dimension(), 2);
   EXPECT_EQ(shape.num_chains(), 0);
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(0, 0).ToPoint()));
   ValidateShape(shape);
 }
 
@@ -478,6 +642,30 @@ TEST(GeoArrowLaxPolygonShape, SimpleTriangle) {
   auto chain0 = shape.chain(0);
   EXPECT_EQ(chain0.start, 0);
   EXPECT_EQ(chain0.length, 3);
+
+  // Check brute force containment outside and inside using the computed
+  // reference
+  EXPECT_FALSE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint()));
+  EXPECT_TRUE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(0.1, 0.1).ToPoint()));
+
+  // Check with custom reference points. This is to ensure that the containment
+  // logic for multiple loops works whether the reference point is inside or
+  // outside.
+  S2Shape::ReferencePoint reference_out{S2LatLng::FromDegrees(-1, -1).ToPoint(),
+                                        false};
+  S2Shape::ReferencePoint reference_in{
+      S2LatLng::FromDegrees(0.2, 0.2).ToPoint(), true};
+
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint(),
+                                        reference_in));
+  EXPECT_TRUE(shape.BruteForceContains(
+      S2LatLng::FromDegrees(0.1, 0.1).ToPoint(), reference_in));
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint(),
+                                        reference_out));
+  EXPECT_TRUE(shape.BruteForceContains(
+      S2LatLng::FromDegrees(0.1, 0.1).ToPoint(), reference_out));
 
   ValidateShape(shape);
 }
@@ -504,6 +692,35 @@ TEST(GeoArrowLaxPolygonShape, PolygonWithHole) {
   auto pos = shape.chain_position(6);
   EXPECT_EQ(pos.chain_id, 1);
   EXPECT_EQ(pos.offset, 2);
+
+  // Check brute force containment outside and inside using the computed
+  // reference (including a point inside the hole)
+  EXPECT_FALSE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint()));
+  EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1, 1).ToPoint()));
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3, 3).ToPoint()));
+
+  // Check with custom reference points. This is to ensure that the containment
+  // logic for multiple loops works whether the reference point is inside or
+  // outside.
+  S2Shape::ReferencePoint reference_out{S2LatLng::FromDegrees(-1, -1).ToPoint(),
+                                        false};
+  S2Shape::ReferencePoint reference_in{
+      S2LatLng::FromDegrees(0.2, 0.2).ToPoint(), true};
+
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint(),
+                                        reference_in));
+  EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1, 1).ToPoint(),
+                                       reference_in));
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3, 3).ToPoint(),
+                                        reference_in));
+
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint(),
+                                        reference_out));
+  EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1, 1).ToPoint(),
+                                       reference_out));
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3, 3).ToPoint(),
+                                        reference_out));
 
   ValidateShape(shape);
 }
@@ -549,6 +766,39 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygonWithHoles) {
   EXPECT_EQ(shape.chain(1).length, 4);
   EXPECT_EQ(shape.chain(2).length, 3);
   EXPECT_EQ(shape.num_edges(), 11);  // 4 + 4 + 3
+
+  // Check brute force containment outside, inside shell, inside hole, and
+  // inside the second polygon
+  EXPECT_FALSE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint()));
+  EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1, 1).ToPoint()));
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3, 3).ToPoint()));
+  EXPECT_TRUE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(20.1, 20.1).ToPoint()));
+
+  // Check with custom reference points
+  S2Shape::ReferencePoint reference_out{S2LatLng::FromDegrees(-1, -1).ToPoint(),
+                                        false};
+  S2Shape::ReferencePoint reference_in{
+      S2LatLng::FromDegrees(0.2, 0.2).ToPoint(), true};
+
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint(),
+                                        reference_in));
+  EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1, 1).ToPoint(),
+                                       reference_in));
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3, 3).ToPoint(),
+                                        reference_in));
+  EXPECT_TRUE(shape.BruteForceContains(
+      S2LatLng::FromDegrees(20.1, 20.1).ToPoint(), reference_in));
+
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(-1, 1).ToPoint(),
+                                        reference_out));
+  EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(1, 1).ToPoint(),
+                                       reference_out));
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3, 3).ToPoint(),
+                                        reference_out));
+  EXPECT_TRUE(shape.BruteForceContains(
+      S2LatLng::FromDegrees(20.1, 20.1).ToPoint(), reference_out));
 
   ValidateShape(shape);
 }
