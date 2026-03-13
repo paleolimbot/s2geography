@@ -165,7 +165,11 @@ void VisitEdges(const struct GeoArrowGeometryNode* node, Visit&& visit) {
 /// This utility wrapper is a wrapper around a sequence of coordinates whose
 /// view is defined by a GeoArrowGeometryNode. This wrapper facilitates visiting
 /// raw storage for algorithms that require it. The raw storage always has
-/// XY values corresponding to longitude and latitude.
+/// XY values corresponding to longitude and latitude. It is designed to be
+/// trivial/cheap to create.
+///
+/// In general, copying vertices and edges out of a sequence has a cost,
+/// although most of the things we use S2 to do have a much higher cost.
 class GeoArrowChain {
  public:
   GeoArrowChain(const struct GeoArrowGeometryNode* node) : node(node) {}
@@ -185,22 +189,27 @@ class GeoArrowChain {
     internal::VisitVertices(node, offset, n, visit);
   }
 
+  /// \brief Call a function for each pair of S2Points in this sequence
   template <typename Visit>
   void VisitEdges(Visit&& visit) {
     internal::VisitEdges(node, visit);
   }
 
+  /// \brief Call a function for each pair of S2Points in a slice of this
+  /// sequence
   template <typename Visit>
   void VisitEdges(int64_t offset, int64_t n, Visit&& visit) {
     internal::VisitEdges(node, offset, n, visit);
   }
 
+  /// \brief Copy a single vertex out of this sequence
   S2Point vertex(int64_t i) {
     S2Point v;
     this->VisitVertices(i, 1, [&](const S2Point& pt) { v = pt; });
     return v;
   }
 
+  /// \brief Copy a single pair of vertices out of this sequence
   S2Shape::Edge edge(int64_t i) {
     S2Shape::Edge e;
     this->VisitEdges(i, 1, [&](const S2Shape::Edge& edge) { e = edge; });
@@ -218,8 +227,14 @@ class GeoArrowChain {
 /// defines a closed loop. This wrapper is specifically designed to provide
 /// access to the loop measures and brute force containment algorithms that
 /// are used across multiple functions.
+///
+/// This class must be constructed with some scratch space and intentionally
+/// does not define its own. This is because the S2Loop measures only operate on
+/// spans of S2Point. This scratch space is lazily initialized and reused if
+/// more than one method is called.
 struct GeoArrowLoop : public GeoArrowChain {
  public:
+  /// \brief Construct a loop and clear the scratch space
   GeoArrowLoop(const struct GeoArrowGeometryNode* node,
                std::vector<S2Point>* scratch)
       : GeoArrowChain(node), scratch_(scratch) {
@@ -244,6 +259,12 @@ struct GeoArrowLoop : public GeoArrowChain {
   /// scaled to the signed area of this loop.
   S2Point GetCentroid();
 
+  /// \brief Check containment
+  ///
+  /// Checks containment based on a reference point (e.g., one obtained from an
+  /// S2Shape). Note that winding order doesn't matter here and is not checked
+  /// (the winding order is used by the S2Shape to calculate the reference
+  /// point).
   bool BruteForceContains(const S2Point& pt,
                           const S2Shape::ReferencePoint& reference);
 
@@ -253,16 +274,33 @@ struct GeoArrowLoop : public GeoArrowChain {
   void BuildScratch();
 };
 
+/// \brief Wrapper around a GeoArrowGeometryView
+///
+/// This is a utility wrapper around a sequence of nodes, used for
+/// to keep the GeoArrow C structures and iteration out of the interface
+/// except for this header.
 class GeoArrowGeom {
  public:
+  /// \brief Construct an empty sequence of nodes
   explicit GeoArrowGeom() = default;
+
+  /// \brief Construct from a GeoArrowGeometryView
   GeoArrowGeom(struct GeoArrowGeometryView geom) : geom_(geom) {}
+
+  /// \brief Construct from a node and size
   GeoArrowGeom(const struct GeoArrowGeometryNode* node, int64_t size)
       : geom_{node, size} {}
 
+  /// \brief The root node
   const struct GeoArrowGeometryNode* root() const { return geom_.root; }
+
+  /// \brief The number of nodes in this sequence
   int64_t size() const { return geom_.size_nodes; }
 
+  /// \brief Visit sequences of coordinates
+  ///
+  /// Call a function of GeoArrowChain for each sequence (point or
+  /// linestring) in this set of nodes. Other node types are ignored.
   template <typename Visit>
   void VisitChains(Visit&& visit) {
     internal::VisitGeoArrowNodes(geom_,
@@ -278,6 +316,13 @@ class GeoArrowGeom {
                                  });
   }
 
+  /// \brief Visit sequences of coordinates as GeoArrowLoop
+  ///
+  /// Call a function of GeoArrowLoop for each sequence (point or
+  /// linestring) in this set of nodes. Other node types are ignored.
+  /// This function does not check if the nodes are actually part of
+  /// a polygon or not (e.g., so that the GeoArrowGeom may be a sequence
+  /// of loops).
   template <typename Visit>
   void VisitLoops(std::vector<S2Point>* scratch, Visit&& visit) {
     internal::VisitGeoArrowNodes(geom_,
@@ -292,11 +337,20 @@ class GeoArrowGeom {
                                  });
   }
 
+  /// \brief Call a function for each vertex in this node set
+  ///
+  /// This visits all chains and all vertices, including the duplicate closed
+  /// ring vertex in a polygon ring.
   template <typename Visit>
   void VisitVertices(Visit&& visit) {
     VisitChains([&](GeoArrowChain chain) { chain.VisitVertices(visit); });
   }
 
+  /// \brief Call a function for each pair of vertices in this node set
+  ///
+  /// This visits all chains and all edges. Note that point geometries are not
+  /// included in this visitation (i.e., only sequences with 2 or more
+  /// coordinates are visited).
   template <typename Visit>
   void VisitEdges(Visit&& visit) {
     VisitChains([&](GeoArrowChain chain) { chain.VisitEdges(visit); });

@@ -183,9 +183,20 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   ChainPosition chain_position(int e) const override;
   TypeTag type_tag() const override;
 
+  /// \brief Check containment using a brute force edge crossing approach
+  ///
+  /// This may be faster for polygons with a small number of edges.
+  bool BruteForceContains(const S2Point& pt);
+
+  /// \brief Check containment using a brute force edge crossing approach and a
+  /// custom reference point
+  ///
+  /// This may be used to avoid calling GetReferencePoint() more than once, or
+  /// by using outside information to calculate it. Note that if the reference
+  /// point is known, there is no need to call NormalizeOrientation() (i.e., the
+  /// orientation is only used to obtain the reference point).
   bool BruteForceContains(const S2Point& pt,
                           const S2Shape::ReferencePoint& reference);
-  bool BruteForceContains(const S2Point& pt);
 
  private:
   GeoArrowGeom geom_{};
@@ -277,10 +288,25 @@ class GeoArrowGeography {
   /// \brief Retrieve a shape
   const S2Shape* Shape(int id) const;
 
+  /// \brief S2Shape containing all points in this geography
+  ///
+  /// This may be accessed even if the underlying geometry is non-point
+  /// (will represent a point shape with zero vertices).
   const GeoArrowPointShape* points() const;
+
+  /// \brief S2Shape containing all linestrings in this geography
+  ///
+  /// This may be accessed even if the underlying geometry is non-linestring
+  /// (will represent a linestring shape with zero chains).
   const GeoArrowLaxPolylineShape* lines() const;
+
+  /// \brief S2Shape containing all polygons in this geography
+  ///
+  /// This may be accessed even if the underlying geometry is non-polygon
+  /// (will represent a polygon with zero chains).
   const GeoArrowLaxPolygonShape* polygons() const;
 
+  /// \brief Visit all vertices in this geography
   template <typename Visit>
   void VisitVertices(Visit&& visit) {
     points()->geom().VisitChains(
@@ -291,9 +317,12 @@ class GeoArrowGeography {
         [&](GeoArrowChain chain) { chain.VisitVertices(visit); });
   }
 
+  /// \brief Visit all pairs of vertices in this geography
+  ///
+  /// Note that this does not include point geometries (i.e., only sequences)
+  /// of 2 or more vertices are considered.
   template <typename Visit>
   void VisitEdges(Visit&& visit) {
-    points()->geom().VisitEdges(visit);
     lines()->geom().VisitEdges(visit);
     polygons()->geom().VisitEdges(visit);
   }
