@@ -160,19 +160,6 @@ struct S2Intersects {
       return BruteForceExec(value0, value1);
     }
 
-    // When one side already has an index and the other is small+fresh, use
-    // the indexed side's S2CrossingEdgeQuery and S2ContainsPointQuery to
-    // iterate over the fresh side's edges/vertices without building a
-    // second index.
-    if (!value0.is_fresh() && value1.is_fresh() &&
-        value1.num_edges() < kMaxBruteForceEdges) {
-      return SemiBruteForceExec(value0.ShapeIndex(), value1);
-    }
-    if (value0.is_fresh() && !value1.is_fresh() &&
-        value0.num_edges() < kMaxBruteForceEdges) {
-      return SemiBruteForceExec(value1.ShapeIndex(), value0);
-    }
-
     // Next we try a covering intersection check. This is very cheap if an index
     // has already been built. In the event that an index does have to be built
     // to build the covering, it is effectively reused in the actual
@@ -235,53 +222,6 @@ struct S2Intersects {
     return false;
   }
 
-  // One side is indexed, the other (fresh_geog) is small and unindexed.
-  // Intersects is symmetric so we can always query the indexed side.
-  bool SemiBruteForceExec(const S2ShapeIndex& indexed,
-                          GeoArrowGeography& fresh_geog) {
-    // Check if any edge of the fresh geometry crosses an edge in the index.
-    // CrossingType::ALL includes shared-vertex intersections (CLOSED model).
-    S2CrossingEdgeQuery crossing_query(&indexed);
-    bool found = false;
-    fresh_geog.VisitEdges([&](const S2Shape::Edge& e) {
-      if (found) return;
-      crossing_query.GetCrossingEdges(
-          e.v0, e.v1, s2shapeutil::CrossingType::ALL, &crossing_edges_);
-      if (!crossing_edges_.empty()) {
-        found = true;
-      }
-    });
-    if (found) return true;
-
-    // Check if any vertex of the fresh geometry is contained by the index.
-    auto contains_query = MakeS2ContainsPointQuery(
-        &indexed, S2ContainsPointQueryOptions(S2VertexModel::CLOSED));
-    fresh_geog.VisitVertices([&](const S2Point& pt) {
-      if (!found && contains_query.Contains(pt)) {
-        found = true;
-      }
-    });
-    if (found) return true;
-
-    // Check if any vertex of the indexed geometry is inside the fresh
-    // geometry's polygons.
-    if (fresh_geog.polygons()->num_edges() > 0) {
-      auto ref = fresh_geog.polygons()->GetReferencePoint();
-      for (int i = 0; i < indexed.num_shape_ids(); i++) {
-        const S2Shape* shape = indexed.shape(i);
-        if (shape == nullptr) continue;
-        for (int j = 0; j < shape->num_edges(); j++) {
-          S2Shape::Edge e = shape->edge(j);
-          if (fresh_geog.polygons()->BruteForceContains(e.v0, ref)) {
-            return true;
-          }
-        }
-      }
-    }
-
-    return false;
-  }
-
   bool ExecUsingShapeIndex(arg0_t::c_type value0, arg1_t::c_type value1) {
     return s2_intersects(value0.ShapeIndex(), value1.ShapeIndex(), options_);
   }
@@ -289,7 +229,6 @@ struct S2Intersects {
   S2BooleanOperation::Options options_;
   std::vector<S2CellId> intersection_;
   std::vector<S2Shape::Edge> edges_;
-  std::vector<s2shapeutil::ShapeEdge> crossing_edges_;
 };
 
 struct S2Contains {
