@@ -366,6 +366,26 @@ INSTANTIATE_TEST_SUITE_P(
                           "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
                           true},
 
+        // Two distant small polygons (brute force: all three checks fail)
+        ScalarScalarParam{"polygon_not_intersects_distant_polygon",
+                          "POLYGON ((0 0, 1 0, 0 1, 0 0))", "intersects",
+                          "POLYGON ((30 30, 31 30, 30 31, 30 30))", false},
+
+        // Linestring x linestring crossing (brute force edge crossing, no
+        // polygons)
+        ScalarScalarParam{"linestring_intersects_linestring_crossing",
+                          "LINESTRING (0 0, 1 1)", "intersects",
+                          "LINESTRING (0 1, 1 0)", true},
+        // Linestring x linestring shared vertex (brute force CrossingSign == 0)
+        ScalarScalarParam{"linestring_intersects_linestring_shared_vertex",
+                          "LINESTRING (0 0, 1 0)", "intersects",
+                          "LINESTRING (1 0, 2 0)", true},
+        // Linestring x linestring disjoint (brute force all checks fail, no
+        // polygons)
+        ScalarScalarParam{"linestring_not_intersects_linestring",
+                          "LINESTRING (0 0, 1 0)", "intersects",
+                          "LINESTRING (30 30, 31 30)", false},
+
         // Contains
         // Nulls
         ScalarScalarParam{"null_contains", std::nullopt, "contains",
@@ -429,6 +449,27 @@ INSTANTIATE_TEST_SUITE_P(
         ScalarScalarParam{"polygon_not_contains_exterior_linestring",
                           "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
                           "LINESTRING (3 3, 4 4)", false},
+
+        // Linestring does not contain point (no polygons on container ->
+        // brute force condition not met, falls through to index path)
+        ScalarScalarParam{"linestring_not_contains_point",
+                          "LINESTRING (0 0, 1 0)", "contains", "POINT (0.5 0)",
+                          false},
+        // Linestring does not contain linestring
+        ScalarScalarParam{"linestring_not_contains_linestring",
+                          "LINESTRING (0 0, 2 0)", "contains",
+                          "LINESTRING (0 0, 1 0)", false},
+
+        // Polygon does not contain overlapping polygon (brute force: vertices
+        // inside but edges cross)
+        ScalarScalarParam{"polygon_not_contains_overlapping_polygon",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
+                          "POLYGON ((0.1 0.1, 3 0.1, 0.1 3, 0.1 0.1))", false},
+        // Polygon does not contain distant polygon (brute force: vertex
+        // outside early exit)
+        ScalarScalarParam{"polygon_not_contains_distant_polygon",
+                          "POLYGON ((0 0, 1 0, 0 1, 0 0))", "contains",
+                          "POLYGON ((30 30, 31 30, 30 31, 30 30))", false},
 
         // Equals
         // Nulls
