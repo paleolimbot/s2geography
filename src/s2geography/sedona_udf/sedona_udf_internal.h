@@ -258,7 +258,9 @@ class ArrowInputView {
   ArrowInputView(const ArrowInputView&) = delete;
   ArrowInputView& operator=(const ArrowInputView&) = delete;
 
-  void SetPrepareScalar(bool prepare_scalar) {}
+  void SetPrepareScalar(bool prepare_scalar) {
+    S2GEOGRAPHY_UNUSED(prepare_scalar);
+  }
 
   void SetArray(const struct ArrowArray* array, int64_t num_rows) {
     NANOARROW_THROW_NOT_OK(ArrowArrayViewSetArray(view_.get(), array, nullptr));
@@ -332,7 +334,9 @@ class GeographyInputView {
   GeographyInputView(const GeographyInputView&) = delete;
   GeographyInputView& operator=(const GeographyInputView&) = delete;
 
-  void SetPrepareScalar(bool prepare_scalar) {}
+  void SetPrepareScalar(bool prepare_scalar) {
+    S2GEOGRAPHY_UNUSED(prepare_scalar);
+  }
 
   std::string GetCrs() { return type_.crs(); }
 
@@ -441,7 +445,7 @@ class GeoArrowGeographyInputView {
   int64_t current_array_length_;
   int64_t stashed_index_;
   GeoArrowGeography stashed_;
-  bool prepare_scalar_;
+  bool prepare_scalar_{};
 
   void StashIfNeeded(int64_t i, bool prepare = false) {
     if (i != stashed_index_) {
@@ -584,7 +588,7 @@ class SedonaUnaryKernelAdapter {
 
   static void NewImpl(const struct SedonaCScalarKernel* self,
                       struct SedonaCScalarKernelImpl* out) {
-    auto* kernel_private = static_cast<ImplData*>(self->private_data);
+    auto* kernel_private = static_cast<KernelData*>(self->private_data);
     auto* impl_private = new ImplData();
     impl_private->prepare_arg0_scalar = kernel_private->prepare_arg0_scalar;
 
@@ -697,7 +701,7 @@ class SedonaBinaryKernelAdapter {
 
   static void NewImpl(const struct SedonaCScalarKernel* self,
                       struct SedonaCScalarKernelImpl* out) {
-    auto* kernel_private = static_cast<ImplData*>(self->private_data);
+    auto* kernel_private = static_cast<KernelData*>(self->private_data);
     auto* impl_private = new ImplData();
     impl_private->prepare_arg0_scalar = kernel_private->prepare_arg0_scalar;
     impl_private->prepare_arg1_scalar = kernel_private->prepare_arg1_scalar;
