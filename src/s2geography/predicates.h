@@ -44,9 +44,15 @@ bool s2_intersects_box(const S2ShapeIndex& geog1, const S2LatLngRect& rect,
 
 namespace sedona_udf {
 
-void IntersectsKernel(struct SedonaCScalarKernel* out);
-void ContainsKernel(struct SedonaCScalarKernel* out);
-void EqualsKernel(struct SedonaCScalarKernel* out);
+void IntersectsKernel(struct SedonaCScalarKernel* out,
+                      bool prepare_arg0_scalar = true,
+                      bool prepare_arg1_scalar = true);
+void ContainsKernel(struct SedonaCScalarKernel* out,
+                    bool prepare_arg0_scalar = true,
+                    bool prepare_arg1_scalar = true);
+void EqualsKernel(struct SedonaCScalarKernel* out,
+                  bool prepare_arg0_scalar = true,
+                  bool prepare_arg1_scalar = true);
 
 }  // namespace sedona_udf
 

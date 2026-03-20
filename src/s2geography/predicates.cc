@@ -525,16 +525,22 @@ struct S2Equals {
   std::vector<S2CellId> intersection_;
 };
 
-void IntersectsKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2Intersects>(out, "st_intersects");
+void IntersectsKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
+                      bool prepare_arg1_scalar) {
+  InitBinaryKernel<S2Intersects>(out, "st_intersects", prepare_arg0_scalar,
+                                 prepare_arg1_scalar);
 }
 
-void ContainsKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2Contains>(out, "st_contains");
+void ContainsKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
+                    bool prepare_arg1_scalar) {
+  InitBinaryKernel<S2Contains>(out, "st_contains", prepare_arg0_scalar,
+                               prepare_arg1_scalar);
 }
 
-void EqualsKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2Equals>(out, "st_equals");
+void EqualsKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
+                  bool prepare_arg1_scalar) {
+  InitBinaryKernel<S2Equals>(out, "st_equals", prepare_arg0_scalar,
+                             prepare_arg1_scalar);
 }
 
 }  // namespace sedona_udf
