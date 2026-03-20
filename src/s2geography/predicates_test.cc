@@ -248,30 +248,45 @@ class PredicatesScalarScalarTest
 TEST_P(PredicatesScalarScalarTest, SedonaUdf) {
   const auto& p = GetParam();
 
-  struct SedonaCScalarKernel kernel;
-  struct SedonaCScalarKernelImpl impl;
-  if (p.op == "intersects") {
-    s2geography::sedona_udf::IntersectsKernel(&kernel);
-  } else if (p.op == "contains") {
-    s2geography::sedona_udf::ContainsKernel(&kernel);
-  } else if (p.op == "equals") {
-    s2geography::sedona_udf::EqualsKernel(&kernel);
-  } else {
-    FAIL() << "Unknown predicate: " << p.op;
+  // Check with all combinations of forcing an index build on scalar arguments.
+  // Because all of our arguments are scalar (we test length one arrays derived
+  // from the test parameter), this lets us get full test coverage of any
+  // special cases designed to avoid building internal indexes of small array
+  // elements.
+  for (bool prepare_arg0 : {true, false}) {
+    for (bool prepare_arg1 : {true, false}) {
+      SCOPED_TRACE("prepare_arg0: " + std::to_string(prepare_arg0) +
+                   ", prepare_arg1: " + std::to_string(prepare_arg1));
+      struct SedonaCScalarKernel kernel;
+      struct SedonaCScalarKernelImpl impl;
+      if (p.op == "intersects") {
+        s2geography::sedona_udf::IntersectsKernel(&kernel, prepare_arg0,
+                                                  prepare_arg1);
+      } else if (p.op == "contains") {
+        s2geography::sedona_udf::ContainsKernel(&kernel, prepare_arg0,
+                                                prepare_arg1);
+      } else if (p.op == "equals") {
+        s2geography::sedona_udf::EqualsKernel(&kernel, prepare_arg0,
+                                              prepare_arg1);
+      } else {
+        FAIL() << "Unknown predicate: " << p.op;
+      }
+
+      ASSERT_NO_FATAL_FAILURE(TestInitKernel(&kernel, &impl,
+                                             {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                                             NANOARROW_TYPE_BOOL));
+
+      nanoarrow::UniqueArray out_array;
+      ASSERT_NO_FATAL_FAILURE(
+          TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                            {{p.lhs}, {p.rhs}}, {}, out_array.get()));
+      impl.release(&impl);
+      kernel.release(&kernel);
+
+      ASSERT_NO_FATAL_FAILURE(
+          TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL, {p.expected}));
+    }
   }
-
-  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
-      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
-
-  nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(
-      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
-                        {{p.lhs}, {p.rhs}}, {}, out_array.get()));
-  impl.release(&impl);
-  kernel.release(&kernel);
-
-  ASSERT_NO_FATAL_FAILURE(
-      TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL, {p.expected}));
 }
 
 INSTANTIATE_TEST_SUITE_P(
