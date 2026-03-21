@@ -204,8 +204,7 @@ bool VisitEdges(const struct GeoArrowGeometryNode* node, int64_t offset,
 
   S2Shape::Edge e;
   return VisitLngLatEdges(
-      node, offset, n,
-      [&](double lng0, double lat0, double lng1, double lat1) {
+      node, offset, n, [&](double lng0, double lat0, double lng1, double lat1) {
         e.v0 = S2LatLng::FromDegrees(lat0, lng0).ToPoint();
         e.v1 = S2LatLng::FromDegrees(lat1, lng1).ToPoint();
         return visit(e);
@@ -269,14 +268,20 @@ class GeoArrowChain {
   /// \brief Copy a single vertex out of this sequence
   S2Point vertex(int64_t i) {
     S2Point v{};
-    this->VisitVertices(i, 1, [&](const S2Point& pt) { v = pt; return true; });
+    this->VisitVertices(i, 1, [&](const S2Point& pt) {
+      v = pt;
+      return true;
+    });
     return v;
   }
 
   /// \brief Copy a single pair of vertices out of this sequence
   S2Shape::Edge edge(int64_t i) {
     S2Shape::Edge e{};
-    this->VisitEdges(i, 1, [&](const S2Shape::Edge& edge) { e = edge; return true; });
+    this->VisitEdges(i, 1, [&](const S2Shape::Edge& edge) {
+      e = edge;
+      return true;
+    });
     return e;
   }
 
