@@ -176,10 +176,15 @@ struct S2Intersects {
   }
 
   bool BruteForceExec(GeoArrowGeography& geog0, GeoArrowGeography& geog1) {
-    // Collect edges from geog1 for repeated iteration
-    edges_.clear();
+    // Collect edges from both geometries upfront
+    edges0_.clear();
+    geog0.VisitEdges([&](const S2Shape::Edge& e) {
+      edges0_.push_back(e);
+      return true;
+    });
+    edges1_.clear();
     geog1.VisitEdges([&](const S2Shape::Edge& e) {
-      edges_.push_back(e);
+      edges1_.push_back(e);
       return true;
     });
 
@@ -190,7 +195,7 @@ struct S2Intersects {
     // For the CLOSED polygon model, shared vertices count as intersection.
     if (!geog0.VisitEdges([&](const S2Shape::Edge& e0) {
           S2CopyingEdgeCrosser crosser(e0.v0, e0.v1);
-          for (const auto& e1 : edges_) {
+          for (const auto& e1 : edges1_) {
             if (crosser.CrossingSign(e1.v0, e1.v1) >= 0) {
               return false;
             }
@@ -224,7 +229,6 @@ struct S2Intersects {
     // VisitEdges only visits lines and polygons, so standalone point
     // geometries are not covered by the edge-crossing check above.
 
-    // edges_ still contains geog1's line/polygon edges from earlier
     if (!geog0.points()->geom().VisitVertices([&](const S2Point& p) {
           // Check if this point matches any vertex of geog1
           if (!geog1.VisitVertices(
@@ -232,8 +236,8 @@ struct S2Intersects {
             return false;
           }
           // Check if this point lies on the interior of any edge of geog1
-          for (size_t j = 0; j < edges_.size(); j++) {
-            if (S2::IsInteriorDistanceLess(p, edges_[j].v0, edges_[j].v1,
+          for (const auto& e : edges1_) {
+            if (S2::IsInteriorDistanceLess(p, e.v0, e.v1,
                                            S1ChordAngle::Zero().Successor())) {
               return false;
             }
@@ -243,13 +247,6 @@ struct S2Intersects {
       return true;
     }
 
-    // Reload with geog0's edges for checking geog1's points
-    edges_.clear();
-    geog0.VisitEdges([&](const S2Shape::Edge& e) {
-      edges_.push_back(e);
-      return true;
-    });
-
     if (!geog1.points()->geom().VisitVertices([&](const S2Point& p) {
           // Check if this point matches any vertex of geog0
           if (!geog0.VisitVertices(
@@ -257,8 +254,8 @@ struct S2Intersects {
             return false;
           }
           // Check if this point lies on the interior of any edge of geog0
-          for (size_t j = 0; j < edges_.size(); j++) {
-            if (S2::IsInteriorDistanceLess(p, edges_[j].v0, edges_[j].v1,
+          for (const auto& e : edges0_) {
+            if (S2::IsInteriorDistanceLess(p, e.v0, e.v1,
                                            S1ChordAngle::Zero().Successor())) {
               return false;
             }
@@ -277,7 +274,8 @@ struct S2Intersects {
 
   S2BooleanOperation::Options options_;
   std::vector<S2CellId> intersection_;
-  std::vector<S2Shape::Edge> edges_;
+  std::vector<S2Shape::Edge> edges0_;
+  std::vector<S2Shape::Edge> edges1_;
 };
 
 struct S2Contains {
