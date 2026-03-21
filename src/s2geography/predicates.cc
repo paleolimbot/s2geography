@@ -334,14 +334,6 @@ struct S2Contains {
       return SemiBruteForceIndexedContains(value0.ShapeIndex(), value1);
     }
 
-    // When value1 has an index and value0 (container) is small+fresh with
-    // polygons, use brute force containment on value0's polygons.
-    if (value0.is_unindexed() && !value1.is_unindexed() &&
-        value0.num_edges() < kMaxBruteForceEdges &&
-        value0.polygons()->num_edges() > 0) {
-      return SemiBruteForceContainsFresh(value0, value1.ShapeIndex());
-    }
-
     S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
                                  &intersection_);
     if (intersection_.empty()) {
@@ -416,54 +408,6 @@ struct S2Contains {
     });
     if (crossing_found) {
       return false;
-    }
-
-    return true;
-  }
-
-  // Container (value0) is small+fresh with polygons, value1 is indexed.
-  // Use brute force containment on value0's polygons for each vertex of
-  // value1, and brute force edge crossing checks.
-  bool SemiBruteForceContainsFresh(GeoArrowGeography& container,
-                                   const S2ShapeIndex& contained) {
-    // All vertices of the contained index must be inside the container's
-    // polygons.
-    auto ref = container.polygons()->GetReferencePoint();
-    for (const S2Shape* shape : contained) {
-      for (int j = 0; j < shape->num_edges(); j++) {
-        S2Shape::Edge e = shape->edge(j);
-        if (!container.polygons()->BruteForceContains(e.v0, ref)) {
-          return false;
-        }
-      }
-      // Check the last vertex of each chain too (edge() gives (v0, v1) pairs
-      // but the last vertex of a chain is only in the v1 of the last edge).
-      for (int c = 0; c < shape->num_chains(); c++) {
-        S2Shape::Chain chain = shape->chain(c);
-        if (chain.length > 0) {
-          S2Shape::Edge last = shape->chain_edge(c, chain.length - 1);
-          if (!container.polygons()->BruteForceContains(last.v1, ref)) {
-            return false;
-          }
-        }
-      }
-    }
-
-    // No edges of the contained geometry may properly cross edges of the
-    // container.
-    edges_.clear();
-    container.VisitEdges([&](const S2Shape::Edge& e) { edges_.push_back(e); });
-
-    for (const S2Shape* shape : contained) {
-      for (int j = 0; j < shape->num_edges(); j++) {
-        S2Shape::Edge e1 = shape->edge(j);
-        S2CopyingEdgeCrosser crosser(e1.v0, e1.v1);
-        for (const auto& e0 : edges_) {
-          if (crosser.CrossingSign(e0.v0, e0.v1) > 0) {
-            return false;
-          }
-        }
-      }
     }
 
     return true;
