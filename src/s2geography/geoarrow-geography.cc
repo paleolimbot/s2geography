@@ -33,14 +33,13 @@ void ReverseNodeInPlace(struct GeoArrowGeometryNode* node) {
 }
 
 bool AllLngLatNaN(struct GeoArrowGeometryView geom) {
-  bool out = true;
-  internal::VisitGeoArrowNodes(
+  return internal::VisitGeoArrowNodes(
       geom, [&](const struct GeoArrowGeometryNode* node) {
-        internal::VisitLngLat(node, 0, node->size, [&](double lng, double lat) {
-          out = out && std::isnan(lng) && std::isnan(lat);
-        });
+        return internal::VisitLngLat(
+            node, 0, node->size, [&](double lng, double lat) {
+              return std::isnan(lng) && std::isnan(lat);
+            });
       });
-  return out;
 }
 
 const char* GeometryTypeString(uint8_t geometry_type) {
@@ -96,12 +95,13 @@ void GeoArrowPointShape::Init(struct GeoArrowGeometryView geom) {
 
   // This is rare but for now we check, as otherwise we might get an attempt to
   // visit the coordinate of a node that doesn't have any.
-  geom_.VisitChains([&](GeoArrowChain chain) {
+  geom_.VisitChains([&](GeoArrowChain chain) -> bool {
     if (chain.size() == 0) {
       throw Exception(
           "Can't create GeoArrowPointShape() from MULTIPOINT with EMPTY "
           "components");
     }
+    return true;
   });
 }
 
@@ -192,7 +192,7 @@ void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
 
   num_edges_[0] = 0;
   int64_t i = 1;
-  geom_.VisitChains([&](GeoArrowChain chain) {
+  geom_.VisitChains([&](GeoArrowChain chain) -> bool {
     num_edges += chain.size() == 0 ? 0 : chain.size() - 1;
     if (num_edges > std::numeric_limits<int>::max()) {
       throw Exception(
@@ -201,6 +201,7 @@ void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
     }
 
     num_edges_[i++] = num_edges;
+    return true;
   });
 }
 
@@ -297,6 +298,7 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
                 "Can't create GeoArrowLaxPolygonShape() from geometry type " +
                 std::string(GeometryTypeString(geom.root->geometry_type)));
         }
+        return true;
       });
 
   geom_ = {loops_.data(), static_cast<int64_t>(loops_.size())};
@@ -358,14 +360,16 @@ bool GeoArrowLaxPolygonShape::BruteForceContains(
 
   geom_.VisitChains([&](GeoArrowChain loop) {
     if (loop.size() < 2) {
-      return;
+      return true;
     }
 
     S2Point v0 = loop.vertex(0);
     S2CopyingEdgeCrosser crosser(reference.point, pt, v0);
     loop.VisitVertices(1, loop.size() - 1, [&](const S2Point& vertex) {
       inside ^= crosser.EdgeOrVertexCrossing(vertex);
+      return true;
     });
+    return true;
   });
 
   return inside;
@@ -453,8 +457,10 @@ void GeoArrowGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
       if (points_.num_vertices() <= 32) {
-        points_.geom().VisitVertices(
-            [&](S2Point v) { cell_ids->push_back(S2CellId(v)); });
+        points_.geom().VisitVertices([&](S2Point v) {
+          cell_ids->push_back(S2CellId(v));
+          return true;
+        });
         return;
       }
       break;
@@ -655,6 +661,7 @@ bool GeoArrowLoop::BruteForceContains(
   bool inside = reference.contained;
   this->VisitVertices(1, size() - 1, [&](const S2Point& vertex_pt) {
     inside ^= crosser.EdgeOrVertexCrossing(vertex_pt);
+    return true;
   });
 
   return inside;
@@ -666,8 +673,10 @@ void GeoArrowLoop::BuildScratch() {
   }
 
   if (scratch_->empty()) {
-    this->VisitVertices(0, node->size - 1,
-                        [&](const S2Point& pt) { scratch_->push_back(pt); });
+    this->VisitVertices(0, node->size - 1, [&](const S2Point& pt) {
+      scratch_->push_back(pt);
+      return true;
+    });
   }
 }
 

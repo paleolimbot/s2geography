@@ -153,7 +153,7 @@ TEST(GeoArrowGeom, VisitPoint) {
   GeoArrowGeom g(geom.geom());
 
   std::vector<S2Point> vertices;
-  g.VisitVertices([&](const S2Point& p) { vertices.push_back(p); });
+  g.VisitVertices([&](const S2Point& p) { vertices.push_back(p); return true; });
   ASSERT_EQ(vertices.size(), 1);
   EXPECT_EQ(vertices[0], S2LatLng::FromDegrees(2, 1).ToPoint());
 }
@@ -163,7 +163,7 @@ TEST(GeoArrowGeom, VisitVerticesLineString) {
   GeoArrowGeom g(geom.geom());
 
   std::vector<S2Point> vertices;
-  g.VisitVertices([&](const S2Point& p) { vertices.push_back(p); });
+  g.VisitVertices([&](const S2Point& p) { vertices.push_back(p); return true; });
   ASSERT_EQ(vertices.size(), 3);
   EXPECT_EQ(vertices[0], S2LatLng::FromDegrees(0, 0).ToPoint());
   EXPECT_EQ(vertices[1], S2LatLng::FromDegrees(1, 1).ToPoint());
@@ -175,7 +175,7 @@ TEST(GeoArrowGeom, VisitEdgesLineString) {
   GeoArrowGeom g(geom.geom());
 
   std::vector<S2Shape::Edge> edges;
-  g.VisitEdges([&](const S2Shape::Edge& e) { edges.push_back(e); });
+  g.VisitEdges([&](const S2Shape::Edge& e) { edges.push_back(e); return true; });
   ASSERT_EQ(edges.size(), 2);
   EXPECT_EQ(edges[0].v0, S2LatLng::FromDegrees(0, 0).ToPoint());
   EXPECT_EQ(edges[0].v1, S2LatLng::FromDegrees(1, 1).ToPoint());
@@ -188,7 +188,7 @@ TEST(GeoArrowGeom, VisitEdgesSingleVertex) {
   GeoArrowGeom g(geom.geom());
 
   int count = 0;
-  g.VisitEdges([&](const S2Shape::Edge&) { ++count; });
+  g.VisitEdges([&](const S2Shape::Edge&) { ++count; return true; });
   EXPECT_EQ(count, 0);
 }
 
@@ -199,7 +199,7 @@ TEST(GeoArrowGeom, VisitChainsMultiLineString) {
   GeoArrowGeom g(geom.geom());
   std::vector<uint32_t> chain_sizes;
   g.VisitChains(
-      [&](GeoArrowChain chain) { chain_sizes.push_back(chain.size()); });
+      [&](GeoArrowChain chain) { chain_sizes.push_back(chain.size()); return true; });
   ASSERT_EQ(chain_sizes.size(), 2);
   EXPECT_EQ(chain_sizes[0], 2);
   EXPECT_EQ(chain_sizes[1], 3);
@@ -214,6 +214,7 @@ TEST(GeoArrowGeom, VisitChainsEmpty) {
   g.VisitChains([&](GeoArrowChain chain) {
     EXPECT_EQ(chain.size(), 0);
     ++count;
+    return true;
   });
   EXPECT_EQ(count, 1);
 }
@@ -227,6 +228,7 @@ TEST(GeoArrowGeom, VisitLoopsPolygon) {
   g.VisitLoops(&scratch, [&](GeoArrowLoop loop) {
     ++loop_count;
     EXPECT_EQ(loop.size(), 5);
+    return true;
   });
   EXPECT_EQ(loop_count, 1);
 }
@@ -237,7 +239,7 @@ TEST(GeoArrowGeom, VisitEdgesPolygon) {
   GeoArrowGeom g(geom.geom());
 
   std::vector<S2Shape::Edge> edges;
-  g.VisitEdges([&](const S2Shape::Edge& e) { edges.push_back(e); });
+  g.VisitEdges([&](const S2Shape::Edge& e) { edges.push_back(e); return true; });
   ASSERT_EQ(edges.size(), 4);
 
   // First edge: (0,0) / (10,0)
@@ -254,7 +256,7 @@ TEST(GeoArrowGeom, DefaultConstructor) {
   EXPECT_EQ(g.root(), nullptr);
 
   int count = 0;
-  g.VisitVertices([&](S2Point) { ++count; });
+  g.VisitVertices([&](S2Point) { ++count; return true; });
   EXPECT_EQ(count, 0);
 }
 
