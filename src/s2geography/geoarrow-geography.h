@@ -264,6 +264,21 @@ class GeoArrowGeography {
   /// building an index.
   std::unique_ptr<S2Region> Region();
 
+  /// \brief Return true if the internal index has not yet been built
+  bool is_unindexed() const {
+    if (indexed_) {
+      return !index_.is_fresh();
+    } else {
+      return true;
+    }
+  }
+
+  /// \brief Force building the internal index
+  void ForceBuildIndex() {
+    InitIndex();
+    index_.ForceBuild();
+  }
+
   /// \brief If this geography represents a single point, compute and return it
   ///
   /// This allows callers to use potentially much faster implementations of

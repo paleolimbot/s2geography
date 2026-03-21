@@ -258,6 +258,10 @@ class ArrowInputView {
   ArrowInputView(const ArrowInputView&) = delete;
   ArrowInputView& operator=(const ArrowInputView&) = delete;
 
+  void SetPrepareScalar(bool prepare_scalar) {
+    S2GEOGRAPHY_UNUSED(prepare_scalar);
+  }
+
   void SetArray(const struct ArrowArray* array, int64_t num_rows) {
     NANOARROW_THROW_NOT_OK(ArrowArrayViewSetArray(view_.get(), array, nullptr));
 
@@ -329,6 +333,10 @@ class GeographyInputView {
   }
   GeographyInputView(const GeographyInputView&) = delete;
   GeographyInputView& operator=(const GeographyInputView&) = delete;
+
+  void SetPrepareScalar(bool prepare_scalar) {
+    S2GEOGRAPHY_UNUSED(prepare_scalar);
+  }
 
   std::string GetCrs() { return type_.crs(); }
 
@@ -408,6 +416,10 @@ class GeoArrowGeographyInputView {
 
   std::string GetCrs() { return type_.crs(); }
 
+  void SetPrepareScalar(bool prepare_scalar) {
+    prepare_scalar_ = prepare_scalar;
+  }
+
   void SetArray(const struct ArrowArray* array, int64_t num_rows) {
     inner_.SetArray(array, num_rows);
     current_array_length_ = array->length;
@@ -417,7 +429,12 @@ class GeoArrowGeographyInputView {
   bool IsNull(int64_t i) { return inner_.IsNull(i); }
 
   GeoArrowGeography& Get(int64_t i) {
-    StashIfNeeded(i % current_array_length_);
+    if (current_array_length_ == 1) {
+      StashIfNeeded(0, prepare_scalar_);
+    } else {
+      StashIfNeeded(i);
+    }
+
     return stashed_;
   }
 
@@ -428,8 +445,9 @@ class GeoArrowGeographyInputView {
   int64_t current_array_length_;
   int64_t stashed_index_;
   GeoArrowGeography stashed_;
+  bool prepare_scalar_{};
 
-  void StashIfNeeded(int64_t i) {
+  void StashIfNeeded(int64_t i, bool prepare = false) {
     if (i != stashed_index_) {
       std::string_view inner = inner_.Get(i);
       struct GeoArrowBufferView src = {
@@ -442,6 +460,10 @@ class GeoArrowGeographyInputView {
 
       stashed_.Init(geom);
       stashed_index_ = i;
+
+      if (prepare) {
+        stashed_.ForceBuildIndex();
+      }
     }
   }
 };
@@ -459,6 +481,8 @@ class GeoArrowGeographyInputView {
 /// \brief Private data for SedonaCScalarKernel
 struct KernelData {
   std::string name;
+  bool prepare_arg0_scalar{true};
+  bool prepare_arg1_scalar{true};
 };
 
 inline const char* KernelFunctionName(const struct SedonaCScalarKernel* self) {
@@ -482,6 +506,7 @@ class SedonaUnaryKernelAdapter {
     std::unique_ptr<typename Exec::arg0_t> arg0;
     std::unique_ptr<typename Exec::out_t> out;
     Exec exec;
+    bool prepare_arg0_scalar{true};
   };
 
   static int ImplInit(struct SedonaCScalarKernelImpl* self,
@@ -498,6 +523,7 @@ class SedonaUnaryKernelAdapter {
       }
 
       data->arg0 = std::make_unique<typename Exec::arg0_t>(arg_types[0]);
+      data->arg0->SetPrepareScalar(data->prepare_arg0_scalar);
       data->out = std::make_unique<typename Exec::out_t>();
       data->exec.Init({});
 
@@ -560,9 +586,13 @@ class SedonaUnaryKernelAdapter {
     self->release = nullptr;
   }
 
-  static void NewImpl(const struct SedonaCScalarKernel* /*kernel*/,
+  static void NewImpl(const struct SedonaCScalarKernel* self,
                       struct SedonaCScalarKernelImpl* out) {
-    out->private_data = new ImplData();
+    auto* kernel_private = static_cast<KernelData*>(self->private_data);
+    auto* impl_private = new ImplData();
+    impl_private->prepare_arg0_scalar = kernel_private->prepare_arg0_scalar;
+
+    out->private_data = impl_private;
     out->init = &ImplInit;
     out->execute = &ImplExecute;
     out->get_last_error = &ImplGetLastError;
@@ -580,6 +610,8 @@ class SedonaBinaryKernelAdapter {
     std::unique_ptr<typename Exec::arg1_t> arg1;
     std::unique_ptr<typename Exec::out_t> out;
     Exec exec;
+    bool prepare_arg0_scalar{true};
+    bool prepare_arg1_scalar{true};
   };
 
   static int ImplInit(struct SedonaCScalarKernelImpl* self,
@@ -598,6 +630,8 @@ class SedonaBinaryKernelAdapter {
 
       data->arg0 = std::make_unique<typename Exec::arg0_t>(arg_types[0]);
       data->arg1 = std::make_unique<typename Exec::arg1_t>(arg_types[1]);
+      data->arg0->SetPrepareScalar(data->prepare_arg0_scalar);
+      data->arg1->SetPrepareScalar(data->prepare_arg1_scalar);
       data->out = std::make_unique<typename Exec::out_t>();
       data->exec.Init({});
 
@@ -665,9 +699,14 @@ class SedonaBinaryKernelAdapter {
     self->release = nullptr;
   }
 
-  static void NewImpl(const struct SedonaCScalarKernel* /*kernel*/,
+  static void NewImpl(const struct SedonaCScalarKernel* self,
                       struct SedonaCScalarKernelImpl* out) {
-    out->private_data = new ImplData();
+    auto* kernel_private = static_cast<KernelData*>(self->private_data);
+    auto* impl_private = new ImplData();
+    impl_private->prepare_arg0_scalar = kernel_private->prepare_arg0_scalar;
+    impl_private->prepare_arg1_scalar = kernel_private->prepare_arg1_scalar;
+
+    out->private_data = impl_private;
     out->init = &ImplInit;
     out->execute = &ImplExecute;
     out->get_last_error = &ImplGetLastError;
@@ -677,9 +716,9 @@ class SedonaBinaryKernelAdapter {
 
 /// \brief Initialize a SedonaCScalarKernel for a unary Exec
 template <typename Exec>
-void InitUnaryKernel(struct SedonaCScalarKernel* out, const char* name) {
-  auto* data = new KernelData();
-  data->name = name;
+void InitUnaryKernel(struct SedonaCScalarKernel* out, const char* name,
+                     bool prepare_arg0_scalar = true) {
+  auto* data = new KernelData{name, prepare_arg0_scalar};
   out->private_data = data;
   out->function_name = &KernelFunctionName;
   out->new_impl = &SedonaUnaryKernelAdapter<Exec>::NewImpl;
@@ -688,9 +727,10 @@ void InitUnaryKernel(struct SedonaCScalarKernel* out, const char* name) {
 
 /// \brief Initialize a SedonaCScalarKernel for a binary Exec
 template <typename Exec>
-void InitBinaryKernel(struct SedonaCScalarKernel* out, const char* name) {
-  auto* data = new KernelData();
-  data->name = name;
+void InitBinaryKernel(struct SedonaCScalarKernel* out, const char* name,
+                      bool prepare_arg0_scalar = true,
+                      bool prepare_arg1_scalar = true) {
+  auto* data = new KernelData{name, prepare_arg0_scalar, prepare_arg1_scalar};
   out->private_data = data;
   out->function_name = &KernelFunctionName;
   out->new_impl = &SedonaBinaryKernelAdapter<Exec>::NewImpl;
