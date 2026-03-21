@@ -176,8 +176,6 @@ struct S2Intersects {
   }
 
   bool BruteForceExec(GeoArrowGeography& geog0, GeoArrowGeography& geog1) {
-
-
     // Collect edges from geog1 for repeated iteration
     edges_.clear();
     geog1.VisitEdges([&](const S2Shape::Edge& e) { edges_.push_back(e); });
@@ -244,14 +242,15 @@ struct S2Intersects {
         });
         // Check if this point lies on the interior of any edge of geog1
         for (size_t j = 0; j < edges_.size() && !found; j++) {
-          if (S2::IsInteriorDistanceLess(
-                  p, edges_[j].v0, edges_[j].v1,
-                  S1ChordAngle::Zero().Successor())) {
+          if (S2::IsInteriorDistanceLess(p, edges_[j].v0, edges_[j].v1,
+                                         S1ChordAngle::Zero().Successor())) {
             found = true;
           }
         }
       }
-      if (found) return true;
+      if (found) {
+        return true;
+      }
     }
 
     if (np1 > 0) {
@@ -267,14 +266,15 @@ struct S2Intersects {
         });
         // Check if this point lies on the interior of any edge of geog0
         for (size_t j = 0; j < edges_.size() && !found; j++) {
-          if (S2::IsInteriorDistanceLess(
-                  p, edges_[j].v0, edges_[j].v1,
-                  S1ChordAngle::Zero().Successor())) {
+          if (S2::IsInteriorDistanceLess(p, edges_[j].v0, edges_[j].v1,
+                                         S1ChordAngle::Zero().Successor())) {
             found = true;
           }
         }
       }
-      if (found) return true;
+      if (found) {
+        return true;
+      }
     }
 
     return false;
