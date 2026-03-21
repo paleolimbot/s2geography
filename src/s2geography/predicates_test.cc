@@ -86,9 +86,6 @@ TEST(Predicates, SedonaUdfContainsScalarArray) {
                                           {true, false, std::nullopt}));
 }
 
-// Semi-brute force tests: scalar side is indexed, array items are fresh.
-// These exercise the SemiBruteForce paths for non-point geometries.
-
 TEST(Predicates, SedonaUdfIntersectsScalarPolygonArrayLinestring) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::IntersectsKernel(&kernel);
