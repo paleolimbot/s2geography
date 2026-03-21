@@ -154,7 +154,7 @@ struct S2Intersects {
     // For small non-point geometries where no index has been built yet,
     // use brute force edge crossing and containment checks to avoid the
     // cost of building an index.
-    if (value0.is_fresh() && value1.is_fresh() &&
+    if (value0.is_unindexed() && value1.is_unindexed() &&
         value0.num_edges() < kMaxBruteForceEdges &&
         value1.num_edges() < kMaxBruteForceEdges) {
       return BruteForceExec(value0, value1);
@@ -256,7 +256,7 @@ struct S2Contains {
       // A point cannot contain anything
       return false;
     } else if (maybe_point1) {
-      if (value0.is_fresh() && value0.num_edges() < kMaxBruteForceEdges &&
+      if (value0.is_unindexed() && value0.num_edges() < kMaxBruteForceEdges &&
           value0.dimension() == 2) {
         return value0.polygons()->BruteForceContains(*maybe_point1);
       }
@@ -268,7 +268,7 @@ struct S2Contains {
 
     // For small non-point geometries where A has polygons and no index has
     // been built yet, use brute force containment and edge crossing checks.
-    if (value0.is_fresh() && value1.is_fresh() &&
+    if (value0.is_unindexed() && value1.is_unindexed() &&
         value0.num_edges() < kMaxBruteForceEdges &&
         value1.num_edges() < kMaxBruteForceEdges &&
         value0.polygons()->num_edges() > 0) {
@@ -277,14 +277,14 @@ struct S2Contains {
 
     // When the container (value0) has an index and value1 is small+fresh,
     // check containment using the index's point query and crossing query.
-    if (!value0.is_fresh() && value1.is_fresh() &&
+    if (!value0.is_unindexed() && value1.is_unindexed() &&
         value1.num_edges() < kMaxBruteForceEdges) {
       return SemiBruteForceIndexedContains(value0.ShapeIndex(), value1);
     }
 
     // When value1 has an index and value0 (container) is small+fresh with
     // polygons, use brute force containment on value0's polygons.
-    if (value0.is_fresh() && !value1.is_fresh() &&
+    if (value0.is_unindexed() && !value1.is_unindexed() &&
         value0.num_edges() < kMaxBruteForceEdges &&
         value0.polygons()->num_edges() > 0) {
       return SemiBruteForceContainsFresh(value0, value1.ShapeIndex());

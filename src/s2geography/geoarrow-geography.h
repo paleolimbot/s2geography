@@ -265,7 +265,13 @@ class GeoArrowGeography {
   std::unique_ptr<S2Region> Region();
 
   /// \brief Return true if the internal index has not yet been built
-  bool is_fresh() const { return !indexed_ && index_.is_fresh(); }
+  bool is_unindexed() const {
+    if (indexed_) {
+      return !index_.is_fresh();
+    } else {
+      return true;
+    }
+  }
 
   /// \brief Force building the internal index
   void ForceBuildIndex() {
