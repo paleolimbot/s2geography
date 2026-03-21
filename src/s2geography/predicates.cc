@@ -5,6 +5,7 @@
 #include <s2/s2contains_point_query.h>
 #include <s2/s2crossing_edge_query.h>
 #include <s2/s2edge_crosser.h>
+#include <s2/s2edge_distances.h>
 #include <s2/s2edge_tessellator.h>
 #include <s2/s2lax_loop_shape.h>
 
@@ -128,6 +129,15 @@ struct S2Intersects {
       return false;
     }
 
+    // For small geometries where no index has been built yet,
+    // use brute force edge crossing and containment checks to avoid the
+    // cost of building an index.
+    if (value0.is_unindexed() && value1.is_unindexed() &&
+        value0.num_edges() < kMaxBruteForceEdges &&
+        value1.num_edges() < kMaxBruteForceEdges) {
+      return BruteForceExec(value0, value1);
+    }
+
     // The containment test for a S2Point is ~20x faster than building an index
     // containing exactly one point for every element so we try very hard to
     // avoid it.
@@ -151,15 +161,6 @@ struct S2Intersects {
              ExecUsingShapeIndex(value0, value1);
     }
 
-    // For small non-point geometries where no index has been built yet,
-    // use brute force edge crossing and containment checks to avoid the
-    // cost of building an index.
-    if (value0.is_unindexed() && value1.is_unindexed() &&
-        value0.num_edges() < kMaxBruteForceEdges &&
-        value1.num_edges() < kMaxBruteForceEdges) {
-      return BruteForceExec(value0, value1);
-    }
-
     // Next we try a covering intersection check. This is very cheap if an index
     // has already been built. In the event that an index does have to be built
     // to build the covering, it is effectively reused in the actual
@@ -175,6 +176,8 @@ struct S2Intersects {
   }
 
   bool BruteForceExec(GeoArrowGeography& geog0, GeoArrowGeography& geog1) {
+
+
     // Collect edges from geog1 for repeated iteration
     edges_.clear();
     geog1.VisitEdges([&](const S2Shape::Edge& e) { edges_.push_back(e); });
@@ -223,6 +226,55 @@ struct S2Intersects {
       if (found) {
         return true;
       }
+    }
+
+    // Check point vertices against the other geometry's vertices and edges.
+    // VisitEdges only visits lines and polygons, so standalone point
+    // geometries are not covered by the edge-crossing check above.
+    int np0 = geog0.points()->num_vertices();
+    int np1 = geog1.points()->num_vertices();
+
+    if (np0 > 0) {
+      // edges_ still contains geog1's line/polygon edges from earlier
+      for (int i = 0; i < np0 && !found; i++) {
+        S2Point p = geog0.points()->vertex(i);
+        // Check if this point matches any vertex of geog1
+        geog1.VisitVertices([&](const S2Point& v) {
+          if (!found && p == v) found = true;
+        });
+        // Check if this point lies on the interior of any edge of geog1
+        for (size_t j = 0; j < edges_.size() && !found; j++) {
+          if (S2::IsInteriorDistanceLess(
+                  p, edges_[j].v0, edges_[j].v1,
+                  S1ChordAngle::Zero().Successor())) {
+            found = true;
+          }
+        }
+      }
+      if (found) return true;
+    }
+
+    if (np1 > 0) {
+      // Reload with geog0's edges for checking geog1's points
+      edges_.clear();
+      geog0.VisitEdges([&](const S2Shape::Edge& e) { edges_.push_back(e); });
+
+      for (int i = 0; i < np1 && !found; i++) {
+        S2Point p = geog1.points()->vertex(i);
+        // Check if this point matches any vertex of geog0
+        geog0.VisitVertices([&](const S2Point& v) {
+          if (!found && p == v) found = true;
+        });
+        // Check if this point lies on the interior of any edge of geog0
+        for (size_t j = 0; j < edges_.size() && !found; j++) {
+          if (S2::IsInteriorDistanceLess(
+                  p, edges_[j].v0, edges_[j].v1,
+                  S1ChordAngle::Zero().Successor())) {
+            found = true;
+          }
+        }
+      }
+      if (found) return true;
     }
 
     return false;

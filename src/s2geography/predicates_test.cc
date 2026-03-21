@@ -386,6 +386,35 @@ INSTANTIATE_TEST_SUITE_P(
                           "LINESTRING (0 0, 1 0)", "intersects",
                           "LINESTRING (30 30, 31 30)", false},
 
+        // Multipoint x multipoint (brute force point-vertex match)
+        ScalarScalarParam{"multipoint_intersects_multipoint_shared",
+                          "MULTIPOINT (0 0, 1 1)", "intersects",
+                          "MULTIPOINT (1 1, 2 2)", true},
+        // Multipoint x multipoint disjoint
+        ScalarScalarParam{"multipoint_not_intersects_multipoint",
+                          "MULTIPOINT (0 0, 1 1)", "intersects",
+                          "MULTIPOINT (3 3, 4 4)", false},
+        // Multipoint x linestring (point at line vertex)
+        ScalarScalarParam{"multipoint_intersects_linestring_vertex",
+                          "MULTIPOINT (0 0, 5 5)", "intersects",
+                          "LINESTRING (0 0, 1 0)", true},
+        // Linestring x multipoint (point at line vertex, reversed)
+        ScalarScalarParam{"linestring_intersects_multipoint_vertex",
+                          "LINESTRING (0 0, 1 0)", "intersects",
+                          "MULTIPOINT (0 0, 5 5)", true},
+        // Multipoint x linestring disjoint
+        ScalarScalarParam{"multipoint_not_intersects_linestring",
+                          "MULTIPOINT (5 5, 6 6)", "intersects",
+                          "LINESTRING (0 0, 1 0)", false},
+        // Multipoint x polygon (point inside polygon, brute force)
+        ScalarScalarParam{"multipoint_intersects_polygon_interior",
+                          "MULTIPOINT (0.25 0.25, 5 5)", "intersects",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", true},
+        // Multipoint x polygon disjoint
+        ScalarScalarParam{"multipoint_not_intersects_polygon",
+                          "MULTIPOINT (5 5, 6 6)", "intersects",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", false},
+
         // Contains
         // Nulls
         ScalarScalarParam{"null_contains", std::nullopt, "contains",
