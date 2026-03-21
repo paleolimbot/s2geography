@@ -223,49 +223,49 @@ struct S2Intersects {
     // Check point vertices against the other geometry's vertices and edges.
     // VisitEdges only visits lines and polygons, so standalone point
     // geometries are not covered by the edge-crossing check above.
-    int np0 = geog0.points()->num_vertices();
-    int np1 = geog1.points()->num_vertices();
 
-    if (np0 > 0) {
-      // edges_ still contains geog1's line/polygon edges from earlier
-      for (int i = 0; i < np0; i++) {
-        S2Point p = geog0.points()->vertex(i);
-        // Check if this point matches any vertex of geog1
-        if (!geog1.VisitVertices([&](const S2Point& v) { return !(p == v); })) {
-          return true;
-        }
-        // Check if this point lies on the interior of any edge of geog1
-        for (size_t j = 0; j < edges_.size(); j++) {
-          if (S2::IsInteriorDistanceLess(p, edges_[j].v0, edges_[j].v1,
-                                         S1ChordAngle::Zero().Successor())) {
-            return true;
+    // edges_ still contains geog1's line/polygon edges from earlier
+    if (!geog0.points()->geom().VisitVertices([&](const S2Point& p) {
+          // Check if this point matches any vertex of geog1
+          if (!geog1.VisitVertices(
+                  [&](const S2Point& v) { return !(p == v); })) {
+            return false;
           }
-        }
-      }
+          // Check if this point lies on the interior of any edge of geog1
+          for (size_t j = 0; j < edges_.size(); j++) {
+            if (S2::IsInteriorDistanceLess(p, edges_[j].v0, edges_[j].v1,
+                                           S1ChordAngle::Zero().Successor())) {
+              return false;
+            }
+          }
+          return true;
+        })) {
+      return true;
     }
 
-    if (np1 > 0) {
-      // Reload with geog0's edges for checking geog1's points
-      edges_.clear();
-      geog0.VisitEdges([&](const S2Shape::Edge& e) {
-        edges_.push_back(e);
-        return true;
-      });
+    // Reload with geog0's edges for checking geog1's points
+    edges_.clear();
+    geog0.VisitEdges([&](const S2Shape::Edge& e) {
+      edges_.push_back(e);
+      return true;
+    });
 
-      for (int i = 0; i < np1; i++) {
-        S2Point p = geog1.points()->vertex(i);
-        // Check if this point matches any vertex of geog0
-        if (!geog0.VisitVertices([&](const S2Point& v) { return !(p == v); })) {
-          return true;
-        }
-        // Check if this point lies on the interior of any edge of geog0
-        for (size_t j = 0; j < edges_.size(); j++) {
-          if (S2::IsInteriorDistanceLess(p, edges_[j].v0, edges_[j].v1,
-                                         S1ChordAngle::Zero().Successor())) {
-            return true;
+    if (!geog1.points()->geom().VisitVertices([&](const S2Point& p) {
+          // Check if this point matches any vertex of geog0
+          if (!geog0.VisitVertices(
+                  [&](const S2Point& v) { return !(p == v); })) {
+            return false;
           }
-        }
-      }
+          // Check if this point lies on the interior of any edge of geog0
+          for (size_t j = 0; j < edges_.size(); j++) {
+            if (S2::IsInteriorDistanceLess(p, edges_[j].v0, edges_[j].v1,
+                                           S1ChordAngle::Zero().Successor())) {
+              return false;
+            }
+          }
+          return true;
+        })) {
+      return true;
     }
 
     return false;
