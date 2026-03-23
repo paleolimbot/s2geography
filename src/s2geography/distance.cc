@@ -236,10 +236,10 @@ void ClearanceLine(GeoArrowGeography& value0, GeoArrowGeography& value1,
     ClearanceLineUsingShapeIndexAndPoint(value0.ShapeIndex(), *maybe_point0,
                                          out);
   } else if (maybe_point1) {
-    ClearanceLineUsingShapeIndexAndPoint(value0.ShapeIndex(), *maybe_point1,
+    ClearanceLineUsingPointAndShapeIndex(*maybe_point1, value1.ShapeIndex(),
                                          out);
   } else {
-    ClearanceLine(value0, value1, out);
+    ClearanceLineUsingShapeIndex(value0.ShapeIndex(), value1.ShapeIndex(), out);
   }
 }
 
