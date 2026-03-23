@@ -324,13 +324,17 @@ class GeoArrowGeography {
 
   /// \brief Visit all vertices in this geography
   template <typename Visit>
-  void VisitVertices(Visit&& visit) {
-    points()->geom().VisitChains(
-        [&](GeoArrowChain chain) { chain.VisitVertices(visit); });
-    lines()->geom().VisitChains(
-        [&](GeoArrowChain chain) { chain.VisitVertices(visit); });
-    polygons()->geom().VisitChains(
-        [&](GeoArrowChain chain) { chain.VisitVertices(visit); });
+  bool VisitVertices(Visit&& visit) {
+    if (!points()->geom().VisitChains(
+            [&](GeoArrowChain chain) { return chain.VisitVertices(visit); }))
+      return false;
+    if (!lines()->geom().VisitChains(
+            [&](GeoArrowChain chain) { return chain.VisitVertices(visit); }))
+      return false;
+    if (!polygons()->geom().VisitChains(
+            [&](GeoArrowChain chain) { return chain.VisitVertices(visit); }))
+      return false;
+    return true;
   }
 
   /// \brief Visit all pairs of vertices in this geography
@@ -338,9 +342,10 @@ class GeoArrowGeography {
   /// Note that this does not include point geometries (i.e., only sequences)
   /// of 2 or more vertices are considered.
   template <typename Visit>
-  void VisitEdges(Visit&& visit) {
-    lines()->geom().VisitEdges(visit);
-    polygons()->geom().VisitEdges(visit);
+  bool VisitEdges(Visit&& visit) {
+    if (!lines()->geom().VisitEdges(visit)) return false;
+    if (!polygons()->geom().VisitEdges(visit)) return false;
+    return true;
   }
 
  private:
