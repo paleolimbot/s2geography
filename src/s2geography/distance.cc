@@ -90,7 +90,7 @@ std::pair<S2Point, S2Point> s2_minimum_clearance_line_between(
 
 namespace sedona_udf {
 
-static const int kMaxBruteForceEdges = 32;
+static const int kMaxBruteForceEdgeComparisons = 64;
 
 struct EdgePair {
   S2Shape::Edge e0{};
@@ -103,9 +103,9 @@ struct EdgePair {
   S1ChordAngle distance{S1ChordAngle::Infinity()};
 };
 
-static void ClearanceLineOnlyEdgesBruteForce(const GeoArrowGeography& value0,
-                                             const GeoArrowGeography& value1,
-                                             EdgePair* out) {
+void ClearanceLineOnlyEdgesBruteForce(const GeoArrowGeography& value0,
+                                      const GeoArrowGeography& value1,
+                                      EdgePair* out) {
   value0.VisitEdges([&](S2Shape::Edge& e0) {
     ++(out->edge_id0);
     out->edge_id1 = -1;
@@ -138,23 +138,32 @@ static void ClearanceLineOnlyEdgesBruteForce(const GeoArrowGeography& value0,
   }
 }
 
-static void ClearanceLineUsingShapeIndex(const S2ShapeIndex& value0,
-                                         const S2ShapeIndex& value1,
-                                         EdgePair* out) {
+void ClearanceLineFromPoints(const S2Point& value0, const S2Point& value1,
+                             EdgePair* out) {
+  out->closest_points = std::make_pair(value0, value1);
+  out->edge_id0 = 0;
+  out->edge_id1 = 0;
+  out->shape_id0 = 0;
+  out->shape_id1 = 1;
+  out->e0 = S2Shape::Edge(value0, value0);
+  out->e1 = S2Shape::Edge(value1, value1);
+  out->distance = S1ChordAngle(value0, value1);
+}
+
+void ClearanceLineUsingShapeIndex(const S2ShapeIndex& value0,
+                                  const S2ShapeIndex& value1, EdgePair* out) {
   S2ClosestEdgeQuery query0(&value0);
   query0.mutable_options()->set_include_interiors(false);
   S2ClosestEdgeQuery::ShapeIndexTarget target(&value1);
 
+  // Get the edge from value0 that is closest to value1.
   const auto& result0 = query0.FindClosestEdge(&target);
-
   if (result0.edge_id() == -1) {
     return;
   }
 
   out->edge_id0 = result0.edge_id();
   out->shape_id0 = result0.shape_id();
-
-  // Get the edge from value0 (edge0) that is closest to value1.
   out->e0 = query0.GetEdge(result0);
 
   // Now find the edge from index2 (edge2) that is closest to edge1.
@@ -177,6 +186,68 @@ static void ClearanceLineUsingShapeIndex(const S2ShapeIndex& value0,
                                                      out->e1.v0, out->e1.v1);
 }
 
+void ClearanceLineUsingShapeIndexAndPoint(const S2ShapeIndex& value0,
+                                          const S2Point& value1,
+                                          EdgePair* out) {
+  S2ClosestEdgeQuery query0(&value0);
+  query0.mutable_options()->set_include_interiors(false);
+  S2ClosestEdgeQuery::PointTarget target(value1);
+
+  const auto& result0 = query0.FindClosestEdge(&target);
+
+  if (result0.edge_id() == -1) {
+    return;
+  }
+
+  out->edge_id0 = result0.edge_id();
+  out->shape_id0 = result0.shape_id();
+  out->e0 = query0.GetEdge(result0);
+
+  out->edge_id1 = 0;
+  out->shape_id1 = 0;
+  out->e1 = S2Shape::Edge(value1, value1);
+
+  // Find the closest point pair on edge1 and edge2.
+  out->closest_points = S2::GetEdgePairClosestPoints(out->e0.v0, out->e0.v1,
+                                                     out->e1.v0, out->e1.v1);
+}
+
+void ClearanceLineUsingPointAndShapeIndex(const S2Point& value0,
+                                          const S2ShapeIndex& value1,
+                                          EdgePair* out) {
+  ClearanceLineUsingShapeIndexAndPoint(value1, value0, out);
+  std::swap(out->e0, out->e1);
+  std::swap(out->shape_id0, out->shape_id1);
+  std::swap(out->edge_id0, out->edge_id1);
+  std::swap(out->closest_points.first, out->closest_points.second);
+}
+
+void ClearanceLine(GeoArrowGeography& value0, GeoArrowGeography& value1,
+                   EdgePair* out) {
+  *out = {};
+
+  // If either argument is EMPTY, the default constructor of EdgePair() is the
+  // correct output.
+  if (value0.is_empty() || value1.is_empty()) {
+    return;
+  }
+
+  auto maybe_point0 = value0.Point();
+  auto maybe_point1 = value1.Point();
+  if (maybe_point0 && maybe_point1) {
+    ClearanceLineFromPoints(*maybe_point0, *maybe_point1, out);
+    return;
+  } else if (maybe_point0) {
+    ClearanceLineUsingShapeIndexAndPoint(value0.ShapeIndex(), *maybe_point1,
+                                         out);
+  } else if (maybe_point1) {
+    ClearanceLineUsingShapeIndexAndPoint(value0.ShapeIndex(), *maybe_point1,
+                                         out);
+  } else {
+    ClearanceLine(value0, value1, out);
+  }
+}
+
 struct S2ClosestPointExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
@@ -185,12 +256,18 @@ struct S2ClosestPointExec {
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    S2Point out = s2_closest_point(value0.ShapeIndex(), value1.ShapeIndex());
-    stashed_ = PointGeography(out);
+    ClearanceLine(value0, value1, &edge_pair_);
+    if (edge_pair_.edge_id0 == -1) {
+      stashed_ = PointGeography();
+    } else {
+      stashed_ = PointGeography(edge_pair_.closest_points.first);
+    }
+
     return stashed_;
   }
 
   PointGeography stashed_;
+  EdgePair edge_pair_;
 };
 
 struct S2DistanceExec {
@@ -201,9 +278,11 @@ struct S2DistanceExec {
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    return s2_distance(value0.ShapeIndex(), value1.ShapeIndex()) *
-           S2Earth::RadiusMeters();
+    ClearanceLine(value0, value1, &edge_pair_);
+    return edge_pair_.distance.radians() * S2Earth::RadiusMeters();
   }
+
+  EdgePair edge_pair_;
 };
 
 struct S2MaxDistanceExec {
@@ -227,6 +306,18 @@ struct S2ShortestLineExec {
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    ClearanceLine(value0, value1, &edge_pair_);
+    if (edge_pair_.edge_id0 == -1) {
+      stashed_ = PolylineGeography();
+    } else {
+      stashed_ = PolylineGeography(std::make_unique<S2Polyline>(
+          std::vector<S2Point>{edge_pair_.closest_points.first,
+                               edge_pair_.closest_points.second},
+          S2Debug::DISABLE));
+    }
+
+    return stashed_;
+
     std::pair<S2Point, S2Point> out = s2_minimum_clearance_line_between(
         value0.ShapeIndex(), value1.ShapeIndex());
     stashed_ = PolylineGeography(std::make_unique<S2Polyline>(
@@ -235,6 +326,7 @@ struct S2ShortestLineExec {
   }
 
   PolylineGeography stashed_;
+  EdgePair edge_pair_;
 };
 
 void ClosestPointKernel(struct SedonaCScalarKernel* out) {
