@@ -104,17 +104,30 @@ struct EdgePair {
 void ClearanceLineOnlyEdgesBruteForce(const GeoArrowGeography& value0,
                                       const GeoArrowGeography& value1,
                                       EdgePair* out) {
+  *out = {};
+  S2GEOGRAPHY_DCHECK(value0.polygons()->is_empty());
+  S2GEOGRAPHY_DCHECK(value1.polygons()->is_empty());
+
+  int edge_id0 = -1;
   value0.VisitEdges([&](S2Shape::Edge& e0) {
-    ++(out->edge_id0);
-    out->edge_id1 = -1;
+    ++edge_id0;
+    int edge_id1 = -1;
     value1.VisitEdges([&](S2Shape::Edge& e1) {
-      ++(out->edge_id1);
+      ++edge_id1;
 
       auto closest_points_candidate =
           S2::GetEdgePairClosestPoints(e0.v0, e0.v1, e1.v0, e1.v1);
       S1ChordAngle distance_candidate = S1ChordAngle(
           closest_points_candidate.first, closest_points_candidate.second);
       if (distance_candidate < out->distance) {
+        auto resolved0 = value0.ResolveGlobalEdgeId(edge_id0);
+        out->shape_id0 = resolved0.first;
+        out->edge_id0 = resolved0.second;
+
+        auto resolved1 = value0.ResolveGlobalEdgeId(out->edge_id1);
+        out->shape_id1 = resolved1.first;
+        out->edge_id1 = resolved1.second;
+
         out->distance = distance_candidate;
         out->closest_points = closest_points_candidate;
       }
@@ -132,6 +145,48 @@ void ClearanceLineOnlyEdgesBruteForce(const GeoArrowGeography& value0,
     out->edge_id0 = resolved0.second;
     out->edge_id1 = resolved1.second;
   }
+}
+
+void ClearanceLineOnlyEdgesSemiBruteForce(const S2ShapeIndex& value0,
+                                          const GeoArrowGeography& value1,
+                                          EdgePair* out) {
+  *out = {};
+  S2GEOGRAPHY_DCHECK(value1.polygons()->is_empty());
+
+  S2ClosestEdgeQuery query0(&value0);
+  query0.mutable_options()->set_include_interiors(false);
+
+  int edge_id1 = -1;
+  value1.VisitEdges([&](S2Shape::Edge& e1) {
+    ++edge_id1;
+
+    S2ClosestEdgeQuery::EdgeTarget target(e1.v0, e1.v1);
+    const auto& result0 = query0.FindClosestEdge(&target);
+    if (result0.edge_id() == -1) {
+      return true;
+    }
+
+    S2Shape::Edge e0 = query0.GetEdge(result0);
+
+    auto closest_points_candidate =
+        S2::GetEdgePairClosestPoints(e0.v0, e0.v1, e1.v0, e1.v1);
+    auto distance_candidate =
+        S1ChordAngle(out->closest_points.first, out->closest_points.second);
+
+    if (distance_candidate < out->distance) {
+      out->shape_id0 = result0.shape_id();
+      out->edge_id0 = result0.edge_id();
+
+      auto resolved_id1 = value1.ResolveGlobalEdgeId(edge_id1);
+      out->shape_id1 = resolved_id1.first;
+      out->edge_id1 = resolved_id1.second;
+
+      out->distance = distance_candidate;
+      out->closest_points = closest_points_candidate;
+    }
+
+    return true;
+  });
 }
 
 void ClearanceLineFromPoints(const S2Point& value0, const S2Point& value1,
@@ -185,6 +240,8 @@ void ClearanceLineUsingShapeIndex(const S2ShapeIndex& value0,
 void ClearanceLineUsingShapeIndexAndPoint(const S2ShapeIndex& value0,
                                           const S2Point& value1,
                                           EdgePair* out) {
+  *out = {};
+
   S2ClosestEdgeQuery query0(&value0);
   query0.mutable_options()->set_include_interiors(false);
   S2ClosestEdgeQuery::PointTarget target(value1);
@@ -208,22 +265,28 @@ void ClearanceLineUsingShapeIndexAndPoint(const S2ShapeIndex& value0,
   out->distance = S1ChordAngle(p0, value1);
 }
 
-void ClearanceLineUsingPointAndShapeIndex(const S2Point& value0,
-                                          const S2ShapeIndex& value1,
-                                          EdgePair* out) {
-  ClearanceLineUsingShapeIndexAndPoint(value1, value0, out);
-  std::swap(out->shape_id0, out->shape_id1);
-  std::swap(out->edge_id0, out->edge_id1);
-  std::swap(out->closest_points.first, out->closest_points.second);
+bool IsAlreadyIndexedOrLarge(const GeoArrowGeography& value) {
+  return !value.is_unindexed() ||
+         value.num_edges() > kMaxBruteForceEdgeComparisons;
+}
+
+bool HasNoPolygons(const GeoArrowGeography& value) {
+  return value.polygons()->is_empty();
+}
+
+bool BothSmallWithoutPolygons(const GeoArrowGeography& value0,
+                              const GeoArrowGeography& value1) {
+  return HasNoPolygons(value0) && HasNoPolygons(value1) &&
+         (value0.num_edges() * value1.num_edges()) <
+             kMaxBruteForceEdgeComparisons;
 }
 
 void ClearanceLine(GeoArrowGeography& value0, GeoArrowGeography& value1,
                    EdgePair* out) {
-  *out = {};
-
   // If either argument is EMPTY, the default constructor of EdgePair() is the
   // correct output.
   if (value0.is_empty() || value1.is_empty()) {
+    *out = {};
     return;
   }
 
@@ -232,12 +295,24 @@ void ClearanceLine(GeoArrowGeography& value0, GeoArrowGeography& value1,
   if (maybe_point0 && maybe_point1) {
     ClearanceLineFromPoints(*maybe_point0, *maybe_point1, out);
     return;
-  } else if (maybe_point0) {
+  } else if (maybe_point0 && IsAlreadyIndexedOrLarge(value1)) {
+    ClearanceLineUsingShapeIndexAndPoint(value1.ShapeIndex(), *maybe_point0,
+                                         out);
+    std::swap(out->shape_id0, out->shape_id1);
+    std::swap(out->edge_id0, out->edge_id1);
+    std::swap(out->closest_points.first, out->closest_points.second);
+  } else if (maybe_point1 && IsAlreadyIndexedOrLarge(value0)) {
     ClearanceLineUsingShapeIndexAndPoint(value0.ShapeIndex(), *maybe_point0,
                                          out);
-  } else if (maybe_point1) {
-    ClearanceLineUsingPointAndShapeIndex(*maybe_point1, value1.ShapeIndex(),
-                                         out);
+  } else if (BothSmallWithoutPolygons(value0, value1)) {
+    ClearanceLineOnlyEdgesBruteForce(value0, value1, out);
+  } else if (IsAlreadyIndexedOrLarge(value0) && HasNoPolygons(value1)) {
+    ClearanceLineOnlyEdgesSemiBruteForce(value0.ShapeIndex(), value1, out);
+  } else if (IsAlreadyIndexedOrLarge(value1) && HasNoPolygons(value0)) {
+    ClearanceLineOnlyEdgesSemiBruteForce(value1.ShapeIndex(), value0, out);
+    std::swap(out->shape_id0, out->shape_id1);
+    std::swap(out->edge_id0, out->edge_id1);
+    std::swap(out->closest_points.first, out->closest_points.second);
   } else {
     ClearanceLineUsingShapeIndex(value0.ShapeIndex(), value1.ShapeIndex(), out);
   }
