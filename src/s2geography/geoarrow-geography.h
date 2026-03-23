@@ -342,11 +342,18 @@ class GeoArrowGeography {
   /// Note that this does not include point geometries (i.e., only sequences)
   /// of 2 or more vertices are considered.
   template <typename Visit>
-  bool VisitEdges(Visit&& visit) {
+  bool VisitEdges(Visit&& visit) const {
+    if (!points()->geom().VisitVertices([&](S2Point v) {
+          S2Shape::Edge e{v, v};
+          return visit(e);
+        }))
+      return false;
     if (!lines()->geom().VisitEdges(visit)) return false;
     if (!polygons()->geom().VisitEdges(visit)) return false;
     return true;
   }
+
+  const std::pair<int, int> ResolveGlobalEdgeId(int global_edge_id) const;
 
  private:
   struct GeoArrowGeometryView geom_{};

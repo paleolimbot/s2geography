@@ -90,6 +90,93 @@ std::pair<S2Point, S2Point> s2_minimum_clearance_line_between(
 
 namespace sedona_udf {
 
+static const int kMaxBruteForceEdges = 32;
+
+struct EdgePair {
+  S2Shape::Edge e0{};
+  S2Shape::Edge e1{};
+  int shape_id0;
+  int shape_id1;
+  int edge_id0{-1};
+  int edge_id1{-1};
+  std::pair<S2Point, S2Point> closest_points{};
+  S1ChordAngle distance{S1ChordAngle::Infinity()};
+};
+
+static void ClearanceLineOnlyEdgesBruteForce(const GeoArrowGeography& value0,
+                                             const GeoArrowGeography& value1,
+                                             EdgePair* out) {
+  value0.VisitEdges([&](S2Shape::Edge& e0) {
+    ++(out->edge_id0);
+    out->edge_id1 = -1;
+    value1.VisitEdges([&](S2Shape::Edge& e1) {
+      ++(out->edge_id1);
+
+      auto closest_points_candidate =
+          S2::GetEdgePairClosestPoints(e0.v0, e0.v1, e1.v0, e1.v1);
+      S1ChordAngle distance_candidate = S1ChordAngle(
+          closest_points_candidate.first, closest_points_candidate.second);
+      if (distance_candidate < out->distance) {
+        out->e0 = e0;
+        out->e1 = e1;
+        out->distance = distance_candidate;
+        out->closest_points = closest_points_candidate;
+      }
+
+      return true;
+    });
+    return true;
+  });
+
+  if (out->edge_id0 != -1) {
+    auto resolved0 = value0.ResolveGlobalEdgeId(out->edge_id0);
+    auto resolved1 = value0.ResolveGlobalEdgeId(out->edge_id0);
+    out->shape_id0 = resolved0.first;
+    out->shape_id1 = resolved1.first;
+    out->edge_id0 = resolved0.second;
+    out->edge_id1 = resolved1.second;
+  }
+}
+
+static void ClearanceLineUsingShapeIndex(const S2ShapeIndex& value0,
+                                         const S2ShapeIndex& value1,
+                                         EdgePair* out) {
+  S2ClosestEdgeQuery query0(&value0);
+  query0.mutable_options()->set_include_interiors(false);
+  S2ClosestEdgeQuery::ShapeIndexTarget target(&value1);
+
+  const auto& result0 = query0.FindClosestEdge(&target);
+
+  if (result0.edge_id() == -1) {
+    return;
+  }
+
+  out->edge_id0 = result0.edge_id();
+  out->shape_id0 = result0.shape_id();
+
+  // Get the edge from value0 (edge0) that is closest to value1.
+  out->e0 = query0.GetEdge(result0);
+
+  // Now find the edge from index2 (edge2) that is closest to edge1.
+  S2ClosestEdgeQuery query1(&value1);
+  query1.mutable_options()->set_include_interiors(false);
+  S2ClosestEdgeQuery::EdgeTarget target2(out->e0.v0, out->e0.v1);
+  auto result1 = query1.FindClosestEdge(&target2);
+
+  // what if result1 has no edges?
+  if (result1.is_interior()) {
+    throw Exception("S2ClosestEdgeQuery result is interior!");
+  }
+
+  out->edge_id1 = result1.edge_id();
+  out->shape_id1 = result1.shape_id();
+  out->e1 = query1.GetEdge(result1);
+
+  // Find the closest point pair on edge1 and edge2.
+  out->closest_points = S2::GetEdgePairClosestPoints(out->e0.v0, out->e0.v1,
+                                                     out->e1.v0, out->e1.v1);
+}
+
 struct S2ClosestPointExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
