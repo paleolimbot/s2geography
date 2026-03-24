@@ -167,10 +167,10 @@ void ClearanceLineOnlyEdgesSemiBruteForce(const S2ShapeIndex& value0,
     S2ClosestEdgeQuery::EdgeTarget target(e1.v0, e1.v1);
     const auto& result0 = query0.FindClosestEdge(&target);
 
-    if (result0.shape_id() == -1) {
+    if (result0.is_empty()) {
       // No matching edges
       return true;
-    } else if (result0.edge_id() == -1) {
+    } else if (result0.is_interior()) {
       // Edge interior intersects a polygon in the index.
       out->shape_id0 = result0.shape_id();
       out->edge_id0 = -1;
@@ -294,10 +294,10 @@ void ClearanceLineUsingShapeIndexAndPoint(const S2ShapeIndex& value0,
 
   const auto& result0 = query0.FindClosestEdge(&target);
 
-  if (result0.shape_id() == -1) {
+  if (result0.is_empty()) {
     // No matching edges
     return;
-  } else if (result0.edge_id() == -1) {
+  } else if (result0.is_interior()) {
     // Interior point match
     out->shape_id0 = result0.shape_id();
     out->edge_id0 = -1;
