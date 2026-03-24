@@ -2,8 +2,10 @@
 #include "s2geography/distance.h"
 
 #include <s2/s2closest_edge_query.h>
+#include <s2/s2crossing_edge_query.h>
 #include <s2/s2debug.h>
 #include <s2/s2earth.h>
+#include <s2/s2edge_crossings.h>
 #include <s2/s2furthest_edge_query.h>
 
 #include "s2geography/geography.h"
@@ -167,9 +169,20 @@ void ClearanceLineOnlyEdgesSemiBruteForce(const S2ShapeIndex& value0,
       // No matching edges
       return true;
     } else if (result0.edge_id() == -1) {
-      // Match interior
-      // TODO: this is not quite right for an edge where neither vertex
-      // intersects the index bo the middle does
+      // Edge interior intersects a polygon in the index. Find the actual
+      // intersection point using a crossing edge query.
+      S2CrossingEdgeQuery crossing_query(&value0);
+      std::vector<s2shapeutil::ShapeEdge> crossing_edges;
+      crossing_query.GetCrossingEdges(
+          e1.v0, e1.v1, s2shapeutil::CrossingType::ALL, &crossing_edges);
+
+      S2Point intersection_point = e1.v0;  // fallback
+      if (!crossing_edges.empty()) {
+        const auto& ce = crossing_edges[0];
+        intersection_point =
+            S2::GetIntersection(e1.v0, e1.v1, ce.v0(), ce.v1());
+      }
+
       out->shape_id0 = result0.shape_id();
       out->edge_id0 = -1;
 
@@ -178,7 +191,8 @@ void ClearanceLineOnlyEdgesSemiBruteForce(const S2ShapeIndex& value0,
       out->edge_id1 = resolved_id1.second;
 
       out->distance = S1ChordAngle::Zero();
-      out->closest_points = std::make_pair(e1.v0, e1.v0);
+      out->closest_points =
+          std::make_pair(intersection_point, intersection_point);
       return true;
     }
 
@@ -186,8 +200,8 @@ void ClearanceLineOnlyEdgesSemiBruteForce(const S2ShapeIndex& value0,
 
     auto closest_points_candidate =
         S2::GetEdgePairClosestPoints(e0.v0, e0.v1, e1.v0, e1.v1);
-    auto distance_candidate =
-        S1ChordAngle(out->closest_points.first, out->closest_points.second);
+    auto distance_candidate = S1ChordAngle(closest_points_candidate.first,
+                                           closest_points_candidate.second);
 
     if (distance_candidate < out->distance) {
       out->shape_id0 = result0.shape_id();
@@ -382,6 +396,10 @@ struct S2DistanceExec {
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
     ClearanceLine(value0, value1, &edge_pair_);
+    if (edge_pair_.shape_id0 == -1) {
+      // TODO: return NULL
+    }
+
     return edge_pair_.distance.radians() * S2Earth::RadiusMeters();
   }
 

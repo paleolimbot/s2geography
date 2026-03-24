@@ -134,7 +134,47 @@ INSTANTIATE_TEST_SUITE_P(
         DistanceScalarScalarParam{"point_distance_polygon_outside",
                                   "POINT (-1 0)",
                                   "POLYGON ((0 0, 2 0, 0 2, 0 0))",
-                                  111195.10117748393}
+                                  111195.10117748393},
+
+        // Linestring x polygon (linestring fully inside)
+        DistanceScalarScalarParam{"linestring_distance_polygon_inside",
+                                  "LINESTRING (0.25 0.25, 0.5 0.5)",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0},
+        // Polygon x linestring (linestring fully inside)
+        DistanceScalarScalarParam{"polygon_distance_linestring_inside",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                  "LINESTRING (0.25 0.25, 0.5 0.5)", 0.0},
+
+        // Linestring x polygon (linestring partially crosses boundary)
+        DistanceScalarScalarParam{"linestring_distance_polygon_crossing",
+                                  "LINESTRING (0.25 0.25, 3 3)",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0},
+        // Polygon x linestring (linestring partially crosses boundary)
+        DistanceScalarScalarParam{"polygon_distance_linestring_crossing",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                  "LINESTRING (0.25 0.25, 3 3)", 0.0},
+
+        // Linestring x polygon (linestring crosses through, neither vertex
+        // inside)
+        DistanceScalarScalarParam{"linestring_distance_polygon_through",
+                                  "LINESTRING (-1 0.5, 3 0.5)",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0},
+        // Polygon x linestring (linestring crosses through, neither vertex
+        // inside)
+        DistanceScalarScalarParam{"polygon_distance_linestring_through",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                  "LINESTRING (-1 0.5, 3 0.5)", 0.0},
+
+        // Linestring x polygon (linestring fully outside)
+        DistanceScalarScalarParam{"linestring_distance_polygon_outside",
+                                  "LINESTRING (3 3, 4 4)",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                  314367.35908786184},
+        // Polygon x linestring (linestring fully outside)
+        DistanceScalarScalarParam{"polygon_distance_linestring_outside",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                  "LINESTRING (3 3, 4 4)",
+                                  314367.35908786184}
 
         ),
     [](const ::testing::TestParamInfo<DistanceScalarScalarParam>& info) {
