@@ -265,8 +265,8 @@ void ClearanceLineUsingShapeIndexAndPoint(const S2ShapeIndex& value0,
   out->distance = S1ChordAngle(p0, value1);
 }
 
-bool IsAlreadyIndexedOrLarge(const GeoArrowGeography& value) {
-  return !value.is_unindexed() ||
+bool IsAlreadyIndexedOrLargeOrHasPolygons(const GeoArrowGeography& value) {
+  return !value.polygons()->is_empty() || !value.is_unindexed() ||
          value.num_edges() > kMaxBruteForceEdgeComparisons;
 }
 
@@ -295,20 +295,22 @@ void ClearanceLine(GeoArrowGeography& value0, GeoArrowGeography& value1,
   if (maybe_point0 && maybe_point1) {
     ClearanceLineFromPoints(*maybe_point0, *maybe_point1, out);
     return;
-  } else if (maybe_point0 && IsAlreadyIndexedOrLarge(value1)) {
+  } else if (maybe_point0 && IsAlreadyIndexedOrLargeOrHasPolygons(value1)) {
     ClearanceLineUsingShapeIndexAndPoint(value1.ShapeIndex(), *maybe_point0,
                                          out);
     std::swap(out->shape_id0, out->shape_id1);
     std::swap(out->edge_id0, out->edge_id1);
     std::swap(out->closest_points.first, out->closest_points.second);
-  } else if (maybe_point1 && IsAlreadyIndexedOrLarge(value0)) {
+  } else if (maybe_point1 && IsAlreadyIndexedOrLargeOrHasPolygons(value0)) {
     ClearanceLineUsingShapeIndexAndPoint(value0.ShapeIndex(), *maybe_point0,
                                          out);
   } else if (BothSmallWithoutPolygons(value0, value1)) {
     ClearanceLineOnlyEdgesBruteForce(value0, value1, out);
-  } else if (IsAlreadyIndexedOrLarge(value0) && HasNoPolygons(value1)) {
+  } else if (IsAlreadyIndexedOrLargeOrHasPolygons(value0) &&
+             HasNoPolygons(value1)) {
     ClearanceLineOnlyEdgesSemiBruteForce(value0.ShapeIndex(), value1, out);
-  } else if (IsAlreadyIndexedOrLarge(value1) && HasNoPolygons(value0)) {
+  } else if (IsAlreadyIndexedOrLargeOrHasPolygons(value1) &&
+             HasNoPolygons(value0)) {
     ClearanceLineOnlyEdgesSemiBruteForce(value1.ShapeIndex(), value0, out);
     std::swap(out->shape_id0, out->shape_id1);
     std::swap(out->edge_id0, out->edge_id1);
