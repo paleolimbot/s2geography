@@ -405,8 +405,10 @@ void ClosestPointKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<S2ClosestPointExec>(out, "st_closestpoint");
 }
 
-void DistanceKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2DistanceExec>(out, "st_distance");
+void DistanceKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
+                    bool prepare_arg1_scalar) {
+  InitBinaryKernel<S2DistanceExec>(out, "st_distance", prepare_arg0_scalar,
+                                   prepare_arg1_scalar);
 }
 
 void MaxDistanceKernel(struct SedonaCScalarKernel* out) {

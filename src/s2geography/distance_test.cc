@@ -1,5 +1,6 @@
 #include "s2geography/distance.h"
 
+#include <cmath>
 #include <gtest/gtest.h>
 
 #include "nanoarrow/nanoarrow.hpp"
@@ -36,6 +37,106 @@ TEST(Distance, SedonaUdfDistance) {
       TestResultArrow(out_array.get(), NANOARROW_TYPE_DOUBLE,
                       {111195.10117748393, 0.0, std::nullopt}));
 }
+
+struct DistanceScalarScalarParam {
+  std::string name;
+  std::optional<std::string> lhs;
+  std::optional<std::string> rhs;
+  std::optional<double> expected;
+
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const DistanceScalarScalarParam& p) {
+    os << (p.lhs ? *p.lhs : "null") << " distance "
+       << (p.rhs ? *p.rhs : "null") << " -> ";
+    if (p.expected) {
+      os << *p.expected;
+    } else {
+      os << "null";
+    }
+    return os;
+  }
+};
+
+class DistanceScalarScalarTest
+    : public ::testing::TestWithParam<DistanceScalarScalarParam> {};
+
+TEST_P(DistanceScalarScalarTest, SedonaUdf) {
+  const auto& p = GetParam();
+
+  for (bool prepare_arg0 : {true, false}) {
+    for (bool prepare_arg1 : {true, false}) {
+      SCOPED_TRACE("prepare_arg0: " + std::to_string(prepare_arg0) +
+                   ", prepare_arg1: " + std::to_string(prepare_arg1));
+      struct SedonaCScalarKernel kernel;
+      struct SedonaCScalarKernelImpl impl;
+      s2geography::sedona_udf::DistanceKernel(&kernel, prepare_arg0,
+                                              prepare_arg1);
+
+      ASSERT_NO_FATAL_FAILURE(TestInitKernel(&kernel, &impl,
+                                             {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                                             NANOARROW_TYPE_DOUBLE));
+
+      nanoarrow::UniqueArray out_array;
+      ASSERT_NO_FATAL_FAILURE(
+          TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                            {{p.lhs}, {p.rhs}}, {}, out_array.get()));
+      impl.release(&impl);
+      kernel.release(&kernel);
+
+      ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(),
+                                              NANOARROW_TYPE_DOUBLE,
+                                              {p.expected}));
+    }
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Distance, DistanceScalarScalarTest,
+    ::testing::Values(
+        // Nulls
+        DistanceScalarScalarParam{"null_distance", std::nullopt, "POINT EMPTY",
+                                  std::nullopt},
+        DistanceScalarScalarParam{"distance_null", "POINT EMPTY", std::nullopt,
+                                  std::nullopt},
+        DistanceScalarScalarParam{"null_distance_null", std::nullopt,
+                                  std::nullopt, std::nullopt},
+
+        // Empties
+        DistanceScalarScalarParam{"distance_empty", "POINT (0 0)",
+                                  "POINT EMPTY",
+                                  std::numeric_limits<double>::infinity()},
+        DistanceScalarScalarParam{"empty_distance", "POINT EMPTY",
+                                  "POINT (0 0)",
+                                  std::numeric_limits<double>::infinity()},
+
+        // Point x point
+        DistanceScalarScalarParam{"point_distance_same_point", "POINT (0 0)",
+                                  "POINT (0 0)", 0.0},
+        DistanceScalarScalarParam{"point_distance_point", "POINT (0 0)",
+                                  "POINT (0 1)", 111195.10117748393},
+
+        // Point x linestring (point on linestring)
+        DistanceScalarScalarParam{"point_distance_linestring_on",
+                                  "POINT (0 0)", "LINESTRING (0 0, 0 1)", 0.0},
+        // Point x linestring (point off linestring)
+        DistanceScalarScalarParam{"point_distance_linestring_off",
+                                  "POINT (1 0)", "LINESTRING (0 0, 0 1)",
+                                  111195.10117748393},
+
+        // Point x polygon (point on boundary)
+        DistanceScalarScalarParam{"point_distance_polygon_boundary",
+                                  "POINT (0 0)",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0},
+        // Point x polygon (point outside)
+        DistanceScalarScalarParam{"point_distance_polygon_outside",
+                                  "POINT (-1 0)",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                  111195.10117748393}
+
+        ),
+    [](const ::testing::TestParamInfo<DistanceScalarScalarParam>& info) {
+      return info.param.name;
+    });
 
 TEST(Distance, SedonaUdfMaxDistance) {
   struct SedonaCScalarKernel kernel;
@@ -95,3 +196,6 @@ TEST(Distance, SedonaUdfClosestPoint) {
   ASSERT_NO_FATAL_FAILURE(TestResultGeography(
       out_array.get(), {"POINT (0 1)", "POINT (0 0)", std::nullopt}));
 }
+
+
+
