@@ -248,24 +248,61 @@ void ClearanceLineUsingShapeIndex(const S2ShapeIndex& value0,
   const auto& result0 = query0.FindClosestEdge(&target);
   if (result0.is_empty()) {
     return;
-  } else if (result0.is_interior()) {
-    // TODO
   }
 
+  // If distance is zero, the geometries touch or overlap.
+  if (result0.distance().is_zero()) {
+    out->distance = S1ChordAngle::Zero();
+
+    if (flags & kFlagComputePoints) {
+      if (!result0.is_interior()) {
+        // result0 gives us the edge from value0 that touches value1.
+        // Use value1's index to find the crossing edge.
+        S2Shape::Edge e0 = query0.GetEdge(result0);
+        S2CrossingEdgeQuery crossing_query(&value1);
+        std::vector<s2shapeutil::ShapeEdge> crossing_edges;
+        crossing_query.GetCrossingEdges(e0.v0, e0.v1,
+                                        s2shapeutil::CrossingType::ALL,
+                                        &crossing_edges);
+        if (!crossing_edges.empty()) {
+          auto pt = S2::GetIntersection(e0.v0, e0.v1,
+                                        crossing_edges[0].v0(),
+                                        crossing_edges[0].v1());
+          out->closest_points = std::make_pair(pt, pt);
+        } else {
+          // Shared vertex, no proper crossing.
+          out->closest_points = std::make_pair(e0.v0, e0.v0);
+        }
+      } else {
+        // Interior match: one fully contains the other. Use a vertex from
+        // value1.
+        for (int s = 0; s < value1.num_shape_ids(); ++s) {
+          const S2Shape* shape = value1.shape(s);
+          if (shape != nullptr && shape->num_edges() > 0) {
+            S2Point pt = shape->edge(0).v0;
+            out->closest_points = std::make_pair(pt, pt);
+            break;
+          }
+        }
+      }
+    }
+
+    return;
+  }
+
+  // Distance > 0: find the actual closest edge pair. Interior matches are
+  // impossible at this point.
   out->edge_id0 = result0.edge_id();
   out->shape_id0 = result0.shape_id();
   S2Shape::Edge e0 = query0.GetEdge(result0);
 
-  // Now find the edge from index2 (edge2) that is closest to edge1.
   S2ClosestEdgeQuery query1(&value1);
-  query1.mutable_options()->set_include_interiors(true);
-  query0.mutable_options()->set_max_results(1);
+  query1.mutable_options()->set_include_interiors(false);
+  query1.mutable_options()->set_max_results(1);
   S2ClosestEdgeQuery::EdgeTarget target2(e0.v0, e0.v1);
   auto result1 = query1.FindClosestEdge(&target2);
-
-  // what if result1 has no edges?
-  if (result1.is_interior()) {
-    throw Exception("S2ClosestEdgeQuery result is interior!");
+  if (result1.is_empty()) {
+    return;
   }
 
   out->edge_id1 = result1.edge_id();

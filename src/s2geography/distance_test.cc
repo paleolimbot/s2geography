@@ -174,7 +174,40 @@ INSTANTIATE_TEST_SUITE_P(
         DistanceScalarScalarParam{"polygon_distance_linestring_outside",
                                   "POLYGON ((0 0, 2 0, 0 2, 0 0))",
                                   "LINESTRING (3 3, 4 4)",
-                                  314367.35908786184}
+                                  314367.35908786184},
+
+        // Polygon x polygon (one fully inside the other)
+        DistanceScalarScalarParam{
+            "polygon_distance_polygon_inside",
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))", 0.0},
+        // Polygon x polygon (one fully inside, reversed)
+        DistanceScalarScalarParam{
+            "polygon_distance_polygon_inside_rev",
+            "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0},
+
+        // Polygon x polygon (partially overlapping)
+        DistanceScalarScalarParam{
+            "polygon_distance_polygon_crossing",
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            "POLYGON ((1 0, 3 0, 1 2, 1 0))", 0.0},
+        // Polygon x polygon (partially overlapping, reversed)
+        DistanceScalarScalarParam{
+            "polygon_distance_polygon_crossing_rev",
+            "POLYGON ((1 0, 3 0, 1 2, 1 0))",
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0},
+
+        // Polygon x polygon (fully outside)
+        DistanceScalarScalarParam{
+            "polygon_distance_polygon_outside",
+            "POLYGON ((0 0, 1 0, 0 1, 0 0))",
+            "POLYGON ((30 30, 31 30, 30 31, 30 30))", 4520972.0955287321},
+        // Polygon x polygon (fully outside, reversed)
+        DistanceScalarScalarParam{
+            "polygon_distance_polygon_outside_rev",
+            "POLYGON ((30 30, 31 30, 30 31, 30 30))",
+            "POLYGON ((0 0, 1 0, 0 1, 0 0))", 4520972.0955287321}
 
         ),
     [](const ::testing::TestParamInfo<DistanceScalarScalarParam>& info) {
