@@ -261,12 +261,10 @@ void ClearanceLineUsingShapeIndex(const S2ShapeIndex& value0,
         S2Shape::Edge e0 = query0.GetEdge(result0);
         S2CrossingEdgeQuery crossing_query(&value1);
         std::vector<s2shapeutil::ShapeEdge> crossing_edges;
-        crossing_query.GetCrossingEdges(e0.v0, e0.v1,
-                                        s2shapeutil::CrossingType::ALL,
-                                        &crossing_edges);
+        crossing_query.GetCrossingEdges(
+            e0.v0, e0.v1, s2shapeutil::CrossingType::ALL, &crossing_edges);
         if (!crossing_edges.empty()) {
-          auto pt = S2::GetIntersection(e0.v0, e0.v1,
-                                        crossing_edges[0].v0(),
+          auto pt = S2::GetIntersection(e0.v0, e0.v1, crossing_edges[0].v0(),
                                         crossing_edges[0].v1());
           out->closest_points = std::make_pair(pt, pt);
         } else {
