@@ -1,6 +1,5 @@
 #include "s2geography/distance.h"
 
-#include <cmath>
 #include <gtest/gtest.h>
 
 #include "nanoarrow/nanoarrow.hpp"
@@ -123,6 +122,10 @@ INSTANTIATE_TEST_SUITE_P(
                                   "POINT (1 0)", "LINESTRING (0 0, 0 1)",
                                   111195.10117748393},
 
+        // Point x polygon (point inside)
+        DistanceScalarScalarParam{"point_distance_polygon_inside",
+                                  "POINT (0.25 0.25)",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0},
         // Point x polygon (point on boundary)
         DistanceScalarScalarParam{"point_distance_polygon_boundary",
                                   "POINT (0 0)",
