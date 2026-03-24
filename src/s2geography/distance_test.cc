@@ -123,10 +123,10 @@ INSTANTIATE_TEST_SUITE_P(
         // Empties
         DistanceScalarScalarParam{
             "distance_empty", "POINT (0 0)", "POINT EMPTY",
-            std::numeric_limits<double>::infinity(), "LINESTRING (0 0, 0 0)"},
+            std::numeric_limits<double>::infinity(), "LINESTRING EMPTY"},
         DistanceScalarScalarParam{
             "empty_distance", "POINT EMPTY", "POINT (0 0)",
-            std::numeric_limits<double>::infinity(), "LINESTRING (0 0, 0 0)"},
+            std::numeric_limits<double>::infinity(), "LINESTRING EMPTY"},
 
         // Point x point
         DistanceScalarScalarParam{"point_distance_same_point", "POINT (0 0)",

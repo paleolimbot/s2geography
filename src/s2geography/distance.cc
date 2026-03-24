@@ -97,8 +97,8 @@ static const int kFlagComputeDistance = 1;
 static const int kFlagComputePoints = 2;
 
 struct EdgePair {
-  int shape_id0;
-  int shape_id1;
+  int shape_id0{-1};
+  int shape_id1{-1};
   int edge_id0{-1};
   int edge_id1{-1};
   std::pair<S2Point, S2Point> closest_points{};
@@ -239,6 +239,8 @@ void ClearanceLineFromPoints(const S2Point& value0, const S2Point& value1,
 void ClearanceLineUsingShapeIndex(const S2ShapeIndex& value0,
                                   const S2ShapeIndex& value1, EdgePair* out,
                                   int flags) {
+  *out = {};
+
   S2ClosestEdgeQuery query0(&value0);
   query0.mutable_options()->set_include_interiors(true);
   query0.mutable_options()->set_max_results(1);
@@ -253,6 +255,8 @@ void ClearanceLineUsingShapeIndex(const S2ShapeIndex& value0,
   // If distance is zero, the geometries touch or overlap.
   if (result0.distance().is_zero()) {
     out->distance = S1ChordAngle::Zero();
+    out->shape_id0 = result0.shape_id();
+    out->edge_id0 = result0.edge_id();
 
     if (flags & kFlagComputePoints) {
       if (!result0.is_interior()) {
@@ -267,6 +271,8 @@ void ClearanceLineUsingShapeIndex(const S2ShapeIndex& value0,
           auto pt = S2::GetIntersection(e0.v0, e0.v1, crossing_edges[0].v0(),
                                         crossing_edges[0].v1());
           out->closest_points = std::make_pair(pt, pt);
+          out->shape_id1 = crossing_edges[0].id().shape_id;
+          out->edge_id1 = crossing_edges[0].id().edge_id;
         } else {
           // Shared vertex, no proper crossing.
           out->closest_points = std::make_pair(e0.v0, e0.v0);
@@ -279,6 +285,8 @@ void ClearanceLineUsingShapeIndex(const S2ShapeIndex& value0,
           if (shape != nullptr && shape->num_edges() > 0) {
             S2Point pt = shape->edge(0).v0;
             out->closest_points = std::make_pair(pt, pt);
+            out->shape_id1 = s;
+            out->edge_id1 = 0;
             break;
           }
         }
