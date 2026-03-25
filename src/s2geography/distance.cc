@@ -203,13 +203,7 @@ void ClearanceLineOnlyEdgesSemiBruteForce(const S2ShapeIndex& value0,
       return true;
     }
 
-    S2Shape::Edge e0 = query0.GetEdge(result0);
-
-    auto closest_points_candidate =
-        S2::GetEdgePairClosestPoints(e0.v0, e0.v1, e1.v0, e1.v1);
-    auto distance_candidate = S1ChordAngle(closest_points_candidate.first,
-                                           closest_points_candidate.second);
-
+    auto distance_candidate = result0.distance();
     if (distance_candidate < out->distance) {
       out->shape_id0 = result0.shape_id();
       out->edge_id0 = result0.edge_id();
@@ -219,7 +213,12 @@ void ClearanceLineOnlyEdgesSemiBruteForce(const S2ShapeIndex& value0,
       out->edge_id1 = resolved_id1.second;
 
       out->distance = distance_candidate;
-      out->closest_points = closest_points_candidate;
+
+      if (flags & kFlagComputePoints) {
+        S2Shape::Edge e0 = query0.GetEdge(result0);
+        out->closest_points =
+            S2::GetEdgePairClosestPoints(e0.v0, e0.v1, e1.v0, e1.v1);
+      }
     }
 
     return true;
@@ -300,28 +299,27 @@ void ClearanceLineUsingShapeIndex(const S2ShapeIndex& value0,
   // impossible at this point.
   out->edge_id0 = result0.edge_id();
   out->shape_id0 = result0.shape_id();
-  S2Shape::Edge e0 = query0.GetEdge(result0);
+  out->distance = result0.distance();
 
-  S2ClosestEdgeQuery query1(&value1);
-  query1.mutable_options()->set_include_interiors(false);
-  query1.mutable_options()->set_max_results(1);
-  S2ClosestEdgeQuery::EdgeTarget target2(e0.v0, e0.v1);
-  auto result1 = query1.FindClosestEdge(&target2);
-  if (result1.is_empty()) {
-    return;
-  }
+  // If we need the other point, we need another edge crossing query
+  if (flags & kFlagComputePoints) {
+    S2ClosestEdgeQuery query1(&value1);
+    query1.mutable_options()->set_include_interiors(false);
+    query1.mutable_options()->set_max_results(1);
+    S2Shape::Edge e0 = query0.GetEdge(result0);
+    S2ClosestEdgeQuery::EdgeTarget target2(e0.v0, e0.v1);
+    auto result1 = query1.FindClosestEdge(&target2);
+    if (result1.is_empty()) {
+      return;
+    }
 
-  out->edge_id1 = result1.edge_id();
-  out->shape_id1 = result1.shape_id();
-  S2Shape::Edge e1 = query1.GetEdge(result1);
+    out->edge_id1 = result1.edge_id();
+    out->shape_id1 = result1.shape_id();
+    S2Shape::Edge e1 = query1.GetEdge(result1);
 
-  // Find the closest point pair on edge1 and edge2.
-  out->closest_points =
-      S2::GetEdgePairClosestPoints(e0.v0, e0.v1, e1.v0, e1.v1);
-
-  if (flags & kFlagComputeDistance) {
-    out->distance =
-        S1ChordAngle(out->closest_points.first, out->closest_points.second);
+    // Find the closest point pair on edge1 and edge2.
+    out->closest_points =
+        S2::GetEdgePairClosestPoints(e0.v0, e0.v1, e1.v0, e1.v1);
   }
 }
 
