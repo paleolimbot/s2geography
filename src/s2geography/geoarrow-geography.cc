@@ -680,8 +680,12 @@ void GeoArrowLoop::BuildScratch() {
   }
 }
 
-const std::pair<int, int> GeoArrowGeography::ResolveGlobalEdgeId(
+std::pair<int, int> GeoArrowGeography::ResolveGlobalEdgeId(
     int global_edge_id) const {
+  if (geom_.size_nodes == 0) {
+    return std::make_pair(-1, -1);
+  }
+
   switch (geom_.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:

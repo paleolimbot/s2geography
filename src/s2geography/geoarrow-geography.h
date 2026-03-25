@@ -337,10 +337,10 @@ class GeoArrowGeography {
     return true;
   }
 
-  /// \brief Visit all pairs of vertices in this geography
+  /// \brief Visit all edges in this geography
   ///
-  /// Note that this does not include point geometries (i.e., only sequences)
-  /// of 2 or more vertices are considered.
+  /// Note that for point geometries, "edges" are degenerate (start and end point
+  /// are identical), consistent with how edges are iterated over in an S2Shape.
   template <typename Visit>
   bool VisitEdges(Visit&& visit) const {
     if (!points()->geom().VisitVertices([&](S2Point v) {
@@ -353,7 +353,7 @@ class GeoArrowGeography {
     return true;
   }
 
-  const std::pair<int, int> ResolveGlobalEdgeId(int global_edge_id) const;
+  std::pair<int, int> ResolveGlobalEdgeId(int global_edge_id) const;
 
  private:
   struct GeoArrowGeometryView geom_{};
