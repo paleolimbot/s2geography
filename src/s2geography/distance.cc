@@ -128,7 +128,7 @@ void ClearanceLineOnlyEdgesBruteForce(const GeoArrowGeography& value0,
         out->shape_id0 = resolved0.first;
         out->edge_id0 = resolved0.second;
 
-        auto resolved1 = value0.ResolveGlobalEdgeId(out->edge_id1);
+        auto resolved1 = value0.ResolveGlobalEdgeId(edge_id1);
         out->shape_id1 = resolved1.first;
         out->edge_id1 = resolved1.second;
 
@@ -232,7 +232,7 @@ void ClearanceLineFromPoints(const S2Point& value0, const S2Point& value1,
   out->edge_id0 = 0;
   out->edge_id1 = 0;
   out->shape_id0 = 0;
-  out->shape_id1 = 1;
+  out->shape_id1 = 0;
   out->distance = S1ChordAngle(value0, value1);
 }
 
@@ -381,6 +381,9 @@ bool HasNoPolygons(const GeoArrowGeography& value) {
 bool BothSmallWithoutPolygons(const GeoArrowGeography& value0,
                               const GeoArrowGeography& value1) {
   return HasNoPolygons(value0) && HasNoPolygons(value1) &&
+         // Also check each side to ensure the product will not overflow
+         value0.num_edges() < kMaxBruteForceEdgeComparisons &&
+         value1.num_edges() < kMaxBruteForceEdgeComparisons &&
          (value0.num_edges() * value1.num_edges()) <
              kMaxBruteForceEdgeComparisons;
 }
@@ -499,12 +502,6 @@ struct S2ShortestLineExec {
           S2Debug::DISABLE));
     }
 
-    return stashed_;
-
-    std::pair<S2Point, S2Point> out = s2_minimum_clearance_line_between(
-        value0.ShapeIndex(), value1.ShapeIndex());
-    stashed_ = PolylineGeography(std::make_unique<S2Polyline>(
-        std::vector<S2Point>{out.first, out.second}, S2Debug::DISABLE));
     return stashed_;
   }
 
