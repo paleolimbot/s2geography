@@ -140,15 +140,6 @@ void ClearanceLineOnlyEdgesBruteForce(const GeoArrowGeography& value0,
     });
     return true;
   });
-
-  if (out->edge_id0 != -1) {
-    auto resolved0 = value0.ResolveGlobalEdgeId(out->edge_id0);
-    auto resolved1 = value0.ResolveGlobalEdgeId(out->edge_id0);
-    out->shape_id0 = resolved0.first;
-    out->shape_id1 = resolved1.first;
-    out->edge_id0 = resolved0.second;
-    out->edge_id1 = resolved1.second;
-  }
 }
 
 void ClearanceLineOnlyEdgesSemiBruteForce(const S2ShapeIndex& value0,
