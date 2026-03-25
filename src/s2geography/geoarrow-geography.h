@@ -337,10 +337,24 @@ class GeoArrowGeography {
     return true;
   }
 
+  /// \brief Visit all edges in this geography excepting points
+  ///
+  /// Unlike VisitEdges(), which includes points as degenerate edges,
+  /// this version omits degenerate point edges completely. (Note that
+  /// degenerate edges still may exist in questionably valid linestring
+  /// and/or polygon input).
+  template <typename Visit>
+  bool VisitNonPointEdges(Visit&& visit) const {
+    if (!lines()->geom().VisitEdges(visit)) return false;
+    if (!polygons()->geom().VisitEdges(visit)) return false;
+    return true;
+  }
+
   /// \brief Visit all edges in this geography
   ///
-  /// Note that for point geometries, "edges" are degenerate (start and end point
-  /// are identical), consistent with how edges are iterated over in an S2Shape.
+  /// Note that for point geometries, "edges" are degenerate (start and end
+  /// point are identical), consistent with how edges are iterated over in an
+  /// S2Shape.
   template <typename Visit>
   bool VisitEdges(Visit&& visit) const {
     if (!points()->geom().VisitVertices([&](S2Point v) {
