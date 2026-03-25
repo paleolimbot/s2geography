@@ -86,6 +86,6 @@ TEST(AccessorsGeog, SedonaUdfConvexHull) {
   kernel.release(&kernel);
 
   ASSERT_NO_FATAL_FAILURE(TestResultGeography(
-      out_array.get(), {"POINT (0 1)", "POLYGON ((0 0, 0 1, 0 0))",
-                        "POLYGON ((0 0, 0 1, 1 0, 0 0))", std::nullopt}));
+      out_array.get(), {"POINT (0 1)", "LINESTRING (0 0, 0 1)",
+                        "POLYGON ((0 0, 1 0, 0 1, 0 0))", std::nullopt}));
 }

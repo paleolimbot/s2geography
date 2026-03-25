@@ -2,6 +2,7 @@
 #include "s2geography/accessors-geog.h"
 
 #include <s2/s2centroids.h>
+#include <s2/s2edge_distances.h>
 
 #include "s2geography/accessors.h"
 #include "s2geography/build.h"
@@ -302,8 +303,51 @@ struct S2ConvexHullExec {
     });
 
     auto hull_loop = query.GetConvexHull();
-    // TODO: check if it is a very small loop with only 3 points, because
-    // if the input is colinear the output should be a line.
+
+    // If we have a very skinny loop this means the output should be a line.
+    // TODO: make less verbose.
+    if (hull_loop->num_vertices() == 3) {
+      S1ChordAngle perp_limit(S2::kProjectPerpendicularError);
+      const S2Point& v0 = hull_loop->vertex(0);
+      const S2Point& v1 = hull_loop->vertex(1);
+      const S2Point& v2 = hull_loop->vertex(2);
+
+      // Check each vertex against its opposite edge. If any vertex lies
+      // on the opposite edge, the three points are collinear and the
+      // convex hull is really a line segment (the longest edge).
+      S2Point edge_vertices[3][2] = {
+          {v1, v2},  // edge opposite v0
+          {v0, v2},  // edge opposite v1
+          {v0, v1},  // edge opposite v2
+      };
+
+      for (int i = 0; i < 3; i++) {
+        const S2Point& x = hull_loop->vertex(i);
+        const S2Point& a = edge_vertices[i][0];
+        const S2Point& b = edge_vertices[i][1];
+        if (S2::IsDistanceLess(x, a, b, perp_limit)) {
+          // Find the longest edge to use as the polyline
+          S1ChordAngle d01(v0, v1);
+          S1ChordAngle d02(v0, v2);
+          S1ChordAngle d12(v1, v2);
+          S2Point pa, pb;
+          if (d01 >= d02 && d01 >= d12) {
+            pa = v0;
+            pb = v1;
+          } else if (d02 >= d01 && d02 >= d12) {
+            pa = v0;
+            pb = v2;
+          } else {
+            pa = v1;
+            pb = v2;
+          }
+          auto polyline =
+              std::make_unique<S2Polyline>(std::vector<S2Point>{pa, pb});
+          stashed_ = std::make_unique<PolylineGeography>(std::move(polyline));
+          return *stashed_;
+        }
+      }
+    }
 
     auto polygon = std::make_unique<S2Polygon>();
     polygon->Init(std::move(hull_loop));
