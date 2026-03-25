@@ -128,7 +128,7 @@ void ClearanceLineOnlyEdgesBruteForce(const GeoArrowGeography& value0,
         out->shape_id0 = resolved0.first;
         out->edge_id0 = resolved0.second;
 
-        auto resolved1 = value0.ResolveGlobalEdgeId(edge_id1);
+        auto resolved1 = value1.ResolveGlobalEdgeId(edge_id1);
         out->shape_id1 = resolved1.first;
         out->edge_id1 = resolved1.second;
 
@@ -200,7 +200,8 @@ void ClearanceLineOnlyEdgesSemiBruteForce(const S2ShapeIndex& value0,
             std::make_pair(intersection_point, intersection_point);
       }
 
-      return true;
+      // Stop iterating because no distance can be less than zero
+      return false;
     }
 
     auto distance_candidate = result0.distance();

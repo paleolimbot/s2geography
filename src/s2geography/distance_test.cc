@@ -93,7 +93,8 @@ TEST_P(DistanceScalarScalarTest, SedonaUdf) {
       {
         struct SedonaCScalarKernel kernel;
         struct SedonaCScalarKernelImpl impl;
-        s2geography::sedona_udf::ShortestLineKernel(&kernel);
+        s2geography::sedona_udf::ShortestLineKernel(&kernel, prepare_arg0,
+                                                    prepare_arg1);
 
         ASSERT_NO_FATAL_FAILURE(TestInitKernel(
             &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
