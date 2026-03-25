@@ -67,45 +67,48 @@ TEST_P(DistanceScalarScalarTest, SedonaUdf) {
     for (bool prepare_arg1 : {true, false}) {
       SCOPED_TRACE("prepare_arg0: " + std::to_string(prepare_arg0) +
                    ", prepare_arg1: " + std::to_string(prepare_arg1));
-      struct SedonaCScalarKernel kernel;
-      struct SedonaCScalarKernelImpl impl;
-      s2geography::sedona_udf::DistanceKernel(&kernel, prepare_arg0,
-                                              prepare_arg1);
+      // Test ST_Distance()
+      {
+        struct SedonaCScalarKernel kernel;
+        struct SedonaCScalarKernelImpl impl;
+        s2geography::sedona_udf::DistanceKernel(&kernel, prepare_arg0,
+                                                prepare_arg1);
 
-      ASSERT_NO_FATAL_FAILURE(TestInitKernel(&kernel, &impl,
-                                             {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
-                                             NANOARROW_TYPE_DOUBLE));
+        ASSERT_NO_FATAL_FAILURE(TestInitKernel(&kernel, &impl,
+                                               {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                                               NANOARROW_TYPE_DOUBLE));
 
-      nanoarrow::UniqueArray out_array;
-      ASSERT_NO_FATAL_FAILURE(
-          TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
-                            {{p.lhs}, {p.rhs}}, {}, out_array.get()));
-      impl.release(&impl);
-      kernel.release(&kernel);
+        nanoarrow::UniqueArray out_array;
+        ASSERT_NO_FATAL_FAILURE(
+            TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                              {{p.lhs}, {p.rhs}}, {}, out_array.get()));
+        impl.release(&impl);
+        kernel.release(&kernel);
 
-      ASSERT_NO_FATAL_FAILURE(TestResultArrow(
-          out_array.get(), NANOARROW_TYPE_DOUBLE, {p.expected}));
+        ASSERT_NO_FATAL_FAILURE(TestResultArrow(
+            out_array.get(), NANOARROW_TYPE_DOUBLE, {p.expected}));
+      }
+
+      // Test ST_ShortestLine
+      {
+        struct SedonaCScalarKernel kernel;
+        struct SedonaCScalarKernelImpl impl;
+        s2geography::sedona_udf::ShortestLineKernel(&kernel);
+
+        ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+            &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
+
+        nanoarrow::UniqueArray out_array;
+        ASSERT_NO_FATAL_FAILURE(
+            TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                              {{p.lhs}, {p.rhs}}, {}, out_array.get()));
+        impl.release(&impl);
+        kernel.release(&kernel);
+
+        ASSERT_NO_FATAL_FAILURE(
+            TestResultGeography(out_array.get(), {p.expected_shortest_line}));
+      }
     }
-  }
-
-  // Test ST_ShortestLine
-  {
-    struct SedonaCScalarKernel kernel;
-    struct SedonaCScalarKernelImpl impl;
-    s2geography::sedona_udf::ShortestLineKernel(&kernel);
-
-    ASSERT_NO_FATAL_FAILURE(TestInitKernel(
-        &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
-
-    nanoarrow::UniqueArray out_array;
-    ASSERT_NO_FATAL_FAILURE(
-        TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
-                          {{p.lhs}, {p.rhs}}, {}, out_array.get()));
-    impl.release(&impl);
-    kernel.release(&kernel);
-
-    ASSERT_NO_FATAL_FAILURE(
-        TestResultGeography(out_array.get(), {p.expected_shortest_line}));
   }
 }
 

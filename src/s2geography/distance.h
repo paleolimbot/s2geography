@@ -29,7 +29,9 @@ void DistanceKernel(struct SedonaCScalarKernel* out,
                     bool prepare_arg0_scalar = true,
                     bool prepare_arg1_scalar = true);
 void MaxDistanceKernel(struct SedonaCScalarKernel* out);
-void ShortestLineKernel(struct SedonaCScalarKernel* out);
+void ShortestLineKernel(struct SedonaCScalarKernel* out,
+                        bool prepare_arg0_scalar = true,
+                        bool prepare_arg1_scalar = true);
 void ClosestPointKernel(struct SedonaCScalarKernel* out);
 
 }  // namespace sedona_udf

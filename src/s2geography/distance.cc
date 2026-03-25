@@ -526,8 +526,10 @@ void MaxDistanceKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<S2MaxDistanceExec>(out, "st_maxdistance");
 }
 
-void ShortestLineKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2ShortestLineExec>(out, "st_shortestline");
+void ShortestLineKernel(struct SedonaCScalarKernel* out,
+                        bool prepare_arg0_scalar, bool prepare_arg1_scalar) {
+  InitBinaryKernel<S2ShortestLineExec>(
+      out, "st_shortestline", prepare_arg0_scalar, prepare_arg1_scalar);
 }
 
 }  // namespace sedona_udf
