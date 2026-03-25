@@ -457,13 +457,14 @@ struct S2DistanceExec {
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
-  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+  std::optional<out_t::c_type> Exec(arg0_t::c_type value0,
+                                    arg1_t::c_type value1) {
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputeDistance);
     if (edge_pair_.shape_id0 == -1) {
-      // TODO: return NULL
+      return std::nullopt;
+    } else {
+      return edge_pair_.distance.radians() * S2Earth::RadiusMeters();
     }
-
-    return edge_pair_.distance.radians() * S2Earth::RadiusMeters();
   }
 
   EdgePair edge_pair_;
