@@ -37,6 +37,218 @@ TEST(Distance, SedonaUdfDistance) {
                       {111195.10117748393, 0.0, std::nullopt}));
 }
 
+struct DistanceScalarScalarParam {
+  std::string name;
+  std::optional<std::string> lhs;
+  std::optional<std::string> rhs;
+  std::optional<double> expected;
+  std::optional<std::string> expected_shortest_line;
+
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const DistanceScalarScalarParam& p) {
+    os << (p.lhs ? *p.lhs : "null") << " distance " << (p.rhs ? *p.rhs : "null")
+       << " -> ";
+    if (p.expected) {
+      os << *p.expected;
+    } else {
+      os << "null";
+    }
+    return os;
+  }
+};
+
+class DistanceScalarScalarTest
+    : public ::testing::TestWithParam<DistanceScalarScalarParam> {};
+
+TEST_P(DistanceScalarScalarTest, SedonaUdf) {
+  const auto& p = GetParam();
+
+  for (bool prepare_arg0 : {true, false}) {
+    for (bool prepare_arg1 : {true, false}) {
+      SCOPED_TRACE("prepare_arg0: " + std::to_string(prepare_arg0) +
+                   ", prepare_arg1: " + std::to_string(prepare_arg1));
+      // Test ST_Distance()
+      {
+        struct SedonaCScalarKernel kernel;
+        struct SedonaCScalarKernelImpl impl;
+        s2geography::sedona_udf::DistanceKernel(&kernel, prepare_arg0,
+                                                prepare_arg1);
+
+        ASSERT_NO_FATAL_FAILURE(TestInitKernel(&kernel, &impl,
+                                               {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                                               NANOARROW_TYPE_DOUBLE));
+
+        nanoarrow::UniqueArray out_array;
+        ASSERT_NO_FATAL_FAILURE(
+            TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                              {{p.lhs}, {p.rhs}}, {}, out_array.get()));
+        impl.release(&impl);
+        kernel.release(&kernel);
+
+        ASSERT_NO_FATAL_FAILURE(TestResultArrow(
+            out_array.get(), NANOARROW_TYPE_DOUBLE, {p.expected}));
+      }
+
+      // Test ST_ShortestLine
+      {
+        struct SedonaCScalarKernel kernel;
+        struct SedonaCScalarKernelImpl impl;
+        s2geography::sedona_udf::ShortestLineKernel(&kernel, prepare_arg0,
+                                                    prepare_arg1);
+
+        ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+            &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
+
+        nanoarrow::UniqueArray out_array;
+        ASSERT_NO_FATAL_FAILURE(
+            TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                              {{p.lhs}, {p.rhs}}, {}, out_array.get()));
+        impl.release(&impl);
+        kernel.release(&kernel);
+
+        ASSERT_NO_FATAL_FAILURE(
+            TestResultGeography(out_array.get(), {p.expected_shortest_line}));
+      }
+    }
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Distance, DistanceScalarScalarTest,
+    ::testing::Values(
+        // Nulls
+        DistanceScalarScalarParam{"null_distance", std::nullopt, "POINT EMPTY",
+                                  std::nullopt, std::nullopt},
+        DistanceScalarScalarParam{"distance_null", "POINT EMPTY", std::nullopt,
+                                  std::nullopt, std::nullopt},
+        DistanceScalarScalarParam{"null_distance_null", std::nullopt,
+                                  std::nullopt, std::nullopt, std::nullopt},
+
+        // Empties
+        DistanceScalarScalarParam{"distance_empty", "POINT (0 0)",
+                                  "POINT EMPTY", std::nullopt,
+                                  "LINESTRING EMPTY"},
+        DistanceScalarScalarParam{"empty_distance", "POINT EMPTY",
+                                  "POINT (0 0)", std::nullopt,
+                                  "LINESTRING EMPTY"},
+
+        // Point x point
+        DistanceScalarScalarParam{"point_distance_same_point", "POINT (0 0)",
+                                  "POINT (0 0)", 0.0, "LINESTRING (0 0, 0 0)"},
+        DistanceScalarScalarParam{"point_distance_point", "POINT (0 0)",
+                                  "POINT (0 1)", 111195.10117748393,
+                                  "LINESTRING (0 0, 0 1)"},
+
+        // Point x linestring (point on linestring)
+        DistanceScalarScalarParam{"point_distance_linestring_on", "POINT (0 0)",
+                                  "LINESTRING (0 0, 0 1)", 0.0,
+                                  "LINESTRING (0 0, 0 0)"},
+        // Point x linestring (point off linestring)
+        DistanceScalarScalarParam{"point_distance_linestring_off",
+                                  "POINT (1 0)", "LINESTRING (0 0, 0 1)",
+                                  111195.10117748393, "LINESTRING (1 0, 0 0)"},
+
+        // Point x polygon (point inside)
+        DistanceScalarScalarParam{"point_distance_polygon_inside",
+                                  "POINT (0.25 0.25)",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0,
+                                  "LINESTRING (0.25 0.25, 0.25 0.25)"},
+        // Point x polygon (point on boundary)
+        DistanceScalarScalarParam{
+            "point_distance_polygon_boundary", "POINT (0 0)",
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0, "LINESTRING (0 0, 0 0)"},
+        // Point x polygon (point outside)
+        DistanceScalarScalarParam{"point_distance_polygon_outside",
+                                  "POINT (-1 0)",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                  111195.10117748393, "LINESTRING (-1 0, 0 0)"},
+
+        // Linestring x polygon (linestring fully inside)
+        DistanceScalarScalarParam{"linestring_distance_polygon_inside",
+                                  "LINESTRING (0.25 0.25, 0.5 0.5)",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0,
+                                  "LINESTRING (0.25 0.25, 0.25 0.25)"},
+        // Polygon x linestring (linestring fully inside)
+        DistanceScalarScalarParam{"polygon_distance_linestring_inside",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                  "LINESTRING (0.25 0.25, 0.5 0.5)", 0.0,
+                                  "LINESTRING (0.25 0.25, 0.25 0.25)"},
+
+        // Linestring x polygon (linestring partially crosses boundary)
+        DistanceScalarScalarParam{
+            "linestring_distance_polygon_crossing",
+            "LINESTRING (0.25 0.25, 3 3)", "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            0.0, "LINESTRING (0.999743 1.000714, 0.999743 1.000714)"},
+        // Polygon x linestring (linestring partially crosses boundary)
+        DistanceScalarScalarParam{
+            "polygon_distance_linestring_crossing",
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))", "LINESTRING (0.25 0.25, 3 3)",
+            0.0, "LINESTRING (0.999743 1.000714, 0.999743 1.000714)"},
+
+        // Linestring x polygon (linestring crosses through, neither vertex
+        // inside)
+        DistanceScalarScalarParam{"linestring_distance_polygon_through",
+                                  "LINESTRING (-1 0.5, 3 0.5)",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0,
+                                  "LINESTRING (1.5 0.500286, 1.5 0.500286)"},
+        // Polygon x linestring (linestring crosses through, neither vertex
+        // inside)
+        DistanceScalarScalarParam{"polygon_distance_linestring_through",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                  "LINESTRING (-1 0.5, 3 0.5)", 0.0,
+                                  "LINESTRING (1.5 0.500286, 1.5 0.500286)"},
+
+        // Linestring x polygon (linestring fully outside)
+        DistanceScalarScalarParam{
+            "linestring_distance_polygon_outside", "LINESTRING (3 3, 4 4)",
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))", 314367.35908786184,
+            "LINESTRING (3 3, 0.998247 1.00221)"},
+        // Polygon x linestring (linestring fully outside)
+        DistanceScalarScalarParam{"polygon_distance_linestring_outside",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                  "LINESTRING (3 3, 4 4)", 314367.35908786184,
+                                  "LINESTRING (0.998247 1.00221, 3 3)"},
+
+        // Polygon x polygon (one fully inside the other)
+        DistanceScalarScalarParam{
+            "polygon_distance_polygon_inside", "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))", 0.0,
+            "LINESTRING (0.1 0.1, 0.1 0.1)"},
+        // Polygon x polygon (one fully inside, reversed)
+        DistanceScalarScalarParam{
+            "polygon_distance_polygon_inside_rev",
+            "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0,
+            "LINESTRING (0.1 0.1, 0.1 0.1)"},
+
+        // Polygon x polygon (partially overlapping)
+        DistanceScalarScalarParam{"polygon_distance_polygon_crossing",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                  "POLYGON ((1 0, 3 0, 1 2, 1 0))", 0.0,
+                                  "LINESTRING (2 0, 2 0)"},
+        // Polygon x polygon (partially overlapping, reversed)
+        DistanceScalarScalarParam{"polygon_distance_polygon_crossing_rev",
+                                  "POLYGON ((1 0, 3 0, 1 2, 1 0))",
+                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0,
+                                  "LINESTRING (2 0, 2 0)"},
+
+        // Polygon x polygon (fully outside)
+        DistanceScalarScalarParam{"polygon_distance_polygon_outside",
+                                  "POLYGON ((0 0, 1 0, 0 1, 0 0))",
+                                  "POLYGON ((30 30, 31 30, 30 31, 30 30))",
+                                  4520972.0955287321,
+                                  "LINESTRING (0 1, 30 30)"},
+        // Polygon x polygon (fully outside, reversed)
+        DistanceScalarScalarParam{"polygon_distance_polygon_outside_rev",
+                                  "POLYGON ((30 30, 31 30, 30 31, 30 30))",
+                                  "POLYGON ((0 0, 1 0, 0 1, 0 0))",
+                                  4520972.0955287321, "LINESTRING (30 30, 0 1)"}
+
+        ),
+    [](const ::testing::TestParamInfo<DistanceScalarScalarParam>& info) {
+      return info.param.name;
+    });
+
 TEST(Distance, SedonaUdfMaxDistance) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::MaxDistanceKernel(&kernel);

@@ -680,4 +680,37 @@ void GeoArrowLoop::BuildScratch() {
   }
 }
 
+std::pair<int, int> GeoArrowGeography::ResolveGlobalEdgeId(
+    int global_edge_id) const {
+  if (geom_.size_nodes == 0) {
+    return std::make_pair(-1, -1);
+  }
+
+  switch (geom_.root->geometry_type) {
+    case GEOARROW_GEOMETRY_TYPE_POINT:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+    case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+    case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
+    case GEOARROW_GEOMETRY_TYPE_POLYGON:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
+      return std::make_pair(0, global_edge_id);
+    case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
+      break;
+    default:
+      throw Exception("unsupported geometry type");
+  }
+
+  if (global_edge_id < points_.num_edges()) {
+    return std::make_pair(0, global_edge_id);
+  }
+
+  global_edge_id -= points_.num_edges();
+  if (global_edge_id < lines_.num_edges()) {
+    return std::make_pair(1, global_edge_id);
+  }
+
+  global_edge_id -= lines_.num_edges();
+  return std::make_pair(2, global_edge_id);
+}
+
 }  // namespace s2geography

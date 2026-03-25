@@ -337,16 +337,37 @@ class GeoArrowGeography {
     return true;
   }
 
-  /// \brief Visit all pairs of vertices in this geography
+  /// \brief Visit all edges in this geography excepting points
   ///
-  /// Note that this does not include point geometries (i.e., only sequences)
-  /// of 2 or more vertices are considered.
+  /// Unlike VisitEdges(), which includes points as degenerate edges,
+  /// this version omits degenerate point edges completely. (Note that
+  /// degenerate edges still may exist in questionably valid linestring
+  /// and/or polygon input).
   template <typename Visit>
-  bool VisitEdges(Visit&& visit) {
+  bool VisitNonPointEdges(Visit&& visit) const {
     if (!lines()->geom().VisitEdges(visit)) return false;
     if (!polygons()->geom().VisitEdges(visit)) return false;
     return true;
   }
+
+  /// \brief Visit all edges in this geography
+  ///
+  /// Note that for point geometries, "edges" are degenerate (start and end
+  /// point are identical), consistent with how edges are iterated over in an
+  /// S2Shape.
+  template <typename Visit>
+  bool VisitEdges(Visit&& visit) const {
+    if (!points()->geom().VisitVertices([&](S2Point v) {
+          S2Shape::Edge e{v, v};
+          return visit(e);
+        }))
+      return false;
+    if (!lines()->geom().VisitEdges(visit)) return false;
+    if (!polygons()->geom().VisitEdges(visit)) return false;
+    return true;
+  }
+
+  std::pair<int, int> ResolveGlobalEdgeId(int global_edge_id) const;
 
  private:
   struct GeoArrowGeometryView geom_{};

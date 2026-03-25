@@ -176,14 +176,14 @@ struct S2Intersects {
   }
 
   bool BruteForceExec(GeoArrowGeography& geog0, GeoArrowGeography& geog1) {
-    // Collect edges from both geometries upfront
+    // Collect non-point edges from both geometries upfront
     edges0_.clear();
-    geog0.VisitEdges([&](const S2Shape::Edge& e) {
+    geog0.VisitNonPointEdges([&](const S2Shape::Edge& e) {
       edges0_.push_back(e);
       return true;
     });
     edges1_.clear();
-    geog1.VisitEdges([&](const S2Shape::Edge& e) {
+    geog1.VisitNonPointEdges([&](const S2Shape::Edge& e) {
       edges1_.push_back(e);
       return true;
     });
@@ -193,7 +193,7 @@ struct S2Intersects {
     //    0 if edges share a vertex
     //   -1 otherwise (no crossing)
     // For the CLOSED polygon model, shared vertices count as intersection.
-    if (!geog0.VisitEdges([&](const S2Shape::Edge& e0) {
+    if (!geog0.VisitNonPointEdges([&](const S2Shape::Edge& e0) {
           S2CopyingEdgeCrosser crosser(e0.v0, e0.v1);
           for (const auto& e1 : edges1_) {
             if (crosser.CrossingSign(e1.v0, e1.v1) >= 0) {
@@ -343,12 +343,12 @@ struct S2Contains {
 
     // No edges of geog1 may properly cross edges of geog0
     edges_.clear();
-    geog0.VisitEdges([&](const S2Shape::Edge& e) {
+    geog0.VisitNonPointEdges([&](const S2Shape::Edge& e) {
       edges_.push_back(e);
       return true;
     });
 
-    if (!geog1.VisitEdges([&](const S2Shape::Edge& e1) {
+    if (!geog1.VisitNonPointEdges([&](const S2Shape::Edge& e1) {
           S2CopyingEdgeCrosser crosser(e1.v0, e1.v1);
           for (const auto& e0 : edges_) {
             if (crosser.CrossingSign(e0.v0, e0.v1) > 0) {
@@ -377,7 +377,7 @@ struct S2Contains {
 
     // No edge of the fresh geometry may properly cross an edge of the index.
     S2CrossingEdgeQuery crossing_query(&indexed);
-    if (!fresh_geog.VisitEdges([&](const S2Shape::Edge& e) {
+    if (!fresh_geog.VisitNonPointEdges([&](const S2Shape::Edge& e) {
           crossing_query.GetCrossingEdges(e.v0, e.v1,
                                           s2shapeutil::CrossingType::INTERIOR,
                                           &crossing_edges_);

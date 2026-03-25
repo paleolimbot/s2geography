@@ -16,6 +16,30 @@ namespace sedona_udf {
 template <class... T>
 struct always_false : std::false_type {};
 
+/// \brief Wraps a type so it can be stored in std::optional
+///
+/// std::optional<T&> is not valid in C++17. This trait maps reference types
+/// to std::reference_wrapper<T> so they can be stored in std::optional,
+/// and leaves non-reference types unchanged. This allows Exec implementations
+/// to return either std::optional<c_type> or c_type.
+template <typename T>
+struct optional_storable {
+  using type = T;
+};
+
+template <typename T>
+struct optional_storable<T&> {
+  using type = std::reference_wrapper<T>;
+};
+
+template <typename T>
+struct optional_storable<const T&> {
+  using type = std::reference_wrapper<const T>;
+};
+
+template <typename T>
+using optional_storable_t = typename optional_storable<T>::type;
+
 /// \defgroup sedona_udf-utils Arrow UDF Utilities
 ///
 /// To simplify implementations of a large number of functions, we
@@ -674,8 +698,14 @@ class SedonaBinaryKernelAdapter {
         } else {
           typename Exec::arg0_t::c_type item0 = data->arg0->Get(i);
           typename Exec::arg1_t::c_type item1 = data->arg1->Get(i);
-          typename Exec::out_t::c_type item_out = data->exec.Exec(item0, item1);
-          data->out->Append(item_out);
+
+          std::optional<optional_storable_t<typename Exec::out_t::c_type>>
+              item_out = data->exec.Exec(item0, item1);
+          if (item_out) {
+            data->out->Append(*item_out);
+          } else {
+            data->out->AppendNull();
+          }
         }
       }
 
