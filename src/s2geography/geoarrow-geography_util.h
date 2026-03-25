@@ -15,6 +15,14 @@ namespace s2geography {
 
 namespace internal {
 
+/// \brief Internal flag we set to mark holes as we process polygon input
+///
+/// For the purposes of this flag, this is set purely by position (i.e.,
+/// the first ring in each polygon is a shell and the rest are holes). This
+/// is not validated.
+static constexpr uint8_t kFlagS2GeographyIsHole =
+    (static_cast<uint8_t>(1) << 7);
+
 /// \brief Visit "nodes" of a GeoArrowGeometryView
 ///
 /// Briefly, a GeoArrowGeometryNode is either a sequence (if geometry_type
@@ -304,11 +312,18 @@ class GeoArrowChain {
 struct GeoArrowLoop : public GeoArrowChain {
  public:
   /// \brief Construct a loop and clear the scratch space
+  ///
+  /// Optionally tracks shell/hole for algorithms that require it; however,
+  /// note that the loops provided by VisitLoops() are oriented correctly such
+  /// that the curvature, signed area, centroid, and containment checks do not
+  /// require checking the hole status.
   GeoArrowLoop(const struct GeoArrowGeometryNode* node,
-               std::vector<S2Point>* scratch)
-      : GeoArrowChain(node), scratch_(scratch) {
+               std::vector<S2Point>* scratch, bool is_hole = false)
+      : GeoArrowChain(node), scratch_(scratch), is_hole_(is_hole) {
     scratch_->clear();
   }
+
+  bool is_hole() const { return is_hole_; }
 
   /// \brief Get the sum of the turning angles
   ///
@@ -339,6 +354,7 @@ struct GeoArrowLoop : public GeoArrowChain {
 
  protected:
   std::vector<S2Point>* scratch_{};
+  bool is_hole_;
 
   void BuildScratch();
 };
@@ -397,7 +413,9 @@ class GeoArrowGeom {
         geom_, [&](const struct GeoArrowGeometryNode* node) {
           switch (node->geometry_type) {
             case GEOARROW_GEOMETRY_TYPE_LINESTRING:
-              return visit(GeoArrowLoop(node, scratch));
+              return visit(
+                  GeoArrowLoop(node, scratch,
+                               node->flags & internal::kFlagS2GeographyIsHole));
             default:
               return true;
           }

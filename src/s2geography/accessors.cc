@@ -273,36 +273,54 @@ bool s2_find_validation_error(const Geography& geog, S2Error* error) {
 }
 
 namespace sedona_udf {
+
 struct S2LengthExec {
-  using arg0_t = GeographyInputView;
+  using arg0_t = GeoArrowGeographyInputView;
   using out_t = DoubleOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value) {
-    return s2_length(value) * S2Earth::RadiusMeters();
+    double length = 0.0;
+    value.lines()->geom().VisitEdges([&](const S2Shape::Edge& e) {
+      length += S1ChordAngle(e.v0, e.v1).radians();
+      return true;
+    });
+    return length * S2Earth::RadiusMeters();
   }
 };
 
 struct S2AreaExec {
-  using arg0_t = GeographyInputView;
+  using arg0_t = GeoArrowGeographyInputView;
   using out_t = DoubleOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value) {
-    return s2_area(value) * S2Earth::RadiusMeters() * S2Earth::RadiusMeters();
+    double area = 0.0;
+    value.polygons()->geom().VisitLoops(&scratch_, [&](GeoArrowLoop loop) {
+      area += loop.GetSignedArea();
+      return true;
+    });
+    return area * S2Earth::RadiusMeters() * S2Earth::RadiusMeters();
   }
+
+  std::vector<S2Point> scratch_;
 };
 
 struct S2PerimeterExec {
-  using arg0_t = GeographyInputView;
+  using arg0_t = GeoArrowGeographyInputView;
   using out_t = DoubleOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value) {
-    return s2_perimeter(value) * S2Earth::RadiusMeters();
+    double perimeter = 0.0;
+    value.polygons()->geom().VisitEdges([&](const S2Shape::Edge& e) {
+      perimeter += S1ChordAngle(e.v0, e.v1).radians();
+      return true;
+    });
+    return perimeter * S2Earth::RadiusMeters();
   }
 };
 
@@ -317,6 +335,7 @@ void AreaKernel(struct SedonaCScalarKernel* out) {
 void PerimeterKernel(struct SedonaCScalarKernel* out) {
   InitUnaryKernel<S2PerimeterExec>(out, "st_perimeter");
 }
+
 }  // namespace sedona_udf
 
 }  // namespace s2geography

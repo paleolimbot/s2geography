@@ -19,9 +19,6 @@ namespace s2geography {
 
 namespace {
 
-static constexpr uint8_t kFlagS2GeographyIsHole =
-    (static_cast<uint8_t>(1) << 7);
-
 void ReverseNodeInPlace(struct GeoArrowGeometryNode* node) {
   if (node->size <= 1) return;
   for (int i = 0; i < 4; ++i) {
@@ -287,7 +284,7 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
             loops_.push_back(*node);
 
             if (is_hole) {
-              loops_.back().flags |= kFlagS2GeographyIsHole;
+              loops_.back().flags |= internal::kFlagS2GeographyIsHole;
             }
 
             ++num_loops_;
@@ -308,7 +305,7 @@ void GeoArrowLaxPolygonShape::NormalizeOrientation() {
   for (auto& node : loops_) {
     GeoArrowLoop loop(&node, &point_scratch_);
     double curvature = loop.GetCurvature();
-    bool is_hole = (node.flags & kFlagS2GeographyIsHole) != 0;
+    bool is_hole = (node.flags & internal::kFlagS2GeographyIsHole) != 0;
     if (is_hole != (curvature < 0)) {
       ReverseNodeInPlace(&node);
     }

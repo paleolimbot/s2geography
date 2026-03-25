@@ -203,32 +203,116 @@ std::unique_ptr<PolygonGeography> S2ConvexHullAggregator::Finalize() {
 namespace sedona_udf {
 
 struct S2CentroidExec {
-  using arg0_t = GeographyInputView;
+  using arg0_t = GeoArrowGeographyInputView;
   using out_t = WkbGeographyOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value) {
-    S2Point out = s2_centroid(value);
-    stashed_ = PointGeography(out);
+    S2Point pt;
+
+    // Compute in decreasing dimensionality and return early, because
+    // centroids of lower dimension do not count towards the final value
+    // if the geography has mixed dimension.
+    if (!value.polygons()->is_empty()) {
+      value.polygons()->geom().VisitLoops(&scratch_, [&](GeoArrowLoop loop) {
+        pt += loop.GetCentroid();
+        return true;
+      });
+
+      stashed_ = PointGeography(pt.Normalize());
+      return stashed_;
+    }
+
+    if (!value.lines()->is_empty()) {
+      value.lines()->geom().VisitEdges([&](const S2Shape::Edge& e) {
+        pt += S2::TrueCentroid(e.v0, e.v1);
+        return true;
+      });
+
+      stashed_ = PointGeography(pt.Normalize());
+      return stashed_;
+    }
+
+    if (!value.points()->is_empty()) {
+      value.points()->geom().VisitVertices([&](const S2Point& v) {
+        pt += v;
+        return true;
+      });
+
+      stashed_ = PointGeography(pt.Normalize());
+      return stashed_;
+    }
+
+    // TODO: this needs to be a geometrycollection empty
+    stashed_ = PointGeography();
     return stashed_;
   }
 
   PointGeography stashed_;
+  std::vector<S2Point> scratch_;
 };
 
 struct S2ConvexHullExec {
-  using arg0_t = GeographyInputView;
+  using arg0_t = GeoArrowGeographyInputView;
   using out_t = WkbGeographyOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value) {
-    stashed_ = s2_convex_hull(value);
+    if (value.is_empty()) {
+      stashed_ = std::make_unique<GeographyCollection>();
+      return *stashed_;
+    }
+
+    auto maybe_point = value.Point();
+    if (maybe_point) {
+      stashed_ = std::make_unique<PointGeography>(*maybe_point);
+      return *stashed_;
+    }
+
+    // This query could be more efficient if we vendored the S2ConvexHullQuery
+    // because there are a lot of unnecessary copies involved here.
+    S2ConvexHullQuery query;
+
+    // Points and lines are added purely on the basis of their vertices
+    // (in the internals of the S2ConvexHullQuery as well).
+    value.points()->geom().VisitVertices([&](const S2Point& v) {
+      query.AddPoint(v);
+      return true;
+    });
+
+    value.lines()->geom().VisitVertices([&](const S2Point& v) {
+      query.AddPoint(v);
+      return true;
+    });
+
+    value.polygons()->geom().VisitLoops(&scratch_, [&](GeoArrowLoop loop) {
+      // Holes don't contribute to convex hulls
+      if (loop.is_hole()) {
+        return true;
+      }
+
+      loop.VisitVertices([&](const S2Point& v) {
+        query.AddPoint(v);
+        return true;
+      });
+
+      return true;
+    });
+
+    auto hull_loop = query.GetConvexHull();
+    // TODO: check if it is a very small loop with only 3 points, because
+    // if the input is colinear the output should be a line.
+
+    auto polygon = std::make_unique<S2Polygon>();
+    polygon->Init(std::move(hull_loop));
+    stashed_ = std::make_unique<PolygonGeography>(std::move(polygon));
     return *stashed_;
   }
 
   std::unique_ptr<Geography> stashed_;
+  std::vector<S2Point> scratch_;
 };
 
 struct S2PointOnSurfaceExec {

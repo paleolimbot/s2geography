@@ -46,3 +46,23 @@ TEST(LinearReferencing, SedonaUdfLineInterpolatePoint) {
       out_array.get(),
       {"POINT (0 0)", "POINT (0 0.5)", "POINT (0 1)", std::nullopt}));
 }
+
+TEST(AccessorsGeog, SedonaUdfInterpolateNormalized) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::LineInterpolatePointKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+                        {{"LINESTRING (0 0, 0 1)"}},
+                        {{0.0, 0.5, 1.0, std::nullopt}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(
+      out_array.get(),
+      {"POINT (0 0)", "POINT (0 0.5)", "POINT (0 1)", std::nullopt}));
+}
