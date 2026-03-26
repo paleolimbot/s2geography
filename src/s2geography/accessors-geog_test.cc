@@ -6,7 +6,7 @@
 #include "nanoarrow/nanoarrow.hpp"
 #include "s2geography/sedona_udf/sedona_udf_test_internal.h"
 
-TEST(Accessors, SedonaUdfArea) {
+TEST(Accessors, SedonaUdfAreaArray) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::AreaKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -27,7 +27,7 @@ TEST(Accessors, SedonaUdfArea) {
                       {0.0, 0.0, 6182489130.9071951, std::nullopt}));
 }
 
-TEST(Accessors, SedonaUdfLength) {
+TEST(Accessors, SedonaUdfLengthArray) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::LengthKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -48,7 +48,7 @@ TEST(Accessors, SedonaUdfLength) {
                       {0.0, 111195.10117748393, 0.0, std::nullopt}));
 }
 
-TEST(AccessorsGeog, SedonaUdfCentroid) {
+TEST(AccessorsGeog, SedonaUdfCentroidArray) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::CentroidKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -69,7 +69,7 @@ TEST(AccessorsGeog, SedonaUdfCentroid) {
                         "POINT (0.33335 0.333344)", std::nullopt}));
 }
 
-TEST(AccessorsGeog, SedonaUdfConvexHull) {
+TEST(AccessorsGeog, SedonaUdfConvexHullArray) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::ConvexHullKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
@@ -269,5 +269,159 @@ INSTANTIATE_TEST_SUITE_P(
 
         ),
     [](const ::testing::TestParamInfo<UnaryDoubleScalarParam>& info) {
+      return info.param.name;
+    });
+
+struct UnaryGeographyScalarParam {
+  std::string name;
+  std::optional<std::string> input;
+  std::optional<std::string> expected;
+
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const UnaryGeographyScalarParam& p) {
+    os << (p.input ? *p.input : "null") << " -> ";
+    if (p.expected) {
+      os << *p.expected;
+    } else {
+      os << "null";
+    }
+    return os;
+  }
+};
+
+void TestUnaryScalarGeography(void (*init_kernel)(struct SedonaCScalarKernel*),
+                              const UnaryGeographyScalarParam& p) {
+  struct SedonaCScalarKernel kernel;
+  init_kernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(
+      TestInitKernel(&kernel, &impl, {ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(&impl, {ARROW_TYPE_WKB},
+                                            {{p.input}}, {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(out_array.get(), {p.expected}));
+}
+
+class CentroidScalarTest
+    : public ::testing::TestWithParam<UnaryGeographyScalarParam> {};
+
+TEST_P(CentroidScalarTest, SedonaUdf) {
+  ASSERT_NO_FATAL_FAILURE(TestUnaryScalarGeography(
+      s2geography::sedona_udf::CentroidKernel, GetParam()));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AccessorsGeog, CentroidScalarTest,
+    ::testing::Values(
+        // Nulls
+        UnaryGeographyScalarParam{"null_centroid", std::nullopt, std::nullopt},
+
+        // Empties
+        UnaryGeographyScalarParam{"point_empty", "POINT EMPTY", "POINT EMPTY"},
+        UnaryGeographyScalarParam{"linestring_empty", "LINESTRING EMPTY",
+                                  "POINT EMPTY"},
+        UnaryGeographyScalarParam{"polygon_empty", "POLYGON EMPTY",
+                                  "POINT EMPTY"},
+
+        // Points
+        UnaryGeographyScalarParam{"point", "POINT (0 1)", "POINT (0 1)"},
+        UnaryGeographyScalarParam{"multipoint", "MULTIPOINT ((0 0), (0 1))",
+                                  "POINT (0 0.5)"},
+
+        // Linestrings
+        UnaryGeographyScalarParam{"linestring", "LINESTRING (0 0, 0 1)",
+                                  "POINT (0 0.5)"},
+        UnaryGeographyScalarParam{"linestring_two_segments",
+                                  "LINESTRING (0 0, 0 1, 0 5)",
+                                  "POINT (0 2.5)"},
+        UnaryGeographyScalarParam{"multilinestring",
+                                  "MULTILINESTRING ((0 0, 0 1), (10 0, 10 5))",
+                                  "POINT (8.336347 2.171205)"},
+
+        // Polygons
+        UnaryGeographyScalarParam{"triangle", "POLYGON ((0 0, 0 1, 1 0, 0 0))",
+                                  "POINT (0.33335 0.333344)"},
+        UnaryGeographyScalarParam{
+            "polygon_with_hole",
+            "POLYGON ((0 0, 0 2, 2 0, 0 0), (0.1 0.1, 0.1 0.5, 0.5 "
+            "0.1, 0.1 0.1))",
+            "POINT (0.684859 0.68481)"},
+        UnaryGeographyScalarParam{
+            "multipolygon",
+            "MULTIPOLYGON (((0 0, 0 1, 1 0, 0 0)), ((10 10, 10 11, "
+            "11 10, 10 10)))",
+            "POINT (5.254205 5.315242)"},
+        UnaryGeographyScalarParam{
+            "multipolygon_with_hole",
+            "MULTIPOLYGON (((0 0, 0 2, 2 0, 0 0), (0.1 0.1, 0.1 0.5, "
+            "0.5 0.1, 0.1 0.1)), ((10 10, 10 11, 11 10, 10 10)))",
+            "POINT (2.624356 2.655749)"}
+
+        ),
+    [](const ::testing::TestParamInfo<UnaryGeographyScalarParam>& info) {
+      return info.param.name;
+    });
+
+class ConvexHullScalarTest
+    : public ::testing::TestWithParam<UnaryGeographyScalarParam> {};
+
+TEST_P(ConvexHullScalarTest, SedonaUdf) {
+  ASSERT_NO_FATAL_FAILURE(TestUnaryScalarGeography(
+      s2geography::sedona_udf::ConvexHullKernel, GetParam()));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AccessorsGeog, ConvexHullScalarTest,
+    ::testing::Values(
+        // Nulls
+        UnaryGeographyScalarParam{"null_convex_hull", std::nullopt,
+                                  std::nullopt},
+
+        // Empties
+        UnaryGeographyScalarParam{"point_empty", "POINT EMPTY",
+                                  "GEOMETRYCOLLECTION EMPTY"},
+        UnaryGeographyScalarParam{"linestring_empty", "LINESTRING EMPTY",
+                                  "GEOMETRYCOLLECTION EMPTY"},
+        UnaryGeographyScalarParam{"polygon_empty", "POLYGON EMPTY",
+                                  "GEOMETRYCOLLECTION EMPTY"},
+
+        // Points
+        UnaryGeographyScalarParam{"point", "POINT (0 1)", "POINT (0 1)"},
+        UnaryGeographyScalarParam{"multipoint_two", "MULTIPOINT ((0 0), (0 1))",
+                                  "LINESTRING (0 0, 0 1)"},
+        UnaryGeographyScalarParam{"multipoint_three",
+                                  "MULTIPOINT ((0 0), (0 1), (1 0))",
+                                  "POLYGON ((0 0, 1 0, 0 1, 0 0))"},
+
+        // Linestrings
+        UnaryGeographyScalarParam{"linestring", "LINESTRING (0 0, 0 1)",
+                                  "LINESTRING (0 0, 0 1)"},
+        UnaryGeographyScalarParam{"linestring_colinear",
+                                  "LINESTRING (0 0, 0 1, 0 2)",
+                                  "LINESTRING (0 0, 0 2)"},
+        UnaryGeographyScalarParam{"linestring_non_colinear",
+                                  "LINESTRING (0 0, 0 1, 1 0)",
+                                  "POLYGON ((0 0, 1 0, 0 1, 0 0))"},
+
+        // Polygons
+        UnaryGeographyScalarParam{"triangle", "POLYGON ((0 0, 0 1, 1 0, 0 0))",
+                                  "POLYGON ((0 0, 1 0, 0 1, 0 0))"},
+        UnaryGeographyScalarParam{
+            "polygon_with_hole",
+            "POLYGON ((0 0, 0 2, 2 0, 0 0), (0.1 0.1, 0.1 0.5, 0.5 "
+            "0.1, 0.1 0.1))",
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))"},
+        UnaryGeographyScalarParam{
+            "multipolygon_with_hole",
+            "MULTIPOLYGON (((0 0, 0 2, 2 0, 0 0), (0.1 0.1, 0.1 0.5, "
+            "0.5 0.1, 0.1 0.1)), ((10 10, 10 11, 11 10, 10 10)))",
+            "POLYGON ((0 0, 2 0, 11 10, 10 11, 0 2, 0 0))"}
+
+        ),
+    [](const ::testing::TestParamInfo<UnaryGeographyScalarParam>& info) {
       return info.param.name;
     });
