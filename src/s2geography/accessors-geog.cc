@@ -245,12 +245,11 @@ struct S2CentroidExec {
       return stashed_;
     }
 
-    // TODO: this needs to be a geometrycollection empty
-    stashed_ = PointGeography();
-    return stashed_;
+    return empty_;
   }
 
   PointGeography stashed_;
+  GeographyCollection empty_;
   std::vector<S2Point> scratch_;
 };
 

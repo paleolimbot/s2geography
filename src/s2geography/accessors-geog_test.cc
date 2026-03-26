@@ -321,11 +321,12 @@ INSTANTIATE_TEST_SUITE_P(
         UnaryGeographyScalarParam{"null_centroid", std::nullopt, std::nullopt},
 
         // Empties
-        UnaryGeographyScalarParam{"point_empty", "POINT EMPTY", "POINT EMPTY"},
+        UnaryGeographyScalarParam{"point_empty", "POINT EMPTY",
+                                  "GEOMETRYCOLLECTION EMPTY"},
         UnaryGeographyScalarParam{"linestring_empty", "LINESTRING EMPTY",
-                                  "POINT EMPTY"},
+                                  "GEOMETRYCOLLECTION EMPTY"},
         UnaryGeographyScalarParam{"polygon_empty", "POLYGON EMPTY",
-                                  "POINT EMPTY"},
+                                  "GEOMETRYCOLLECTION EMPTY"},
 
         // Points
         UnaryGeographyScalarParam{"point", "POINT (0 1)", "POINT (0 1)"},
