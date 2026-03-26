@@ -90,13 +90,13 @@ TEST(AccessorsGeog, SedonaUdfConvexHull) {
                         "POLYGON ((0 0, 1 0, 0 1, 0 0))", std::nullopt}));
 }
 
-
-struct AreaScalarParam {
+struct UnaryDoubleScalarParam {
   std::string name;
   std::optional<std::string> input;
   std::optional<double> expected;
 
-  friend std::ostream& operator<<(std::ostream& os, const AreaScalarParam& p) {
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const UnaryDoubleScalarParam& p) {
     os << (p.input ? *p.input : "null") << " -> ";
     if (p.expected) {
       os << *p.expected;
@@ -107,13 +107,10 @@ struct AreaScalarParam {
   }
 };
 
-class AreaScalarTest : public ::testing::TestWithParam<AreaScalarParam> {};
-
-TEST_P(AreaScalarTest, SedonaUdf) {
-  const auto& p = GetParam();
-
+void TestUnaryScalarDouble(void (*init_kernel)(struct SedonaCScalarKernel*),
+                           const UnaryDoubleScalarParam& p) {
   struct SedonaCScalarKernel kernel;
-  s2geography::sedona_udf::AreaKernel(&kernel);
+  init_kernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(
       TestInitKernel(&kernel, &impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_DOUBLE));
@@ -128,45 +125,149 @@ TEST_P(AreaScalarTest, SedonaUdf) {
       TestResultArrow(out_array.get(), NANOARROW_TYPE_DOUBLE, {p.expected}));
 }
 
+class AreaScalarTest : public ::testing::TestWithParam<UnaryDoubleScalarParam> {
+};
+
+TEST_P(AreaScalarTest, SedonaUdf) {
+  ASSERT_NO_FATAL_FAILURE(
+      TestUnaryScalarDouble(s2geography::sedona_udf::AreaKernel, GetParam()));
+}
+
 INSTANTIATE_TEST_SUITE_P(
     Accessors, AreaScalarTest,
     ::testing::Values(
         // Nulls
-        AreaScalarParam{"null_area", std::nullopt, std::nullopt},
+        UnaryDoubleScalarParam{"null_area", std::nullopt, std::nullopt},
 
         // Empties
-        AreaScalarParam{"point_empty", "POINT EMPTY", 0.0},
-        AreaScalarParam{"linestring_empty", "LINESTRING EMPTY", 0.0},
-        AreaScalarParam{"polygon_empty", "POLYGON EMPTY", 0.0},
+        UnaryDoubleScalarParam{"point_empty", "POINT EMPTY", 0.0},
+        UnaryDoubleScalarParam{"linestring_empty", "LINESTRING EMPTY", 0.0},
+        UnaryDoubleScalarParam{"polygon_empty", "POLYGON EMPTY", 0.0},
 
         // Points (zero area)
-        AreaScalarParam{"point", "POINT (0 0)", 0.0},
-        AreaScalarParam{"multipoint", "MULTIPOINT ((0 0), (1 1))", 0.0},
+        UnaryDoubleScalarParam{"point", "POINT (0 0)", 0.0},
+        UnaryDoubleScalarParam{"multipoint", "MULTIPOINT ((0 0), (1 1))", 0.0},
 
         // Linestrings (zero area)
-        AreaScalarParam{"linestring", "LINESTRING (0 0, 0 1)", 0.0},
-        AreaScalarParam{"multilinestring",
-                        "MULTILINESTRING ((0 0, 0 1), (1 0, 1 1))", 0.0},
+        UnaryDoubleScalarParam{"linestring", "LINESTRING (0 0, 0 1)", 0.0},
+        UnaryDoubleScalarParam{"multilinestring",
+                               "MULTILINESTRING ((0 0, 0 1), (1 0, 1 1))", 0.0},
 
         // Polygons
-        AreaScalarParam{"triangle", "POLYGON ((0 0, 0 1, 1 0, 0 0))",
-                        6182489130.9071951},
-        AreaScalarParam{"square", "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))",
-                        12364036567.076418},
+        UnaryDoubleScalarParam{"triangle", "POLYGON ((0 0, 0 1, 1 0, 0 0))",
+                               6182489130.9071951},
+        UnaryDoubleScalarParam{"square", "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))",
+                               12364036567.076418},
 
         // Multipolygon
-        AreaScalarParam{
+        UnaryDoubleScalarParam{
             "multipolygon",
-            "MULTIPOLYGON (((0 0, 0 1, 1 0, 0 0)), ((10 10, 10 11, 11 10, 10 10)))",
+            "MULTIPOLYGON (((0 0, 0 1, 1 0, 0 0)), ((10 10, 10 11, "
+            "11 10, 10 10)))",
             12271037686.230379},
 
         // Polygon with hole
-        AreaScalarParam{
+        UnaryDoubleScalarParam{
             "polygon_with_hole",
-            "POLYGON ((0 0, 0 2, 2 0, 0 0), (0.1 0.1, 0.1 0.5, 0.5 0.1, 0.1 0.1))",
+            "POLYGON ((0 0, 0 2, 2 0, 0 0), (0.1 0.1, 0.1 0.5, 0.5 "
+            "0.1, 0.1 0.1))",
             23744568445.094166}
 
         ),
-    [](const ::testing::TestParamInfo<AreaScalarParam>& info) {
+    [](const ::testing::TestParamInfo<UnaryDoubleScalarParam>& info) {
+      return info.param.name;
+    });
+
+class LengthScalarTest
+    : public ::testing::TestWithParam<UnaryDoubleScalarParam> {};
+
+TEST_P(LengthScalarTest, SedonaUdf) {
+  ASSERT_NO_FATAL_FAILURE(
+      TestUnaryScalarDouble(s2geography::sedona_udf::LengthKernel, GetParam()));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Accessors, LengthScalarTest,
+    ::testing::Values(
+        // Nulls
+        UnaryDoubleScalarParam{"null_length", std::nullopt, std::nullopt},
+
+        // Empties
+        UnaryDoubleScalarParam{"point_empty", "POINT EMPTY", 0.0},
+        UnaryDoubleScalarParam{"linestring_empty", "LINESTRING EMPTY", 0.0},
+        UnaryDoubleScalarParam{"polygon_empty", "POLYGON EMPTY", 0.0},
+
+        // Points (zero length)
+        UnaryDoubleScalarParam{"point", "POINT (0 0)", 0.0},
+        UnaryDoubleScalarParam{"multipoint", "MULTIPOINT ((0 0), (1 1))", 0.0},
+
+        // Linestrings
+        UnaryDoubleScalarParam{"linestring_one_segment",
+                               "LINESTRING (0 0, 0 1)", 111195.10117748393},
+        UnaryDoubleScalarParam{"linestring_two_segments",
+                               "LINESTRING (0 0, 0 1, 1 1)",
+                               222373.26637265272},
+        UnaryDoubleScalarParam{"multilinestring",
+                               "MULTILINESTRING ((0 0, 0 1), (1 0, 1 1))",
+                               222390.20235496786},
+
+        // Polygons (zero length — perimeter is separate)
+        UnaryDoubleScalarParam{"triangle", "POLYGON ((0 0, 0 1, 1 0, 0 0))",
+                               0.0},
+        UnaryDoubleScalarParam{"square", "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))",
+                               0.0}
+
+        ),
+    [](const ::testing::TestParamInfo<UnaryDoubleScalarParam>& info) {
+      return info.param.name;
+    });
+
+class PerimeterScalarTest
+    : public ::testing::TestWithParam<UnaryDoubleScalarParam> {};
+
+TEST_P(PerimeterScalarTest, SedonaUdf) {
+  ASSERT_NO_FATAL_FAILURE(TestUnaryScalarDouble(
+      s2geography::sedona_udf::PerimeterKernel, GetParam()));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Accessors, PerimeterScalarTest,
+    ::testing::Values(
+        // Nulls
+        UnaryDoubleScalarParam{"null_perimeter", std::nullopt, std::nullopt},
+
+        // Empties
+        UnaryDoubleScalarParam{"point_empty", "POINT EMPTY", 0.0},
+        UnaryDoubleScalarParam{"linestring_empty", "LINESTRING EMPTY", 0.0},
+        UnaryDoubleScalarParam{"polygon_empty", "POLYGON EMPTY", 0.0},
+
+        // Points (zero perimeter)
+        UnaryDoubleScalarParam{"point", "POINT (0 0)", 0.0},
+
+        // Linestrings (zero perimeter)
+        UnaryDoubleScalarParam{"linestring", "LINESTRING (0 0, 0 1)", 0.0},
+
+        // Polygons
+        UnaryDoubleScalarParam{"triangle", "POLYGON ((0 0, 0 1, 1 0, 0 0))",
+                               379639.83044747578},
+        UnaryDoubleScalarParam{"square", "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))",
+                               444763.46872762055},
+
+        // Multipolygon
+        UnaryDoubleScalarParam{
+            "multipolygon",
+            "MULTIPOLYGON (((0 0, 0 1, 1 0, 0 0)), ((10 10, 10 11, 11 10, 10 "
+            "10)))",
+            756282.14701838186},
+
+        // Polygon with hole
+        UnaryDoubleScalarParam{
+            "polygon_with_hole",
+            "POLYGON ((0 0, 0 2, 2 0, 0 0), (0.1 0.1, 0.1 0.5, 0.5 0.1, 0.1 "
+            "0.1))",
+            911112.66968130425}
+
+        ),
+    [](const ::testing::TestParamInfo<UnaryDoubleScalarParam>& info) {
       return info.param.name;
     });
