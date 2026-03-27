@@ -154,13 +154,52 @@ struct S2LineInterpolatePointExec {
 };
 
 struct S2LineLocatePointExec {
-  using arg0_t = GeographyInputView;
-  using arg1_t = GeographyInputView;
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
   using out_t = DoubleOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
-  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+  std::optional<out_t::c_type> Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    if (value0.is_empty() || value1.is_empty()) {
+      return std::nullopt;
+    }
+
+    if (!value0.points()->is_empty() || !value0.polygons()->is_empty() ||
+        value0.lines()->num_chains() != 1) {
+      throw Exception(
+          "First argument to ST_LineLocatePoint must be a single linestring");
+    }
+
+    auto maybe_point = value1.Point();
+    if (!maybe_point) {
+      throw Exception("Second argument to ST_LineLocatePoint must be a point");
+    }
+
+    S2Point pt = *maybe_point;
+
+    S1Angle min_distance_to_segment = S1Angle::Infinity();
+    int closest_edge_id = -1;
+
+    S1Angle length_sum;
+    cumulative_lengths_.clear();
+    cumulative_lengths_.push_back(length_sum);
+    int edge_id = -1;
+    value0.VisitEdges([&](const S2Shape::Edge& e) {
+      ++edge_id;
+
+      length_sum += S1Angle(e.v0, e.v1);
+      cumulative_lengths_.push_back(length_sum);
+
+      S1Angle distance_to_segment = S2::GetDistance(pt, e.v0, e.v1);
+      if (distance_to_segment < min_distance_to_segment) {
+        closest_edge_id = edge_id;
+      }
+      return true;
+    });
+
+
+
     //   ABSL_DCHECK_GT(num_vertices(), 0);
 
     // if (num_vertices() == 1) {
@@ -191,8 +230,11 @@ struct S2LineLocatePointExec {
     // return closest_point;
     // stashed_ = PointGeography(s2_interpolate_normalized(value0, value1));
 
-    return s2_project_normalized(value0, value1);
+    // return s2_project_normalized(value0, value1);
+    return 0.0;
   }
+
+  std::vector<S1Angle> cumulative_lengths_;
 };
 
 void LineInterpolatePointKernel(struct SedonaCScalarKernel* out) {
