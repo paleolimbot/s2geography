@@ -103,6 +103,18 @@ INSTANTIATE_TEST_SUITE_P(
         LineLocatePointParam{"null_both", std::nullopt, std::nullopt,
                              std::nullopt},
 
+        // Empties
+        LineLocatePointParam{"empty_line", "LINESTRING EMPTY", "POINT (0 0)",
+                             std::nullopt},
+        LineLocatePointParam{"empty_point", "LINESTRING (0 1, 2 3)",
+                             "POINT EMPTY", std::nullopt},
+
+        // Degenerate
+        LineLocatePointParam{"zero_length_line", "LINESTRING (1 1, 1 1)",
+                             "POINT (0 0)", 0.0},
+        LineLocatePointParam{"invalid_line", "LINESTRING (1 1)", "POINT (0 0)",
+                             std::nullopt},
+
         // Endpoints and midpoints
         LineLocatePointParam{"start", "LINESTRING (0 0, 0 2)", "POINT (0 0)",
                              0.0},
@@ -178,6 +190,16 @@ INSTANTIATE_TEST_SUITE_P(
                                   std::nullopt, std::nullopt},
         LineInterpolatePointParam{"null_both", std::nullopt, std::nullopt,
                                   std::nullopt},
+
+        // Empties
+        LineInterpolatePointParam{"empty_line", "LINESTRING EMPTY", 0.0,
+                                  std::nullopt},
+
+        // Degenerate
+        LineInterpolatePointParam{"zero_length_line", "LINESTRING (1 1, 1 1)",
+                                  0.5, "POINT (1 1)"},
+        LineInterpolatePointParam{"invalid_line", "LINESTRING (1 1)", 0.5,
+                                  "POINT (1 1)"},
 
         // Endpoints and midpoints
         LineInterpolatePointParam{"start", "LINESTRING (0 0, 0 2)", 0.0,

@@ -204,11 +204,16 @@ struct S2LineLocatePointExec {
       return true;
     });
 
+    if (length_sum == S1Angle::Zero()) {
+      return 0.0;
+    }
+
     S2GEOGRAPHY_DCHECK_GE(closest_edge_id, 0);
     S2Shape::Edge e = value0.lines()->edge(closest_edge_id);
     S2Point pt_on_edge = S2::Project(pt, e.v0, e.v1);
     S1Angle e_distance(e.v0, pt_on_edge);
     S1Angle total_distance = cumulative_lengths_[closest_edge_id] + e_distance;
+
     return (total_distance / length_sum);
   }
 
