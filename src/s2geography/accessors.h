@@ -22,6 +22,7 @@ namespace sedona_udf {
 void LengthKernel(struct SedonaCScalarKernel* out);
 void AreaKernel(struct SedonaCScalarKernel* out);
 void PerimeterKernel(struct SedonaCScalarKernel* out);
+
 }  // namespace sedona_udf
 
 }  // namespace s2geography

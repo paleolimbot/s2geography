@@ -2,6 +2,7 @@
 #include "s2geography/accessors-geog.h"
 
 #include <s2/s2centroids.h>
+#include <s2/s2edge_distances.h>
 
 #include "s2geography/accessors.h"
 #include "s2geography/build.h"
@@ -203,32 +204,158 @@ std::unique_ptr<PolygonGeography> S2ConvexHullAggregator::Finalize() {
 namespace sedona_udf {
 
 struct S2CentroidExec {
-  using arg0_t = GeographyInputView;
+  using arg0_t = GeoArrowGeographyInputView;
   using out_t = WkbGeographyOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value) {
-    S2Point out = s2_centroid(value);
-    stashed_ = PointGeography(out);
-    return stashed_;
+    S2Point pt;
+
+    // Compute in decreasing dimensionality and return early, because
+    // centroids of lower dimension do not count towards the final value
+    // if the geography has mixed dimension.
+    if (!value.polygons()->is_empty()) {
+      value.polygons()->geom().VisitLoops(&scratch_, [&](GeoArrowLoop loop) {
+        pt += loop.GetCentroid();
+        return true;
+      });
+
+      stashed_ = PointGeography(pt.Normalize());
+      return stashed_;
+    }
+
+    if (!value.lines()->is_empty()) {
+      value.lines()->geom().VisitEdges([&](const S2Shape::Edge& e) {
+        pt += S2::TrueCentroid(e.v0, e.v1);
+        return true;
+      });
+
+      stashed_ = PointGeography(pt.Normalize());
+      return stashed_;
+    }
+
+    if (!value.points()->is_empty()) {
+      value.points()->geom().VisitVertices([&](const S2Point& v) {
+        pt += v;
+        return true;
+      });
+
+      stashed_ = PointGeography(pt.Normalize());
+      return stashed_;
+    }
+
+    return empty_;
   }
 
   PointGeography stashed_;
+  GeographyCollection empty_;
+  std::vector<S2Point> scratch_;
 };
 
 struct S2ConvexHullExec {
-  using arg0_t = GeographyInputView;
+  using arg0_t = GeoArrowGeographyInputView;
   using out_t = WkbGeographyOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value) {
-    stashed_ = s2_convex_hull(value);
+    if (value.is_empty()) {
+      stashed_ = std::make_unique<GeographyCollection>();
+      return *stashed_;
+    }
+
+    auto maybe_point = value.Point();
+    if (maybe_point) {
+      stashed_ = std::make_unique<PointGeography>(*maybe_point);
+      return *stashed_;
+    }
+
+    // This query could be more efficient if we vendored the S2ConvexHullQuery
+    // because there are a lot of unnecessary copies involved here.
+    S2ConvexHullQuery query;
+
+    // Points and lines are added purely on the basis of their vertices
+    // (in the internals of the S2ConvexHullQuery as well).
+    value.points()->geom().VisitVertices([&](const S2Point& v) {
+      query.AddPoint(v);
+      return true;
+    });
+
+    value.lines()->geom().VisitVertices([&](const S2Point& v) {
+      query.AddPoint(v);
+      return true;
+    });
+
+    value.polygons()->geom().VisitLoops(&scratch_, [&](GeoArrowLoop loop) {
+      // Holes don't contribute to convex hulls
+      if (loop.is_hole()) {
+        return true;
+      }
+
+      loop.VisitVertices([&](const S2Point& v) {
+        query.AddPoint(v);
+        return true;
+      });
+
+      return true;
+    });
+
+    auto hull_loop = query.GetConvexHull();
+
+    // If we have a very skinny loop this means the output should be a line.
+    // TODO: make less verbose.
+    if (hull_loop->num_vertices() == 3) {
+      S1ChordAngle perp_limit(S2::kProjectPerpendicularError);
+      const S2Point& v0 = hull_loop->vertex(0);
+      const S2Point& v1 = hull_loop->vertex(1);
+      const S2Point& v2 = hull_loop->vertex(2);
+
+      // Check each vertex against its opposite edge. If any vertex lies
+      // on the opposite edge, the three points are collinear and the
+      // convex hull is really a line segment (the longest edge).
+      S2Point edge_vertices[3][2] = {
+          {v1, v2},  // edge opposite v0
+          {v0, v2},  // edge opposite v1
+          {v0, v1},  // edge opposite v2
+      };
+
+      for (int i = 0; i < 3; i++) {
+        const S2Point& x = hull_loop->vertex(i);
+        const S2Point& a = edge_vertices[i][0];
+        const S2Point& b = edge_vertices[i][1];
+        if (S2::IsDistanceLess(x, a, b, perp_limit)) {
+          // Find the longest edge to use as the polyline
+          S1ChordAngle d01(v0, v1);
+          S1ChordAngle d02(v0, v2);
+          S1ChordAngle d12(v1, v2);
+          S2Point pa, pb;
+          if (d01 >= d02 && d01 >= d12) {
+            pa = v0;
+            pb = v1;
+          } else if (d02 >= d01 && d02 >= d12) {
+            pa = v0;
+            pb = v2;
+          } else {
+            pa = v1;
+            pb = v2;
+          }
+          auto polyline =
+              std::make_unique<S2Polyline>(std::vector<S2Point>{pa, pb});
+          stashed_ = std::make_unique<PolylineGeography>(std::move(polyline));
+          return *stashed_;
+        }
+      }
+    }
+
+    auto polygon = std::make_unique<S2Polygon>();
+    polygon->Init(std::move(hull_loop));
+    stashed_ = std::make_unique<PolygonGeography>(std::move(polygon));
     return *stashed_;
   }
 
   std::unique_ptr<Geography> stashed_;
+  std::vector<S2Point> scratch_;
 };
 
 struct S2PointOnSurfaceExec {
