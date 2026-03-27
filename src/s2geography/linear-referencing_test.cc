@@ -35,14 +35,14 @@ TEST(LinearReferencing, SedonaUdfLineInterpolatePoint) {
       &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(
-      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
-                        {{"LINESTRING (0 0, 0 1)"}},
-                        {{0.0, 0.5, 1.0, std::nullopt}}, out_array.get()));
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+      {{"LINESTRING (0 0, 0 1, 0 2)"}},
+      {{0.0, 0.25, 0.5, 0.75, 1.0, std::nullopt}}, out_array.get()));
   impl.release(&impl);
   kernel.release(&kernel);
 
   ASSERT_NO_FATAL_FAILURE(TestResultGeography(
-      out_array.get(),
-      {"POINT (0 0)", "POINT (0 0.5)", "POINT (0 1)", std::nullopt}));
+      out_array.get(), {"POINT (0 0)", "POINT (0 0.5)", "POINT (0 1)",
+                        "POINT (0 1.5)", "POINT (0 2)", std::nullopt}));
 }

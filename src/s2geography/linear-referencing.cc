@@ -1,6 +1,10 @@
 
 #include "s2geography/linear-referencing.h"
 
+#include <s2/s2edge_distances.h>
+
+#include <algorithm>
+
 #include "s2geography/accessors.h"
 #include "s2geography/build.h"
 #include "s2geography/geography.h"
@@ -77,18 +81,63 @@ S2Point s2_interpolate_normalized(const Geography& geog, double distance_norm) {
 namespace sedona_udf {
 
 struct S2LineInterpolatePointExec {
-  using arg0_t = GeographyInputView;
+  using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = DoubleInputView;
   using out_t = WkbGeographyOutputBuilder;
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
-  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    stashed_ = PointGeography(s2_interpolate_normalized(value0, value1));
+  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type fraction) {
+    if (value0.is_empty()) {
+      stashed_ = PointGeography();
+      return stashed_;
+    }
+
+    if (!value0.points()->is_empty() || !value0.polygons()->is_empty() ||
+        value0.lines()->num_chains() != 1) {
+      throw Exception(
+          "Input to ST_LineInterpolatePoint must be a single linestring");
+    }
+
+    S2Point pt;
+    if (fraction <= 0) {
+      value0.VisitVertices([&](const S2Point& v) {
+        pt = v;
+        return false;
+      });
+      stashed_ = PointGeography(pt);
+      return stashed_;
+    } else if (fraction >= 1) {
+      stashed_ = PointGeography(
+          value0.lines()->edge(value0.lines()->num_edges() - 1).v1);
+      return stashed_;
+    }
+
+    S1Angle length_sum;
+    cumulative_lengths_.clear();
+    cumulative_lengths_.push_back(length_sum);
+    value0.VisitEdges([&](const S2Shape::Edge& e) {
+      length_sum += S1Angle(e.v0, e.v1);
+      cumulative_lengths_.push_back(length_sum);
+      return true;
+    });
+
+    S1Angle target = fraction * length_sum;
+    auto it = std::lower_bound(cumulative_lengths_.begin(),
+                               cumulative_lengths_.end(), target);
+    int edge_idx = static_cast<int>(it - cumulative_lengths_.begin());
+
+    S1Angle prev_length = cumulative_lengths_[edge_idx - 1];
+    S2Shape::Edge e = value0.lines()->edge(edge_idx - 1);
+    S1Angle remaining = target - prev_length;
+    pt = S2::GetPointOnLine(e.v0, e.v1, remaining);
+
+    stashed_ = PointGeography(pt);
     return stashed_;
   }
 
   PointGeography stashed_;
+  std::vector<S1Angle> cumulative_lengths_;
 };
 
 struct S2LineLocatePointExec {
@@ -99,6 +148,36 @@ struct S2LineLocatePointExec {
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
   out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+    //   ABSL_DCHECK_GT(num_vertices(), 0);
+
+    // if (num_vertices() == 1) {
+    //   // If there is only one vertex, it is always closest to any given
+    //   point. *next_vertex = 1; return vertex(0);
+    // }
+
+    // // Initial value larger than any possible distance on the unit sphere.
+    // S1Angle min_distance = S1Angle::Radians(10);
+    // int min_index = -1;
+
+    // // Find the line segment in the polyline that is closest to the point
+    // given. for (int i = 1; i < num_vertices(); ++i) {
+    //   S1Angle distance_to_segment = S2::GetDistance(point, vertex(i-1),
+    //                                                         vertex(i));
+    //   if (distance_to_segment < min_distance) {
+    //     min_distance = distance_to_segment;
+    //     min_index = i;
+    //   }
+    // }
+    // ABSL_DCHECK_NE(min_index, -1);
+
+    // // Compute the point on the segment found that is closest to the point
+    // given. S2Point closest_point =
+    //     S2::Project(point, vertex(min_index - 1), vertex(min_index));
+
+    // *next_vertex = min_index + (closest_point == vertex(min_index) ? 1 : 0);
+    // return closest_point;
+    // stashed_ = PointGeography(s2_interpolate_normalized(value0, value1));
+
     return s2_project_normalized(value0, value1);
   }
 };
