@@ -80,6 +80,8 @@ S2Point s2_interpolate_normalized(const Geography& geog, double distance_norm) {
 
 namespace sedona_udf {
 
+static constexpr int kMaxEdgesLinearSearch = 32;
+
 struct S2LineInterpolatePointExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = DoubleInputView;
@@ -123,12 +125,23 @@ struct S2LineInterpolatePointExec {
     });
 
     S1Angle target = fraction * length_sum;
-    auto it = std::lower_bound(cumulative_lengths_.begin(),
-                               cumulative_lengths_.end(), target);
-    int edge_idx = static_cast<int>(it - cumulative_lengths_.begin());
+    int num_edges = value0.lines()->num_edges();
+    int edge_idx;
+    if (num_edges <= kMaxEdgesLinearSearch) {
+      for (size_t i = 1; i < cumulative_lengths_.size(); ++i) {
+        if (target < cumulative_lengths_[i]) {
+          edge_idx = static_cast<int>(i) - 1;
+          break;
+        }
+      }
+    } else {
+      auto it = std::lower_bound(cumulative_lengths_.begin(),
+                                 cumulative_lengths_.end(), target);
+      edge_idx = static_cast<int>(it - cumulative_lengths_.begin()) - 1;
+    }
 
-    S1Angle prev_length = cumulative_lengths_[edge_idx - 1];
-    S2Shape::Edge e = value0.lines()->edge(edge_idx - 1);
+    S1Angle prev_length = cumulative_lengths_[edge_idx];
+    S2Shape::Edge e = value0.lines()->edge(edge_idx);
     S1Angle remaining = target - prev_length;
     pt = S2::GetPointOnLine(e.v0, e.v1, remaining);
 
