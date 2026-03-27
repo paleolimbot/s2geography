@@ -160,7 +160,8 @@ struct S2LineLocatePointExec {
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
-  std::optional<out_t::c_type> Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+  std::optional<out_t::c_type> Exec(arg0_t::c_type value0,
+                                    arg1_t::c_type value1) {
     if (value0.is_empty() || value1.is_empty()) {
       return std::nullopt;
     }
@@ -178,6 +179,9 @@ struct S2LineLocatePointExec {
 
     S2Point pt = *maybe_point;
 
+    // This section always does a linear search. In theory some of this search
+    // could be reused for a scalar input across multiple query points; however,
+    // it's unclear that this would be a common query pattern.
     S1Angle min_distance_to_segment = S1Angle::Infinity();
     int closest_edge_id = -1;
 
@@ -194,44 +198,18 @@ struct S2LineLocatePointExec {
       S1Angle distance_to_segment = S2::GetDistance(pt, e.v0, e.v1);
       if (distance_to_segment < min_distance_to_segment) {
         closest_edge_id = edge_id;
+        min_distance_to_segment = distance_to_segment;
       }
+
       return true;
     });
 
-
-
-    //   ABSL_DCHECK_GT(num_vertices(), 0);
-
-    // if (num_vertices() == 1) {
-    //   // If there is only one vertex, it is always closest to any given
-    //   point. *next_vertex = 1; return vertex(0);
-    // }
-
-    // // Initial value larger than any possible distance on the unit sphere.
-    // S1Angle min_distance = S1Angle::Radians(10);
-    // int min_index = -1;
-
-    // // Find the line segment in the polyline that is closest to the point
-    // given. for (int i = 1; i < num_vertices(); ++i) {
-    //   S1Angle distance_to_segment = S2::GetDistance(point, vertex(i-1),
-    //                                                         vertex(i));
-    //   if (distance_to_segment < min_distance) {
-    //     min_distance = distance_to_segment;
-    //     min_index = i;
-    //   }
-    // }
-    // ABSL_DCHECK_NE(min_index, -1);
-
-    // // Compute the point on the segment found that is closest to the point
-    // given. S2Point closest_point =
-    //     S2::Project(point, vertex(min_index - 1), vertex(min_index));
-
-    // *next_vertex = min_index + (closest_point == vertex(min_index) ? 1 : 0);
-    // return closest_point;
-    // stashed_ = PointGeography(s2_interpolate_normalized(value0, value1));
-
-    // return s2_project_normalized(value0, value1);
-    return 0.0;
+    S2GEOGRAPHY_DCHECK_GE(closest_edge_id, 0);
+    S2Shape::Edge e = value0.lines()->edge(closest_edge_id);
+    S2Point pt_on_edge = S2::Project(pt, e.v0, e.v1);
+    S1Angle e_distance(e.v0, pt_on_edge);
+    S1Angle total_distance = cumulative_lengths_[closest_edge_id] + e_distance;
+    return (total_distance / length_sum);
   }
 
   std::vector<S1Angle> cumulative_lengths_;
