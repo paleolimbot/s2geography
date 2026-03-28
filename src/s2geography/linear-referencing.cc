@@ -124,6 +124,15 @@ struct S2LineInterpolatePointExec {
       return true;
     });
 
+    if (length_sum.radians() == 0) {
+      value0.VisitVertices([&](const S2Point& v) {
+        pt = v;
+        return false;
+      });
+      stashed_ = PointGeography(pt);
+      return stashed_;
+    }
+
     S1Angle target = fraction * length_sum;
     int num_edges = value0.lines()->num_edges();
     int edge_idx;
