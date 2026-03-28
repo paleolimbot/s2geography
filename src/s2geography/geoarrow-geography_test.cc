@@ -280,6 +280,140 @@ TEST(GeoArrowGeom, DefaultConstructor) {
   EXPECT_EQ(count, 0);
 }
 
+TEST(GeoArrowGeom, VisitNativeVerticesPoint) {
+  auto geom = TestGeometry::FromWKT("POINT ZM (1 2 3 4)");
+  GeoArrowGeom g(geom.geom());
+
+  std::vector<internal::GeoArrowVertex> vertices;
+  g.VisitNativeVertices([&](const internal::GeoArrowVertex& v) {
+    vertices.push_back(v);
+    return true;
+  });
+  ASSERT_EQ(vertices.size(), 1);
+  EXPECT_DOUBLE_EQ(vertices[0].lng, 1);
+  EXPECT_DOUBLE_EQ(vertices[0].lat, 2);
+  EXPECT_DOUBLE_EQ(vertices[0].zm[0], 3);
+  EXPECT_DOUBLE_EQ(vertices[0].zm[1], 4);
+}
+
+TEST(GeoArrowGeom, VisitNativeVerticesLineString) {
+  auto geom =
+      TestGeometry::FromWKT("LINESTRING ZM (0 0 10 20, 1 1 11 21, 2 2 12 22)");
+  GeoArrowGeom g(geom.geom());
+
+  std::vector<internal::GeoArrowVertex> vertices;
+  g.VisitNativeVertices([&](const internal::GeoArrowVertex& v) {
+    vertices.push_back(v);
+    return true;
+  });
+  ASSERT_EQ(vertices.size(), 3);
+  EXPECT_DOUBLE_EQ(vertices[0].lng, 0);
+  EXPECT_DOUBLE_EQ(vertices[0].lat, 0);
+  EXPECT_DOUBLE_EQ(vertices[0].zm[0], 10);
+  EXPECT_DOUBLE_EQ(vertices[0].zm[1], 20);
+  EXPECT_DOUBLE_EQ(vertices[1].lng, 1);
+  EXPECT_DOUBLE_EQ(vertices[1].lat, 1);
+  EXPECT_DOUBLE_EQ(vertices[1].zm[0], 11);
+  EXPECT_DOUBLE_EQ(vertices[1].zm[1], 21);
+  EXPECT_DOUBLE_EQ(vertices[2].lng, 2);
+  EXPECT_DOUBLE_EQ(vertices[2].lat, 2);
+  EXPECT_DOUBLE_EQ(vertices[2].zm[0], 12);
+  EXPECT_DOUBLE_EQ(vertices[2].zm[1], 22);
+}
+
+TEST(GeoArrowGeom, VisitNativeEdgesLineString) {
+  auto geom =
+      TestGeometry::FromWKT("LINESTRING ZM (0 0 10 20, 1 1 11 21, 2 2 12 22)");
+  GeoArrowGeom g(geom.geom());
+
+  std::vector<internal::GeoArrowEdge> edges;
+  g.VisitNativeEdges([&](const internal::GeoArrowEdge& e) {
+    edges.push_back(e);
+    return true;
+  });
+  ASSERT_EQ(edges.size(), 2);
+  EXPECT_DOUBLE_EQ(edges[0].v0.lng, 0);
+  EXPECT_DOUBLE_EQ(edges[0].v0.lat, 0);
+  EXPECT_DOUBLE_EQ(edges[0].v0.zm[0], 10);
+  EXPECT_DOUBLE_EQ(edges[0].v0.zm[1], 20);
+  EXPECT_DOUBLE_EQ(edges[0].v1.lng, 1);
+  EXPECT_DOUBLE_EQ(edges[0].v1.lat, 1);
+  EXPECT_DOUBLE_EQ(edges[0].v1.zm[0], 11);
+  EXPECT_DOUBLE_EQ(edges[0].v1.zm[1], 21);
+  EXPECT_DOUBLE_EQ(edges[1].v0.lng, 1);
+  EXPECT_DOUBLE_EQ(edges[1].v0.lat, 1);
+  EXPECT_DOUBLE_EQ(edges[1].v0.zm[0], 11);
+  EXPECT_DOUBLE_EQ(edges[1].v0.zm[1], 21);
+  EXPECT_DOUBLE_EQ(edges[1].v1.lng, 2);
+  EXPECT_DOUBLE_EQ(edges[1].v1.lat, 2);
+  EXPECT_DOUBLE_EQ(edges[1].v1.zm[0], 12);
+  EXPECT_DOUBLE_EQ(edges[1].v1.zm[1], 22);
+}
+
+TEST(GeoArrowGeom, VisitNativeEdgesSingleVertex) {
+  auto geom = TestGeometry::FromWKT("POINT ZM (5 10 15 20)");
+  GeoArrowGeom g(geom.geom());
+
+  int count = 0;
+  g.VisitNativeEdges([&](const internal::GeoArrowEdge&) {
+    ++count;
+    return true;
+  });
+  EXPECT_EQ(count, 0);
+}
+
+TEST(GeoArrowGeom, VisitNativeEdgesPolygon) {
+  auto geom = TestGeometry::FromWKT(
+      "POLYGON ZM ((0 0 1 2, 10 0 3 4, 10 10 5 6, 0 10 7 8, 0 0 1 2))");
+  GeoArrowGeom g(geom.geom());
+
+  std::vector<internal::GeoArrowEdge> edges;
+  g.VisitNativeEdges([&](const internal::GeoArrowEdge& e) {
+    edges.push_back(e);
+    return true;
+  });
+  ASSERT_EQ(edges.size(), 4);
+
+  EXPECT_DOUBLE_EQ(edges[0].v0.lng, 0);
+  EXPECT_DOUBLE_EQ(edges[0].v0.lat, 0);
+  EXPECT_DOUBLE_EQ(edges[0].v0.zm[0], 1);
+  EXPECT_DOUBLE_EQ(edges[0].v0.zm[1], 2);
+  EXPECT_DOUBLE_EQ(edges[0].v1.lng, 10);
+  EXPECT_DOUBLE_EQ(edges[0].v1.lat, 0);
+  EXPECT_DOUBLE_EQ(edges[0].v1.zm[0], 3);
+  EXPECT_DOUBLE_EQ(edges[0].v1.zm[1], 4);
+  EXPECT_DOUBLE_EQ(edges[3].v0.lng, 0);
+  EXPECT_DOUBLE_EQ(edges[3].v0.lat, 10);
+  EXPECT_DOUBLE_EQ(edges[3].v0.zm[0], 7);
+  EXPECT_DOUBLE_EQ(edges[3].v0.zm[1], 8);
+  EXPECT_DOUBLE_EQ(edges[3].v1.lng, 0);
+  EXPECT_DOUBLE_EQ(edges[3].v1.lat, 0);
+  EXPECT_DOUBLE_EQ(edges[3].v1.zm[0], 1);
+  EXPECT_DOUBLE_EQ(edges[3].v1.zm[1], 2);
+}
+
+TEST(GeoArrowChain, NativeVertexAndEdge) {
+  auto geom = TestGeometry::FromWKT(
+      "LINESTRING ZM (3 4 100 200, 5 6 101 201, 7 8 102 202)");
+  GeoArrowChain chain(geom.geom().root);
+
+  auto v = chain.native_vertex(1);
+  EXPECT_DOUBLE_EQ(v.lng, 5);
+  EXPECT_DOUBLE_EQ(v.lat, 6);
+  EXPECT_DOUBLE_EQ(v.zm[0], 101);
+  EXPECT_DOUBLE_EQ(v.zm[1], 201);
+
+  auto e = chain.native_edge(0);
+  EXPECT_DOUBLE_EQ(e.v0.lng, 3);
+  EXPECT_DOUBLE_EQ(e.v0.lat, 4);
+  EXPECT_DOUBLE_EQ(e.v0.zm[0], 100);
+  EXPECT_DOUBLE_EQ(e.v0.zm[1], 200);
+  EXPECT_DOUBLE_EQ(e.v1.lng, 5);
+  EXPECT_DOUBLE_EQ(e.v1.lat, 6);
+  EXPECT_DOUBLE_EQ(e.v1.zm[0], 101);
+  EXPECT_DOUBLE_EQ(e.v1.zm[1], 201);
+}
+
 // Specifically check loop functions
 
 TEST(GeoArrowLoop, LoopMetrics) {

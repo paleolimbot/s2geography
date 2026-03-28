@@ -254,8 +254,8 @@ internal::GeoArrowEdge GeoArrowLaxPolylineShape::native_edge(int e) const {
   return GeoArrowLaxPolylineShape::native_chain_edge(pos.chain_id, pos.offset);
 }
 
-internal::GeoArrowEdge GeoArrowLaxPolylineShape::native_chain_edge(int i,
-                                                                   int j) const {
+internal::GeoArrowEdge GeoArrowLaxPolylineShape::native_chain_edge(
+    int i, int j) const {
   return GeoArrowChain(geom_.root() + i).native_edge(j);
 }
 

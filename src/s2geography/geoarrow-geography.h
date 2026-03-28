@@ -71,7 +71,7 @@ class GeoArrowPointShape : public S2Shape {
   ChainPosition chain_position(int e) const override;
   TypeTag type_tag() const override;
 
-internal::GeoArrowEdge native_edge(int e) const;
+  internal::GeoArrowEdge native_edge(int e) const;
   internal::GeoArrowEdge native_chain_edge(int i, int j) const;
 
  private:
