@@ -142,6 +142,17 @@ S2Shape::ChainPosition GeoArrowPointShape::chain_position(int e) const {
 
 S2Shape::TypeTag GeoArrowPointShape::type_tag() const { return kTypeTag; }
 
+internal::GeoArrowEdge GeoArrowPointShape::native_edge(int e) const {
+  internal::GeoArrowVertex v = GeoArrowChain(geom_.root() + e).native_vertex(0);
+  return internal::GeoArrowEdge{v, v};
+}
+
+internal::GeoArrowEdge GeoArrowPointShape::native_chain_edge(int /*i*/,
+                                                             int j) const {
+  internal::GeoArrowVertex v = GeoArrowChain(geom_.root() + j).native_vertex(0);
+  return internal::GeoArrowEdge{v, v};
+}
+
 GeoArrowLaxPolylineShape::GeoArrowLaxPolylineShape(
     struct GeoArrowGeometryView geom) {
   Init(geom);
@@ -237,6 +248,16 @@ S2Shape::ChainPosition GeoArrowLaxPolylineShape::chain_position(int e) const {
 }
 
 S2Shape::TypeTag GeoArrowLaxPolylineShape::type_tag() const { return kTypeTag; }
+
+internal::GeoArrowEdge GeoArrowLaxPolylineShape::native_edge(int e) const {
+  ChainPosition pos = GeoArrowLaxPolylineShape::chain_position(e);
+  return GeoArrowLaxPolylineShape::native_chain_edge(pos.chain_id, pos.offset);
+}
+
+internal::GeoArrowEdge GeoArrowLaxPolylineShape::native_chain_edge(int i,
+                                                                   int j) const {
+  return GeoArrowChain(geom_.root() + i).native_edge(j);
+}
 
 // --- GeoArrowLaxPolygonShape ---
 
@@ -347,6 +368,16 @@ S2Shape::ChainPosition GeoArrowLaxPolygonShape::chain_position(int e) const {
 }
 
 S2Shape::TypeTag GeoArrowLaxPolygonShape::type_tag() const { return kTypeTag; }
+
+internal::GeoArrowEdge GeoArrowLaxPolygonShape::native_edge(int e) const {
+  ChainPosition pos = GeoArrowLaxPolygonShape::chain_position(e);
+  return GeoArrowLaxPolygonShape::native_chain_edge(pos.chain_id, pos.offset);
+}
+
+internal::GeoArrowEdge GeoArrowLaxPolygonShape::native_chain_edge(int i,
+                                                                  int j) const {
+  return GeoArrowChain(&loops_[i]).native_edge(j);
+}
 
 bool GeoArrowLaxPolygonShape::BruteForceContains(
     const S2Point& pt, const S2Shape::ReferencePoint& reference) const {

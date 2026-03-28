@@ -71,6 +71,9 @@ class GeoArrowPointShape : public S2Shape {
   ChainPosition chain_position(int e) const override;
   TypeTag type_tag() const override;
 
+internal::GeoArrowEdge native_edge(int e) const;
+  internal::GeoArrowEdge native_chain_edge(int i, int j) const;
+
  private:
   GeoArrowGeom geom_;
 };
@@ -113,6 +116,9 @@ class GeoArrowLaxPolylineShape : public S2Shape {
   Edge chain_edge(int i, int j) const override;
   ChainPosition chain_position(int e) const override;
   TypeTag type_tag() const override;
+
+  internal::GeoArrowEdge native_edge(int e) const;
+  internal::GeoArrowEdge native_chain_edge(int i, int j) const;
 
  private:
   GeoArrowGeom geom_{};
@@ -182,6 +188,9 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   Edge chain_edge(int i, int j) const override;
   ChainPosition chain_position(int e) const override;
   TypeTag type_tag() const override;
+
+  internal::GeoArrowEdge native_edge(int e) const;
+  internal::GeoArrowEdge native_chain_edge(int i, int j) const;
 
   /// \brief Check containment using a brute force edge crossing approach
   ///
