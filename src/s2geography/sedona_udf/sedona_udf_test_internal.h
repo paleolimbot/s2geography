@@ -244,9 +244,12 @@ inline void TestResultGeography(
   for (int64_t i = 0; i < result->length; i++) {
     SCOPED_TRACE("expected[" + std::to_string(i) + "]");
     if (geogs[i].get() == nullptr) {
-      ASSERT_FALSE(expected[i].has_value());
+      ASSERT_FALSE(expected[i].has_value())
+          << "Expected " << ::testing::PrintToString(*expected[i])
+          << " but got NULL";
     } else {
-      ASSERT_TRUE(expected[i].has_value());
+      ASSERT_TRUE(expected[i].has_value())
+          << "Expected NULL but got " << ::testing::PrintToString(*geogs[i]);
       ASSERT_THAT(*geogs[i], s2geography::WktEquals6(*expected[i]));
     }
   }

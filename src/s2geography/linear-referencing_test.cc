@@ -92,6 +92,22 @@ TEST_P(LineLocatePointTest, SedonaUdf) {
       TestResultArrow(out_array.get(), NANOARROW_TYPE_DOUBLE, {p.expected}));
 }
 
+// Create a linestring with n vertices roughly spaced between 0 0 and 180 90
+std::string VeryLongLinestring(int n) {
+  std::stringstream ss;
+
+  ss << "LINESTRING (0 0";
+  double dlon = 180.0 / n;
+  double dlat = 90.0 / n;
+  for (int i = 1; i < n; i++) {
+    ss << ", " << (i * dlon) << " " << (i * dlat);
+  }
+
+  ss << ")";
+
+  return ss.str();
+}
+
 INSTANTIATE_TEST_SUITE_P(
     LinearReferencing, LineLocatePointTest,
     ::testing::Values(
@@ -134,7 +150,17 @@ INSTANTIATE_TEST_SUITE_P(
         LineLocatePointParam{"off_line_start", "LINESTRING (0 0, 0 2)",
                              "POINT (1 0)", 0.0},
         LineLocatePointParam{"off_line_mid", "LINESTRING (0 0, 0 2)",
-                             "POINT (1 1)", 0.50007614855210425}),
+                             "POINT (1 1)", 0.50007614855210425},
+        // A few points on a very long linestring
+        LineLocatePointParam{"long_line_start", VeryLongLinestring(100),
+                             "POINT (0 0)", 0.0},
+        LineLocatePointParam{"long_line_midish", VeryLongLinestring(100),
+                             "POINT (44 38)", 0.38060699282822169},
+        LineLocatePointParam{"long_line_endish", VeryLongLinestring(100),
+                             "POINT (180 89)", 0.99935140921752641}
+
+        ),
+
     [](const ::testing::TestParamInfo<LineLocatePointParam>& info) {
       return info.param.name;
     });
@@ -199,7 +225,7 @@ INSTANTIATE_TEST_SUITE_P(
         LineInterpolatePointParam{"zero_length_line", "LINESTRING (1 1, 1 1)",
                                   0.5, "POINT (1 1)"},
         LineInterpolatePointParam{"invalid_line", "LINESTRING (1 1)", 0.5,
-                                  "POINT (1 1)"},
+                                  std::nullopt},
 
         // Endpoints and midpoints
         LineInterpolatePointParam{"start", "LINESTRING (0 0, 0 2)", 0.0,
@@ -221,7 +247,17 @@ INSTANTIATE_TEST_SUITE_P(
         LineInterpolatePointParam{"fraction_zero", "LINESTRING (0 0, 0 2)", 0.0,
                                   "POINT (0 0)"},
         LineInterpolatePointParam{"fraction_one", "LINESTRING (0 0, 0 2)", 1.0,
-                                  "POINT (0 2)"}),
+                                  "POINT (0 2)"},
+
+        // A few points on a very long linestring
+        LineInterpolatePointParam{"long_line_start", VeryLongLinestring(100),
+                                  0.0, "POINT (0 0)"},
+        LineInterpolatePointParam{"long_line_midish", VeryLongLinestring(100),
+                                  0.4, "POINT (55.384968 27.695838)"},
+        LineInterpolatePointParam{"long_line_endish", VeryLongLinestring(100),
+                                  0.9, "POINT (149.533768 74.771147)"}
+
+        ),
     [](const ::testing::TestParamInfo<LineInterpolatePointParam>& info) {
       return info.param.name;
     });

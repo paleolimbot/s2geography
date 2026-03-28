@@ -89,10 +89,10 @@ struct S2LineInterpolatePointExec {
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
-  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type fraction) {
+  std::optional<optional_storable_t<out_t::c_type>> Exec(
+      arg0_t::c_type value0, arg1_t::c_type fraction) {
     if (value0.is_empty()) {
-      stashed_ = PointGeography();
-      return stashed_;
+      return std::nullopt;
     }
 
     if (!value0.points()->is_empty() || !value0.polygons()->is_empty() ||
