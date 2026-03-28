@@ -211,12 +211,20 @@ bool VisitEdges(const struct GeoArrowGeometryNode* node, int64_t offset,
   }
 
   S2Shape::Edge e;
-  return VisitLngLatEdges(
-      node, offset, n, [&](double lng0, double lat0, double lng1, double lat1) {
-        e.v0 = S2LatLng::FromDegrees(lat0, lng0).ToPoint();
-        e.v1 = S2LatLng::FromDegrees(lat1, lng1).ToPoint();
-        return visit(e);
-      });
+  VisitVertices(node, offset, 1, [&](const S2Point& v) {
+    e.v0 = v;
+    return true;
+  });
+
+  return VisitVertices(node, offset + 1, n, [&](const S2Point& v) {
+    e.v1 = v;
+    if (!visit(e)) {
+      return false;
+    }
+
+    e.v0 = e.v1;
+    return true;
+  });
 }
 
 /// \brief Visit all edges in a sequence as S2Shape::Edges
