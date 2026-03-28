@@ -104,79 +104,73 @@ bool VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
   return true;
 }
 
-/// \brief Visit sequential longitudes and latitudes of a single node
-///
-/// This is a building block for other visitors. This utility visits each
-/// pair of sequential vertices (i.e., "edges").
+struct GeoArrowVertex {
+  double lng;
+  double lat;
+  double zm[2];
+};
+
+struct GeoArrowEdge {
+  GeoArrowVertex v0;
+  GeoArrowVertex v1;
+};
+
+/// \brief Visit native vertices
 template <typename Visit>
-bool VisitLngLatEdges(const struct GeoArrowGeometryNode* node, int64_t offset,
-                      int64_t n, Visit&& visit) {
+bool VisitLngLatZM(const struct GeoArrowGeometryNode* node, int64_t offset,
+                   int64_t n, Visit&& visit) {
   S2GEOGRAPHY_DCHECK_GE(offset, 0);
   S2GEOGRAPHY_DCHECK_GE(n, 0);
   if (n == 0) {
     return true;
   }
 
-  S2GEOGRAPHY_DCHECK_LT(offset + n, static_cast<int64_t>(node->size));
+  S2GEOGRAPHY_DCHECK_LE(offset + n, static_cast<int64_t>(node->size));
 
   const uint8_t* lngs = node->coords[0] + offset * node->coord_stride[0];
   const uint8_t* lats = node->coords[1] + offset * node->coord_stride[1];
-  double lng0, lat0, lng1, lat1;
+  const uint8_t* zm0s = node->coords[2] + offset * node->coord_stride[2];
+  const uint8_t* zm1s = node->coords[3] + offset * node->coord_stride[3];
+  struct GeoArrowVertex v;
 
   if (node->flags & GEOARROW_GEOMETRY_NODE_FLAG_SWAP_ENDIAN) {
     uint64_t tmp;
-
-    // Extract the first vertex
-    memcpy(&tmp, lngs, sizeof(double));
-    tmp = GEOARROW_BSWAP64(tmp);
-    memcpy(&lng0, &tmp, sizeof(double));
-
-    memcpy(&tmp, lats, sizeof(double));
-    tmp = GEOARROW_BSWAP64(tmp);
-    memcpy(&lat0, &tmp, sizeof(double));
-
-    lngs += node->coord_stride[0];
-    lats += node->coord_stride[1];
-
     for (int64_t i = 0; i < n; ++i) {
-      // Extract the next vertex
       memcpy(&tmp, lngs, sizeof(double));
       tmp = GEOARROW_BSWAP64(tmp);
-      memcpy(&lng1, &tmp, sizeof(double));
+      memcpy(&v.lng, &tmp, sizeof(double));
 
       memcpy(&tmp, lats, sizeof(double));
       tmp = GEOARROW_BSWAP64(tmp);
-      memcpy(&lat1, &tmp, sizeof(double));
+      memcpy(&v.lat, &tmp, sizeof(double));
 
-      // Visit
-      if (!visit(lng0, lat0, lng1, lat1)) return false;
+      memcpy(&tmp, zm0s, sizeof(double));
+      tmp = GEOARROW_BSWAP64(tmp);
+      memcpy(&v.zm[0], &tmp, sizeof(double));
 
-      // Move this vertex to the previous vertex and advance
-      lng0 = lng1;
-      lat0 = lat1;
+      memcpy(&tmp, zm1s, sizeof(double));
+      tmp = GEOARROW_BSWAP64(tmp);
+      memcpy(&v.zm[1], &tmp, sizeof(double));
+
+      if (!visit(v)) return false;
+
       lngs += node->coord_stride[0];
       lats += node->coord_stride[1];
+      zm0s += node->coord_stride[2];
+      zm1s += node->coord_stride[3];
     }
   } else {
-    // Extract the first vertex
-    memcpy(&lng0, lngs, sizeof(double));
-    memcpy(&lat0, lats, sizeof(double));
-    lngs += node->coord_stride[0];
-    lats += node->coord_stride[1];
-
     for (int64_t i = 0; i < n; ++i) {
-      // Extract the next vertex
-      memcpy(&lng1, lngs, sizeof(double));
-      memcpy(&lat1, lats, sizeof(double));
+      memcpy(&v.lng, lngs, sizeof(double));
+      memcpy(&v.lat, lats, sizeof(double));
+      memcpy(&v.zm[0], zm0s, sizeof(double));
+      memcpy(&v.zm[1], zm1s, sizeof(double));
+      if (!visit(v)) return false;
 
-      // Visit
-      if (!visit(lng0, lat0, lng1, lat1)) return false;
-
-      // Move this vertex to the previous vertex and advance
-      lng0 = lng1;
-      lat0 = lat1;
       lngs += node->coord_stride[0];
       lats += node->coord_stride[1];
+      zm0s += node->coord_stride[2];
+      zm1s += node->coord_stride[3];
     }
   }
   return true;
@@ -237,6 +231,60 @@ bool VisitEdges(const struct GeoArrowGeometryNode* node, Visit&& visit) {
   return VisitEdges(node, 0, node->size - 1, visit);
 }
 
+/// \brief Visit a subset of vertices in a sequence as GeoArrowVertex
+template <typename Visit>
+bool VisitNativeVertices(const struct GeoArrowGeometryNode* node,
+                         int64_t offset, int64_t n, Visit&& visit) {
+  return VisitLngLatZM(node, offset, n,
+                       [&](const GeoArrowVertex& v) { return visit(v); });
+}
+
+/// \brief Visit all vertices in a sequence as GeoArrowVertex
+template <typename Visit>
+bool VisitNativeVertices(const struct GeoArrowGeometryNode* node,
+                         Visit&& visit) {
+  return VisitLngLatZM(node, 0, node->size,
+                       [&](const GeoArrowVertex& v) { return visit(v); });
+}
+
+/// \brief Visit a subset of edges in a sequence as GeoArrowEdge
+template <typename Visit>
+bool VisitNativeEdges(const struct GeoArrowGeometryNode* node, int64_t offset,
+                      int64_t n, Visit&& visit) {
+  S2GEOGRAPHY_DCHECK_GE(offset, 0);
+  S2GEOGRAPHY_DCHECK_GE(n, 0);
+
+  if (static_cast<int64_t>(node->size) < offset + n + 1) {
+    return true;
+  }
+
+  GeoArrowEdge e;
+  VisitNativeVertices(node, offset, 1, [&](const GeoArrowVertex& v) {
+    e.v0 = v;
+    return true;
+  });
+
+  return VisitNativeVertices(node, offset + 1, n, [&](const GeoArrowVertex& v) {
+    e.v1 = v;
+    if (!visit(e)) {
+      return false;
+    }
+
+    e.v0 = e.v1;
+    return true;
+  });
+}
+
+/// \brief Visit all edges in a sequence as GeoArrowEdge
+template <typename Visit>
+bool VisitNativeEdges(const struct GeoArrowGeometryNode* node, Visit&& visit) {
+  if (node->size <= 1) {
+    return true;
+  }
+
+  return VisitNativeEdges(node, 0, node->size - 1, visit);
+}
+
 }  // namespace internal
 
 /// \brief A sequence of coordinates
@@ -295,6 +343,51 @@ class GeoArrowChain {
   S2Shape::Edge edge(int64_t i) {
     S2Shape::Edge e{};
     this->VisitEdges(i, 1, [&](const S2Shape::Edge& edge) {
+      e = edge;
+      return true;
+    });
+    return e;
+  }
+
+  /// \brief Call a function for each GeoArrowVertex in this sequence
+  template <typename Visit>
+  bool VisitNativeVertices(Visit&& visit) const {
+    return internal::VisitNativeVertices(node, visit);
+  }
+
+  /// \brief Call a function for each GeoArrowVertex in a slice of this sequence
+  template <typename Visit>
+  bool VisitNativeVertices(int64_t offset, int64_t n, Visit&& visit) const {
+    return internal::VisitNativeVertices(node, offset, n, visit);
+  }
+
+  /// \brief Call a function for each pair of GeoArrowVertex in this sequence
+  template <typename Visit>
+  bool VisitNativeEdges(Visit&& visit) const {
+    return internal::VisitNativeEdges(node, visit);
+  }
+
+  /// \brief Call a function for each pair of GeoArrowVertex in a slice of this
+  /// sequence
+  template <typename Visit>
+  bool VisitNativeEdges(int64_t offset, int64_t n, Visit&& visit) const {
+    return internal::VisitNativeEdges(node, offset, n, visit);
+  }
+
+  /// \brief Copy a single native vertex out of this sequence
+  internal::GeoArrowVertex native_vertex(int64_t i) const {
+    internal::GeoArrowVertex v{};
+    this->VisitNativeVertices(i, 1, [&](const internal::GeoArrowVertex& vtx) {
+      v = vtx;
+      return true;
+    });
+    return v;
+  }
+
+  /// \brief Copy a single pair of native vertices out of this sequence
+  internal::GeoArrowEdge native_edge(int64_t i) const {
+    internal::GeoArrowEdge e{};
+    this->VisitNativeEdges(i, 1, [&](const internal::GeoArrowEdge& edge) {
       e = edge;
       return true;
     });
@@ -449,6 +542,27 @@ class GeoArrowGeom {
   bool VisitEdges(Visit&& visit) {
     return VisitChains(
         [&](GeoArrowChain chain) { return chain.VisitEdges(visit); });
+  }
+
+  /// \brief Call a function for each native vertex in this node set
+  ///
+  /// This visits all chains and all vertices, including the duplicate closed
+  /// ring vertex in a polygon ring.
+  template <typename Visit>
+  bool VisitNativeVertices(Visit&& visit) {
+    return VisitChains(
+        [&](GeoArrowChain chain) { return chain.VisitNativeVertices(visit); });
+  }
+
+  /// \brief Call a function for each pair of native vertices in this node set
+  ///
+  /// This visits all chains and all edges. Note that point geometries are not
+  /// included in this visitation (i.e., only sequences with 2 or more
+  /// coordinates are visited).
+  template <typename Visit>
+  bool VisitNativeEdges(Visit&& visit) {
+    return VisitChains(
+        [&](GeoArrowChain chain) { return chain.VisitNativeEdges(visit); });
   }
 
  private:
