@@ -71,7 +71,14 @@ class GeoArrowPointShape : public S2Shape {
   ChainPosition chain_position(int e) const override;
   TypeTag type_tag() const override;
 
+  /// \brief Extract a native edge with a given identifier
+  ///
+  /// Unlike edge(), the native edge is a faithful representation of the source
+  /// (e.g., does not drop ZM information or roundtrip lon/lat values to
+  /// S2Point space)
   internal::GeoArrowEdge native_edge(int e) const;
+
+  /// \brief Extract a native edge within a chain
   internal::GeoArrowEdge native_chain_edge(int i, int j) const;
 
  private:
@@ -117,7 +124,14 @@ class GeoArrowLaxPolylineShape : public S2Shape {
   ChainPosition chain_position(int e) const override;
   TypeTag type_tag() const override;
 
+  /// \brief Extract a native edge with a given identifier
+  ///
+  /// Unlike edge(), the native edge is a faithful representation of the source
+  /// (e.g., does not drop ZM information or roundtrip lon/lat values to
+  /// S2Point space)
   internal::GeoArrowEdge native_edge(int e) const;
+
+  /// \brief Extract a native edge within a chain
   internal::GeoArrowEdge native_chain_edge(int i, int j) const;
 
  private:
@@ -189,7 +203,18 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   ChainPosition chain_position(int e) const override;
   TypeTag type_tag() const override;
 
+  /// \brief Extract a native edge with a given identifier
+  ///
+  /// Unlike edge(), the native edge is a faithful representation of the source
+  /// (e.g., does not drop ZM information or roundtrip lon/lat values to
+  /// S2Point space).
+  ///
+  /// Note that for polygons specifically, this will correctly refer to the
+  /// source edge but that the source edge may have been reoriented when
+  /// constructing the shape to ensure consistent winding order.
   internal::GeoArrowEdge native_edge(int e) const;
+
+  /// \brief Extract a native edge within a chain
   internal::GeoArrowEdge native_chain_edge(int i, int j) const;
 
   /// \brief Check containment using a brute force edge crossing approach
@@ -376,7 +401,19 @@ class GeoArrowGeography {
     return true;
   }
 
+  /// \brief Resolve a shape_id/edge_id pair
+  ///
+  /// Given an edge identifier derived from a sequential visit of all edges
+  /// (e.g., VisitEdges()), derive a shape_id/edge_id pair. This is to support
+  /// brute force shortcuts that give identical information as what would be
+  /// derived from obtaining an edge from an S2ShapeIndex.
   std::pair<int, int> ResolveGlobalEdgeId(int global_edge_id) const;
+
+  /// \brief Resolve the source edge given a shape_id and edge_id
+  ///
+  /// This is useful to reconstruct ZM information after querying a shape index
+  /// for an edge.
+  internal::GeoArrowEdge native_edge(int shape_id, int edge_id) const;
 
  private:
   struct GeoArrowGeometryView geom_{};

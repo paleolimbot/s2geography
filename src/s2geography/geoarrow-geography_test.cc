@@ -1314,6 +1314,26 @@ TEST_F(GeoArrowGeographyTest, MultiPoint) {
   auto shape = geog.Shape(0);
   ASSERT_NE(shape, nullptr);
   EXPECT_EQ(shape->num_edges(), 3);
+
+  EXPECT_EQ(geog.ResolveGlobalEdgeId(0), std::make_pair(0, 0));
+}
+
+TEST_F(GeoArrowGeographyTest, PointNativeEdge) {
+  auto geog = MakeGeography(
+      "MULTIPOINT ZM ((0 1 100 200), (2 3 101 201), (4 5 103 203))");
+  auto e_first = geog.native_edge(0, 0);
+  EXPECT_DOUBLE_EQ(e_first.v0.lng, 0);
+  EXPECT_DOUBLE_EQ(e_first.v0.lat, 1);
+  EXPECT_DOUBLE_EQ(e_first.v0.zm[0], 100);
+  EXPECT_DOUBLE_EQ(e_first.v0.zm[1], 200);
+  EXPECT_EQ(e_first.v0, e_first.v1);
+
+  auto e_last = geog.native_edge(0, 2);
+  EXPECT_DOUBLE_EQ(e_last.v0.lng, 4);
+  EXPECT_DOUBLE_EQ(e_last.v0.lat, 5);
+  EXPECT_DOUBLE_EQ(e_last.v0.zm[0], 103);
+  EXPECT_DOUBLE_EQ(e_last.v0.zm[1], 203);
+  EXPECT_EQ(e_last.v0, e_last.v1);
 }
 
 TEST_F(GeoArrowGeographyTest, EmptyPoint) {
@@ -1337,6 +1357,32 @@ TEST_F(GeoArrowGeographyTest, Linestring) {
   ASSERT_NE(shape, nullptr);
   EXPECT_EQ(shape->dimension(), 1);
   EXPECT_EQ(shape->num_edges(), 2);
+
+  EXPECT_EQ(geog.ResolveGlobalEdgeId(0), std::make_pair(0, 0));
+}
+
+TEST_F(GeoArrowGeographyTest, LinestringNativeEdge) {
+  auto geog =
+      MakeGeography("LINESTRING ZM (0 1 100 200, 2 3 101 201, 4 5 103 203)");
+  auto e_first = geog.native_edge(0, 0);
+  EXPECT_DOUBLE_EQ(e_first.v0.lng, 0);
+  EXPECT_DOUBLE_EQ(e_first.v0.lat, 1);
+  EXPECT_DOUBLE_EQ(e_first.v0.zm[0], 100);
+  EXPECT_DOUBLE_EQ(e_first.v0.zm[1], 200);
+  EXPECT_DOUBLE_EQ(e_first.v1.lng, 2);
+  EXPECT_DOUBLE_EQ(e_first.v1.lat, 3);
+  EXPECT_DOUBLE_EQ(e_first.v1.zm[0], 101);
+  EXPECT_DOUBLE_EQ(e_first.v1.zm[1], 201);
+
+  auto e_last = geog.native_edge(0, 1);
+  EXPECT_DOUBLE_EQ(e_last.v0.lng, 2);
+  EXPECT_DOUBLE_EQ(e_last.v0.lat, 3);
+  EXPECT_DOUBLE_EQ(e_last.v0.zm[0], 101);
+  EXPECT_DOUBLE_EQ(e_last.v0.zm[1], 201);
+  EXPECT_DOUBLE_EQ(e_last.v1.lng, 4);
+  EXPECT_DOUBLE_EQ(e_last.v1.lat, 5);
+  EXPECT_DOUBLE_EQ(e_last.v1.zm[0], 103);
+  EXPECT_DOUBLE_EQ(e_last.v1.zm[1], 203);
 }
 
 TEST_F(GeoArrowGeographyTest, MultiLinestring) {
@@ -1360,6 +1406,34 @@ TEST_F(GeoArrowGeographyTest, Polygon) {
   ASSERT_NE(shape, nullptr);
   EXPECT_EQ(shape->dimension(), 2);
   EXPECT_EQ(shape->num_edges(), 3);
+
+  EXPECT_EQ(geog.ResolveGlobalEdgeId(0), std::make_pair(0, 0));
+}
+
+TEST_F(GeoArrowGeographyTest, PolygonNativeEdge) {
+  // Note: the input ring (0 0, 0 1, 1 0, 0 0) is clockwise on the sphere,
+  // so it gets reversed to (0 0, 1 0, 0 1, 0 0).
+  auto geog = MakeGeography(
+      "POLYGON ZM ((0 0 100 200, 0 1 101 201, 1 0 103 203, 0 0 100 200))");
+  auto e_first = geog.native_edge(0, 0);
+  EXPECT_DOUBLE_EQ(e_first.v0.lng, 0);
+  EXPECT_DOUBLE_EQ(e_first.v0.lat, 0);
+  EXPECT_DOUBLE_EQ(e_first.v0.zm[0], 100);
+  EXPECT_DOUBLE_EQ(e_first.v0.zm[1], 200);
+  EXPECT_DOUBLE_EQ(e_first.v1.lng, 1);
+  EXPECT_DOUBLE_EQ(e_first.v1.lat, 0);
+  EXPECT_DOUBLE_EQ(e_first.v1.zm[0], 103);
+  EXPECT_DOUBLE_EQ(e_first.v1.zm[1], 203);
+
+  auto e_last = geog.native_edge(0, 2);
+  EXPECT_DOUBLE_EQ(e_last.v0.lng, 0);
+  EXPECT_DOUBLE_EQ(e_last.v0.lat, 1);
+  EXPECT_DOUBLE_EQ(e_last.v0.zm[0], 101);
+  EXPECT_DOUBLE_EQ(e_last.v0.zm[1], 201);
+  EXPECT_DOUBLE_EQ(e_last.v1.lng, 0);
+  EXPECT_DOUBLE_EQ(e_last.v1.lat, 0);
+  EXPECT_DOUBLE_EQ(e_last.v1.zm[0], 100);
+  EXPECT_DOUBLE_EQ(e_last.v1.zm[1], 200);
 }
 
 TEST_F(GeoArrowGeographyTest, MultiPolygon) {
