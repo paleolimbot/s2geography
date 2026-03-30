@@ -113,7 +113,10 @@ class TestGeometry {
 
 /// \brief Utility to sanity check an S2Shape, which has global edge ids
 /// but also has edges organized into chains.
-void ValidateShape(const S2Shape& shape) {
+template <typename T>
+void ValidateShape(const T& shape) {
+  EXPECT_EQ(shape.type_tag(), T::kTypeTag);
+
   int num_edges = shape.num_edges();
   int num_chains = shape.num_chains();
 
@@ -143,6 +146,17 @@ void ValidateShape(const S2Shape& shape) {
     auto ce = shape.chain_edge(pos.chain_id, pos.offset);
     EXPECT_EQ(edge.v0, ce.v0) << "edge " << e;
     EXPECT_EQ(edge.v1, ce.v1) << "edge " << e;
+
+    auto native_edge = shape.native_edge(e);
+    auto native_ce = shape.native_chain_edge(pos.chain_id, pos.offset);
+    EXPECT_EQ(native_edge.v0, native_ce.v0) << "edge " << e;
+    EXPECT_EQ(native_edge.v1, native_ce.v1) << "edge " << e;
+
+    auto edge_check = S2Shape::Edge{
+        S2LatLng::FromDegrees(native_edge.v0.lat, native_edge.v0.lng).ToPoint(),
+        S2LatLng::FromDegrees(native_edge.v1.lat, native_edge.v1.lng).ToPoint(),
+    };
+    EXPECT_EQ(edge_check, edge);
   }
 }
 
@@ -639,6 +653,10 @@ TEST(GeoArrowPointShape, BigEndianWKB) {
   EXPECT_DOUBLE_EQ(e.v1.lat, 10);
   EXPECT_DOUBLE_EQ(e.v1.zm[0], 5);
   EXPECT_DOUBLE_EQ(e.v1.zm[1], 15);
+
+  // Also check the chain edge
+  auto chain_e = shape.native_chain_edge(0, 0);
+  EXPECT_EQ(chain_e, e);
 
   ValidateShape(shape);
 }
