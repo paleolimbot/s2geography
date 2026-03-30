@@ -294,6 +294,14 @@ TEST(GeoArrowGeom, VisitNativeVerticesPoint) {
   EXPECT_DOUBLE_EQ(vertices[0].lat, 2);
   EXPECT_DOUBLE_EQ(vertices[0].zm[0], 3);
   EXPECT_DOUBLE_EQ(vertices[0].zm[1], 4);
+
+  // Early termination
+  int count = 0;
+  EXPECT_FALSE(g.VisitNativeVertices([&](const internal::GeoArrowVertex&) {
+    ++count;
+    return false;
+  }));
+  EXPECT_EQ(count, 1);
 }
 
 TEST(GeoArrowGeom, VisitNativeVerticesLineString) {
@@ -319,6 +327,14 @@ TEST(GeoArrowGeom, VisitNativeVerticesLineString) {
   EXPECT_DOUBLE_EQ(vertices[2].lat, 2);
   EXPECT_DOUBLE_EQ(vertices[2].zm[0], 12);
   EXPECT_DOUBLE_EQ(vertices[2].zm[1], 22);
+
+  // Early termination: stop after first vertex
+  int count = 0;
+  EXPECT_FALSE(g.VisitNativeVertices([&](const internal::GeoArrowVertex&) {
+    ++count;
+    return false;
+  }));
+  EXPECT_EQ(count, 1);
 }
 
 TEST(GeoArrowGeom, VisitNativeEdgesLineString) {
@@ -348,6 +364,14 @@ TEST(GeoArrowGeom, VisitNativeEdgesLineString) {
   EXPECT_DOUBLE_EQ(edges[1].v1.lat, 2);
   EXPECT_DOUBLE_EQ(edges[1].v1.zm[0], 12);
   EXPECT_DOUBLE_EQ(edges[1].v1.zm[1], 22);
+
+  // Early termination: stop after first edge
+  int count = 0;
+  EXPECT_FALSE(g.VisitNativeEdges([&](const internal::GeoArrowEdge&) {
+    ++count;
+    return false;
+  }));
+  EXPECT_EQ(count, 1);
 }
 
 TEST(GeoArrowGeom, VisitNativeEdgesSingleVertex) {
@@ -390,6 +414,30 @@ TEST(GeoArrowGeom, VisitNativeEdgesPolygon) {
   EXPECT_DOUBLE_EQ(edges[3].v1.lat, 0);
   EXPECT_DOUBLE_EQ(edges[3].v1.zm[0], 1);
   EXPECT_DOUBLE_EQ(edges[3].v1.zm[1], 2);
+
+  // Early termination: stop after first edge
+  int count = 0;
+  EXPECT_FALSE(g.VisitNativeEdges([&](const internal::GeoArrowEdge&) {
+    ++count;
+    return false;
+  }));
+  EXPECT_EQ(count, 1);
+}
+
+TEST(GeoArrowChain, VertexAndEdge) {
+  auto geom = TestGeometry::FromWKT("LINESTRING (3 4, 5 6, 7 8)");
+  GeoArrowChain chain(geom.geom().root);
+
+  auto v = chain.vertex(1);
+  EXPECT_EQ(v, S2LatLng::FromDegrees(6, 5).ToPoint());
+
+  auto e = chain.edge(0);
+  EXPECT_EQ(e.v0, S2LatLng::FromDegrees(4, 3).ToPoint());
+  EXPECT_EQ(e.v1, S2LatLng::FromDegrees(6, 5).ToPoint());
+
+  e = chain.edge(1);
+  EXPECT_EQ(e.v0, S2LatLng::FromDegrees(6, 5).ToPoint());
+  EXPECT_EQ(e.v1, S2LatLng::FromDegrees(8, 7).ToPoint());
 }
 
 TEST(GeoArrowChain, NativeVertexAndEdge) {
@@ -412,6 +460,16 @@ TEST(GeoArrowChain, NativeVertexAndEdge) {
   EXPECT_DOUBLE_EQ(e.v1.lat, 6);
   EXPECT_DOUBLE_EQ(e.v1.zm[0], 101);
   EXPECT_DOUBLE_EQ(e.v1.zm[1], 201);
+
+  e = chain.native_edge(1);
+  EXPECT_DOUBLE_EQ(e.v0.lng, 5);
+  EXPECT_DOUBLE_EQ(e.v0.lat, 6);
+  EXPECT_DOUBLE_EQ(e.v0.zm[0], 101);
+  EXPECT_DOUBLE_EQ(e.v0.zm[1], 201);
+  EXPECT_DOUBLE_EQ(e.v1.lng, 7);
+  EXPECT_DOUBLE_EQ(e.v1.lat, 8);
+  EXPECT_DOUBLE_EQ(e.v1.zm[0], 102);
+  EXPECT_DOUBLE_EQ(e.v1.zm[1], 202);
 }
 
 // Specifically check loop functions
@@ -554,12 +612,14 @@ TEST(GeoArrowPointShape, MultiPoint) {
 
 TEST(GeoArrowPointShape, BigEndianWKB) {
   // clang-format off
-  // Big-endian WKB for POINT (30 10)
+  // Big-endian WKB for POINT ZM (30 10 5 15)
   std::vector<uint8_t> wkb = {
     0x00,                                      // big endian
-    0x00, 0x00, 0x00, 0x01,                    // type: Point
+    0x00, 0x00, 0x0b, 0xb9,                    // type: Point ZM (3001)
     0x40, 0x3e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // x: 30.0
     0x40, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // y: 10.0
+    0x40, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // z: 5.0
+    0x40, 0x2e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // m: 15.0
   };
   // clang-format on
 
@@ -568,6 +628,17 @@ TEST(GeoArrowPointShape, BigEndianWKB) {
   EXPECT_EQ(shape.num_vertices(), 1);
   EXPECT_EQ(shape.num_edges(), 1);
   EXPECT_EQ(shape.num_chains(), 1);
+
+  // The point's degenerate edge should have correct native coordinates
+  auto e = shape.native_edge(0);
+  EXPECT_DOUBLE_EQ(e.v0.lng, 30);
+  EXPECT_DOUBLE_EQ(e.v0.lat, 10);
+  EXPECT_DOUBLE_EQ(e.v0.zm[0], 5);
+  EXPECT_DOUBLE_EQ(e.v0.zm[1], 15);
+  EXPECT_DOUBLE_EQ(e.v1.lng, 30);
+  EXPECT_DOUBLE_EQ(e.v1.lat, 10);
+  EXPECT_DOUBLE_EQ(e.v1.zm[0], 5);
+  EXPECT_DOUBLE_EQ(e.v1.zm[1], 15);
 
   ValidateShape(shape);
 }
@@ -823,6 +894,16 @@ TEST(GeoArrowLaxPolygonShape, SimpleTriangle) {
   EXPECT_TRUE(shape.BruteForceContains(
       S2LatLng::FromDegrees(0.1, 0.1).ToPoint(), reference_out));
 
+  // Check loops for hole status
+  std::vector<S2Point> scratch;
+  std::vector<bool> hole_flags;
+  shape.geom().VisitLoops(&scratch, [&](GeoArrowLoop loop) {
+    hole_flags.push_back(loop.is_hole());
+    return true;
+  });
+  ASSERT_EQ(hole_flags.size(), 1);
+  EXPECT_FALSE(hole_flags[0]);  // shell
+
   ValidateShape(shape);
 }
 
@@ -878,6 +959,17 @@ TEST(GeoArrowLaxPolygonShape, PolygonWithHole) {
   EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(3, 3).ToPoint(),
                                         reference_out));
 
+  // Check loops for hole status
+  std::vector<S2Point> scratch;
+  std::vector<bool> hole_flags;
+  shape.geom().VisitLoops(&scratch, [&](GeoArrowLoop loop) {
+    hole_flags.push_back(loop.is_hole());
+    return true;
+  });
+  ASSERT_EQ(hole_flags.size(), 2);
+  EXPECT_FALSE(hole_flags[0]);  // shell
+  EXPECT_TRUE(hole_flags[1]);   // hole
+
   ValidateShape(shape);
 }
 
@@ -895,6 +987,17 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygon2Components) {
   EXPECT_EQ(pos.chain_id, 1);
   EXPECT_EQ(pos.offset, 2);
 
+  // Check loops for hole status
+  std::vector<S2Point> scratch;
+  std::vector<bool> hole_flags;
+  shape.geom().VisitLoops(&scratch, [&](GeoArrowLoop loop) {
+    hole_flags.push_back(loop.is_hole());
+    return true;
+  });
+  ASSERT_EQ(hole_flags.size(), 2);
+  EXPECT_FALSE(hole_flags[0]);  // shell
+  EXPECT_FALSE(hole_flags[1]);  // shell
+
   ValidateShape(shape);
 }
 
@@ -906,6 +1009,18 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygon3Components) {
   GeoArrowLaxPolygonShape shape(geom.geom());
   EXPECT_EQ(shape.num_edges(), 9);  // 3 + 3 + 3
   EXPECT_EQ(shape.num_chains(), 3);
+
+  // Check loops for hole status
+  std::vector<S2Point> scratch;
+  std::vector<bool> hole_flags;
+  shape.geom().VisitLoops(&scratch, [&](GeoArrowLoop loop) {
+    hole_flags.push_back(loop.is_hole());
+    return true;
+  });
+  ASSERT_EQ(hole_flags.size(), 3);
+  EXPECT_FALSE(hole_flags[0]);  // shell
+  EXPECT_FALSE(hole_flags[1]);  // shell
+  EXPECT_FALSE(hole_flags[2]);  // shell
 
   ValidateShape(shape);
 }
@@ -955,6 +1070,18 @@ TEST(GeoArrowLaxPolygonShape, MultiPolygonWithHoles) {
                                         reference_out));
   EXPECT_TRUE(shape.BruteForceContains(
       S2LatLng::FromDegrees(20.1, 20.1).ToPoint(), reference_out));
+
+  // Check loops for hole status
+  std::vector<S2Point> scratch;
+  std::vector<bool> hole_flags;
+  shape.geom().VisitLoops(&scratch, [&](GeoArrowLoop loop) {
+    hole_flags.push_back(loop.is_hole());
+    return true;
+  });
+  ASSERT_EQ(hole_flags.size(), 3);
+  EXPECT_FALSE(hole_flags[0]);  // shell
+  EXPECT_TRUE(hole_flags[1]);   // hole
+  EXPECT_FALSE(hole_flags[2]);  // shell
 
   ValidateShape(shape);
 }
