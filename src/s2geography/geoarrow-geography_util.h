@@ -4,6 +4,7 @@
 #include <s2/s2latlng.h>
 #include <s2/s2shape.h>
 
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -104,15 +105,55 @@ bool VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
   return true;
 }
 
+/// \brief A lossless vertex in lon/lat/z/m coordinates
+///
+/// Unlike an S2Point, this version of a vertex (1) does not incur rounding
+/// errors from the roundtrip between S2LatLng and S2Point and (2) propagates
+/// Z and M values.
 struct GeoArrowVertex {
+  /// \brief The longitude (X) value
   double lng;
+  /// \brief The latitude (Y) values
   double lat;
+  /// \brief The ZM portion of the coordinate
+  ///
+  /// Whether these values are missing, Z, M, or ZM depends on the
+  /// dimensions of the sequence. These will be NaN in the event that
+  /// there is no Z or M present in the source sequence.
   double zm[2];
+
+  friend bool operator==(const GeoArrowVertex& a, const GeoArrowVertex& b) {
+    // Treat NaNs as equal so that missing ZM information does not affect
+    // inequality (as long as it is consistently missing for both)
+    auto eq = [](double x, double y) {
+      return x == y || (std::isnan(x) && std::isnan(y));
+    };
+    return eq(a.lng, b.lng) && eq(a.lat, b.lat) && eq(a.zm[0], b.zm[0]) &&
+           eq(a.zm[1], b.zm[1]);
+  }
+
+  friend bool operator!=(const GeoArrowVertex& a, const GeoArrowVertex& b) {
+    return !(a == b);
+  }
 };
 
+/// \brief A lossless edge in lon/lat/z/m coordinates
+///
+/// Similar to an S2Shape::Edge except propagates exact vertices and ZM
+/// information.
 struct GeoArrowEdge {
+  /// \brief The first vertex of the edge
   GeoArrowVertex v0;
+  /// \brief The second vertex of the edge
   GeoArrowVertex v1;
+
+  friend bool operator==(const GeoArrowEdge& a, const GeoArrowEdge& b) {
+    return a.v0 == b.v0 && a.v1 == b.v1;
+  }
+
+  friend bool operator!=(const GeoArrowEdge& a, const GeoArrowEdge& b) {
+    return !(a == b);
+  }
 };
 
 /// \brief Visit native vertices
