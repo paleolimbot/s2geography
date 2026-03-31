@@ -484,6 +484,7 @@ struct S2ShortestLineExec {
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
     if (edge_pair_.shape_id0 == -1) {
       out->Append(PolylineGeography());
+      return;
     }
 
     auto native_edge0 =
