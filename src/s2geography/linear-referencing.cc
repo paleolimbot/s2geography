@@ -87,12 +87,10 @@ struct S2LineInterpolatePointExec {
   using arg1_t = DoubleInputView;
   using out_t = WkbGeographyOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
-  std::optional<optional_storable_t<out_t::c_type>> Exec(
-      arg0_t::c_type value0, arg1_t::c_type fraction) {
+  void Exec(arg0_t::c_type value0, arg1_t::c_type fraction, out_t* out) {
     if (value0.is_empty()) {
-      return std::nullopt;
+      out->AppendNull();
+      return;
     }
 
     if (!value0.points()->is_empty() || !value0.polygons()->is_empty() ||
@@ -107,12 +105,12 @@ struct S2LineInterpolatePointExec {
         pt = v;
         return false;
       });
-      stashed_ = PointGeography(pt);
-      return stashed_;
+      out->Append(PointGeography(pt));
+      return;
     } else if (fraction >= 1) {
-      stashed_ = PointGeography(
-          value0.lines()->edge(value0.lines()->num_edges() - 1).v1);
-      return stashed_;
+      out->Append(PointGeography(
+          value0.lines()->edge(value0.lines()->num_edges() - 1).v1));
+      return;
     }
 
     S1Angle length_sum;
@@ -129,8 +127,8 @@ struct S2LineInterpolatePointExec {
         pt = v;
         return false;
       });
-      stashed_ = PointGeography(pt);
-      return stashed_;
+      out->Append(PointGeography(pt));
+      return;
     }
 
     S1Angle target = fraction * length_sum;
@@ -154,11 +152,9 @@ struct S2LineInterpolatePointExec {
     S1Angle remaining = target - prev_length;
     pt = S2::GetPointOnLine(e.v0, e.v1, remaining);
 
-    stashed_ = PointGeography(pt);
-    return stashed_;
+    out->Append(PointGeography(pt));
   }
 
-  PointGeography stashed_;
   std::vector<S1Angle> cumulative_lengths_;
 };
 
@@ -167,12 +163,10 @@ struct S2LineLocatePointExec {
   using arg1_t = GeoArrowGeographyInputView;
   using out_t = DoubleOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
-  std::optional<out_t::c_type> Exec(arg0_t::c_type value0,
-                                    arg1_t::c_type value1) {
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     if (value0.is_empty() || value1.is_empty()) {
-      return std::nullopt;
+      out->AppendNull();
+      return;
     }
 
     if (!value0.points()->is_empty() || !value0.polygons()->is_empty() ||
@@ -214,7 +208,8 @@ struct S2LineLocatePointExec {
     });
 
     if (length_sum == S1Angle::Zero()) {
-      return 0.0;
+      out->Append(0.0);
+      return;
     }
 
     S2GEOGRAPHY_DCHECK_GE(closest_edge_id, 0);
@@ -223,7 +218,7 @@ struct S2LineLocatePointExec {
     S1Angle e_distance(e.v0, pt_on_edge);
     S1Angle total_distance = cumulative_lengths_[closest_edge_id] + e_distance;
 
-    return (total_distance / length_sum);
+    out->Append(total_distance / length_sum);
   }
 
   std::vector<S1Angle> cumulative_lengths_;

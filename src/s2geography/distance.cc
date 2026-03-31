@@ -425,20 +425,15 @@ struct S2ClosestPointExec {
   using arg1_t = GeoArrowGeographyInputView;
   using out_t = WkbGeographyOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
-  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
     if (edge_pair_.shape_id0 == -1) {
-      stashed_ = PointGeography();
+      out->Append(PointGeography());
     } else {
-      stashed_ = PointGeography(edge_pair_.closest_points.first);
+      out->Append(PointGeography(edge_pair_.closest_points.first));
     }
-
-    return stashed_;
   }
 
-  PointGeography stashed_;
   EdgePair edge_pair_;
 };
 
@@ -447,15 +442,12 @@ struct S2DistanceExec {
   using arg1_t = GeoArrowGeographyInputView;
   using out_t = DoubleOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
-  std::optional<out_t::c_type> Exec(arg0_t::c_type value0,
-                                    arg1_t::c_type value1) {
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputeDistance);
     if (edge_pair_.shape_id0 == -1) {
-      return std::nullopt;
+      out->AppendNull();
     } else {
-      return edge_pair_.distance.radians() * S2Earth::RadiusMeters();
+      out->Append(edge_pair_.distance.radians() * S2Earth::RadiusMeters());
     }
   }
 
@@ -469,9 +461,9 @@ struct S2MaxDistanceExec {
 
   void Init(const std::unordered_map<std::string, std::string>& options) {}
 
-  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
-    return s2_max_distance(value0.ShapeIndex(), value1.ShapeIndex()) *
-           S2Earth::RadiusMeters();
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
+    out->Append(s2_max_distance(value0.ShapeIndex(), value1.ShapeIndex()) *
+                S2Earth::RadiusMeters());
   }
 };
 
@@ -480,23 +472,19 @@ struct S2ShortestLineExec {
   using arg1_t = GeoArrowGeographyInputView;
   using out_t = WkbGeographyOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
-  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
     if (edge_pair_.shape_id0 == -1) {
-      stashed_ = PolylineGeography();
+      out->Append(PolylineGeography());
     } else {
-      stashed_ = PolylineGeography(std::make_unique<S2Polyline>(
+      PolylineGeography result(std::make_unique<S2Polyline>(
           std::vector<S2Point>{edge_pair_.closest_points.first,
                                edge_pair_.closest_points.second},
           S2Debug::DISABLE));
+      out->Append(result);
     }
-
-    return stashed_;
   }
 
-  PolylineGeography stashed_;
   EdgePair edge_pair_;
 };
 

@@ -118,15 +118,15 @@ struct S2Intersects {
   using arg1_t = GeoArrowGeographyInputView;
   using out_t = BoolOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {
-    // Use Simple Features compatibility options
+  S2Intersects() {
     options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
   }
 
-  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     // If either argument is EMPTY, the result is FALSE
     if (value0.is_empty() || value1.is_empty()) {
-      return false;
+      out->Append(false);
+      return;
     }
 
     // For small geometries where no index has been built yet,
@@ -135,7 +135,8 @@ struct S2Intersects {
     if (value0.is_unindexed() && value1.is_unindexed() &&
         value0.num_edges() < kMaxBruteForceEdges &&
         value1.num_edges() < kMaxBruteForceEdges) {
-      return BruteForceExec(value0, value1);
+      out->Append(BruteForceExec(value0, value1));
+      return;
     }
 
     // The containment test for a S2Point is ~20x faster than building an index
@@ -144,21 +145,28 @@ struct S2Intersects {
     auto maybe_point0 = value0.Point();
     auto maybe_point1 = value1.Point();
     if (maybe_point0 && maybe_point1) {
-      return maybe_point0->Normalize() == maybe_point1->Normalize();
+      out->Append(maybe_point0->Normalize() == maybe_point1->Normalize());
+      return;
     } else if (maybe_point0) {
       auto region1 = value1.Region();
       if (!region1->MayIntersect(S2Cell(*maybe_point0))) {
-        return false;
+        out->Append(false);
+        return;
       }
-      return region1->Contains(*maybe_point0) ||
-             ExecUsingShapeIndex(value0, value1);
+
+      out->Append(region1->Contains(*maybe_point0) ||
+                  ExecUsingShapeIndex(value0, value1));
+      return;
     } else if (maybe_point1) {
       auto region0 = value0.Region();
       if (!region0->MayIntersect(S2Cell(*maybe_point1))) {
-        return false;
+        out->Append(false);
+        return;
       }
-      return region0->Contains(*maybe_point1) ||
-             ExecUsingShapeIndex(value0, value1);
+
+      out->Append(region0->Contains(*maybe_point1) ||
+                  ExecUsingShapeIndex(value0, value1));
+      return;
     }
 
     // Next we try a covering intersection check. This is very cheap if an index
@@ -169,10 +177,11 @@ struct S2Intersects {
     S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
                                  &intersection_);
     if (intersection_.empty()) {
-      return false;
+      out->Append(false);
+      return;
     }
 
-    return ExecUsingShapeIndex(value0, value1);
+    out->Append(ExecUsingShapeIndex(value0, value1));
   }
 
   bool BruteForceExec(GeoArrowGeography& geog0, GeoArrowGeography& geog1) {
@@ -283,28 +292,30 @@ struct S2Contains {
   using arg1_t = GeoArrowGeographyInputView;
   using out_t = BoolOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
-  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     // If either argument is EMPTY, the result is FALSE
     if (value0.is_empty() || value1.is_empty()) {
-      return false;
+      out->Append(false);
+      return;
     }
 
     auto maybe_point0 = value0.Point();
     auto maybe_point1 = value1.Point();
     if (maybe_point0) {
       // A point cannot contain anything
-      return false;
+      out->Append(false);
+      return;
     } else if (maybe_point1) {
       if (value0.is_unindexed() && value0.num_edges() < kMaxBruteForceEdges &&
           value0.dimension() == 2) {
-        return value0.polygons()->BruteForceContains(*maybe_point1);
+        out->Append(value0.polygons()->BruteForceContains(*maybe_point1));
+        return;
       }
 
       auto region0 = value0.Region();
-      return region0->MayIntersect(S2Cell(*maybe_point1)) &&
-             region0->Contains(*maybe_point1);
+      out->Append(region0->MayIntersect(S2Cell(*maybe_point1)) &&
+                  region0->Contains(*maybe_point1));
+      return;
     }
 
     // For small non-point geometries where A has polygons and no index has
@@ -313,23 +324,26 @@ struct S2Contains {
         value0.num_edges() < kMaxBruteForceEdges &&
         value1.num_edges() < kMaxBruteForceEdges &&
         value0.polygons()->num_edges() > 0) {
-      return BruteForceExec(value0, value1);
+      out->Append(BruteForceExec(value0, value1));
+      return;
     }
 
     // When the container (value0) has an index and value1 is small+fresh,
     // check containment using the index's point query and crossing query.
     if (!value0.is_unindexed() && value1.is_unindexed() &&
         value1.num_edges() < kMaxBruteForceEdges) {
-      return SemiBruteForceIndexedContains(value0.ShapeIndex(), value1);
+      out->Append(SemiBruteForceIndexedContains(value0.ShapeIndex(), value1));
+      return;
     }
 
     S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
                                  &intersection_);
     if (intersection_.empty()) {
-      return false;
+      out->Append(false);
+      return;
     }
 
-    return ExecUsingShapeIndex(value0, value1);
+    out->Append(ExecUsingShapeIndex(value0, value1));
   }
 
   bool BruteForceExec(GeoArrowGeography& geog0, GeoArrowGeography& geog1) {
@@ -404,27 +418,30 @@ struct S2Equals {
   using arg1_t = GeoArrowGeographyInputView;
   using out_t = BoolOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {
+  S2Equals() {
     options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
   }
 
-  out_t::c_type Exec(arg0_t::c_type value0, arg1_t::c_type value1) {
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     // Empties equal each other regardless of exactly how they are empty
     if (value0.is_empty() && value1.is_empty()) {
-      return true;
+      out->Append(true);
+      return;
     }
 
     if (GeographyIdentical(value0, value1)) {
-      return true;
+      out->Append(true);
+      return;
     }
 
     S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
                                  &intersection_);
     if (intersection_.empty()) {
-      return false;
+      out->Append(false);
+      return;
     }
 
-    return s2_equals(value0.ShapeIndex(), value1.ShapeIndex(), options_);
+    out->Append(s2_equals(value0.ShapeIndex(), value1.ShapeIndex(), options_));
   }
 
   bool GeographyIdentical(GeoArrowGeography& value0,

@@ -207,9 +207,7 @@ struct S2CentroidExec {
   using arg0_t = GeoArrowGeographyInputView;
   using out_t = WkbGeographyOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
-  out_t::c_type Exec(arg0_t::c_type value) {
+  void Exec(arg0_t::c_type value, out_t* out) {
     S2Point pt;
 
     // Compute in decreasing dimensionality and return early, because
@@ -221,8 +219,8 @@ struct S2CentroidExec {
         return true;
       });
 
-      stashed_ = PointGeography(pt.Normalize());
-      return stashed_;
+      out->Append(PointGeography(pt.Normalize()));
+      return;
     }
 
     if (!value.lines()->is_empty()) {
@@ -231,8 +229,8 @@ struct S2CentroidExec {
         return true;
       });
 
-      stashed_ = PointGeography(pt.Normalize());
-      return stashed_;
+      out->Append(PointGeography(pt.Normalize()));
+      return;
     }
 
     if (!value.points()->is_empty()) {
@@ -241,15 +239,13 @@ struct S2CentroidExec {
         return true;
       });
 
-      stashed_ = PointGeography(pt.Normalize());
-      return stashed_;
+      out->Append(PointGeography(pt.Normalize()));
+      return;
     }
 
-    return empty_;
+    out->Append(GeographyCollection());
   }
 
-  PointGeography stashed_;
-  GeographyCollection empty_;
   std::vector<S2Point> scratch_;
 };
 
@@ -257,18 +253,16 @@ struct S2ConvexHullExec {
   using arg0_t = GeoArrowGeographyInputView;
   using out_t = WkbGeographyOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
-  out_t::c_type Exec(arg0_t::c_type value) {
+  void Exec(arg0_t::c_type value, out_t* out) {
     if (value.is_empty()) {
-      stashed_ = std::make_unique<GeographyCollection>();
-      return *stashed_;
+      out->Append(GeographyCollection());
+      return;
     }
 
     auto maybe_point = value.Point();
     if (maybe_point) {
-      stashed_ = std::make_unique<PointGeography>(*maybe_point);
-      return *stashed_;
+      out->Append(PointGeography(*maybe_point));
+      return;
     }
 
     // This query could be more efficient if we vendored the S2ConvexHullQuery
@@ -342,19 +336,17 @@ struct S2ConvexHullExec {
           }
           auto polyline =
               std::make_unique<S2Polyline>(std::vector<S2Point>{pa, pb});
-          stashed_ = std::make_unique<PolylineGeography>(std::move(polyline));
-          return *stashed_;
+          out->Append(PolylineGeography(std::move(polyline)));
+          return;
         }
       }
     }
 
     auto polygon = std::make_unique<S2Polygon>();
     polygon->Init(std::move(hull_loop));
-    stashed_ = std::make_unique<PolygonGeography>(std::move(polygon));
-    return *stashed_;
+    out->Append(PolygonGeography(std::move(polygon)));
   }
 
-  std::unique_ptr<Geography> stashed_;
   std::vector<S2Point> scratch_;
 };
 
@@ -362,15 +354,11 @@ struct S2PointOnSurfaceExec {
   using arg0_t = GeographyInputView;
   using out_t = WkbGeographyOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
-  out_t::c_type Exec(arg0_t::c_type value) {
-    S2Point out = s2_point_on_surface(value, coverer_);
-    stashed_ = PointGeography(out);
-    return stashed_;
+  void Exec(arg0_t::c_type value, out_t* out) {
+    S2Point pt = s2_point_on_surface(value, coverer_);
+    out->Append(PointGeography(pt));
   }
 
-  PointGeography stashed_;
   S2RegionCoverer coverer_;
 };
 
