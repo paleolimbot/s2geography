@@ -142,6 +142,17 @@ S2Shape::ChainPosition GeoArrowPointShape::chain_position(int e) const {
 
 S2Shape::TypeTag GeoArrowPointShape::type_tag() const { return kTypeTag; }
 
+internal::GeoArrowEdge GeoArrowPointShape::native_edge(int e) const {
+  internal::GeoArrowVertex v = GeoArrowChain(geom_.root() + e).native_vertex(0);
+  return internal::GeoArrowEdge{v, v};
+}
+
+internal::GeoArrowEdge GeoArrowPointShape::native_chain_edge(int /*i*/,
+                                                             int j) const {
+  internal::GeoArrowVertex v = GeoArrowChain(geom_.root() + j).native_vertex(0);
+  return internal::GeoArrowEdge{v, v};
+}
+
 GeoArrowLaxPolylineShape::GeoArrowLaxPolylineShape(
     struct GeoArrowGeometryView geom) {
   Init(geom);
@@ -237,6 +248,16 @@ S2Shape::ChainPosition GeoArrowLaxPolylineShape::chain_position(int e) const {
 }
 
 S2Shape::TypeTag GeoArrowLaxPolylineShape::type_tag() const { return kTypeTag; }
+
+internal::GeoArrowEdge GeoArrowLaxPolylineShape::native_edge(int e) const {
+  ChainPosition pos = GeoArrowLaxPolylineShape::chain_position(e);
+  return GeoArrowLaxPolylineShape::native_chain_edge(pos.chain_id, pos.offset);
+}
+
+internal::GeoArrowEdge GeoArrowLaxPolylineShape::native_chain_edge(
+    int i, int j) const {
+  return GeoArrowChain(geom_.root() + i).native_edge(j);
+}
 
 // --- GeoArrowLaxPolygonShape ---
 
@@ -347,6 +368,16 @@ S2Shape::ChainPosition GeoArrowLaxPolygonShape::chain_position(int e) const {
 }
 
 S2Shape::TypeTag GeoArrowLaxPolygonShape::type_tag() const { return kTypeTag; }
+
+internal::GeoArrowEdge GeoArrowLaxPolygonShape::native_edge(int e) const {
+  ChainPosition pos = GeoArrowLaxPolygonShape::chain_position(e);
+  return GeoArrowLaxPolygonShape::native_chain_edge(pos.chain_id, pos.offset);
+}
+
+internal::GeoArrowEdge GeoArrowLaxPolygonShape::native_chain_edge(int i,
+                                                                  int j) const {
+  return GeoArrowChain(&loops_[i]).native_edge(j);
+}
 
 bool GeoArrowLaxPolygonShape::BruteForceContains(
     const S2Point& pt, const S2Shape::ReferencePoint& reference) const {
@@ -568,12 +599,15 @@ int GeoArrowGeography::num_shapes() const {
     case GEOARROW_GEOMETRY_TYPE_POLYGON:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
       return 1;
+    case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
+      return 3;
     default:
-      return 0;
+      throw Exception("Unsupported geometry type");
   }
 }
 
 const S2Shape* GeoArrowGeography::Shape(int id) const {
+  S2GEOGRAPHY_DCHECK_GE(geom_.size_nodes, 0);
   switch (geom_.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
@@ -587,8 +621,19 @@ const S2Shape* GeoArrowGeography::Shape(int id) const {
     case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
       return &polygons_;
 
+    case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
+      switch (id) {
+        case 0:
+          return &points_;
+        case 1:
+          return &lines_;
+        case 2:
+          return &polygons_;
+        default:
+          throw Exception("GeometryCollection shape ids must be 0, 1, or 2");
+      }
     default:
-      throw Exception("unsupported geometry type");
+      throw Exception("Unsupported geometry type in Shape()");
   }
 }
 
@@ -630,6 +675,68 @@ void GeoArrowGeography::InitIndex() {
   }
 
   indexed_ = true;
+}
+
+std::pair<int, int> GeoArrowGeography::ResolveGlobalEdgeId(
+    int global_edge_id) const {
+  if (geom_.size_nodes == 0) {
+    return std::make_pair(-1, -1);
+  }
+
+  switch (geom_.root->geometry_type) {
+    case GEOARROW_GEOMETRY_TYPE_POINT:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+    case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+    case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
+    case GEOARROW_GEOMETRY_TYPE_POLYGON:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
+      return std::make_pair(0, global_edge_id);
+    case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
+      break;
+    default:
+      throw Exception("unsupported geometry type");
+  }
+
+  if (global_edge_id < points_.num_edges()) {
+    return std::make_pair(0, global_edge_id);
+  }
+
+  global_edge_id -= points_.num_edges();
+  if (global_edge_id < lines_.num_edges()) {
+    return std::make_pair(1, global_edge_id);
+  }
+
+  global_edge_id -= lines_.num_edges();
+  return std::make_pair(2, global_edge_id);
+}
+
+internal::GeoArrowEdge GeoArrowGeography::native_edge(int shape_id,
+                                                      int edge_id) const {
+  S2GEOGRAPHY_DCHECK_GE(geom_.size_nodes, 0);
+  switch (geom_.root->geometry_type) {
+    case GEOARROW_GEOMETRY_TYPE_POINT:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+      return points_.native_edge(edge_id);
+    case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+    case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
+      return lines_.native_edge(edge_id);
+    case GEOARROW_GEOMETRY_TYPE_POLYGON:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
+      return polygons_.native_edge(edge_id);
+    case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
+      switch (shape_id) {
+        case 0:
+          return points_.native_edge(edge_id);
+        case 1:
+          return lines_.native_edge(edge_id);
+        case 2:
+          return polygons_.native_edge(edge_id);
+        default:
+          throw Exception("shape index out of bounds");
+      }
+    default:
+      throw Exception("unsupported geometry type");
+  }
 }
 
 double GeoArrowLoop::GetSignedArea() {
@@ -675,39 +782,6 @@ void GeoArrowLoop::BuildScratch() {
       return true;
     });
   }
-}
-
-std::pair<int, int> GeoArrowGeography::ResolveGlobalEdgeId(
-    int global_edge_id) const {
-  if (geom_.size_nodes == 0) {
-    return std::make_pair(-1, -1);
-  }
-
-  switch (geom_.root->geometry_type) {
-    case GEOARROW_GEOMETRY_TYPE_POINT:
-    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
-    case GEOARROW_GEOMETRY_TYPE_LINESTRING:
-    case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
-    case GEOARROW_GEOMETRY_TYPE_POLYGON:
-    case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
-      return std::make_pair(0, global_edge_id);
-    case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
-      break;
-    default:
-      throw Exception("unsupported geometry type");
-  }
-
-  if (global_edge_id < points_.num_edges()) {
-    return std::make_pair(0, global_edge_id);
-  }
-
-  global_edge_id -= points_.num_edges();
-  if (global_edge_id < lines_.num_edges()) {
-    return std::make_pair(1, global_edge_id);
-  }
-
-  global_edge_id -= lines_.num_edges();
-  return std::make_pair(2, global_edge_id);
 }
 
 }  // namespace s2geography
