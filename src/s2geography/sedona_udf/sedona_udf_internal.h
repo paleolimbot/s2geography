@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cerrno>
 
 #include "geoarrow/geoarrow.hpp"
@@ -165,6 +166,159 @@ class WkbGeographyOutputBuilder {
 
  private:
   geoarrow::Writer writer_;
+};
+
+class GeoArrowOutputBuilder {
+ public:
+  GeoArrowOutputBuilder() {
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBWriterInit(&writer_));
+    GeoArrowWKBWriterInitVisitor(&writer_, &v_);
+    v_.error = &error_;
+
+    coords_.coords_stride = 1;
+    coords_.n_values = 2;
+    coords_.n_coords = 0;
+    coords_.values[0] = coord_buf_.data();
+    coords_.values[1] = coord_buf_.data() + coord_buf_.size() / 4;
+    coords_.values[2] = coord_buf_.data() + 2 * coord_buf_.size() / 4;
+    coords_.values[3] = coord_buf_.data() + 3 * coord_buf_.size() / 4;
+
+    coord_src_[0] = std::numeric_limits<double>::quiet_NaN();
+  }
+
+  GeoArrowOutputBuilder(const GeoArrowOutputBuilder&) = delete;
+  GeoArrowOutputBuilder& operator=(const GeoArrowOutputBuilder&) = delete;
+
+  void InitOutputType(struct ArrowSchema* out) {
+    ::geoarrow::Wkb()
+        .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
+        .InitSchema(out);
+  }
+
+  void InitOutputTypeWithCrs(struct ArrowSchema* out, const std::string& crs) {
+    ::geoarrow::Wkb()
+        .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
+        .WithCrs(crs)
+        .InitSchema(out);
+  }
+
+  void Reserve(int64_t additional_size) {
+    // The current geoarrow writer doesn't provide any support for this;
+    // however, it does support multiple cylces of Append/Finish.
+  }
+
+  void SetDimensions(uint8_t dim) {
+    switch (dim) {
+      case GEOARROW_DIMENSIONS_XY:
+      case GEOARROW_DIMENSIONS_XYZ:
+      case GEOARROW_DIMENSIONS_XYM:
+      case GEOARROW_DIMENSIONS_XYZM:
+        coords_.n_values = _GeoArrowkNumDimensions[dim];
+        dim_ = static_cast<enum GeoArrowDimensions>(dim);
+        break;
+      default:
+        throw Exception("Unknown dimensions constant");
+    }
+  }
+
+  void AppendNull() {
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBWriterAppendNull(&writer_));
+  }
+
+  void AppendGeometry(struct GeoArrowGeometryView geom) {
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBWriterAppend(&writer_, geom));
+  }
+
+  void FeatureStart() { GEOARROW_THROW_NOT_OK(&error_, v_.feat_start(&v_)); }
+
+  void GeomStart(enum GeoArrowGeometryType geometry_type) {
+    GEOARROW_THROW_NOT_OK(&error_, v_.geom_start(&v_, geometry_type, dim_));
+  }
+
+  void RingStart() { GEOARROW_THROW_NOT_OK(&error_, v_.ring_start(&v_)); }
+
+  void WriteCoord(const S2Point& v) { WriteCoord(S2LatLng(v)); }
+
+  void WriteCoord(const S2LatLng& v) {
+    WriteCoord(v.lng().degrees(), v.lat().degrees());
+  }
+
+  void WriteCoord(const internal::GeoArrowVertex& v,
+                  enum GeoArrowDimensions dim_src = GEOARROW_DIMENSIONS_XY) {
+    if (coords_.n_coords == kCoordsCapcity) {
+      FlushCoords();
+    }
+
+    if (dim_ == GEOARROW_DIMENSIONS_XY) {
+      const_cast<double*>(coords_.values[0])[coords_.n_coords] = v.lng;
+      const_cast<double*>(coords_.values[1])[coords_.n_coords] = v.lat;
+      ++coords_.n_coords;
+      return;
+    }
+
+    int map[5];
+    GeoArrowMapDimensions(dim_src, dim_, map);
+    std::memcpy(coord_src_ + 1, &v, sizeof(v));
+    for (int i = 0; i < 4; i++) {
+      coord_dst_[i] = coord_src_[map[i] + 1];
+    }
+
+    for (int i = 0; i < coords_.n_values; ++i) {
+      const_cast<double*>(coords_.values[i])[coords_.n_coords] = coord_dst_[i];
+    }
+    ++coords_.n_coords;
+  }
+
+  void WriteCoord(double x, double y) {
+    if (coords_.n_coords == kCoordsCapcity) {
+      FlushCoords();
+    }
+
+    const_cast<double*>(coords_.values[0])[coords_.n_coords] = x;
+    const_cast<double*>(coords_.values[1])[coords_.n_coords] = y;
+    for (int i = 2; i < coords_.n_values; ++i) {
+      const_cast<double*>(coords_.values[i])[coords_.n_coords] = coord_src_[0];
+    }
+
+    ++coords_.n_coords;
+  }
+
+  void FlushCoords() {
+    if (coords_.n_coords == 0) {
+      return;
+    }
+
+    GEOARROW_THROW_NOT_OK(&error_, v_.coords(&v_, &coords_));
+    coords_.n_coords = 0;
+  }
+
+  void RingEnd() {
+    FlushCoords();
+    GEOARROW_THROW_NOT_OK(&error_, v_.ring_end(&v_));
+  }
+
+  void GeomEnd() {
+    FlushCoords();
+    GEOARROW_THROW_NOT_OK(&error_, v_.feat_end(&v_));
+  }
+
+  void FeatureEnd() { GEOARROW_THROW_NOT_OK(&error_, v_.feat_end(&v_)); }
+
+  void Finish(struct ArrowArray* out) {
+    GEOARROW_THROW_NOT_OK(&error_,
+                          GeoArrowWKBWriterFinish(&writer_, out, &error_));
+  }
+
+ private:
+  GeoArrowWKBWriter writer_{};
+  GeoArrowVisitor v_{};
+  GeoArrowError error_{};
+  enum GeoArrowDimensions dim_ {};
+  struct GeoArrowCoordView coords_{};
+  std::array<double, 64> coord_buf_{};
+  static constexpr int64_t kCoordsCapcity = 64 / 4;
+  double coord_src_[5];
+  double coord_dst_[5];
 };
 
 /// \brief Generic view of Arrow input
