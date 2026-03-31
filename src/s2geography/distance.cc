@@ -429,9 +429,17 @@ struct S2ClosestPointExec {
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
     if (edge_pair_.shape_id0 == -1) {
       out->Append(PointGeography());
-    } else {
-      out->Append(PointGeography(edge_pair_.closest_points.first));
+      return;
     }
+
+    auto native_edge =
+        value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
+    auto native_vertex =
+        native_edge.Interpolate(edge_pair_.closest_points.first);
+
+    // TODO: fix writing the output
+
+    out->Append(PointGeography(edge_pair_.closest_points.first));
   }
 
   EdgePair edge_pair_;
@@ -476,13 +484,25 @@ struct S2ShortestLineExec {
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
     if (edge_pair_.shape_id0 == -1) {
       out->Append(PolylineGeography());
-    } else {
-      PolylineGeography result(std::make_unique<S2Polyline>(
-          std::vector<S2Point>{edge_pair_.closest_points.first,
-                               edge_pair_.closest_points.second},
-          S2Debug::DISABLE));
-      out->Append(result);
     }
+
+    auto native_edge0 =
+        value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
+    auto native_vertex0 =
+        native_edge0.Interpolate(edge_pair_.closest_points.first);
+
+    auto native_edge1 =
+        value1.native_edge(edge_pair_.shape_id1, edge_pair_.edge_id1);
+    auto native_vertex1 =
+        native_edge0.Interpolate(edge_pair_.closest_points.second);
+
+    // TODO: writing
+
+    PolylineGeography result(std::make_unique<S2Polyline>(
+        std::vector<S2Point>{edge_pair_.closest_points.first,
+                             edge_pair_.closest_points.second},
+        S2Debug::DISABLE));
+    out->Append(result);
   }
 
   EdgePair edge_pair_;

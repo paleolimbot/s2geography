@@ -147,6 +147,10 @@ struct GeoArrowEdge {
   /// \brief The second vertex of the edge
   GeoArrowVertex v1;
 
+  GeoArrowVertex Interpolate(double fraction);
+
+  GeoArrowVertex Interpolate(const S2Point& point);
+
   friend bool operator==(const GeoArrowEdge& a, const GeoArrowEdge& b) {
     return a.v0 == b.v0 && a.v1 == b.v1;
   }

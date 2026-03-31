@@ -2,6 +2,7 @@
 #include "s2geography/geoarrow-geography.h"
 
 #include <s2/s2edge_crosser.h>
+#include <s2/s2edge_distances.h>
 #include <s2/s2loop_measures.h>
 #include <s2/s2point.h>
 #include <s2/s2projections.h>
@@ -738,6 +739,38 @@ internal::GeoArrowEdge GeoArrowGeography::native_edge(int shape_id,
       throw Exception("unsupported geometry type");
   }
 }
+
+namespace internal {
+
+GeoArrowVertex GeoArrowEdge::Interpolate(double fraction) {
+  if (fraction <= 0) {
+    return v0;
+  } else if (fraction >= 1) {
+    return v1;
+  }
+
+  double dlng = (v1.lng - v0.lng) * fraction;
+  double dlat = (v1.lat - v0.lat) * fraction;
+  double dzm0 = (v1.zm[0] - v0.zm[0]) * fraction;
+  double dzm1 = (v1.zm[1] - v0.zm[1]) * fraction;
+  return {v0.lng + dlng, v0.lat + dlat, {v0.zm[0] + dzm0, v0.zm[1] + dzm1}};
+}
+
+GeoArrowVertex GeoArrowEdge::Interpolate(const S2Point& point) {
+  auto pt0 = S2LatLng::FromDegrees(v0.lat, v0.lng).ToPoint();
+  auto pt1 = S2LatLng::FromDegrees(v1.lat, v1.lng).ToPoint();
+
+  // If the start and end are the same in lon/lat space, return the first vertex
+  if (pt0 == pt1) {
+    return v0;
+  }
+
+  // Otherwise, find the edge fraction and return the interpolated vertex
+  double fraction = S2::GetDistanceFraction(pt0, pt1, point);
+  return Interpolate(fraction);
+}
+
+}  // namespace internal
 
 double GeoArrowLoop::GetSignedArea() {
   BuildScratch();
