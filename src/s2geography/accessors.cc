@@ -278,15 +278,14 @@ struct S2LengthExec {
   using arg0_t = GeoArrowGeographyInputView;
   using out_t = DoubleOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
-  out_t::c_type Exec(arg0_t::c_type value) {
+  void Exec(arg0_t::c_type value, out_t* out) {
     double length = 0.0;
     value.lines()->geom().VisitEdges([&](const S2Shape::Edge& e) {
       length += S1ChordAngle(e.v0, e.v1).radians();
       return true;
     });
-    return length * S2Earth::RadiusMeters();
+
+    out->Append(length * S2Earth::RadiusMeters());
   }
 };
 
@@ -294,15 +293,14 @@ struct S2AreaExec {
   using arg0_t = GeoArrowGeographyInputView;
   using out_t = DoubleOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
-  out_t::c_type Exec(arg0_t::c_type value) {
+  void Exec(arg0_t::c_type value, out_t* out) {
     double area = 0.0;
     value.polygons()->geom().VisitLoops(&scratch_, [&](GeoArrowLoop loop) {
       area += loop.GetSignedArea();
       return true;
     });
-    return area * S2Earth::RadiusMeters() * S2Earth::RadiusMeters();
+
+    out->Append(area * S2Earth::RadiusMeters() * S2Earth::RadiusMeters());
   }
 
   std::vector<S2Point> scratch_;
@@ -312,15 +310,14 @@ struct S2PerimeterExec {
   using arg0_t = GeoArrowGeographyInputView;
   using out_t = DoubleOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
-  out_t::c_type Exec(arg0_t::c_type value) {
+  void Exec(arg0_t::c_type value, out_t* out) {
     double perimeter = 0.0;
     value.polygons()->geom().VisitEdges([&](const S2Shape::Edge& e) {
       perimeter += S1ChordAngle(e.v0, e.v1).radians();
       return true;
     });
-    return perimeter * S2Earth::RadiusMeters();
+
+    out->Append(perimeter * S2Earth::RadiusMeters());
   }
 };
 

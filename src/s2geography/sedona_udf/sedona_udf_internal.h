@@ -549,7 +549,6 @@ class SedonaUnaryKernelAdapter {
       data->arg0 = std::make_unique<typename Exec::arg0_t>(arg_types[0]);
       data->arg0->SetPrepareScalar(data->prepare_arg0_scalar);
       data->out = std::make_unique<typename Exec::out_t>();
-      data->exec.Init({});
 
       std::string crs_out = data->arg0->GetCrs();
       if (crs_out.empty()) {
@@ -585,8 +584,7 @@ class SedonaUnaryKernelAdapter {
           data->out->AppendNull();
         } else {
           typename Exec::arg0_t::c_type item0 = data->arg0->Get(i);
-          typename Exec::out_t::c_type item_out = data->exec.Exec(item0);
-          data->out->Append(item_out);
+          data->exec.Exec(item0, data->out.get());
         }
       }
 
@@ -657,7 +655,6 @@ class SedonaBinaryKernelAdapter {
       data->arg0->SetPrepareScalar(data->prepare_arg0_scalar);
       data->arg1->SetPrepareScalar(data->prepare_arg1_scalar);
       data->out = std::make_unique<typename Exec::out_t>();
-      data->exec.Init({});
 
       // We don't have a reliable way to check the equality of CRSes, so
       // here we just return the first CRS.
@@ -698,14 +695,7 @@ class SedonaBinaryKernelAdapter {
         } else {
           typename Exec::arg0_t::c_type item0 = data->arg0->Get(i);
           typename Exec::arg1_t::c_type item1 = data->arg1->Get(i);
-
-          std::optional<optional_storable_t<typename Exec::out_t::c_type>>
-              item_out = data->exec.Exec(item0, item1);
-          if (item_out) {
-            data->out->Append(*item_out);
-          } else {
-            data->out->AppendNull();
-          }
+          data->exec.Exec(item0, item1, data->out.get());
         }
       }
 
