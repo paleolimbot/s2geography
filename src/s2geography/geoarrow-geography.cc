@@ -599,12 +599,15 @@ int GeoArrowGeography::num_shapes() const {
     case GEOARROW_GEOMETRY_TYPE_POLYGON:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
       return 1;
-    default:
+    case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
       return 3;
+    default:
+      throw Exception("Unsupported geometry type");
   }
 }
 
 const S2Shape* GeoArrowGeography::Shape(int id) const {
+  S2GEOGRAPHY_DCHECK_GE(geom_.size_nodes, 0);
   switch (geom_.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
