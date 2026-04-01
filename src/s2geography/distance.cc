@@ -103,6 +103,27 @@ struct EdgePair {
   int edge_id1{-1};
   std::pair<S2Point, S2Point> closest_points{};
   S1ChordAngle distance{S1ChordAngle::Infinity()};
+
+  bool is_empty() const { return shape_id0 == -1; }
+
+  bool is_interior() const {
+    return !is_empty() && (edge_id0 == -1 || edge_id1 == -1);
+  }
+
+  internal::GeoArrowVertex ResolveInteriorVertex(
+      const GeoArrowGeography& geog0, const GeoArrowGeography& geog1) const {
+    if (edge_id0 == -1) {
+      auto e = geog1.native_edge(shape_id1, edge_id1);
+      return e.Interpolate(closest_points.second);
+    } else if (edge_id1 == -1) {
+      auto e = geog0.native_edge(shape_id0, edge_id0);
+      return e.Interpolate(closest_points.first);
+    } else {
+      throw Exception(
+          "Can't resolve interior vertex of EdgePair where neither result is "
+          "an interior result");
+    }
+  }
 };
 
 void ClearanceLineOnlyEdgesBruteForce(const GeoArrowGeography& value0,
@@ -427,25 +448,23 @@ struct S2ClosestPointExec {
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
-    if (edge_pair_.shape_id0 == -1) {
+    if (edge_pair_.is_empty()) {
       out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_POINT);
       return;
     }
 
-    // internal::GeoArrowVertex v;
-    // if (edge_pair_.closest_points.first == edge_pair_.closest_points.second) {
-
-    // } else if (edge_pair_.edge_id0 == -1) {
-    //   S2GEOGRAPHY_DCHECK(false);
-    // } else {
-    //   auto native_edge =
-    //       value1.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
-    //   v = native_edge.Interpolate(edge_pair_.closest_points.first);
-    // }
+    internal::GeoArrowVertex v;
+    if (edge_pair_.is_interior()) {
+      v = edge_pair_.ResolveInteriorVertex(value0, value1);
+    } else {
+      auto native_edge =
+          value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
+      v = native_edge.Interpolate(edge_pair_.closest_points.first);
+    }
 
     out->FeatureStart();
     out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
-    out->WriteCoord(edge_pair_.closest_points.first);
+    out->WriteCoord(v);
     out->GeomEnd();
     out->FeatureEnd();
   }
@@ -460,7 +479,7 @@ struct S2DistanceExec {
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputeDistance);
-    if (edge_pair_.shape_id0 == -1) {
+    if (edge_pair_.is_empty()) {
       out->AppendNull();
     } else {
       out->Append(edge_pair_.distance.radians() * S2Earth::RadiusMeters());
@@ -490,25 +509,37 @@ struct S2ShortestLineExec {
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
-    if (edge_pair_.shape_id0 == -1) {
+    if (edge_pair_.is_empty()) {
       out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_LINESTRING);
       return;
     }
 
-    // auto native_edge0 =
-    //     value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
-    // auto native_vertex0 =
-    //     native_edge0.Interpolate(edge_pair_.closest_points.first);
+    if (edge_pair_.is_interior()) {
+      auto native_vertex = edge_pair_.ResolveInteriorVertex(value0, value1);
 
-    // auto native_edge1 =
-    //     value1.native_edge(edge_pair_.shape_id1, edge_pair_.edge_id1);
-    // auto native_vertex1 =
-    //     native_edge1.Interpolate(edge_pair_.closest_points.second);
+      out->FeatureStart();
+      out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+      out->WriteCoord(native_vertex);
+      out->WriteCoord(native_vertex);
+      out->GeomEnd();
+      out->FeatureEnd();
+      return;
+    }
+
+    auto native_edge0 =
+        value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
+    auto native_vertex0 =
+        native_edge0.Interpolate(edge_pair_.closest_points.first);
+
+    auto native_edge1 =
+        value1.native_edge(edge_pair_.shape_id1, edge_pair_.edge_id1);
+    auto native_vertex1 =
+        native_edge1.Interpolate(edge_pair_.closest_points.second);
 
     out->FeatureStart();
     out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
-    out->WriteCoord(edge_pair_.closest_points.first);
-    out->WriteCoord(edge_pair_.closest_points.second);
+    out->WriteCoord(native_vertex0);
+    out->WriteCoord(native_vertex1);
     out->GeomEnd();
     out->FeatureEnd();
   }
