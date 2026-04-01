@@ -58,6 +58,9 @@ class GeoArrowPointShape : public S2Shape {
   /// that contains EMPTY children.
   void Init(struct GeoArrowGeometryView geom);
 
+  /// \brief Return the coordinate dimensions (e.g., XY, XYZ, XYM, or XYZM)
+  ///
+  /// The returned values match the integer constants in the GeoArrow header.
   uint8_t dimensions() const;
 
   int num_vertices() const;
@@ -117,6 +120,9 @@ class GeoArrowLaxPolylineShape : public S2Shape {
   /// Throws if geom neither a LINESTRING nor a MULTILINESTRING.
   void Init(struct GeoArrowGeometryView geom);
 
+  /// \brief Return the coordinate dimensions (e.g., XY, XYZ, XYM, or XYZM)
+  ///
+  /// The returned values match the integer constants in the GeoArrow header.
   uint8_t dimensions() const;
 
   int num_edges() const override;
@@ -199,6 +205,9 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   /// array).
   void NormalizeOrientation();
 
+  /// \brief Return the coordinate dimensions (e.g., XY, XYZ, XYM, or XYZM)
+  ///
+  /// The returned values match the integer constants in the GeoArrow header.
   uint8_t dimensions() const;
 
   int num_edges() const override;

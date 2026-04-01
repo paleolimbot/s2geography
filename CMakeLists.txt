@@ -391,8 +391,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
     GTest::gtest_main GTest::gmock)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
   target_link_libraries(wkb_test s2geography GTest::gtest_main)
-  target_link_libraries(geoarrow_geography_test s2geography GTest::gtest_main
-                        GTest::gmock)
+  target_link_libraries(geoarrow_geography_test s2geography GTest::gtest_main)
 
   target_include_directories(sedona_udf_internal_test PRIVATE src/vendored)
   target_include_directories(accessors_geog_test PRIVATE src/vendored)

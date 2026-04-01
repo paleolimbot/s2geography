@@ -789,11 +789,18 @@ GeoArrowVertex GeoArrowEdge::Interpolate(double fraction) {
     return v1;
   }
 
-  double dlng = (v1.lng - v0.lng) * fraction;
-  double dlat = (v1.lat - v0.lat) * fraction;
+  S2Point pt0 = S2LatLng::FromDegrees(v0.lat, v0.lng).ToPoint();
+  S2Point pt1 = S2LatLng::FromDegrees(v1.lat, v1.lng).ToPoint();
+  if (pt0 == pt1) {
+    return v0;
+  }
+
+  S2LatLng out = S2LatLng(S2::Interpolate(pt0, pt1, fraction));
   double dzm0 = (v1.zm[0] - v0.zm[0]) * fraction;
   double dzm1 = (v1.zm[1] - v0.zm[1]) * fraction;
-  return {v0.lng + dlng, v0.lat + dlat, {v0.zm[0] + dzm0, v0.zm[1] + dzm1}};
+  return {out.lng().degrees(),
+          out.lat().degrees(),
+          {v0.zm[0] + dzm0, v0.zm[1] + dzm1}};
 }
 
 GeoArrowVertex GeoArrowEdge::Interpolate(const S2Point& point) {

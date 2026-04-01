@@ -469,15 +469,17 @@ TEST(GeoArrowEdge, InterpolateFractionClampedHigh) {
 TEST(GeoArrowEdge, InterpolateFractionMidpoint) {
   internal::GeoArrowEdge edge{{0, 0, {10, 20}}, {10, 10, {30, 40}}};
   auto result = edge.Interpolate(0.5);
-  EXPECT_DOUBLE_EQ(result.lng, 5);
-  EXPECT_DOUBLE_EQ(result.lat, 5);
+  // Spherical interpolation: lng/lat won't be exactly linear
+  EXPECT_DOUBLE_EQ(result.lng, 4.9616312267025071);
+  EXPECT_DOUBLE_EQ(result.lat, 5.0190006978611486);
+  // ZM values are still linearly interpolated
   EXPECT_DOUBLE_EQ(result.zm[0], 20);
   EXPECT_DOUBLE_EQ(result.zm[1], 30);
 
   // Quarter fraction
   result = edge.Interpolate(0.25);
-  EXPECT_DOUBLE_EQ(result.lng, 2.5);
-  EXPECT_DOUBLE_EQ(result.lat, 2.5);
+  EXPECT_DOUBLE_EQ(result.lng, 2.476047452165361);
+  EXPECT_DOUBLE_EQ(result.lat, 2.5118515100847665);
   EXPECT_DOUBLE_EQ(result.zm[0], 15);
   EXPECT_DOUBLE_EQ(result.zm[1], 25);
 }
