@@ -534,6 +534,98 @@ TEST(GeoArrowLoop, LoopMetrics) {
       S2LatLng::FromDegrees(5, 5).ToPoint(), reference_out));
 }
 
+// GeoArrowEdge::Interpolate tests
+
+TEST(GeoArrowEdge, InterpolateFractionClampedLow) {
+  internal::GeoArrowEdge edge{{0, 0, {10, 20}}, {10, 10, {30, 40}}};
+  auto result = edge.Interpolate(0.0);
+  EXPECT_EQ(result, edge.v0);
+
+  // Negative fraction should also return v0
+  result = edge.Interpolate(-0.5);
+  EXPECT_EQ(result, edge.v0);
+}
+
+TEST(GeoArrowEdge, InterpolateFractionClampedHigh) {
+  internal::GeoArrowEdge edge{{0, 0, {10, 20}}, {10, 10, {30, 40}}};
+  auto result = edge.Interpolate(1.0);
+  EXPECT_EQ(result, edge.v1);
+
+  // Fraction > 1 should also return v1
+  result = edge.Interpolate(2.0);
+  EXPECT_EQ(result, edge.v1);
+}
+
+TEST(GeoArrowEdge, InterpolateFractionMidpoint) {
+  internal::GeoArrowEdge edge{{0, 0, {10, 20}}, {10, 10, {30, 40}}};
+  auto result = edge.Interpolate(0.5);
+  EXPECT_DOUBLE_EQ(result.lng, 5);
+  EXPECT_DOUBLE_EQ(result.lat, 5);
+  EXPECT_DOUBLE_EQ(result.zm[0], 20);
+  EXPECT_DOUBLE_EQ(result.zm[1], 30);
+
+  // Quarter fraction
+  result = edge.Interpolate(0.25);
+  EXPECT_DOUBLE_EQ(result.lng, 2.5);
+  EXPECT_DOUBLE_EQ(result.lat, 2.5);
+  EXPECT_DOUBLE_EQ(result.zm[0], 15);
+  EXPECT_DOUBLE_EQ(result.zm[1], 25);
+}
+
+TEST(GeoArrowEdge, InterpolatePointDegenerateEdge) {
+  // When v0 and v1 map to the same S2Point, should return v0
+  internal::GeoArrowEdge edge{{5, 10, {100, 200}}, {5, 10, {300, 400}}};
+  S2Point any_point = S2LatLng::FromDegrees(10, 5).ToPoint();
+  auto result = edge.Interpolate(any_point);
+  EXPECT_EQ(result, edge.v0);
+}
+
+TEST(GeoArrowEdge, InterpolatePointOnEdge) {
+  internal::GeoArrowEdge edge{{0, 0, {10, 20}}, {10, 0, {30, 40}}};
+  // Point at the midpoint of a constant-latitude edge
+  S2Point midpoint = S2LatLng::FromDegrees(0, 5).ToPoint();
+  auto result = edge.Interpolate(midpoint);
+  EXPECT_DOUBLE_EQ(result.lng, 5);
+  EXPECT_DOUBLE_EQ(result.lat, 0);
+  EXPECT_DOUBLE_EQ(result.zm[0], 20);
+  EXPECT_DOUBLE_EQ(result.zm[1], 30);
+
+  // Point under halfway
+  S2Point quarter_point = S2LatLng::FromDegrees(0, 2.5).ToPoint();
+  result = edge.Interpolate(quarter_point);
+  EXPECT_DOUBLE_EQ(result.lng, 2.5);
+  EXPECT_DOUBLE_EQ(result.lat, 0);
+  EXPECT_DOUBLE_EQ(result.zm[0], 15);
+  EXPECT_DOUBLE_EQ(result.zm[1], 25);
+
+  // Point over halfway
+  S2Point three_quarter_point = S2LatLng::FromDegrees(0, 7.5).ToPoint();
+  result = edge.Interpolate(three_quarter_point);
+  EXPECT_DOUBLE_EQ(result.lng, 7.5);
+  EXPECT_DOUBLE_EQ(result.lat, 0);
+  EXPECT_DOUBLE_EQ(result.zm[0], 25);
+  EXPECT_DOUBLE_EQ(result.zm[1], 35);
+}
+
+TEST(GeoArrowEdge, InterpolatePointAtEndpoints) {
+  internal::GeoArrowEdge edge{{0, 0, {10, 20}}, {10, 0, {30, 40}}};
+  // Point at v0
+  S2Point pt0 = S2LatLng::FromDegrees(0, 0).ToPoint();
+  auto result = edge.Interpolate(pt0);
+  EXPECT_DOUBLE_EQ(result.lng, 0);
+  EXPECT_DOUBLE_EQ(result.lat, 0);
+  EXPECT_DOUBLE_EQ(result.zm[0], 10);
+  EXPECT_DOUBLE_EQ(result.zm[1], 20);
+
+  // Point at v1
+  S2Point pt1 = S2LatLng::FromDegrees(0, 10).ToPoint();
+  result = edge.Interpolate(pt1);
+  EXPECT_DOUBLE_EQ(result.lng, 10);
+  EXPECT_DOUBLE_EQ(result.lat, 0);
+  EXPECT_DOUBLE_EQ(result.zm[0], 30);
+  EXPECT_DOUBLE_EQ(result.zm[1], 40);
+}
+
 // Shape tests
 
 TEST(GeoArrowPointShape, DefaultConstructor) {
