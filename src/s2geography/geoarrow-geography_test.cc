@@ -2,114 +2,24 @@
 
 #include <gtest/gtest.h>
 
-#include <string>
 #include <vector>
 
 #include "geoarrow/geoarrow.hpp"
 #include "s2geography/geography.h"
+#include "s2geography/sedona_udf/sedona_udf_test_internal.h"
 #include "s2geography/wkt-reader.h"
 
 using namespace s2geography;
 
-/// \brief An owning wrapper around a GeoArrowGeometry with utilities to
-/// construct from WKT or WKB
-class TestGeometry {
- public:
-  TestGeometry() : oriented_(false) {
-    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowGeometryInit(&geom_));
+std::unique_ptr<GeoArrowLaxPolygonShape> TestGeometryToPolygonShape(
+    const TestGeometry& test_geom) {
+  auto out = std::make_unique<GeoArrowLaxPolygonShape>(test_geom.geom());
+  if (!test_geom.oriented()) {
+    out->NormalizeOrientation();
   }
 
-  ~TestGeometry() { GeoArrowGeometryReset(&geom_); }
-
-  TestGeometry(const TestGeometry&) = delete;
-  TestGeometry& operator=(const TestGeometry&) = delete;
-
-  TestGeometry(TestGeometry&& other) noexcept
-      : geom_(other.geom_),
-        label_(std::move(other.label_)),
-        oriented_(other.oriented_) {
-    GeoArrowGeometryInit(&other.geom_);
-  }
-
-  TestGeometry& operator=(TestGeometry&& other) noexcept {
-    if (this != &other) {
-      GeoArrowGeometryReset(&geom_);
-      geom_ = other.geom_;
-      GeoArrowGeometryInit(&other.geom_);
-      label_ = std::move(other.label_);
-      oriented_ = other.oriented_;
-    }
-    return *this;
-  }
-
-  static TestGeometry FromWKT(std::string_view wkt) {
-    TestGeometry result;
-    result.label_ = wkt;
-
-    struct GeoArrowStringView wkt_view{wkt.data(),
-                                       static_cast<int64_t>(wkt.size())};
-
-    struct GeoArrowVisitor v{};
-    GeoArrowGeometryInitVisitor(&result.geom_, &v);
-
-    struct GeoArrowWKTReader reader;
-    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKTReaderInit(&reader));
-    GeoArrowErrorCode code = GeoArrowWKTReaderVisit(&reader, wkt_view, &v);
-    GeoArrowWKTReaderReset(&reader);
-    if (code != GEOARROW_OK) {
-      throw Exception("Invalid WKT");
-    }
-
-    return result;
-  }
-
-  static TestGeometry FromWKB(const std::vector<uint8_t>& wkb) {
-    TestGeometry result;
-    struct GeoArrowWKBReader reader;
-    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBReaderInit(&reader));
-    struct GeoArrowBufferView src{wkb.data(), static_cast<int64_t>(wkb.size())};
-    struct GeoArrowGeometryView view;
-    GeoArrowErrorCode code =
-        GeoArrowWKBReaderRead(&reader, src, &view, nullptr);
-    if (code != GEOARROW_OK) {
-      GeoArrowWKBReaderReset(&reader);
-      throw Exception("Invalid WKB");
-    }
-
-    // Copy the parsed geometry into our owned GeoArrowGeometry
-    code = GeoArrowGeometryShallowCopy(view, &result.geom_);
-    GeoArrowWKBReaderReset(&reader);
-    if (code != GEOARROW_OK) {
-      throw Exception("Failed to copy WKB geometry");
-    }
-
-    return result;
-  }
-
-  struct GeoArrowGeometryView geom() const {
-    return GeoArrowGeometryAsView(&geom_);
-  }
-
-  bool oriented() const { return oriented_; }
-
-  void set_oriented(bool oriented) { oriented_ = oriented; }
-
-  std::string_view label() const { return label_; }
-
-  std::unique_ptr<GeoArrowLaxPolygonShape> ToPolygonShape() const {
-    auto out = std::make_unique<GeoArrowLaxPolygonShape>(geom());
-    if (!oriented()) {
-      out->NormalizeOrientation();
-    }
-
-    return out;
-  }
-
- private:
-  struct GeoArrowGeometry geom_;
-  std::string label_;
-  bool oriented_;
-};
+  return out;
+}
 
 /// \brief Utility to sanity check an S2Shape, which has global edge ids
 /// but also has edges organized into chains.
@@ -1215,7 +1125,7 @@ TEST(GeoArrowLaxPolygonShape, ShapeIndexContains) {
       "(-5 -5, -5 5, 5 5, 5 -5, -5 -5))");
 
   MutableS2ShapeIndex poly_index;
-  poly_index.Add(poly_geom.ToPolygonShape());
+  poly_index.Add(TestGeometryToPolygonShape(poly_geom));
 
   WKTReader reader;
   S2BooleanOperation::Options options;
@@ -1257,7 +1167,7 @@ TEST(GeoArrowLaxPolygonShape, ShapeIndexContainsMultiPolygonWithHoles) {
     SCOPED_TRACE(test_geom->label());
 
     MutableS2ShapeIndex poly_index;
-    auto shape = test_geom->ToPolygonShape();
+    auto shape = TestGeometryToPolygonShape(*test_geom);
     ValidateShape(*shape);
     poly_index.Add(std::move(shape));
 
