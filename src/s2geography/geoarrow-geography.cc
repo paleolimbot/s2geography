@@ -765,9 +765,24 @@ GeoArrowVertex GeoArrowEdge::Interpolate(const S2Point& point) {
     return v0;
   }
 
-  // Otherwise, find the edge fraction and return the interpolated vertex
+  // Find the edge fraction. Use this to interpolate ZM (or to directly return
+  // a source vertex if the fraction is 0 or 1).
   double fraction = S2::GetDistanceFraction(point, pt0, pt1);
-  return Interpolate(fraction);
+  if (fraction == 0) {
+    return v0;
+  } else if (fraction == 1) {
+    return v1;
+  }
+
+  // Otherwise, interpolate ZM values in linear space but use the original point
+  // to compute the output longitude and latitude.
+  double dzm0 = (v1.zm[0] - v0.zm[0]) * fraction;
+  double dzm1 = (v1.zm[1] - v0.zm[1]) * fraction;
+
+  S2LatLng ll(point);
+  return {ll.lng().degrees(),
+          ll.lat().degrees(),
+          {v0.zm[0] + dzm0, v0.zm[1] + dzm1}};
 }
 
 }  // namespace internal
