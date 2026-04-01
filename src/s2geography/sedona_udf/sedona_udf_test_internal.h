@@ -58,7 +58,20 @@ class TestGeometry {
 
     auto* offsets = reinterpret_cast<const int32_t*>(out->buffers[1]);
     auto* data = reinterpret_cast<const char*>(out->buffers[2]);
-    return std::string(data, offsets[1]);
+    std::string string_out(data, offsets[1]);
+
+    // Work around a bug in the WKT writer for empty points
+    if (string_out == "POINT (nan nan)") {
+      return "POINT EMPTY";
+    } else if (string_out == "POINT Z (nan nan nan)") {
+      return "POINT Z EMPTY";
+    } else if (string_out == "POINT M (nan nan nan)") {
+      return "POINT M EMPTY";
+    } else if (string_out == "POINT ZM (nan nan nan nan)") {
+      return "POINT ZM EMPTY";
+    }
+
+    return string_out;
   }
 
   static TestGeometry FromWKT(std::string_view wkt) {

@@ -453,17 +453,17 @@ struct S2ClosestPointExec {
   using out_t = GeoArrowOutputBuilder;
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
-    ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
-    if (edge_pair_.is_empty()) {
-      out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_POINT);
-      return;
-    }
-
     // The output usually consists of a vertex derived from the first
     // input. In extreme cases this could result in a NaN written to
     // Z or M (e.g., if value0 is a polygon Z/M and value1 is fully
     // contained and only contains XY values),
     out->SetDimensions(value0.dimensions());
+
+    ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
+    if (edge_pair_.is_empty()) {
+      out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_POINT);
+      return;
+    }
 
     internal::GeoArrowVertex v;
     if (edge_pair_.is_interior()) {
@@ -521,15 +521,15 @@ struct S2ShortestLineExec {
   using out_t = GeoArrowOutputBuilder;
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
+    // The output usually consists of one vertex from each side, so
+    // use the common dimensions as the output dimensionality
+    out->SetDimensionsCommon(value0.dimensions(), value1.dimensions());
+
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
     if (edge_pair_.is_empty()) {
       out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_LINESTRING);
       return;
     }
-
-    // The output usually consists of one vertex from each side, so
-    // use the common dimensions as the output dimensionality
-    out->SetDimensionsCommon(value0.dimensions(), value1.dimensions());
 
     if (edge_pair_.is_interior()) {
       auto native_vertex = edge_pair_.ResolveInteriorVertex(value0, value1);
