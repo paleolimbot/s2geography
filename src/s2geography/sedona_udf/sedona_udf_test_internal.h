@@ -29,7 +29,8 @@ class TestGeometry {
   TestGeometry(TestGeometry&& other) noexcept
       : geom_(other.geom_),
         label_(std::move(other.label_)),
-        oriented_(other.oriented_) {
+        oriented_(other.oriented_),
+        data_(std::move(other.data_)) {
     GeoArrowGeometryInit(&other.geom_);
   }
 
@@ -40,6 +41,7 @@ class TestGeometry {
       GeoArrowGeometryInit(&other.geom_);
       label_ = std::move(other.label_);
       oriented_ = other.oriented_;
+      data_ = std::move(other.data_);
     }
     return *this;
   }

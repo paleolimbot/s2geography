@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <array>
 #include <cerrno>
+#include <cstring>
 #include <limits>
-#include <memory>
 
 #include "geoarrow/geoarrow.hpp"
 #include "nanoarrow/nanoarrow.hpp"
