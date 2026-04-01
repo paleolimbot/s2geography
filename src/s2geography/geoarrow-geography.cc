@@ -62,7 +62,10 @@ GeoArrowPointShape::GeoArrowPointShape(struct GeoArrowGeometryView geom) {
   Init(geom);
 }
 
-void GeoArrowPointShape::Clear() { geom_ = {nullptr, 0}; }
+void GeoArrowPointShape::Clear() {
+  geom_ = {nullptr, 0};
+  dimensions_ = GEOARROW_DIMENSIONS_XY;
+}
 
 void GeoArrowPointShape::Init(struct GeoArrowGeometryView geom) {
   switch (geom.root->geometry_type) {
@@ -101,7 +104,12 @@ void GeoArrowPointShape::Init(struct GeoArrowGeometryView geom) {
     }
     return true;
   });
+
+  // Ensure we keep a record of the source dimensions
+  dimensions_ = geom.root->dimensions;
 }
+
+uint8_t GeoArrowPointShape::dimensions() const { return dimensions_; }
 
 int GeoArrowPointShape::num_vertices() const {
   return static_cast<int>(geom_.size());
@@ -164,6 +172,7 @@ void GeoArrowLaxPolylineShape::Clear() {
   num_chains_ = 0;
   num_edges_.clear();
   num_edges_.push_back(0);
+  dimensions_ = GEOARROW_DIMENSIONS_XY;
 }
 
 void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
@@ -212,7 +221,12 @@ void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
     num_edges_[i++] = num_edges;
     return true;
   });
+
+  // Keep a record of the source dimensions
+  dimensions_ = geom.root->dimensions;
 }
+
+uint8_t GeoArrowLaxPolylineShape::dimensions() const { return dimensions_; }
 
 int GeoArrowLaxPolylineShape::num_edges() const { return num_edges_.back(); }
 
@@ -273,6 +287,7 @@ void GeoArrowLaxPolygonShape::Clear() {
   num_edges_.clear();
   num_edges_.push_back(0);
   loops_.clear();
+  dimensions_ = GEOARROW_DIMENSIONS_XY;
 }
 
 void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
@@ -321,6 +336,9 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
       });
 
   geom_ = {loops_.data(), static_cast<int64_t>(loops_.size())};
+
+  // Keep a record of the source dimensions
+  dimensions_ = geom.root->dimensions;
 }
 
 void GeoArrowLaxPolygonShape::NormalizeOrientation() {
@@ -333,6 +351,8 @@ void GeoArrowLaxPolygonShape::NormalizeOrientation() {
     }
   }
 }
+
+uint8_t GeoArrowLaxPolygonShape::dimensions() const { return dimensions_; }
 
 int GeoArrowLaxPolygonShape::num_edges() const { return num_edges_.back(); }
 
@@ -552,6 +572,26 @@ std::optional<S2Point> GeoArrowGeography::Point() const {
       }
     default:
       return std::nullopt;
+  }
+}
+
+uint8_t GeoArrowGeography::dimensions() const {
+  if (geom_.size_nodes == 0) {
+    return GEOARROW_DIMENSIONS_XY;
+  }
+
+  switch (geom_.root->geometry_type) {
+    case GEOARROW_GEOMETRY_TYPE_POINT:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+      return points_.dimensions();
+    case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+    case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
+      return lines_.dimensions();
+    case GEOARROW_GEOMETRY_TYPE_POLYGON:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
+      return polygons_.dimensions();
+    default:
+      return geom_.root->dimensions;
   }
 }
 
