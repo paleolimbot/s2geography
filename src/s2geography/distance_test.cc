@@ -176,6 +176,21 @@ INSTANTIATE_TEST_SUITE_P(
                                   "POLYGON ((0 0, 2 0, 0 2, 0 0))",
                                   111195.10117748393, "LINESTRING (-1 0, 0 0)"},
 
+         // Z Point x polygon (point inside)
+        DistanceScalarScalarParam{"point_z_distance_polygon_inside",
+                                  "POINT Z (0.25 0.25 10)",
+                                  "POLYGON Z ((0 0 12, 2 0 12, 0 2 12, 0 0 12))", 0.0,
+                                  "LINESTRING Z (0.25 0.25 10, 0.25 0.25 10)"},
+        // Z Point x polygon (point on boundary)
+        DistanceScalarScalarParam{
+            "point_z_distance_polygon_boundary", "POINT Z (0 0 10)",
+            "POLYGON Z ((0 0 12, 2 0 12, 0 2 12, 0 0 12))", 0.0, "LINESTRING Z (0 0 10, 0 0 12)"},
+        // Z Point x polygon (point outside)
+        DistanceScalarScalarParam{"point_z_distance_polygon_outside",
+                                  "POINT Z (-1 0 10)",
+                                  "POLYGON Z ((0 0 12, 2 0 12, 0 2 12, 0 0 12))",
+                                  111195.10117748393, "LINESTRING Z (-1 0 10, 0 0 12)"},
+
         // Linestring x polygon (linestring fully inside)
         DistanceScalarScalarParam{"linestring_distance_polygon_inside",
                                   "LINESTRING (0.25 0.25, 0.5 0.5)",

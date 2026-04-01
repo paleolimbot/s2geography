@@ -104,12 +104,18 @@ struct EdgePair {
   std::pair<S2Point, S2Point> closest_points{};
   S1ChordAngle distance{S1ChordAngle::Infinity()};
 
+  /// \brief Return true if this represents an empty match
   bool is_empty() const { return shape_id0 == -1; }
 
+  /// \brief Return true if one side of this match is an interior
+  /// (i.e., is not an actual vertex on one side of the match)
   bool is_interior() const {
     return !is_empty() && (edge_id0 == -1 || edge_id1 == -1);
   }
 
+  /// \brief Resolve the native vertex of an interior match, which may
+  /// come from the first or second input. The returned vertex is normalized
+  /// to take into acccount the dimensionality of the input.
   internal::GeoArrowVertex ResolveInteriorVertex(
       const GeoArrowGeography& geog0, const GeoArrowGeography& geog1) const {
     if (edge_id0 == -1) {
@@ -453,7 +459,11 @@ struct S2ClosestPointExec {
       return;
     }
 
-    out->SetDimensionsCommon(value0.dimensions(), value1.dimensions());
+    // The output usually consists of a vertex derived from the first
+    // input. In extreme cases this could result in a NaN written to
+    // Z or M (e.g., if value0 is a polygon Z/M and value1 is fully
+    // contained and only contains XY values),
+    out->SetDimensions(value0.dimensions());
 
     internal::GeoArrowVertex v;
     if (edge_pair_.is_interior()) {
@@ -517,6 +527,8 @@ struct S2ShortestLineExec {
       return;
     }
 
+    // The output usually consists of one vertex from each side, so
+    // use the common dimensions as the output dimensionality
     out->SetDimensionsCommon(value0.dimensions(), value1.dimensions());
 
     if (edge_pair_.is_interior()) {
