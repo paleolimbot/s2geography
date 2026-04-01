@@ -114,10 +114,10 @@ struct EdgePair {
       const GeoArrowGeography& geog0, const GeoArrowGeography& geog1) const {
     if (edge_id0 == -1) {
       auto e = geog1.native_edge(shape_id1, edge_id1);
-      return e.Interpolate(closest_points.second);
+      return e.Interpolate(closest_points.second).Normalize(geog1.dimensions());
     } else if (edge_id1 == -1) {
       auto e = geog0.native_edge(shape_id0, edge_id0);
-      return e.Interpolate(closest_points.first);
+      return e.Interpolate(closest_points.first).Normalize(geog0.dimensions());
     } else {
       throw Exception(
           "Can't resolve interior vertex of EdgePair where neither result is "
@@ -461,7 +461,8 @@ struct S2ClosestPointExec {
     } else {
       auto native_edge =
           value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
-      v = native_edge.Interpolate(edge_pair_.closest_points.first);
+      v = native_edge.Interpolate(edge_pair_.closest_points.first)
+              .Normalize(value0.dimensions());
     }
 
     out->FeatureStart();
@@ -533,12 +534,14 @@ struct S2ShortestLineExec {
     auto native_edge0 =
         value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
     auto native_vertex0 =
-        native_edge0.Interpolate(edge_pair_.closest_points.first);
+        native_edge0.Interpolate(edge_pair_.closest_points.first)
+            .Normalize(value0.dimensions());
 
     auto native_edge1 =
         value1.native_edge(edge_pair_.shape_id1, edge_pair_.edge_id1);
     auto native_vertex1 =
-        native_edge1.Interpolate(edge_pair_.closest_points.second);
+        native_edge1.Interpolate(edge_pair_.closest_points.second)
+            .Normalize(value0.dimensions());
 
     out->FeatureStart();
     out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);

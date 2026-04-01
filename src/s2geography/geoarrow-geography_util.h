@@ -122,6 +122,14 @@ struct GeoArrowVertex {
   /// there is no Z or M present in the source sequence.
   double zm[2];
 
+  GeoArrowVertex Normalize(uint8_t dimensions) {
+    GeoArrowVertex v = *this;
+    if (dimensions == 3) {
+      std::swap(v.zm[0], v.zm[1]);
+    }
+    return v;
+  }
+
   friend bool operator==(const GeoArrowVertex& a, const GeoArrowVertex& b) {
     // Treat NaNs as equal so that missing ZM information does not affect
     // inequality (as long as it is consistently missing for both)

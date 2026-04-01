@@ -265,7 +265,7 @@ class GeoArrowOutputBuilder {
   }
 
   void WriteCoord(const internal::GeoArrowVertex& v,
-                  enum GeoArrowDimensions dim_src = GEOARROW_DIMENSIONS_XY) {
+                  uint8_t dim_src = GEOARROW_DIMENSIONS_XYZM) {
     if (coords_.n_coords == kCoordsCapcity) {
       FlushCoords();
     }
@@ -278,7 +278,8 @@ class GeoArrowOutputBuilder {
     }
 
     int map[5];
-    GeoArrowMapDimensions(dim_src, dim_, map);
+    GeoArrowMapDimensions(static_cast<enum GeoArrowDimensions>(dim_src), dim_,
+                          map);
     std::memcpy(coord_src_ + 1, &v, sizeof(v));
     for (int i = 0; i < 4; i++) {
       coord_dst_[i] = coord_src_[map[i] + 1];
