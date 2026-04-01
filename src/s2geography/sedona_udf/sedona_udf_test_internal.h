@@ -2,6 +2,10 @@
 
 #include <gtest/gtest.h>
 
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "geoarrow/geoarrow.hpp"
@@ -95,11 +99,14 @@ class TestGeometry {
     return result;
   }
 
-  static TestGeometry FromWKB(const std::vector<uint8_t>& wkb) {
+  static TestGeometry FromWKB(std::vector<uint8_t> wkb) {
     TestGeometry result;
+    result.data_ = std::move(wkb);
+
     struct GeoArrowWKBReader reader;
     GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBReaderInit(&reader));
-    struct GeoArrowBufferView src{wkb.data(), static_cast<int64_t>(wkb.size())};
+    struct GeoArrowBufferView src{result.data_.data(),
+                                  static_cast<int64_t>(result.data_.size())};
     struct GeoArrowGeometryView view;
     GeoArrowErrorCode code =
         GeoArrowWKBReaderRead(&reader, src, &view, nullptr);
@@ -108,7 +115,9 @@ class TestGeometry {
       throw std::runtime_error("Invalid WKB");
     }
 
-    // Copy the parsed geometry into our owned GeoArrowGeometry
+    // Copy the parsed geometry into our owned GeoArrowGeometry. Because data_
+    // is attached to this object, the pointed to buffers from the nodes will
+    // stay valid
     code = GeoArrowGeometryShallowCopy(view, &result.geom_);
     GeoArrowWKBReaderReset(&reader);
     if (code != GEOARROW_OK) {
@@ -132,6 +141,7 @@ class TestGeometry {
   struct GeoArrowGeometry geom_;
   std::string label_;
   bool oriented_;
+  std::vector<uint8_t> data_;
 };
 
 // We use a simple model for testing functions: types are either geoarrow.wkb

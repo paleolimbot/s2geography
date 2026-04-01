@@ -553,7 +553,7 @@ struct S2ShortestLineExec {
         value1.native_edge(edge_pair_.shape_id1, edge_pair_.edge_id1);
     auto native_vertex1 =
         native_edge1.Interpolate(edge_pair_.closest_points.second)
-            .Normalize(value0.dimensions());
+            .Normalize(value1.dimensions());
 
     out->FeatureStart();
     out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);

@@ -126,7 +126,7 @@ struct GeoArrowVertex {
   /// always represents, x, y, z, and m (in that order)
   GeoArrowVertex Normalize(uint8_t dimensions) {
     GeoArrowVertex v = *this;
-    if (dimensions == 3) {
+    if (dimensions == GEOARROW_DIMENSIONS_XYM) {
       std::swap(v.zm[0], v.zm[1]);
     }
     return v;

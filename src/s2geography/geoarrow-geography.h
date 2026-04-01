@@ -88,7 +88,7 @@ class GeoArrowPointShape : public S2Shape {
 
  private:
   GeoArrowGeom geom_;
-  uint8_t dimensions_;
+  uint8_t dimensions_{GEOARROW_DIMENSIONS_XY};
 };
 
 /// \brief Linestring S2Shape implementation backed by a GeoArrowGeometryView
@@ -149,7 +149,7 @@ class GeoArrowLaxPolylineShape : public S2Shape {
   GeoArrowGeom geom_{};
   int num_chains_{};
   std::vector<int> num_edges_;
-  uint8_t dimensions_;
+  uint8_t dimensions_{GEOARROW_DIMENSIONS_XY};
 };
 
 /// \brief Polygon S2Shape implementation backed by a GeoArrowGeometryView
@@ -258,7 +258,7 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   // Owned loops for O(1) lookup
   std::vector<struct GeoArrowGeometryNode> loops_;
   std::vector<S2Point> point_scratch_;
-  uint8_t dimensions_;
+  uint8_t dimensions_{GEOARROW_DIMENSIONS_XY};
 };
 
 /// \brief Reusable Geography-like wrapper around a GeoArrowGeometryNode

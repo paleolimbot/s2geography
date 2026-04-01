@@ -1,7 +1,10 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cerrno>
+#include <limits>
+#include <memory>
 
 #include "geoarrow/geoarrow.hpp"
 #include "nanoarrow/nanoarrow.hpp"
@@ -220,7 +223,7 @@ class GeoArrowOutputBuilder {
 
   void Reserve(int64_t additional_size) {
     // The current geoarrow writer doesn't provide any support for this;
-    // however, it does support multiple cylces of Append/Finish.
+    // however, it does support multiple cycles of Append/Finish.
   }
 
   /// \brief Set the dimensions of this writer to the common dimensions of dim0
@@ -282,7 +285,7 @@ class GeoArrowOutputBuilder {
     GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBWriterAppend(&writer_, geom));
   }
 
-  /// \brief Start a feature (must be paired with FeatEnd())
+  /// \brief Start a feature (must be paired with FeatureEnd())
   void FeatureStart() { GEOARROW_THROW_NOT_OK(&error_, v_.feat_start(&v_)); }
 
   /// \brief Start a geometry (must be paired with GeomEnd())
@@ -309,7 +312,7 @@ class GeoArrowOutputBuilder {
   /// around the coordinate dimension separately.
   void WriteCoord(const internal::GeoArrowVertex& v,
                   uint8_t dim_src = GEOARROW_DIMENSIONS_XYZM) {
-    if (coords_.n_coords == kCoordsCapcity) {
+    if (coords_.n_coords == kCoordsCapacity) {
       FlushCoords();
     }
 
@@ -364,12 +367,12 @@ class GeoArrowOutputBuilder {
   enum GeoArrowDimensions dim_ { GEOARROW_DIMENSIONS_XY };
   struct GeoArrowCoordView coords_{};
   std::array<double, 64> coord_buf_{};
-  static constexpr int64_t kCoordsCapcity = 64 / 4;
+  static constexpr int64_t kCoordsCapacity = 64 / 4;
   double coord_src_[5];
   double coord_dst_[5];
 
   void WriteCoord(double x, double y) {
-    if (coords_.n_coords == kCoordsCapcity) {
+    if (coords_.n_coords == kCoordsCapacity) {
       FlushCoords();
     }
 
