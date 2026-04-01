@@ -225,6 +225,13 @@ class GeoArrowOutputBuilder {
     GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBWriterAppendNull(&writer_));
   }
 
+  void AppendEmpty(enum GeoArrowGeometryType geometry_type) {
+    FeatureStart();
+    GeomStart(geometry_type);
+    GeomEnd();
+    FeatureEnd();
+  }
+
   void AppendGeometry(struct GeoArrowGeometryView geom) {
     GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBWriterAppend(&writer_, geom));
   }
@@ -299,7 +306,7 @@ class GeoArrowOutputBuilder {
 
   void GeomEnd() {
     FlushCoords();
-    GEOARROW_THROW_NOT_OK(&error_, v_.feat_end(&v_));
+    GEOARROW_THROW_NOT_OK(&error_, v_.geom_end(&v_));
   }
 
   void FeatureEnd() { GEOARROW_THROW_NOT_OK(&error_, v_.feat_end(&v_)); }
@@ -313,7 +320,7 @@ class GeoArrowOutputBuilder {
   GeoArrowWKBWriter writer_{};
   GeoArrowVisitor v_{};
   GeoArrowError error_{};
-  enum GeoArrowDimensions dim_ {};
+  enum GeoArrowDimensions dim_ {GEOARROW_DIMENSIONS_XY};
   struct GeoArrowCoordView coords_{};
   std::array<double, 64> coord_buf_{};
   static constexpr int64_t kCoordsCapcity = 64 / 4;
