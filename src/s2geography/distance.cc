@@ -115,7 +115,7 @@ struct EdgePair {
 
   /// \brief Resolve the native vertex of an interior match, which may
   /// come from the first or second input. The returned vertex is normalized
-  /// to take into acccount the dimensionality of the input.
+  /// to take into account the dimensionality of the input.
   internal::GeoArrowVertex ResolveInteriorVertex(
       const GeoArrowGeography& geog0, const GeoArrowGeography& geog1) const {
     if (edge_id0 == -1) {
