@@ -766,7 +766,7 @@ GeoArrowVertex GeoArrowEdge::Interpolate(const S2Point& point) {
   }
 
   // Otherwise, find the edge fraction and return the interpolated vertex
-  double fraction = S2::GetDistanceFraction(pt0, pt1, point);
+  double fraction = S2::GetDistanceFraction(point, pt0, pt1);
   return Interpolate(fraction);
 }
 
