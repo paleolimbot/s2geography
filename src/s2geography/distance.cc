@@ -423,23 +423,31 @@ void ClearanceLine(GeoArrowGeography& value0, GeoArrowGeography& value1,
 struct S2ClosestPointExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = WkbGeographyOutputBuilder;
+  using out_t = GeoArrowOutputBuilder;
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
     if (edge_pair_.shape_id0 == -1) {
-      out->Append(PointGeography());
+      out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_POINT);
       return;
     }
 
-    auto native_edge =
-        value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
-    auto native_vertex =
-        native_edge.Interpolate(edge_pair_.closest_points.first);
+    // internal::GeoArrowVertex v;
+    // if (edge_pair_.closest_points.first == edge_pair_.closest_points.second) {
 
-    // TODO: fix writing the output
+    // } else if (edge_pair_.edge_id0 == -1) {
+    //   S2GEOGRAPHY_DCHECK(false);
+    // } else {
+    //   auto native_edge =
+    //       value1.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
+    //   v = native_edge.Interpolate(edge_pair_.closest_points.first);
+    // }
 
-    out->Append(PointGeography(edge_pair_.closest_points.first));
+    out->FeatureStart();
+    out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
+    out->WriteCoord(edge_pair_.closest_points.first);
+    out->GeomEnd();
+    out->FeatureEnd();
   }
 
   EdgePair edge_pair_;
@@ -478,32 +486,31 @@ struct S2MaxDistanceExec {
 struct S2ShortestLineExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = WkbGeographyOutputBuilder;
+  using out_t = GeoArrowOutputBuilder;
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
     if (edge_pair_.shape_id0 == -1) {
-      out->Append(PolylineGeography());
+      out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_LINESTRING);
       return;
     }
 
-    auto native_edge0 =
-        value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
-    auto native_vertex0 =
-        native_edge0.Interpolate(edge_pair_.closest_points.first);
+    // auto native_edge0 =
+    //     value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
+    // auto native_vertex0 =
+    //     native_edge0.Interpolate(edge_pair_.closest_points.first);
 
-    auto native_edge1 =
-        value1.native_edge(edge_pair_.shape_id1, edge_pair_.edge_id1);
-    auto native_vertex1 =
-        native_edge0.Interpolate(edge_pair_.closest_points.second);
+    // auto native_edge1 =
+    //     value1.native_edge(edge_pair_.shape_id1, edge_pair_.edge_id1);
+    // auto native_vertex1 =
+    //     native_edge1.Interpolate(edge_pair_.closest_points.second);
 
-    // TODO: writing
-
-    PolylineGeography result(std::make_unique<S2Polyline>(
-        std::vector<S2Point>{edge_pair_.closest_points.first,
-                             edge_pair_.closest_points.second},
-        S2Debug::DISABLE));
-    out->Append(result);
+    out->FeatureStart();
+    out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+    out->WriteCoord(edge_pair_.closest_points.first);
+    out->WriteCoord(edge_pair_.closest_points.second);
+    out->GeomEnd();
+    out->FeatureEnd();
   }
 
   EdgePair edge_pair_;
