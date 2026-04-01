@@ -453,6 +453,8 @@ struct S2ClosestPointExec {
       return;
     }
 
+    out->SetDimensionsCommon(value0.dimensions(), value1.dimensions());
+
     internal::GeoArrowVertex v;
     if (edge_pair_.is_interior()) {
       v = edge_pair_.ResolveInteriorVertex(value0, value1);
@@ -513,6 +515,8 @@ struct S2ShortestLineExec {
       out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_LINESTRING);
       return;
     }
+
+    out->SetDimensionsCommon(value0.dimensions(), value1.dimensions());
 
     if (edge_pair_.is_interior()) {
       auto native_vertex = edge_pair_.ResolveInteriorVertex(value0, value1);

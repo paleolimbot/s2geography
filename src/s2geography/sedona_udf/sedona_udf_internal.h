@@ -207,6 +207,20 @@ class GeoArrowOutputBuilder {
     // however, it does support multiple cylces of Append/Finish.
   }
 
+  void SetDimensionsCommon(uint8_t dim0, uint8_t dim1) {
+    if (dim0 == GEOARROW_DIMENSIONS_XY || dim1 == GEOARROW_DIMENSIONS_XY) {
+      SetDimensions(GEOARROW_DIMENSIONS_XY);
+    } else if (dim0 == GEOARROW_DIMENSIONS_XYZ &&
+               dim1 == GEOARROW_DIMENSIONS_XYM) {
+      SetDimensions(GEOARROW_DIMENSIONS_XY);
+    } else if (dim0 == GEOARROW_DIMENSIONS_XYM &&
+               dim1 == GEOARROW_DIMENSIONS_XYZ) {
+      SetDimensions(GEOARROW_DIMENSIONS_XY);
+    } else {
+      SetDimensions(std::min(dim0, dim1));
+    }
+  }
+
   void SetDimensions(uint8_t dim) {
     switch (dim) {
       case GEOARROW_DIMENSIONS_XY:

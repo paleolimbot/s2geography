@@ -139,6 +139,11 @@ INSTANTIATE_TEST_SUITE_P(
                                   "POINT (0 1)", 111195.10117748393,
                                   "LINESTRING (0 0, 0 1)"},
 
+        DistanceScalarScalarParam{"point_distance_point_zm",
+                                  "POINT ZM (0 0 1 2)", "POINT ZM (0 1 2 3)",
+                                  111195.10117748393,
+                                  "LINESTRING ZM (0 0 1 2, 0 1 2 3)"},
+
         // Point x linestring (point on linestring)
         DistanceScalarScalarParam{"point_distance_linestring_on", "POINT (0 0)",
                                   "LINESTRING (0 0, 0 1)", 0.0,
