@@ -122,6 +122,16 @@ struct GeoArrowVertex {
   /// there is no Z or M present in the source sequence.
   double zm[2];
 
+  /// \brief Normalize the order of zm values such that this object
+  /// always represents, x, y, z, and m (in that order)
+  GeoArrowVertex Normalize(uint8_t dimensions) {
+    GeoArrowVertex v = *this;
+    if (dimensions == GEOARROW_DIMENSIONS_XYM) {
+      std::swap(v.zm[0], v.zm[1]);
+    }
+    return v;
+  }
+
   friend bool operator==(const GeoArrowVertex& a, const GeoArrowVertex& b) {
     // Treat NaNs as equal so that missing ZM information does not affect
     // inequality (as long as it is consistently missing for both)
@@ -146,6 +156,21 @@ struct GeoArrowEdge {
   GeoArrowVertex v0;
   /// \brief The second vertex of the edge
   GeoArrowVertex v1;
+
+  /// \brief Interpolate a value along this edge
+  ///
+  /// - lng and lat values are interpolated along a spherical path
+  /// - z and m values are interpolated linearly
+  GeoArrowVertex Interpolate(double fraction);
+
+  /// \brief Given an S2Point along this edge, interpolate
+  ///
+  /// - lng and lat values are derived directly from point unless
+  ///   the point falls exactly on the start or end of the edge (
+  ///   in which case the start or end vertex is returned directly
+  ///   to minimize roundtrip rounding errors)
+  /// - z and m values are interpolated linearly
+  GeoArrowVertex Interpolate(const S2Point& point);
 
   friend bool operator==(const GeoArrowEdge& a, const GeoArrowEdge& b) {
     return a.v0 == b.v0 && a.v1 == b.v1;

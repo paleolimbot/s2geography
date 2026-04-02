@@ -58,6 +58,11 @@ class GeoArrowPointShape : public S2Shape {
   /// that contains EMPTY children.
   void Init(struct GeoArrowGeometryView geom);
 
+  /// \brief Return the coordinate dimensions (e.g., XY, XYZ, XYM, or XYZM)
+  ///
+  /// The returned values match the integer constants in the GeoArrow header.
+  uint8_t dimensions() const;
+
   int num_vertices() const;
   S2Point vertex(int v) const;
 
@@ -83,6 +88,7 @@ class GeoArrowPointShape : public S2Shape {
 
  private:
   GeoArrowGeom geom_;
+  uint8_t dimensions_{GEOARROW_DIMENSIONS_XY};
 };
 
 /// \brief Linestring S2Shape implementation backed by a GeoArrowGeometryView
@@ -114,6 +120,11 @@ class GeoArrowLaxPolylineShape : public S2Shape {
   /// Throws if geom neither a LINESTRING nor a MULTILINESTRING.
   void Init(struct GeoArrowGeometryView geom);
 
+  /// \brief Return the coordinate dimensions (e.g., XY, XYZ, XYM, or XYZM)
+  ///
+  /// The returned values match the integer constants in the GeoArrow header.
+  uint8_t dimensions() const;
+
   int num_edges() const override;
   Edge edge(int e) const override;
   int dimension() const override;
@@ -138,6 +149,7 @@ class GeoArrowLaxPolylineShape : public S2Shape {
   GeoArrowGeom geom_{};
   int num_chains_{};
   std::vector<int> num_edges_;
+  uint8_t dimensions_{GEOARROW_DIMENSIONS_XY};
 };
 
 /// \brief Polygon S2Shape implementation backed by a GeoArrowGeometryView
@@ -193,6 +205,11 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   /// array).
   void NormalizeOrientation();
 
+  /// \brief Return the coordinate dimensions (e.g., XY, XYZ, XYM, or XYZM)
+  ///
+  /// The returned values match the integer constants in the GeoArrow header.
+  uint8_t dimensions() const;
+
   int num_edges() const override;
   Edge edge(int e) const override;
   int dimension() const override;
@@ -241,6 +258,7 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   // Owned loops for O(1) lookup
   std::vector<struct GeoArrowGeometryNode> loops_;
   std::vector<S2Point> point_scratch_;
+  uint8_t dimensions_{GEOARROW_DIMENSIONS_XY};
 };
 
 /// \brief Reusable Geography-like wrapper around a GeoArrowGeometryNode
@@ -321,6 +339,13 @@ class GeoArrowGeography {
 
   /// \brief Returns true if this geography has no edges
   bool is_empty() const;
+
+  /// \brief Returns the coordinate dimensions (e.g., XY, XYZ, XYM, XYZM)
+  ///
+  /// For geometries with mixed dimension components (e.g., GEOMETRYCOLLECTION
+  /// (POINT Z (...))) this may give unpredictable results; however, is
+  /// guaranteed to be consistent for consistently annotated input.
+  uint8_t dimensions() const;
 
   /// \brief Returns the dimension (0 for point, 1 for linestring, 2 for
   /// polygon), or -1 for geometry collections

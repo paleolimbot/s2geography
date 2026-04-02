@@ -2,114 +2,24 @@
 
 #include <gtest/gtest.h>
 
-#include <string>
 #include <vector>
 
 #include "geoarrow/geoarrow.hpp"
 #include "s2geography/geography.h"
+#include "s2geography/sedona_udf/sedona_udf_test_internal.h"
 #include "s2geography/wkt-reader.h"
 
 using namespace s2geography;
 
-/// \brief An owning wrapper around a GeoArrowGeometry with utilities to
-/// construct from WKT or WKB
-class TestGeometry {
- public:
-  TestGeometry() : oriented_(false) {
-    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowGeometryInit(&geom_));
+std::unique_ptr<GeoArrowLaxPolygonShape> TestGeometryToPolygonShape(
+    const TestGeometry& test_geom) {
+  auto out = std::make_unique<GeoArrowLaxPolygonShape>(test_geom.geom());
+  if (!test_geom.oriented()) {
+    out->NormalizeOrientation();
   }
 
-  ~TestGeometry() { GeoArrowGeometryReset(&geom_); }
-
-  TestGeometry(const TestGeometry&) = delete;
-  TestGeometry& operator=(const TestGeometry&) = delete;
-
-  TestGeometry(TestGeometry&& other) noexcept
-      : geom_(other.geom_),
-        label_(std::move(other.label_)),
-        oriented_(other.oriented_) {
-    GeoArrowGeometryInit(&other.geom_);
-  }
-
-  TestGeometry& operator=(TestGeometry&& other) noexcept {
-    if (this != &other) {
-      GeoArrowGeometryReset(&geom_);
-      geom_ = other.geom_;
-      GeoArrowGeometryInit(&other.geom_);
-      label_ = std::move(other.label_);
-      oriented_ = other.oriented_;
-    }
-    return *this;
-  }
-
-  static TestGeometry FromWKT(std::string_view wkt) {
-    TestGeometry result;
-    result.label_ = wkt;
-
-    struct GeoArrowStringView wkt_view{wkt.data(),
-                                       static_cast<int64_t>(wkt.size())};
-
-    struct GeoArrowVisitor v{};
-    GeoArrowGeometryInitVisitor(&result.geom_, &v);
-
-    struct GeoArrowWKTReader reader;
-    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKTReaderInit(&reader));
-    GeoArrowErrorCode code = GeoArrowWKTReaderVisit(&reader, wkt_view, &v);
-    GeoArrowWKTReaderReset(&reader);
-    if (code != GEOARROW_OK) {
-      throw Exception("Invalid WKT");
-    }
-
-    return result;
-  }
-
-  static TestGeometry FromWKB(const std::vector<uint8_t>& wkb) {
-    TestGeometry result;
-    struct GeoArrowWKBReader reader;
-    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBReaderInit(&reader));
-    struct GeoArrowBufferView src{wkb.data(), static_cast<int64_t>(wkb.size())};
-    struct GeoArrowGeometryView view;
-    GeoArrowErrorCode code =
-        GeoArrowWKBReaderRead(&reader, src, &view, nullptr);
-    if (code != GEOARROW_OK) {
-      GeoArrowWKBReaderReset(&reader);
-      throw Exception("Invalid WKB");
-    }
-
-    // Copy the parsed geometry into our owned GeoArrowGeometry
-    code = GeoArrowGeometryShallowCopy(view, &result.geom_);
-    GeoArrowWKBReaderReset(&reader);
-    if (code != GEOARROW_OK) {
-      throw Exception("Failed to copy WKB geometry");
-    }
-
-    return result;
-  }
-
-  struct GeoArrowGeometryView geom() const {
-    return GeoArrowGeometryAsView(&geom_);
-  }
-
-  bool oriented() const { return oriented_; }
-
-  void set_oriented(bool oriented) { oriented_ = oriented; }
-
-  std::string_view label() const { return label_; }
-
-  std::unique_ptr<GeoArrowLaxPolygonShape> ToPolygonShape() const {
-    auto out = std::make_unique<GeoArrowLaxPolygonShape>(geom());
-    if (!oriented()) {
-      out->NormalizeOrientation();
-    }
-
-    return out;
-  }
-
- private:
-  struct GeoArrowGeometry geom_;
-  std::string label_;
-  bool oriented_;
-};
+  return out;
+}
 
 /// \brief Utility to sanity check an S2Shape, which has global edge ids
 /// but also has edges organized into chains.
@@ -532,6 +442,100 @@ TEST(GeoArrowLoop, LoopMetrics) {
       S2LatLng::FromDegrees(1.1, 1.2).ToPoint(), reference_out));
   EXPECT_FALSE(hole_loop.BruteForceContains(
       S2LatLng::FromDegrees(5, 5).ToPoint(), reference_out));
+}
+
+// GeoArrowEdge::Interpolate tests
+
+TEST(GeoArrowEdge, InterpolateFractionClampedLow) {
+  internal::GeoArrowEdge edge{{0, 0, {10, 20}}, {10, 10, {30, 40}}};
+  auto result = edge.Interpolate(0.0);
+  EXPECT_EQ(result, edge.v0);
+
+  // Negative fraction should also return v0
+  result = edge.Interpolate(-0.5);
+  EXPECT_EQ(result, edge.v0);
+}
+
+TEST(GeoArrowEdge, InterpolateFractionClampedHigh) {
+  internal::GeoArrowEdge edge{{0, 0, {10, 20}}, {10, 10, {30, 40}}};
+  auto result = edge.Interpolate(1.0);
+  EXPECT_EQ(result, edge.v1);
+
+  // Fraction > 1 should also return v1
+  result = edge.Interpolate(2.0);
+  EXPECT_EQ(result, edge.v1);
+}
+
+TEST(GeoArrowEdge, InterpolateFractionMidpoint) {
+  internal::GeoArrowEdge edge{{0, 0, {10, 20}}, {10, 10, {30, 40}}};
+  auto result = edge.Interpolate(0.5);
+  // Spherical interpolation: lng/lat won't be exactly linear
+  EXPECT_DOUBLE_EQ(result.lng, 4.9616312267025071);
+  EXPECT_DOUBLE_EQ(result.lat, 5.0190006978611486);
+  // ZM values are still linearly interpolated
+  EXPECT_DOUBLE_EQ(result.zm[0], 20);
+  EXPECT_DOUBLE_EQ(result.zm[1], 30);
+
+  // Quarter fraction
+  result = edge.Interpolate(0.25);
+  EXPECT_DOUBLE_EQ(result.lng, 2.476047452165361);
+  EXPECT_DOUBLE_EQ(result.lat, 2.5118515100847665);
+  EXPECT_DOUBLE_EQ(result.zm[0], 15);
+  EXPECT_DOUBLE_EQ(result.zm[1], 25);
+}
+
+TEST(GeoArrowEdge, InterpolatePointDegenerateEdge) {
+  // When v0 and v1 map to the same S2Point, should return v0
+  internal::GeoArrowEdge edge{{5, 10, {100, 200}}, {5, 10, {300, 400}}};
+  S2Point any_point = S2LatLng::FromDegrees(10, 5).ToPoint();
+  auto result = edge.Interpolate(any_point);
+  EXPECT_EQ(result, edge.v0);
+}
+
+TEST(GeoArrowEdge, InterpolatePointOnEdge) {
+  internal::GeoArrowEdge edge{{0, 0, {10, 20}}, {10, 0, {30, 40}}};
+  // Point at the midpoint of a constant-latitude edge
+  S2Point midpoint = S2LatLng::FromDegrees(0, 5).ToPoint();
+  auto result = edge.Interpolate(midpoint);
+  EXPECT_DOUBLE_EQ(result.lng, 5);
+  EXPECT_DOUBLE_EQ(result.lat, 0);
+  EXPECT_DOUBLE_EQ(result.zm[0], 20);
+  EXPECT_DOUBLE_EQ(result.zm[1], 30);
+
+  // Point under halfway
+  S2Point quarter_point = S2LatLng::FromDegrees(0, 2.5).ToPoint();
+  result = edge.Interpolate(quarter_point);
+  EXPECT_DOUBLE_EQ(result.lng, 2.5);
+  EXPECT_DOUBLE_EQ(result.lat, 0);
+  EXPECT_DOUBLE_EQ(result.zm[0], 15);
+  EXPECT_DOUBLE_EQ(result.zm[1], 25);
+
+  // Point over halfway
+  S2Point three_quarter_point = S2LatLng::FromDegrees(0, 7.5).ToPoint();
+  result = edge.Interpolate(three_quarter_point);
+  EXPECT_DOUBLE_EQ(result.lng, 7.5);
+  EXPECT_DOUBLE_EQ(result.lat, 0);
+  EXPECT_DOUBLE_EQ(result.zm[0], 25);
+  EXPECT_DOUBLE_EQ(result.zm[1], 35);
+}
+
+TEST(GeoArrowEdge, InterpolatePointAtEndpoints) {
+  internal::GeoArrowEdge edge{{0, 0, {10, 20}}, {10, 0, {30, 40}}};
+  // Point at v0
+  S2Point pt0 = S2LatLng::FromDegrees(0, 0).ToPoint();
+  auto result = edge.Interpolate(pt0);
+  EXPECT_DOUBLE_EQ(result.lng, 0);
+  EXPECT_DOUBLE_EQ(result.lat, 0);
+  EXPECT_DOUBLE_EQ(result.zm[0], 10);
+  EXPECT_DOUBLE_EQ(result.zm[1], 20);
+
+  // Point at v1
+  S2Point pt1 = S2LatLng::FromDegrees(0, 10).ToPoint();
+  result = edge.Interpolate(pt1);
+  EXPECT_DOUBLE_EQ(result.lng, 10);
+  EXPECT_DOUBLE_EQ(result.lat, 0);
+  EXPECT_DOUBLE_EQ(result.zm[0], 30);
+  EXPECT_DOUBLE_EQ(result.zm[1], 40);
 }
 
 // Shape tests
@@ -1123,7 +1127,7 @@ TEST(GeoArrowLaxPolygonShape, ShapeIndexContains) {
       "(-5 -5, -5 5, 5 5, 5 -5, -5 -5))");
 
   MutableS2ShapeIndex poly_index;
-  poly_index.Add(poly_geom.ToPolygonShape());
+  poly_index.Add(TestGeometryToPolygonShape(poly_geom));
 
   WKTReader reader;
   S2BooleanOperation::Options options;
@@ -1165,7 +1169,7 @@ TEST(GeoArrowLaxPolygonShape, ShapeIndexContainsMultiPolygonWithHoles) {
     SCOPED_TRACE(test_geom->label());
 
     MutableS2ShapeIndex poly_index;
-    auto shape = test_geom->ToPolygonShape();
+    auto shape = TestGeometryToPolygonShape(*test_geom);
     ValidateShape(*shape);
     poly_index.Add(std::move(shape));
 

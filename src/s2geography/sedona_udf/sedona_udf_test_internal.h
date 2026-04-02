@@ -2,11 +2,149 @@
 
 #include <gtest/gtest.h>
 
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
 #include "geoarrow/geoarrow.hpp"
 #include "nanoarrow/nanoarrow.hpp"
 #include "s2geography.h"
-#include "s2geography/s2geography_gtest_util.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
+
+/// \brief An owning wrapper around a GeoArrowGeometry with utilities to
+/// construct from WKT or WKB
+class TestGeometry {
+ public:
+  TestGeometry() : oriented_(false) {
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowGeometryInit(&geom_));
+  }
+
+  ~TestGeometry() { GeoArrowGeometryReset(&geom_); }
+
+  TestGeometry(const TestGeometry&) = delete;
+  TestGeometry& operator=(const TestGeometry&) = delete;
+
+  TestGeometry(TestGeometry&& other) noexcept
+      : geom_(other.geom_),
+        label_(std::move(other.label_)),
+        oriented_(other.oriented_),
+        data_(std::move(other.data_)) {
+    GeoArrowGeometryInit(&other.geom_);
+  }
+
+  TestGeometry& operator=(TestGeometry&& other) noexcept {
+    if (this != &other) {
+      GeoArrowGeometryReset(&geom_);
+      geom_ = other.geom_;
+      GeoArrowGeometryInit(&other.geom_);
+      label_ = std::move(other.label_);
+      oriented_ = other.oriented_;
+      data_ = std::move(other.data_);
+    }
+    return *this;
+  }
+
+  std::string ToWKT(int precision = 16) const {
+    struct GeoArrowWKTWriter writer;
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKTWriterInit(&writer));
+    writer.precision = precision;
+
+    struct GeoArrowVisitor v;
+    GeoArrowVisitorInitVoid(&v);
+    GeoArrowWKTWriterInitVisitor(&writer, &v);
+
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowGeometryViewVisit(geom(), &v));
+
+    nanoarrow::UniqueArray out;
+    GEOARROW_THROW_NOT_OK(nullptr, S2GeographyGeoArrowWKTWriterFinish(
+                                       &writer, out.get(), nullptr));
+    GeoArrowWKTWriterReset(&writer);
+
+    auto* offsets = reinterpret_cast<const int32_t*>(out->buffers[1]);
+    auto* data = reinterpret_cast<const char*>(out->buffers[2]);
+    std::string string_out(data, offsets[1]);
+
+    // Work around a bug in the WKT writer for empty points
+    if (string_out == "POINT (nan nan)") {
+      return "POINT EMPTY";
+    } else if (string_out == "POINT Z (nan nan nan)") {
+      return "POINT Z EMPTY";
+    } else if (string_out == "POINT M (nan nan nan)") {
+      return "POINT M EMPTY";
+    } else if (string_out == "POINT ZM (nan nan nan nan)") {
+      return "POINT ZM EMPTY";
+    }
+
+    return string_out;
+  }
+
+  static TestGeometry FromWKT(std::string_view wkt) {
+    TestGeometry result;
+    result.label_ = wkt;
+
+    struct GeoArrowStringView wkt_view{wkt.data(),
+                                       static_cast<int64_t>(wkt.size())};
+
+    struct GeoArrowVisitor v{};
+    GeoArrowGeometryInitVisitor(&result.geom_, &v);
+
+    struct GeoArrowWKTReader reader;
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKTReaderInit(&reader));
+    GeoArrowErrorCode code = GeoArrowWKTReaderVisit(&reader, wkt_view, &v);
+    GeoArrowWKTReaderReset(&reader);
+    if (code != GEOARROW_OK) {
+      throw std::runtime_error("Invalid WKT");
+    }
+
+    return result;
+  }
+
+  static TestGeometry FromWKB(std::vector<uint8_t> wkb) {
+    TestGeometry result;
+    result.data_ = std::move(wkb);
+
+    struct GeoArrowWKBReader reader;
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBReaderInit(&reader));
+    struct GeoArrowBufferView src{result.data_.data(),
+                                  static_cast<int64_t>(result.data_.size())};
+    struct GeoArrowGeometryView view;
+    GeoArrowErrorCode code =
+        GeoArrowWKBReaderRead(&reader, src, &view, nullptr);
+    if (code != GEOARROW_OK) {
+      GeoArrowWKBReaderReset(&reader);
+      throw std::runtime_error("Invalid WKB");
+    }
+
+    // Copy the parsed geometry into our owned GeoArrowGeometry. Because data_
+    // is attached to this object, the pointed to buffers from the nodes will
+    // stay valid
+    code = GeoArrowGeometryShallowCopy(view, &result.geom_);
+    GeoArrowWKBReaderReset(&reader);
+    if (code != GEOARROW_OK) {
+      throw std::runtime_error("Failed to copy WKB geometry");
+    }
+
+    return result;
+  }
+
+  struct GeoArrowGeometryView geom() const {
+    return GeoArrowGeometryAsView(&geom_);
+  }
+
+  bool oriented() const { return oriented_; }
+
+  void set_oriented(bool oriented) { oriented_ = oriented; }
+
+  std::string_view label() const { return label_; }
+
+ private:
+  struct GeoArrowGeometry geom_;
+  std::string label_;
+  bool oriented_;
+  std::vector<uint8_t> data_;
+};
 
 // We use a simple model for testing functions: types are either geoarrow.wkb
 // or an Arrow type (the only ones used here are bool, int32, and double).
@@ -230,27 +368,35 @@ inline void TestResultArrow(struct ArrowArray* result,
 // Check a geography result. This rounds the WKT output to 6 decimal places
 // to avoid floating point differences between platforms.
 inline void TestResultGeography(
-    struct ArrowArray* result,
-    std::vector<std::optional<std::string>> expected) {
+    struct ArrowArray* result, std::vector<std::optional<std::string>> expected,
+    int precision = 6) {
   ASSERT_EQ(result->length, expected.size());
 
-  s2geography::geoarrow::Reader reader;
-  s2geography::geoarrow::ImportOptions options;
-  options.set_check(false);
-  reader.Init(s2geography::geoarrow::Reader::InputType::kWKB, options);
-  std::vector<std::unique_ptr<s2geography::Geography>> geogs;
-  reader.ReadGeography(result, 0, result->length, &geogs);
+  nanoarrow::UniqueArrayView result_view;
+  ArrowArrayViewInitFromType(result_view.get(), NANOARROW_TYPE_BINARY);
+  NANOARROW_THROW_NOT_OK(
+      ArrowArrayViewSetArray(result_view.get(), result, nullptr));
 
   for (int64_t i = 0; i < result->length; i++) {
     SCOPED_TRACE("expected[" + std::to_string(i) + "]");
-    if (geogs[i].get() == nullptr) {
+    if (ArrowArrayViewIsNull(result_view.get(), i)) {
       ASSERT_FALSE(expected[i].has_value())
           << "Expected " << ::testing::PrintToString(*expected[i])
           << " but got NULL";
     } else {
+      auto actual_binary = ArrowArrayViewGetBytesUnsafe(result_view.get(), i);
+      std::vector<uint8_t> actual_binary_vec(
+          actual_binary.data.as_uint8,
+          actual_binary.data.as_uint8 + actual_binary.size_bytes);
+      auto actual_geometry = TestGeometry::FromWKB(actual_binary_vec);
+
       ASSERT_TRUE(expected[i].has_value())
-          << "Expected NULL but got " << ::testing::PrintToString(*geogs[i]);
-      ASSERT_THAT(*geogs[i], s2geography::WktEquals6(*expected[i]));
+          << "Expected NULL but got "
+          << ::testing::PrintToString(actual_geometry.ToWKT(precision));
+
+      auto expected_geometry = TestGeometry::FromWKT(*expected[i]);
+      ASSERT_EQ(actual_geometry.ToWKT(precision),
+                expected_geometry.ToWKT(precision));
     }
   }
 }

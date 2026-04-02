@@ -2,6 +2,7 @@
 #include "s2geography/geoarrow-geography.h"
 
 #include <s2/s2edge_crosser.h>
+#include <s2/s2edge_distances.h>
 #include <s2/s2loop_measures.h>
 #include <s2/s2point.h>
 #include <s2/s2projections.h>
@@ -61,7 +62,10 @@ GeoArrowPointShape::GeoArrowPointShape(struct GeoArrowGeometryView geom) {
   Init(geom);
 }
 
-void GeoArrowPointShape::Clear() { geom_ = {nullptr, 0}; }
+void GeoArrowPointShape::Clear() {
+  geom_ = {nullptr, 0};
+  dimensions_ = GEOARROW_DIMENSIONS_XY;
+}
 
 void GeoArrowPointShape::Init(struct GeoArrowGeometryView geom) {
   switch (geom.root->geometry_type) {
@@ -100,7 +104,12 @@ void GeoArrowPointShape::Init(struct GeoArrowGeometryView geom) {
     }
     return true;
   });
+
+  // Ensure we keep a record of the source dimensions
+  dimensions_ = geom.root->dimensions;
 }
+
+uint8_t GeoArrowPointShape::dimensions() const { return dimensions_; }
 
 int GeoArrowPointShape::num_vertices() const {
   return static_cast<int>(geom_.size());
@@ -163,6 +172,7 @@ void GeoArrowLaxPolylineShape::Clear() {
   num_chains_ = 0;
   num_edges_.clear();
   num_edges_.push_back(0);
+  dimensions_ = GEOARROW_DIMENSIONS_XY;
 }
 
 void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
@@ -211,7 +221,12 @@ void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
     num_edges_[i++] = num_edges;
     return true;
   });
+
+  // Keep a record of the source dimensions
+  dimensions_ = geom.root->dimensions;
 }
+
+uint8_t GeoArrowLaxPolylineShape::dimensions() const { return dimensions_; }
 
 int GeoArrowLaxPolylineShape::num_edges() const { return num_edges_.back(); }
 
@@ -272,6 +287,7 @@ void GeoArrowLaxPolygonShape::Clear() {
   num_edges_.clear();
   num_edges_.push_back(0);
   loops_.clear();
+  dimensions_ = GEOARROW_DIMENSIONS_XY;
 }
 
 void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
@@ -320,6 +336,9 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
       });
 
   geom_ = {loops_.data(), static_cast<int64_t>(loops_.size())};
+
+  // Keep a record of the source dimensions
+  dimensions_ = geom.root->dimensions;
 }
 
 void GeoArrowLaxPolygonShape::NormalizeOrientation() {
@@ -332,6 +351,8 @@ void GeoArrowLaxPolygonShape::NormalizeOrientation() {
     }
   }
 }
+
+uint8_t GeoArrowLaxPolygonShape::dimensions() const { return dimensions_; }
 
 int GeoArrowLaxPolygonShape::num_edges() const { return num_edges_.back(); }
 
@@ -554,6 +575,26 @@ std::optional<S2Point> GeoArrowGeography::Point() const {
   }
 }
 
+uint8_t GeoArrowGeography::dimensions() const {
+  if (geom_.size_nodes == 0) {
+    return GEOARROW_DIMENSIONS_XY;
+  }
+
+  switch (geom_.root->geometry_type) {
+    case GEOARROW_GEOMETRY_TYPE_POINT:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+      return points_.dimensions();
+    case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+    case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
+      return lines_.dimensions();
+    case GEOARROW_GEOMETRY_TYPE_POLYGON:
+    case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
+      return polygons_.dimensions();
+    default:
+      return geom_.root->dimensions;
+  }
+}
+
 int GeoArrowGeography::dimension() const {
   if (geom_.size_nodes == 0) {
     return -1;
@@ -738,6 +779,60 @@ internal::GeoArrowEdge GeoArrowGeography::native_edge(int shape_id,
       throw Exception("unsupported geometry type");
   }
 }
+
+namespace internal {
+
+GeoArrowVertex GeoArrowEdge::Interpolate(double fraction) {
+  if (fraction <= 0) {
+    return v0;
+  } else if (fraction >= 1) {
+    return v1;
+  }
+
+  S2Point pt0 = S2LatLng::FromDegrees(v0.lat, v0.lng).ToPoint();
+  S2Point pt1 = S2LatLng::FromDegrees(v1.lat, v1.lng).ToPoint();
+  if (pt0 == pt1) {
+    return v0;
+  }
+
+  S2LatLng out = S2LatLng(S2::Interpolate(pt0, pt1, fraction));
+  double dzm0 = (v1.zm[0] - v0.zm[0]) * fraction;
+  double dzm1 = (v1.zm[1] - v0.zm[1]) * fraction;
+  return {out.lng().degrees(),
+          out.lat().degrees(),
+          {v0.zm[0] + dzm0, v0.zm[1] + dzm1}};
+}
+
+GeoArrowVertex GeoArrowEdge::Interpolate(const S2Point& point) {
+  auto pt0 = S2LatLng::FromDegrees(v0.lat, v0.lng).ToPoint();
+  auto pt1 = S2LatLng::FromDegrees(v1.lat, v1.lng).ToPoint();
+
+  // If the start and end are the same in lon/lat space, return the first vertex
+  if (pt0 == pt1) {
+    return v0;
+  }
+
+  // Find the edge fraction. Use this to interpolate ZM (or to directly return
+  // a source vertex if the fraction is 0 or 1).
+  double fraction = S2::GetDistanceFraction(point, pt0, pt1);
+  if (fraction == 0) {
+    return v0;
+  } else if (fraction == 1) {
+    return v1;
+  }
+
+  // Otherwise, interpolate ZM values in linear space but use the original point
+  // to compute the output longitude and latitude.
+  double dzm0 = (v1.zm[0] - v0.zm[0]) * fraction;
+  double dzm1 = (v1.zm[1] - v0.zm[1]) * fraction;
+
+  S2LatLng ll(point);
+  return {ll.lng().degrees(),
+          ll.lat().degrees(),
+          {v0.zm[0] + dzm0, v0.zm[1] + dzm1}};
+}
+
+}  // namespace internal
 
 double GeoArrowLoop::GetSignedArea() {
   BuildScratch();

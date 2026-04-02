@@ -103,6 +103,33 @@ struct EdgePair {
   int edge_id1{-1};
   std::pair<S2Point, S2Point> closest_points{};
   S1ChordAngle distance{S1ChordAngle::Infinity()};
+
+  /// \brief Return true if this represents an empty match
+  bool is_empty() const { return shape_id0 == -1; }
+
+  /// \brief Return true if one side of this match is an interior
+  /// (i.e., is not an actual vertex on one side of the match)
+  bool is_interior() const {
+    return !is_empty() && (edge_id0 == -1 || edge_id1 == -1);
+  }
+
+  /// \brief Resolve the native vertex of an interior match, which may
+  /// come from the first or second input. The returned vertex is normalized
+  /// to take into account the dimensionality of the input.
+  internal::GeoArrowVertex ResolveInteriorVertex(
+      const GeoArrowGeography& geog0, const GeoArrowGeography& geog1) const {
+    if (edge_id0 == -1) {
+      auto e = geog1.native_edge(shape_id1, edge_id1);
+      return e.Interpolate(closest_points.second).Normalize(geog1.dimensions());
+    } else if (edge_id1 == -1) {
+      auto e = geog0.native_edge(shape_id0, edge_id0);
+      return e.Interpolate(closest_points.first).Normalize(geog0.dimensions());
+    } else {
+      throw Exception(
+          "Can't resolve interior vertex of EdgePair where neither result is "
+          "an interior result");
+    }
+  }
 };
 
 void ClearanceLineOnlyEdgesBruteForce(const GeoArrowGeography& value0,
@@ -423,15 +450,36 @@ void ClearanceLine(GeoArrowGeography& value0, GeoArrowGeography& value1,
 struct S2ClosestPointExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = WkbGeographyOutputBuilder;
+  using out_t = GeoArrowOutputBuilder;
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
+    // The output usually consists of a vertex derived from the first
+    // input. In extreme cases this could result in a NaN written to
+    // Z or M (e.g., if value0 is a polygon Z/M and value1 is fully
+    // contained and only contains XY values),
+    out->SetDimensions(value0.dimensions());
+
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
-    if (edge_pair_.shape_id0 == -1) {
-      out->Append(PointGeography());
-    } else {
-      out->Append(PointGeography(edge_pair_.closest_points.first));
+    if (edge_pair_.is_empty()) {
+      out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_POINT);
+      return;
     }
+
+    internal::GeoArrowVertex v;
+    if (edge_pair_.is_interior()) {
+      v = edge_pair_.ResolveInteriorVertex(value0, value1);
+    } else {
+      auto native_edge =
+          value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
+      v = native_edge.Interpolate(edge_pair_.closest_points.first)
+              .Normalize(value0.dimensions());
+    }
+
+    out->FeatureStart();
+    out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
+    out->WriteCoord(v);
+    out->GeomEnd();
+    out->FeatureEnd();
   }
 
   EdgePair edge_pair_;
@@ -444,7 +492,7 @@ struct S2DistanceExec {
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputeDistance);
-    if (edge_pair_.shape_id0 == -1) {
+    if (edge_pair_.is_empty()) {
       out->AppendNull();
     } else {
       out->Append(edge_pair_.distance.radians() * S2Earth::RadiusMeters());
@@ -470,19 +518,49 @@ struct S2MaxDistanceExec {
 struct S2ShortestLineExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = WkbGeographyOutputBuilder;
+  using out_t = GeoArrowOutputBuilder;
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
+    // The output usually consists of one vertex from each side, so
+    // use the common dimensions as the output dimensionality
+    out->SetDimensionsCommon(value0.dimensions(), value1.dimensions());
+
     ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
-    if (edge_pair_.shape_id0 == -1) {
-      out->Append(PolylineGeography());
-    } else {
-      PolylineGeography result(std::make_unique<S2Polyline>(
-          std::vector<S2Point>{edge_pair_.closest_points.first,
-                               edge_pair_.closest_points.second},
-          S2Debug::DISABLE));
-      out->Append(result);
+    if (edge_pair_.is_empty()) {
+      out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+      return;
     }
+
+    if (edge_pair_.is_interior()) {
+      auto native_vertex = edge_pair_.ResolveInteriorVertex(value0, value1);
+
+      out->FeatureStart();
+      out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+      out->WriteCoord(native_vertex);
+      out->WriteCoord(native_vertex);
+      out->GeomEnd();
+      out->FeatureEnd();
+      return;
+    }
+
+    auto native_edge0 =
+        value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
+    auto native_vertex0 =
+        native_edge0.Interpolate(edge_pair_.closest_points.first)
+            .Normalize(value0.dimensions());
+
+    auto native_edge1 =
+        value1.native_edge(edge_pair_.shape_id1, edge_pair_.edge_id1);
+    auto native_vertex1 =
+        native_edge1.Interpolate(edge_pair_.closest_points.second)
+            .Normalize(value1.dimensions());
+
+    out->FeatureStart();
+    out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+    out->WriteCoord(native_vertex0);
+    out->WriteCoord(native_vertex1);
+    out->GeomEnd();
+    out->FeatureEnd();
   }
 
   EdgePair edge_pair_;

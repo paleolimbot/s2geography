@@ -1,6 +1,10 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <cerrno>
+#include <cstring>
+#include <limits>
 
 #include "geoarrow/geoarrow.hpp"
 #include "nanoarrow/nanoarrow.hpp"
@@ -165,6 +169,230 @@ class WkbGeographyOutputBuilder {
 
  private:
   geoarrow::Writer writer_;
+};
+
+/// \brief Low-level output builder for Geography as WKB
+///
+/// This builder handles output from functions that return geometry
+/// and exports the output as WKB. Unlike the WkbGeographyOutputBuilder,
+/// this builder exposes low-level building primitives for faster output
+/// (i.e., streaming output with minimal intermediary copying) and more
+/// feature-rich (e.g., ZM output and lossless point/multipoint semantics).
+class GeoArrowOutputBuilder {
+ public:
+  GeoArrowOutputBuilder() {
+    // Initialize the writer and wire it up to the visitor
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBWriterInit(&writer_));
+    GeoArrowWKBWriterInitVisitor(&writer_, &v_);
+    v_.error = &error_;
+
+    // Wire up our coordinate buffer to a GeoArrowCoordView, which is what
+    // the visitor requires for coord visiting.
+    coords_.coords_stride = 1;
+    coords_.n_values = 2;
+    coords_.n_coords = 0;
+    coords_.values[0] = coord_buf_.data();
+    coords_.values[1] = coord_buf_.data() + coord_buf_.size() / 4;
+    coords_.values[2] = coord_buf_.data() + 2 * coord_buf_.size() / 4;
+    coords_.values[3] = coord_buf_.data() + 3 * coord_buf_.size() / 4;
+
+    // Set the fill value for the unlikely event where the output is set to
+    // write more dimensions than exist in a coordinate.
+    coord_src_[0] = std::numeric_limits<double>::quiet_NaN();
+  }
+
+  // Not copyable
+  GeoArrowOutputBuilder(const GeoArrowOutputBuilder&) = delete;
+  GeoArrowOutputBuilder& operator=(const GeoArrowOutputBuilder&) = delete;
+
+  // Ensure we manage the C object we're wrapping correctly
+  ~GeoArrowOutputBuilder() { GeoArrowWKBWriterReset(&writer_); }
+
+  void InitOutputType(struct ArrowSchema* out) {
+    ::geoarrow::Wkb()
+        .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
+        .InitSchema(out);
+  }
+
+  void InitOutputTypeWithCrs(struct ArrowSchema* out, const std::string& crs) {
+    ::geoarrow::Wkb()
+        .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
+        .WithCrs(crs)
+        .InitSchema(out);
+  }
+
+  void Reserve(int64_t additional_size) {
+    // The current geoarrow writer doesn't provide any support for this;
+    // however, it does support multiple cycles of Append/Finish.
+  }
+
+  /// \brief Set the dimensions of this writer to the common dimensions of dim0
+  /// and dim1
+  ///
+  /// For example, XYZM + XYM input will be written set to XYM output.
+  void SetDimensionsCommon(uint8_t dim0, uint8_t dim1) {
+    if (dim0 == GEOARROW_DIMENSIONS_XY || dim1 == GEOARROW_DIMENSIONS_XY) {
+      SetDimensions(GEOARROW_DIMENSIONS_XY);
+    } else if (dim0 == GEOARROW_DIMENSIONS_XYZ &&
+               dim1 == GEOARROW_DIMENSIONS_XYM) {
+      SetDimensions(GEOARROW_DIMENSIONS_XY);
+    } else if (dim0 == GEOARROW_DIMENSIONS_XYM &&
+               dim1 == GEOARROW_DIMENSIONS_XYZ) {
+      SetDimensions(GEOARROW_DIMENSIONS_XY);
+    } else {
+      SetDimensions(std::min(dim0, dim1));
+    }
+  }
+
+  /// \brief Set the output dimensions
+  ///
+  /// Set the output to a specific dimensionality. Coordinates written with
+  /// more dimensions will have these dimensions dropped; coordinates written
+  /// with fewer dimensions will have these dimensions filled. The fill value
+  /// is currently hard-coded to NaN; however, this output should be unlikely
+  /// under normal input/output scenarios.
+  void SetDimensions(uint8_t dim) {
+    switch (dim) {
+      case GEOARROW_DIMENSIONS_XY:
+      case GEOARROW_DIMENSIONS_XYZ:
+      case GEOARROW_DIMENSIONS_XYM:
+      case GEOARROW_DIMENSIONS_XYZM:
+        coords_.n_values = _GeoArrowkNumDimensions[dim];
+        dim_ = static_cast<enum GeoArrowDimensions>(dim);
+        break;
+      default:
+        throw Exception("Unknown dimensions constant");
+    }
+  }
+
+  /// \brief Append a null value
+  void AppendNull() {
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBWriterAppendNull(&writer_));
+  }
+
+  /// \brief Append an empty geometry of a specified type
+  void AppendEmpty(enum GeoArrowGeometryType geometry_type =
+                       GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION) {
+    FeatureStart();
+    GeomStart(geometry_type);
+    GeomEnd();
+    FeatureEnd();
+  }
+
+  /// \brief Append a preexisting geometry verbatim as a complete (non null)
+  /// feature
+  void AppendGeometry(struct GeoArrowGeometryView geom) {
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBWriterAppend(&writer_, geom));
+  }
+
+  /// \brief Start a feature (must be paired with FeatureEnd())
+  void FeatureStart() { GEOARROW_THROW_NOT_OK(&error_, v_.feat_start(&v_)); }
+
+  /// \brief Start a geometry (must be paired with GeomEnd())
+  void GeomStart(enum GeoArrowGeometryType geometry_type) {
+    GEOARROW_THROW_NOT_OK(&error_, v_.geom_start(&v_, geometry_type, dim_));
+  }
+
+  /// \brief Start a ring (must be paired with RingEnd())
+  void RingStart() { GEOARROW_THROW_NOT_OK(&error_, v_.ring_start(&v_)); }
+
+  /// \brief Write an S2Point coordinate as lon, lat
+  void WriteCoord(const S2Point& v) { WriteCoord(S2LatLng(v)); }
+
+  /// \brief Write an S2LatLng coordinate as lon, lat
+  void WriteCoord(const S2LatLng& v) {
+    WriteCoord(v.lng().degrees(), v.lat().degrees());
+  }
+
+  /// \brief Write a GeoArrowVertex
+  ///
+  /// Dimensions are mapped using dim_src and the value set for the output
+  /// (i.e., dimensions are mapped by name, not by position). It is usually
+  /// easier to call v.Normalize() and use the default dim_src than to pass
+  /// around the coordinate dimension separately.
+  void WriteCoord(const internal::GeoArrowVertex& v,
+                  uint8_t dim_src = GEOARROW_DIMENSIONS_XYZM) {
+    if (coords_.n_coords == kCoordsCapacity) {
+      FlushCoords();
+    }
+
+    if (dim_ == GEOARROW_DIMENSIONS_XY) {
+      const_cast<double*>(coords_.values[0])[coords_.n_coords] = v.lng;
+      const_cast<double*>(coords_.values[1])[coords_.n_coords] = v.lat;
+      ++coords_.n_coords;
+      return;
+    }
+
+    int map[5];
+    GeoArrowMapDimensions(static_cast<enum GeoArrowDimensions>(dim_src), dim_,
+                          map);
+    std::memcpy(coord_src_ + 1, &v, sizeof(v));
+    for (int i = 0; i < 4; i++) {
+      coord_dst_[i] = coord_src_[map[i] + 1];
+    }
+
+    for (int i = 0; i < coords_.n_values; ++i) {
+      const_cast<double*>(coords_.values[i])[coords_.n_coords] = coord_dst_[i];
+    }
+    ++coords_.n_coords;
+  }
+
+  /// \brief End a ring
+  void RingEnd() {
+    FlushCoords();
+    GEOARROW_THROW_NOT_OK(&error_, v_.ring_end(&v_));
+  }
+
+  /// \brief End a geometry
+  void GeomEnd() {
+    FlushCoords();
+    GEOARROW_THROW_NOT_OK(&error_, v_.geom_end(&v_));
+  }
+
+  /// \brief End a feature
+  void FeatureEnd() { GEOARROW_THROW_NOT_OK(&error_, v_.feat_end(&v_)); }
+
+  /// \brief Finish the output
+  ///
+  /// The same output builder may be finished and appended to multiple times.
+  void Finish(struct ArrowArray* out) {
+    GEOARROW_THROW_NOT_OK(&error_,
+                          GeoArrowWKBWriterFinish(&writer_, out, &error_));
+  }
+
+ private:
+  GeoArrowWKBWriter writer_{};
+  GeoArrowVisitor v_{};
+  GeoArrowError error_{};
+  enum GeoArrowDimensions dim_ { GEOARROW_DIMENSIONS_XY };
+  struct GeoArrowCoordView coords_{};
+  std::array<double, 64> coord_buf_{};
+  static constexpr int64_t kCoordsCapacity = 64 / 4;
+  double coord_src_[5];
+  double coord_dst_[5];
+
+  void WriteCoord(double x, double y) {
+    if (coords_.n_coords == kCoordsCapacity) {
+      FlushCoords();
+    }
+
+    const_cast<double*>(coords_.values[0])[coords_.n_coords] = x;
+    const_cast<double*>(coords_.values[1])[coords_.n_coords] = y;
+    for (int i = 2; i < coords_.n_values; ++i) {
+      const_cast<double*>(coords_.values[i])[coords_.n_coords] = coord_src_[0];
+    }
+
+    ++coords_.n_coords;
+  }
+
+  void FlushCoords() {
+    if (coords_.n_coords == 0) {
+      return;
+    }
+
+    GEOARROW_THROW_NOT_OK(&error_, v_.coords(&v_, &coords_));
+    coords_.n_coords = 0;
+  }
 };
 
 /// \brief Generic view of Arrow input
