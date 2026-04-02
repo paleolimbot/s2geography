@@ -122,6 +122,9 @@ struct GeoArrowVertex {
   /// there is no Z or M present in the source sequence.
   double zm[2];
 
+  /// \brief Return the S2Point representation of this vertex
+  S2Point ToPoint() const { return S2LatLng::FromDegrees(lat, lng).ToPoint(); }
+
   /// \brief Normalize the order of zm values such that this object
   /// always represents, x, y, z, and m (in that order)
   GeoArrowVertex Normalize(uint8_t dimensions) {
@@ -369,6 +372,9 @@ class GeoArrowChain {
 
   /// \brief The number of coordinates in the sequence
   uint32_t size() const { return node->size; }
+
+  /// \brief The coordinate dimensions of this sequence
+  uint8_t dimensions() const { return node->dimensions; }
 
   /// \brief Call a function for each S2Point in this sequence
   template <typename Visit>

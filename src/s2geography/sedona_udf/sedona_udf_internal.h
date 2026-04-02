@@ -279,6 +279,15 @@ class GeoArrowOutputBuilder {
     FeatureEnd();
   }
 
+  void AppendPoint(const internal::GeoArrowVertex& pt,
+                   uint8_t dim_src = GEOARROW_DIMENSIONS_XYZM) {
+    FeatureStart();
+    GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
+    WriteCoord(pt, dim_src);
+    GeomEnd();
+    FeatureEnd();
+  }
+
   /// \brief Append a preexisting geometry verbatim as a complete (non null)
   /// feature
   void AppendGeometry(struct GeoArrowGeometryView geom) {

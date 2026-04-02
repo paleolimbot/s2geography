@@ -85,7 +85,7 @@ static constexpr int kMaxEdgesLinearSearch = 32;
 struct S2LineInterpolatePointExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = DoubleInputView;
-  using out_t = WkbGeographyOutputBuilder;
+  using out_t = GeoArrowOutputBuilder;
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type fraction, out_t* out) {
     if (value0.is_empty()) {
@@ -99,17 +99,22 @@ struct S2LineInterpolatePointExec {
           "Input to ST_LineInterpolatePoint must be a single linestring");
     }
 
-    S2Point pt;
+    out->SetDimensions(value0.dimensions());
+
     if (fraction <= 0) {
-      value0.VisitVertices([&](const S2Point& v) {
-        pt = v;
-        return false;
-      });
-      out->Append(PointGeography(pt));
+      internal::GeoArrowVertex pt;
+      value0.lines()->geom().VisitNativeVertices(
+          [&](const internal::GeoArrowVertex& v) {
+            pt = v;
+            return false;
+          });
+
+      out->AppendPoint(pt, value0.dimensions());
       return;
     } else if (fraction >= 1) {
-      out->Append(PointGeography(
-          value0.lines()->edge(value0.lines()->num_edges() - 1).v1));
+      auto pt = value0.lines()->native_edge(value0.lines()->num_edges() - 1).v1;
+
+      out->AppendPoint(pt, value0.dimensions());
       return;
     }
 
@@ -123,11 +128,14 @@ struct S2LineInterpolatePointExec {
     });
 
     if (length_sum.radians() == 0) {
-      value0.VisitVertices([&](const S2Point& v) {
-        pt = v;
-        return false;
-      });
-      out->Append(PointGeography(pt));
+      internal::GeoArrowVertex pt;
+      value0.lines()->geom().VisitNativeVertices(
+          [&](const internal::GeoArrowVertex& v) {
+            pt = v;
+            return false;
+          });
+
+      out->AppendPoint(pt, value0.dimensions());
       return;
     }
 
@@ -148,11 +156,20 @@ struct S2LineInterpolatePointExec {
     }
 
     S1Angle prev_length = cumulative_lengths_[edge_idx];
-    S2Shape::Edge e = value0.lines()->edge(edge_idx);
-    S1Angle remaining = target - prev_length;
-    pt = S2::GetPointOnLine(e.v0, e.v1, remaining);
+    S1Angle next_length = cumulative_lengths_[edge_idx + 1];
+    S1Angle edge_length = next_length - prev_length;
+    double edge_fraction;
+    if (edge_length == S1Angle::Zero()) {
+      edge_fraction = 0;
+    } else {
+      S1Angle remaining = target - prev_length;
+      edge_fraction = remaining / edge_length;
+    }
 
-    out->Append(PointGeography(pt));
+    auto native_edge = value0.lines()->native_edge(edge_idx);
+    auto pt = native_edge.Interpolate(edge_fraction);
+
+    out->AppendPoint(pt, value0.dimensions());
   }
 
   std::vector<S1Angle> cumulative_lengths_;
