@@ -337,6 +337,16 @@ INSTANTIATE_TEST_SUITE_P(
         UnaryGeographyScalarParam{"multipoint_z",
                                   "MULTIPOINT Z ((0 0 10), (0 1 11))",
                                   "POINT Z (0 0.5 10.5)"},
+        UnaryGeographyScalarParam{"point_m", "POINT M (0 1 10)",
+                                  "POINT M (0 1 10)"},
+        UnaryGeographyScalarParam{"multipoint_m",
+                                  "MULTIPOINT M ((0 0 10), (0 1 11))",
+                                  "POINT M (0 0.5 10.5)"},
+        UnaryGeographyScalarParam{"point_zm", "POINT ZM (0 1 10 20)",
+                                  "POINT ZM (0 1 10 20)"},
+        UnaryGeographyScalarParam{"multipoint_zm",
+                                  "MULTIPOINT ZM ((0 0 10 20), (0 1 11 21))",
+                                  "POINT ZM (0 0.5 10.5 20.5)"},
 
         // Linestrings
         UnaryGeographyScalarParam{"linestring", "LINESTRING (0 0, 0 1)",
@@ -353,6 +363,19 @@ INSTANTIATE_TEST_SUITE_P(
         UnaryGeographyScalarParam{"linestring_two_segments_z",
                                   "LINESTRING Z (0 0 10, 0 1 11, 0 5 15)",
                                   "POINT Z (0 2.5 12.5)"},
+        UnaryGeographyScalarParam{"linestring_m",
+                                  "LINESTRING M (0 0 10, 0 1 11)",
+                                  "POINT M (0 0.5 10.5)"},
+        UnaryGeographyScalarParam{"linestring_two_segments_m",
+                                  "LINESTRING M (0 0 10, 0 1 11, 0 5 15)",
+                                  "POINT M (0 2.5 12.5)"},
+        UnaryGeographyScalarParam{"linestring_zm",
+                                  "LINESTRING ZM (0 0 10 20, 0 1 11 21)",
+                                  "POINT ZM (0 0.5 10.5 20.5)"},
+        UnaryGeographyScalarParam{
+            "linestring_two_segments_zm",
+            "LINESTRING ZM (0 0 10 20, 0 1 11 21, 0 5 15 25)",
+            "POINT ZM (0 2.5 12.5 22.5)"},
 
         // Polygons
         UnaryGeographyScalarParam{"triangle", "POLYGON ((0 0, 0 1, 1 0, 0 0))",
@@ -382,7 +405,32 @@ INSTANTIATE_TEST_SUITE_P(
                                   "POLYGON Z ((0 0 10, 0 2 10, 2 0 10, 0 0 "
                                   "10), (0.1 0.1 11, 0.1 0.5 11, 0.5 "
                                   "0.1 11, 0.1 0.1 11))",
-                                  "POINT Z (0.684859 0.68481 10.038454)"}
+                                  "POINT Z (0.684859 0.68481 10.038454)"},
+
+        UnaryGeographyScalarParam{
+            "triangle_m", "POLYGON M ((0 0 10, 0 1 10, 1 0 10, 0 0 10))",
+            "POINT M (0.33335 0.333344 10)"},
+
+        // Resulting M should be between 10 and 11 but closer to 10
+        UnaryGeographyScalarParam{"polygon_with_hole_m",
+                                  "POLYGON M ((0 0 10, 0 2 10, 2 0 10, 0 0 "
+                                  "10), (0.1 0.1 11, 0.1 0.5 11, 0.5 "
+                                  "0.1 11, 0.1 0.1 11))",
+                                  "POINT M (0.684859 0.68481 10.038454)"},
+
+        UnaryGeographyScalarParam{
+            "triangle_zm",
+            "POLYGON ZM ((0 0 10 20, 0 1 10 20, 1 0 10 20, 0 0 10 20))",
+            "POINT ZM (0.33335 0.333344 10 20)"},
+
+        // Resulting Z and M should be between 10/20 and 11/21 but closer to
+        // 10/20
+        UnaryGeographyScalarParam{
+            "polygon_with_hole_zm",
+            "POLYGON ZM ((0 0 10 20, 0 2 10 20, 2 0 10 20, 0 0 "
+            "10 20), (0.1 0.1 11 21, 0.1 0.5 11 21, 0.5 "
+            "0.1 11 21, 0.1 0.1 11 21))",
+            "POINT ZM (0.684859 0.68481 10.038454 20.038454)"}
 
         ),
     [](const ::testing::TestParamInfo<UnaryGeographyScalarParam>& info) {

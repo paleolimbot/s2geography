@@ -254,7 +254,6 @@ struct S2CentroidExec {
       Centroid c;
 
       value.polygons()->geom().VisitLoops(&scratch_, [&](GeoArrowLoop loop) {
-        S2Point centroid_pt = loop.GetCentroid();
         c.pt += loop.GetCentroid();
 
         // This part is probably slow, so skip if we don't have to
