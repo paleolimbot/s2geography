@@ -475,11 +475,7 @@ struct S2ClosestPointExec {
               .Normalize(value0.dimensions());
     }
 
-    out->FeatureStart();
-    out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
-    out->WriteCoord(v);
-    out->GeomEnd();
-    out->FeatureEnd();
+    out->AppendPoint(v);
   }
 
   EdgePair edge_pair_;

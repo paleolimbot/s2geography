@@ -109,20 +109,12 @@ struct S2LineInterpolatePointExec {
             return false;
           });
 
-      out->FeatureStart();
-      out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
-      out->WriteCoord(pt, value0.dimensions());
-      out->GeomEnd();
-      out->FeatureEnd();
+      out->AppendPoint(pt, value0.dimensions());
       return;
     } else if (fraction >= 1) {
       auto pt = value0.lines()->native_edge(value0.lines()->num_edges() - 1).v1;
 
-      out->FeatureStart();
-      out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
-      out->WriteCoord(pt, value0.dimensions());
-      out->GeomEnd();
-      out->FeatureEnd();
+      out->AppendPoint(pt, value0.dimensions());
       return;
     }
 
@@ -143,11 +135,7 @@ struct S2LineInterpolatePointExec {
             return false;
           });
 
-      out->FeatureStart();
-      out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
-      out->WriteCoord(pt, value0.dimensions());
-      out->GeomEnd();
-      out->FeatureEnd();
+      out->AppendPoint(pt, value0.dimensions());
       return;
     }
 
@@ -181,11 +169,7 @@ struct S2LineInterpolatePointExec {
     auto native_edge = value0.lines()->native_edge(edge_idx);
     auto pt = native_edge.Interpolate(edge_fraction);
 
-    out->FeatureStart();
-    out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
-    out->WriteCoord(pt, value0.dimensions());
-    out->GeomEnd();
-    out->FeatureEnd();
+    out->AppendPoint(pt, value0.dimensions());
   }
 
   std::vector<S1Angle> cumulative_lengths_;
