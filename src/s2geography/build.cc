@@ -434,6 +434,108 @@ std::unique_ptr<Geography> S2UnionAggregator::Finalize() {
 
 namespace sedona_udf {
 
+class GeoArrowPointVectorLayer : public S2Builder::Layer {
+ public:
+  using GraphOptions = S2Builder::GraphOptions;
+  using Graph = S2Builder::Graph;
+  using EdgeId = Graph::EdgeId;
+
+  GeoArrowPointVectorLayer(const GeoArrowPointShape* source,
+                           std::vector<internal::GeoArrowVertex>* points_out,
+                           int32_t input_edge_id_offset = 0)
+      : source_(source),
+        points_out_(points_out),
+        input_edge_id_offset_(input_edge_id_offset) {}
+
+  GraphOptions graph_options() const override {
+    return GraphOptions(
+        S2Builder::EdgeType::DIRECTED,
+        GraphOptions::DegenerateEdges::KEEP,
+        GraphOptions::DuplicateEdges::MERGE,
+        GraphOptions::SiblingPairs::KEEP);
+  }
+
+  void Build(const Graph& g, S2Error* error) override {
+    for (EdgeId edge_id = 0;
+         static_cast<size_t>(edge_id) < g.edges().size();
+         ++edge_id) {
+      const auto& edge = g.edge(edge_id);
+
+      if (edge.first != edge.second) {
+        *error = S2Error::InvalidArgument("Found non-degenerate edges");
+        continue;
+      }
+
+      // Resolve the output edge back to an input edge, then to a native vertex
+      for (auto input_id : g.input_edge_ids(edge_id)) {
+        int source_edge = static_cast<int>(input_id - input_edge_id_offset_);
+        auto native = source_->native_vertex(source_edge);
+        // For degenerate (point) edges, v0 == v1
+        points_out_->push_back(native.Normalize(source_->dimensions()));
+      }
+    }
+  }
+
+ private:
+  const GeoArrowPointShape* source_;
+  std::vector<internal::GeoArrowVertex>* points_out_;
+  int32_t input_edge_id_offset_;
+};
+
+struct RebuildExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using out_t = GeoArrowOutputBuilder;
+
+  RebuildExec() {
+    builder_.Init(builder_options_);
+  }
+
+  void Exec(arg0_t::c_type value0, out_t* out) {
+    builder_.Reset();
+    native_points_.clear();
+
+    // Start a layer that collects native point vertices
+    builder_.StartLayer(absl::make_unique<GeoArrowPointVectorLayer>(
+        value0.points(), &native_points_));
+    builder_.AddShape(*value0.points());
+
+
+    // TODO: add GeoArrow-aware layers for lines and polygons
+    builder_.AddShape(*value0.lines());
+    builder_.AddShape(*value0.polygons());
+
+    // build the output
+    S2Error error;
+    if (!builder_.Build(&error)) {
+      std::stringstream ss;
+      ss << error;
+      throw Exception(ss.str());
+    }
+
+    // Write native point output to the GeoArrowOutputBuilder
+    // TODO: handle lines and polygons; write a complete geometry
+    if (native_points_.size() == 1) {
+      out->AppendPoint(native_points_[0]);
+    } else if (native_points_.size() > 1) {
+      out->FeatureStart();
+      out->GeomStart(GEOARROW_GEOMETRY_TYPE_MULTIPOINT);
+      for (const auto& pt : native_points_) {
+        out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
+        out->WriteCoord(pt);
+        out->GeomEnd();
+      }
+      out->GeomEnd();
+      out->FeatureEnd();
+    } else {
+      out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_POINT);
+    }
+  }
+
+  S2Builder builder_;
+  S2Builder::Options builder_options_;
+  std::vector<internal::GeoArrowVertex> native_points_;
+};
+
 template <S2BooleanOperation::OpType op_type>
 struct BooleanOperationExec {
   using arg0_t = GeoArrowGeographyInputView;

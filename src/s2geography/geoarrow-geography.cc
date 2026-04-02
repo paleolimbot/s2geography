@@ -119,6 +119,10 @@ S2Point GeoArrowPointShape::vertex(int v) const {
   return GeoArrowChain(geom_.root() + v).vertex(0);
 }
 
+internal::GeoArrowVertex GeoArrowPointShape::native_vertex(int v) const {
+  return GeoArrowChain(geom_.root() + v).native_vertex(0);
+}
+
 int GeoArrowPointShape::num_edges() const { return num_vertices(); }
 
 S2Shape::Edge GeoArrowPointShape::edge(int e) const {

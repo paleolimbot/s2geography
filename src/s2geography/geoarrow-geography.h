@@ -65,6 +65,7 @@ class GeoArrowPointShape : public S2Shape {
 
   int num_vertices() const;
   S2Point vertex(int v) const;
+  internal::GeoArrowVertex native_vertex(int v) const;
 
   int num_edges() const override;
   Edge edge(int e) const override;
@@ -380,6 +381,8 @@ class GeoArrowGeography {
   /// This may be accessed even if the underlying geometry is non-polygon
   /// (will represent a polygon with zero chains).
   const GeoArrowLaxPolygonShape* polygons() const;
+
+  const GeoArrowGeometryView geom() const { return geom_; }
 
   /// \brief Visit all vertices in this geography
   template <typename Visit>
