@@ -244,7 +244,7 @@ struct S2CentroidExec {
   using out_t = GeoArrowOutputBuilder;
 
   void Exec(arg0_t::c_type value, out_t* out) {
-    // Ouput dimensions == input dimensions
+    // Output dimensions == input dimensions
     out->SetDimensions(value.dimensions());
 
     // Compute in decreasing dimensionality and return early, because
