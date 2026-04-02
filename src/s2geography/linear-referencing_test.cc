@@ -226,6 +226,9 @@ INSTANTIATE_TEST_SUITE_P(
                                   0.5, "POINT (1 1)"},
         LineInterpolatePointParam{"invalid_line", "LINESTRING (1 1)", 0.5,
                                   std::nullopt},
+        LineInterpolatePointParam{"zero_length_line_z",
+                                  "LINESTRING Z (1 1 10, 1 1 10)", 0.5,
+                                  "POINT Z (1 1 10)"},
 
         // Endpoints and midpoints
         LineInterpolatePointParam{"start", "LINESTRING (0 0, 0 2)", 0.0,
@@ -234,6 +237,12 @@ INSTANTIATE_TEST_SUITE_P(
                                   "POINT (0 2)"},
         LineInterpolatePointParam{"midpoint", "LINESTRING (0 0, 0 2)", 0.5,
                                   "POINT (0 1)"},
+        LineInterpolatePointParam{"start_z", "LINESTRING Z (0 0 10, 0 2 12)",
+                                  0.0, "POINT Z (0 0 10)"},
+        LineInterpolatePointParam{"end_z", "LINESTRING Z (0 0 10, 0 2 12)", 1.0,
+                                  "POINT Z (0 2 12)"},
+        LineInterpolatePointParam{"midpoint_z", "LINESTRING Z (0 0 10, 0 2 12)",
+                                  0.5, "POINT Z (0 1 11)"},
 
         // Multi-segment line
         LineInterpolatePointParam{"multi_seg_quarter",
@@ -242,12 +251,24 @@ INSTANTIATE_TEST_SUITE_P(
         LineInterpolatePointParam{"multi_seg_three_quarter",
                                   "LINESTRING (0 0, 0 1, 0 2)", 0.75,
                                   "POINT (0 1.5)"},
+        LineInterpolatePointParam{"multi_seg_quarter_z",
+                                  "LINESTRING Z (0 0 10, 0 1 11, 0 2 12)", 0.25,
+                                  "POINT Z (0 0.5 10.5)"},
+        LineInterpolatePointParam{"multi_seg_three_quarter_z",
+                                  "LINESTRING Z (0 0 10, 0 1 11, 0 2 12)", 0.75,
+                                  "POINT Z (0 1.5 11.5)"},
 
         // Boundary fractions
         LineInterpolatePointParam{"fraction_zero", "LINESTRING (0 0, 0 2)", 0.0,
                                   "POINT (0 0)"},
         LineInterpolatePointParam{"fraction_one", "LINESTRING (0 0, 0 2)", 1.0,
                                   "POINT (0 2)"},
+        LineInterpolatePointParam{"fraction_zero_z",
+                                  "LINESTRING Z (0 0 10, 0 2 12)", 0.0,
+                                  "POINT Z (0 0 10)"},
+        LineInterpolatePointParam{"fraction_one_z",
+                                  "LINESTRING Z (0 0 10, 0 2 12)", 1.0,
+                                  "POINT Z (0 2 12)"},
 
         // A few points on a very long linestring
         LineInterpolatePointParam{"long_line_start", VeryLongLinestring(100),
