@@ -259,19 +259,20 @@ struct S2CentroidExec {
 
         // This part is probably slow, so skip if we don't have to
         if (loop.dimensions() != GEOARROW_DIMENSIONS_XY) {
+          // Calculate the ring boundary's ZM centroid
           Centroid loop_c;
-          loop.VisitNativeEdges([&](const internal::GeoArrowEdge& v) {
-            double length = S1Angle(v.v0.ToPoint(), v.v1.ToPoint()).radians();
-            if (length == 0) {
-              return true;
-            }
-
-            loop_c.MergeZM(v.v0, length);
-            loop_c.MergeZM(v.v1, length);
+          loop.VisitNativeEdges([&](const internal::GeoArrowEdge& e) {
+            double length = S1Angle(e.v0.ToPoint(), e.v1.ToPoint()).radians();
+            loop_c.MergeZM(e.v0, length);
+            loop_c.MergeZM(e.v1, length);
             return true;
           });
+
+          // Merge its contribution to the polygon centroid scaled
+          // to its (absolute) area. Holes contribute negative XY
+          // space but not necessarily negative ZM space.
           loop_c.Normalize();
-          c.MergeZM(loop_c.vt, centroid_pt.Norm());
+          c.MergeZM(loop_c.vt, std::abs(loop.GetSignedArea()));
         }
 
         return true;
@@ -288,14 +289,21 @@ struct S2CentroidExec {
           [&](const internal::GeoArrowEdge& e) {
             S2Point segment_centroid =
                 S2::TrueCentroid(e.v0.ToPoint(), e.v1.ToPoint());
-            double length = segment_centroid.Norm();
-
             c.pt += segment_centroid;
-            c.MergeZM(e.v0, length);
-            c.MergeZM(e.v1, length);
 
             return true;
           });
+
+      // This part is probably slow, so skip if we don't have to
+      if (value.dimensions() != GEOARROW_DIMENSIONS_XY) {
+        value.lines()->geom().VisitNativeEdges(
+            [&](const internal::GeoArrowEdge& e) {
+              double length = S1Angle(e.v0.ToPoint(), e.v1.ToPoint()).radians();
+              c.MergeZM(e.v0, length);
+              c.MergeZM(e.v1, length);
+              return true;
+            });
+      }
 
       out->AppendPoint(c.Finalize(), value.dimensions());
       return;

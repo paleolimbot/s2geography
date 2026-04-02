@@ -371,7 +371,18 @@ INSTANTIATE_TEST_SUITE_P(
             "multipolygon_with_hole",
             "MULTIPOLYGON (((0 0, 0 2, 2 0, 0 0), (0.1 0.1, 0.1 0.5, "
             "0.5 0.1, 0.1 0.1)), ((10 10, 10 11, 11 10, 10 10)))",
-            "POINT (2.624356 2.655749)"}
+            "POINT (2.624356 2.655749)"},
+
+        UnaryGeographyScalarParam{
+            "triangle_z", "POLYGON Z ((0 0 10, 0 1 10, 1 0 10, 0 0 10))",
+            "POINT Z (0.33335 0.333344 10)"},
+
+        // Resulting Z should be between 10 and 11 but closer to 10
+        UnaryGeographyScalarParam{"polygon_with_hole_z",
+                                  "POLYGON Z ((0 0 10, 0 2 10, 2 0 10, 0 0 "
+                                  "10), (0.1 0.1 11, 0.1 0.5 11, 0.5 "
+                                  "0.1 11, 0.1 0.1 11))",
+                                  "POINT Z (0.684859 0.68481 10.038454)"}
 
         ),
     [](const ::testing::TestParamInfo<UnaryGeographyScalarParam>& info) {
