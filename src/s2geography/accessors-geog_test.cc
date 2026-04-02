@@ -332,6 +332,11 @@ INSTANTIATE_TEST_SUITE_P(
         UnaryGeographyScalarParam{"point", "POINT (0 1)", "POINT (0 1)"},
         UnaryGeographyScalarParam{"multipoint", "MULTIPOINT ((0 0), (0 1))",
                                   "POINT (0 0.5)"},
+        UnaryGeographyScalarParam{"point_z", "POINT Z (0 1 10)",
+                                  "POINT Z (0 1 10)"},
+        UnaryGeographyScalarParam{"multipoint_z",
+                                  "MULTIPOINT Z ((0 0 10), (0 1 11))",
+                                  "POINT Z (0 0.5 10.5)"},
 
         // Linestrings
         UnaryGeographyScalarParam{"linestring", "LINESTRING (0 0, 0 1)",
@@ -342,6 +347,12 @@ INSTANTIATE_TEST_SUITE_P(
         UnaryGeographyScalarParam{"multilinestring",
                                   "MULTILINESTRING ((0 0, 0 1), (10 0, 10 5))",
                                   "POINT (8.336347 2.171205)"},
+        UnaryGeographyScalarParam{"linestring_z",
+                                  "LINESTRING Z (0 0 10, 0 1 11)",
+                                  "POINT Z (0 0.5 10.5)"},
+        UnaryGeographyScalarParam{"linestring_two_segments_z",
+                                  "LINESTRING Z (0 0 10, 0 1 11, 0 5 15)",
+                                  "POINT Z (0 2.5 12.5)"},
 
         // Polygons
         UnaryGeographyScalarParam{"triangle", "POLYGON ((0 0, 0 1, 1 0, 0 0))",

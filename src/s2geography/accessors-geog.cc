@@ -203,47 +203,119 @@ std::unique_ptr<PolygonGeography> S2ConvexHullAggregator::Finalize() {
 
 namespace sedona_udf {
 
+struct Centroid {
+  // Track the spherical centroid
+  S2Point pt;
+  // Track the ZM centroid
+  internal::GeoArrowVertex vt{0, 0, {0, 0}};
+  // Track the total weight of the ZM component
+  double vt_weight{0};
+
+  void MergeZM(const internal::GeoArrowVertex& v, double weight = 1) {
+    vt.zm[0] += v.zm[0] * weight;
+    vt.zm[1] += v.zm[1] * weight;
+    vt_weight += weight;
+  }
+
+  void Normalize() {
+    if (vt_weight > 0) {
+      vt.zm[0] /= vt_weight;
+      vt.zm[1] /= vt_weight;
+      vt_weight = 1;
+    } else {
+      vt.zm[0] = std::numeric_limits<double>::quiet_NaN();
+      vt.zm[1] = std::numeric_limits<double>::quiet_NaN();
+    }
+  }
+
+  const internal::GeoArrowVertex& Finalize() {
+    Normalize();
+
+    S2LatLng ll(pt);
+    vt.lng = ll.lng().degrees();
+    vt.lat = ll.lat().degrees();
+
+    return vt;
+  }
+};
+
 struct S2CentroidExec {
   using arg0_t = GeoArrowGeographyInputView;
-  using out_t = WkbGeographyOutputBuilder;
+  using out_t = GeoArrowOutputBuilder;
 
   void Exec(arg0_t::c_type value, out_t* out) {
-    S2Point pt;
+    // Ouput dimensions == input dimensions
+    out->SetDimensions(value.dimensions());
 
     // Compute in decreasing dimensionality and return early, because
     // centroids of lower dimension do not count towards the final value
     // if the geography has mixed dimension.
     if (!value.polygons()->is_empty()) {
+      Centroid c;
+
       value.polygons()->geom().VisitLoops(&scratch_, [&](GeoArrowLoop loop) {
-        pt += loop.GetCentroid();
+        S2Point centroid_pt = loop.GetCentroid();
+        c.pt += loop.GetCentroid();
+
+        // This part is probably slow, so skip if we don't have to
+        if (loop.dimensions() != GEOARROW_DIMENSIONS_XY) {
+          Centroid loop_c;
+          loop.VisitNativeEdges([&](const internal::GeoArrowEdge& v) {
+            double length = S1Angle(v.v0.ToPoint(), v.v1.ToPoint()).radians();
+            if (length == 0) {
+              return true;
+            }
+
+            loop_c.MergeZM(v.v0, length);
+            loop_c.MergeZM(v.v1, length);
+            return true;
+          });
+          loop_c.Normalize();
+          c.MergeZM(loop_c.vt, centroid_pt.Norm());
+        }
+
         return true;
       });
 
-      out->Append(PointGeography(pt.Normalize()));
+      out->AppendPoint(c.Finalize(), value.dimensions());
       return;
     }
 
     if (!value.lines()->is_empty()) {
-      value.lines()->geom().VisitEdges([&](const S2Shape::Edge& e) {
-        pt += S2::TrueCentroid(e.v0, e.v1);
-        return true;
-      });
+      Centroid c;
 
-      out->Append(PointGeography(pt.Normalize()));
+      value.lines()->geom().VisitNativeEdges(
+          [&](const internal::GeoArrowEdge& e) {
+            S2Point segment_centroid =
+                S2::TrueCentroid(e.v0.ToPoint(), e.v1.ToPoint());
+            double length = segment_centroid.Norm();
+
+            c.pt += segment_centroid;
+            c.MergeZM(e.v0, length);
+            c.MergeZM(e.v1, length);
+
+            return true;
+          });
+
+      out->AppendPoint(c.Finalize(), value.dimensions());
       return;
     }
 
     if (!value.points()->is_empty()) {
-      value.points()->geom().VisitVertices([&](const S2Point& v) {
-        pt += v;
-        return true;
-      });
+      Centroid c;
 
-      out->Append(PointGeography(pt.Normalize()));
+      value.points()->geom().VisitNativeVertices(
+          [&](const internal::GeoArrowVertex& v) {
+            c.pt += v.ToPoint();
+            c.MergeZM(v);
+            return true;
+          });
+
+      out->AppendPoint(c.Finalize(), value.dimensions());
       return;
     }
 
-    out->Append(GeographyCollection());
+    out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION);
   }
 
   std::vector<S2Point> scratch_;
