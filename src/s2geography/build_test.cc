@@ -242,4 +242,126 @@ TEST(Build, SedonaUdfUnaryUnionGridSize) {
       out_array.get(), {"POINT (0 0)", "POINT (0 0)", std::nullopt}));
 }
 
+struct UnaryUnionGridSizeParam {
+  std::string name;
+  std::optional<std::string> input_wkt;
+  std::optional<double> grid_size;
+  std::optional<std::string> expected_wkt;
+
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const UnaryUnionGridSizeParam& p) {
+    os << (p.input_wkt ? *p.input_wkt : "null")
+       << " grid_size=" << (p.grid_size ? std::to_string(*p.grid_size) : "null")
+       << " -> " << (p.expected_wkt ? *p.expected_wkt : "null");
+    return os;
+  }
+};
+
+class UnaryUnionGridSizeTest
+    : public ::testing::TestWithParam<UnaryUnionGridSizeParam> {};
+
+TEST_P(UnaryUnionGridSizeTest, SedonaUdf) {
+  const auto& p = GetParam();
+
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::UnaryUnionGridSizeKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+                        {{p.input_wkt}}, {{p.grid_size}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(
+      TestResultGeography(out_array.get(), {p.expected_wkt}));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Build, UnaryUnionGridSizeTest,
+    ::testing::Values(
+        // Null inputs
+        UnaryUnionGridSizeParam{"null_geom", std::nullopt, 1.0, std::nullopt},
+        UnaryUnionGridSizeParam{"null_grid_size", "POINT (0 0)", std::nullopt,
+                                std::nullopt},
+        UnaryUnionGridSizeParam{"null_both", std::nullopt, std::nullopt,
+                                std::nullopt},
+
+        // Point snapping to whole degrees (grid_size = 1.0)
+        UnaryUnionGridSizeParam{"point_on_grid", "POINT (0 0)", 1.0,
+                                "POINT (0 0)"},
+        UnaryUnionGridSizeParam{"point_not_on_grid", "POINT (0.001 0.001)", 1.0,
+                                "POINT (0 0)"},
+        UnaryUnionGridSizeParam{"point_no_snap", "POINT (0.001 0.001)", -1,
+                                "POINT (0.001 0.001)"},
+
+        // Point snapping to 0.1 degree grid (grid_size = 0.1)
+        UnaryUnionGridSizeParam{"point_tenth_degree_on_grid", "POINT (0.1 0.1)",
+                                0.1, "POINT (0.1 0.1)"},
+        UnaryUnionGridSizeParam{"point_tenth_degree_snap", "POINT (0.12 0.12)",
+                                0.1, "POINT (0.1 0.1)"},
+
+        // Multipoint: two nearby points snap to same location
+        UnaryUnionGridSizeParam{"multipoint_merge",
+                                "MULTIPOINT ((0.001 0.001), (0.002 0.002))",
+                                1.0, "POINT (0 0)"},
+        // Multipoint: points remain distinct after snapping
+        UnaryUnionGridSizeParam{"multipoint_distinct",
+                                "MULTIPOINT ((0 0), (10 10))", 1.0,
+                                "MULTIPOINT ((0 0), (10 10))"},
+
+        // Check ZM handling
+        UnaryUnionGridSizeParam{"point_on_grid_z", "POINT Z (0 1 10)", 1.0,
+                                "POINT Z (0 1 10)"},
+        UnaryUnionGridSizeParam{"point_no_snap_z", "POINT Z (0.01 1.01 10)",
+                                1.0, "POINT Z (0 1 10)"},
+        UnaryUnionGridSizeParam{"point_not_on_grid_z", "POINT Z (0.01 1.01 10)",
+                                1.0, "POINT Z (0 1 10)"},
+        UnaryUnionGridSizeParam{"multipoint_merge_z",
+                                "MULTIPOINT Z (0.01 1.01 10, 0.01 1.01 20)",
+                                1.0, "POINT Z (0 1 10)"},
+        UnaryUnionGridSizeParam{"multipoint_distinct_z",
+                                "MULTIPOINT Z (0.01 1.01 10, 2.01 3.01 20)",
+                                1.0, "MULTIPOINT Z (0 1 10, 2 3 20)"},
+
+        // Check M handling
+        UnaryUnionGridSizeParam{"point_on_grid_m", "POINT M (0 1 10)", 1.0,
+                                "POINT M (0 1 10)"},
+        UnaryUnionGridSizeParam{"point_no_snap_m", "POINT M (0.01 1.01 10)",
+                                1.0, "POINT M (0 1 10)"},
+        UnaryUnionGridSizeParam{"point_not_on_grid_m", "POINT M (0.01 1.01 10)",
+                                1.0, "POINT M (0 1 10)"},
+        UnaryUnionGridSizeParam{"multipoint_merge_m",
+                                "MULTIPOINT M (0.01 1.01 10, 0.01 1.01 20)",
+                                1.0, "POINT M (0 1 10)"},
+        UnaryUnionGridSizeParam{"multipoint_distinct_m",
+                                "MULTIPOINT M (0.01 1.01 10, 2.01 3.01 20)",
+                                1.0, "MULTIPOINT M (0 1 10, 2 3 20)"},
+
+        // Check ZM handling
+        UnaryUnionGridSizeParam{"point_on_grid_zm", "POINT ZM (0 1 10 100)",
+                                1.0, "POINT ZM (0 1 10 100)"},
+        UnaryUnionGridSizeParam{"point_no_snap_zm",
+                                "POINT ZM (0.01 1.01 10 100)", 1.0,
+                                "POINT ZM (0 1 10 100)"},
+        UnaryUnionGridSizeParam{"point_not_on_grid_zm",
+                                "POINT ZM (0.01 1.01 10 100)", 1.0,
+                                "POINT ZM (0 1 10 100)"},
+        UnaryUnionGridSizeParam{
+            "multipoint_merge_zm",
+            "MULTIPOINT ZM (0.01 1.01 10 100, 0.01 1.01 20 200)", 1.0,
+            "POINT ZM (0 1 10 100)"},
+        UnaryUnionGridSizeParam{
+            "multipoint_distinct_zm",
+            "MULTIPOINT ZM (0.01 1.01 10 100, 2.01 3.01 20 200)", 1.0,
+            "MULTIPOINT ZM (0 1 10 100, 2 3 20 200)"}
+
+        ),
+    [](const ::testing::TestParamInfo<UnaryUnionGridSizeParam>& info) {
+      return info.param.name;
+    });
+
 }  // namespace s2geography

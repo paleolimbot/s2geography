@@ -592,7 +592,9 @@ struct RebuildExec {
       throw Exception(ss.str());
     }
 
-    // Write the output
+    // Write the output. For unary input we write the same output dimensions as
+    // the input
+    out->SetDimensions(value0.dimensions());
 
     // If there is only point output, write it
     if (!native_points_.empty()) {
@@ -620,7 +622,6 @@ struct RebuildExec {
       out->WriteCoord(native_points_[0]);
       out->GeomEnd();
     } else if (native_points_.size() > 1) {
-      out->FeatureStart();
       out->GeomStart(GEOARROW_GEOMETRY_TYPE_MULTIPOINT);
       for (const auto& pt : native_points_) {
         out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
@@ -646,13 +647,19 @@ struct UnaryUnionGridSizeExec {
     // If the grid size changed since the last iteration, we need to recreate
     // the snap function and reinitialize the builder with the new options
     if (grid_size != last_grid_size_) {
-      int exponent = static_cast<int>(std::round(-std::log10(grid_size)));
-      exponent =
-          std::max(s2builderutil::IntLatLngSnapFunction::kMinExponent,
-                   std::min(s2builderutil::IntLatLngSnapFunction::kMaxExponent,
-                            exponent));
-      s2builderutil::IntLatLngSnapFunction snap(exponent);
-      rebuild_.builder_options_.set_snap_function(snap);
+      if (grid_size > 0) {
+        int exponent = static_cast<int>(std::round(-std::log10(grid_size)));
+        exponent = std::max(
+            s2builderutil::IntLatLngSnapFunction::kMinExponent,
+            std::min(s2builderutil::IntLatLngSnapFunction::kMaxExponent,
+                     exponent));
+        s2builderutil::IntLatLngSnapFunction snap(exponent);
+        rebuild_.builder_options_.set_snap_function(snap);
+      } else {
+        s2builderutil::IdentitySnapFunction snap;
+        rebuild_.builder_options_.set_snap_function(snap);
+      }
+
       rebuild_.builder_.Init(rebuild_.builder_options_);
       last_grid_size_ = grid_size;
     }
