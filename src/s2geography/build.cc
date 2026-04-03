@@ -486,6 +486,157 @@ struct EdgeTracker {
   std::vector<const S2Shape*> shapes_;
 };
 
+struct OutputGeometry {
+  void Clear() {
+    points_.clear();
+    line_lengths_.clear();
+    line_vertices_.clear();
+    ring_lengths_.clear();
+    polygon_lengths_.clear();
+    polygon_vertices_.clear();
+    current_line_length_ = 0;
+    current_ring_length_ = 0;
+    current_polygon_ring_count_ = 0;
+  }
+
+  void AddPoint(const internal::GeoArrowVertex& v) { points_.push_back(v); }
+
+  void AddLineVertex(const internal::GeoArrowVertex& v) {
+    line_vertices_.push_back(v);
+    ++current_line_length_;
+  }
+
+  void FinishLine() {
+    line_lengths_.push_back(current_line_length_);
+    current_line_length_ = 0;
+  }
+
+  void AddRingVertex(const internal::GeoArrowVertex& v) {
+    polygon_vertices_.push_back(v);
+    ++current_ring_length_;
+  }
+
+  void FinishRing() {
+    ring_lengths_.push_back(current_ring_length_);
+    current_ring_length_ = 0;
+    ++current_polygon_ring_count_;
+  }
+
+  void FinishPolygon() {
+    polygon_lengths_.push_back(current_polygon_ring_count_);
+    current_polygon_ring_count_ = 0;
+  }
+
+  bool has_points() const { return !points_.empty(); }
+  bool has_lines() const { return !line_lengths_.empty(); }
+  bool has_polygons() const { return !polygon_lengths_.empty(); }
+  int num_types() const { return has_points() + has_lines() + has_polygons(); }
+
+  void WriteTo(GeoArrowOutputBuilder* out, uint8_t geometry_type) {
+    if (num_types() == 0) {
+      out->AppendEmpty(geometry_type);
+      return;
+    }
+
+    if (num_types() == 1) {
+      out->FeatureStart();
+      if (has_points()) WritePointOutput(out);
+      if (has_lines()) WriteLinesOutput(out);
+      if (has_polygons()) WritePolygonOutput(out);
+      out->FeatureEnd();
+      return;
+    }
+
+    out->FeatureStart();
+    out->GeomStart(GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION);
+    if (has_points()) WritePointOutput(out);
+    if (has_lines()) WriteLinesOutput(out);
+    if (has_polygons()) WritePolygonOutput(out);
+    out->GeomEnd();
+    out->FeatureEnd();
+  }
+
+ private:
+  void WritePointOutput(GeoArrowOutputBuilder* out) {
+    if (points_.size() == 1) {
+      out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
+      out->WriteCoord(points_[0]);
+      out->GeomEnd();
+    } else if (points_.size() > 1) {
+      out->GeomStart(GEOARROW_GEOMETRY_TYPE_MULTIPOINT);
+      for (const auto& pt : points_) {
+        out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
+        out->WriteCoord(pt);
+        out->GeomEnd();
+      }
+      out->GeomEnd();
+    }
+  }
+
+  void WriteLinesOutput(GeoArrowOutputBuilder* out) {
+    if (line_lengths_.size() == 1) {
+      out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+      for (int i = 0; i < line_lengths_[0]; ++i) {
+        out->WriteCoord(line_vertices_[i]);
+      }
+      out->GeomEnd();
+    } else if (line_lengths_.size() > 1) {
+      out->GeomStart(GEOARROW_GEOMETRY_TYPE_MULTILINESTRING);
+      int line_vertex_id = 0;
+      for (int line_length : line_lengths_) {
+        out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+        for (int i = 0; i < line_length; ++i) {
+          out->WriteCoord(line_vertices_[line_vertex_id++]);
+        }
+        out->GeomEnd();
+      }
+      out->GeomEnd();
+    }
+  }
+
+  void WritePolygonOutput(GeoArrowOutputBuilder* out) {
+    int ring_id = 0;
+    int vertex_id = 0;
+    if (polygon_lengths_.size() == 1) {
+      out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
+      for (int r = 0; r < polygon_lengths_[0]; ++r) {
+        out->RingStart();
+        for (int i = 0; i < ring_lengths_[ring_id]; ++i) {
+          out->WriteCoord(polygon_vertices_[vertex_id++]);
+        }
+        out->RingEnd();
+        ++ring_id;
+      }
+      out->GeomEnd();
+    } else if (polygon_lengths_.size() > 1) {
+      out->GeomStart(GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON);
+      for (int polygon_length : polygon_lengths_) {
+        out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
+        for (int r = 0; r < polygon_length; ++r) {
+          out->RingStart();
+          for (int i = 0; i < ring_lengths_[ring_id]; ++i) {
+            out->WriteCoord(polygon_vertices_[vertex_id++]);
+          }
+          out->RingEnd();
+          ++ring_id;
+        }
+        out->GeomEnd();
+      }
+      out->GeomEnd();
+    }
+  }
+
+  std::vector<internal::GeoArrowVertex> points_;
+  std::vector<int> line_lengths_;
+  std::vector<internal::GeoArrowVertex> line_vertices_;
+  std::vector<int> ring_lengths_;
+  std::vector<int> polygon_lengths_;
+  std::vector<internal::GeoArrowVertex> polygon_vertices_;
+  int current_line_length_{0};
+  int current_ring_length_{0};
+  int current_polygon_ring_count_{0};
+};
+
 class GeoArrowPointVectorLayer : public S2Builder::Layer {
  public:
   using GraphOptions = S2Builder::GraphOptions;
@@ -493,9 +644,8 @@ class GeoArrowPointVectorLayer : public S2Builder::Layer {
   using EdgeId = Graph::EdgeId;
   using InputEdgeId = Graph::InputEdgeId;
 
-  GeoArrowPointVectorLayer(EdgeTracker* edge_tracker,
-                           std::vector<internal::GeoArrowVertex>* points_out)
-      : edge_tracker_(edge_tracker), points_out_(points_out) {}
+  GeoArrowPointVectorLayer(EdgeTracker* edge_tracker, OutputGeometry* output)
+      : edge_tracker_(edge_tracker), output_(output) {}
 
   GraphOptions graph_options() const override {
     return GraphOptions(
@@ -519,7 +669,7 @@ class GeoArrowPointVectorLayer : public S2Builder::Layer {
       internal::GeoArrowVertex vt;
 
       // GEOS seems to always return the first Z or M it encounters for point
-      // output
+      // output. We could also merge by averaging or some other strategy.
       for (InputEdgeId input_edge_id : g.input_edge_ids(edge_id)) {
         auto e = edge_tracker_->ResolveEdge(input_edge_id);
         vt = e.v0;
@@ -532,15 +682,13 @@ class GeoArrowPointVectorLayer : public S2Builder::Layer {
       }
 
       // Write to the output
-      Write(vt);
+      output_->AddPoint(vt);
     }
   }
 
-  void Write(const internal::GeoArrowVertex& v) { points_out_->push_back(v); }
-
  private:
   EdgeTracker* edge_tracker_;
-  std::vector<internal::GeoArrowVertex>* points_out_;
+  OutputGeometry* output_;
 };
 
 class GeoArrowPolylinesLayer : public S2Builder::Layer {
@@ -550,12 +698,8 @@ class GeoArrowPolylinesLayer : public S2Builder::Layer {
   using EdgeId = Graph::EdgeId;
   using InputEdgeId = Graph::InputEdgeId;
 
-  GeoArrowPolylinesLayer(EdgeTracker* edge_tracker,
-                         std::vector<internal::GeoArrowVertex>* points_out,
-                         std::vector<int>* lengths_out)
-      : edge_tracker_(edge_tracker),
-        points_out_(points_out),
-        lengths_out_(lengths_out) {}
+  GeoArrowPolylinesLayer(EdgeTracker* edge_tracker, OutputGeometry* output)
+      : edge_tracker_(edge_tracker), output_(output) {}
 
   GraphOptions graph_options() const override {
     return GraphOptions(S2Builder::EdgeType::DIRECTED,
@@ -569,13 +713,12 @@ class GeoArrowPolylinesLayer : public S2Builder::Layer {
         g.GetPolylines(Graph::PolylineType::WALK);
 
     for (const auto& edge_polyline : edge_polylines) {
-      Start();
-
       // Write the first vertex of the polyline
       EdgeId first_edge_id = edge_polyline[0];
       S2Point first_pt = g.vertex(g.edge(first_edge_id).first);
       for (InputEdgeId input_edge_id : g.input_edge_ids(first_edge_id)) {
-        Write(edge_tracker_->ResolveEdge(input_edge_id).Interpolate(first_pt));
+        output_->AddLineVertex(
+            edge_tracker_->ResolveEdge(input_edge_id).Interpolate(first_pt));
         break;
       }
 
@@ -583,27 +726,19 @@ class GeoArrowPolylinesLayer : public S2Builder::Layer {
       for (EdgeId edge_id : edge_polyline) {
         S2Point pt = g.vertex(g.edge(edge_id).second);
         for (InputEdgeId input_edge_id : g.input_edge_ids(edge_id)) {
-          Write(edge_tracker_->ResolveEdge(input_edge_id).Interpolate(pt));
+          output_->AddLineVertex(
+              edge_tracker_->ResolveEdge(input_edge_id).Interpolate(pt));
           break;
         }
       }
 
-      lengths_out_->push_back(current_length_);
+      output_->FinishLine();
     }
-  }
-
-  void Start() { current_length_ = 0; }
-
-  void Write(const internal::GeoArrowVertex& v) {
-    points_out_->push_back(v);
-    ++current_length_;
   }
 
  private:
   EdgeTracker* edge_tracker_;
-  std::vector<int>* lengths_out_;
-  std::vector<internal::GeoArrowVertex>* points_out_;
-  int current_length_{0};
+  OutputGeometry* output_;
 };
 
 class GeoArrowPolygonLayer : public S2Builder::Layer {
@@ -613,14 +748,8 @@ class GeoArrowPolygonLayer : public S2Builder::Layer {
   using EdgeId = Graph::EdgeId;
   using InputEdgeId = Graph::InputEdgeId;
 
-  GeoArrowPolygonLayer(EdgeTracker* edge_tracker,
-                       std::vector<internal::GeoArrowVertex>* points_out,
-                       std::vector<int>* ring_lengths_out,
-                       std::vector<int>* polygon_lengths_out)
-      : edge_tracker_(edge_tracker),
-        points_out_(points_out),
-        ring_lengths_out_(ring_lengths_out),
-        polygon_lengths_out_(polygon_lengths_out) {}
+  GeoArrowPolygonLayer(EdgeTracker* edge_tracker, OutputGeometry* output)
+      : edge_tracker_(edge_tracker), output_(output) {}
 
   GraphOptions graph_options() const override {
     return GraphOptions(S2Builder::EdgeType::DIRECTED,
@@ -644,7 +773,7 @@ class GeoArrowPolygonLayer : public S2Builder::Layer {
     // Fast path: single loop -> single polygon with one ring
     if (num_loops == 1) {
       WriteLoop(g, 0);
-      polygon_lengths_out_->push_back(1);
+      output_->FinishPolygon();
       return;
     }
 
@@ -681,7 +810,7 @@ class GeoArrowPolygonLayer : public S2Builder::Layer {
       for (int hole_idx : holes) {
         WriteLoop(g, hole_idx);
       }
-      polygon_lengths_out_->push_back(1 + static_cast<int>(holes.size()));
+      output_->FinishPolygon();
       return;
     }
 
@@ -709,57 +838,47 @@ class GeoArrowPolygonLayer : public S2Builder::Layer {
 
     // Write each shell followed by its holes as a separate polygon
     for (size_t s = 0; s < shells.size(); ++s) {
-      int ring_count = 1;
       WriteLoop(g, shells[s]);
       for (size_t j = 0; j < holes.size(); ++j) {
         if (hole_parent[j] == static_cast<int>(s)) {
           WriteLoop(g, holes[j]);
-          ++ring_count;
         }
       }
-      polygon_lengths_out_->push_back(ring_count);
+      output_->FinishPolygon();
     }
   }
 
   void WriteLoop(const Graph& g, int loop_index) {
     const auto& edge_loop = edge_loops_[loop_index];
-    int ring_length = 0;
 
     for (EdgeId edge_id : edge_loop) {
       S2Point pt = g.vertex(g.edge(edge_id).first);
       for (InputEdgeId input_edge_id : g.input_edge_ids(edge_id)) {
-        points_out_->push_back(
+        output_->AddRingVertex(
             edge_tracker_->ResolveEdge(input_edge_id).Interpolate(pt));
         break;
       }
-      ++ring_length;
     }
 
     // Close the ring by repeating the first vertex
     EdgeId first_edge_id = edge_loop[0];
     S2Point first_pt = g.vertex(g.edge(first_edge_id).first);
     for (InputEdgeId input_edge_id : g.input_edge_ids(first_edge_id)) {
-      points_out_->push_back(
+      output_->AddRingVertex(
           edge_tracker_->ResolveEdge(input_edge_id).Interpolate(first_pt));
       break;
     }
-    ++ring_length;
 
-    ring_lengths_out_->push_back(ring_length);
+    output_->FinishRing();
   }
 
  private:
   EdgeTracker* edge_tracker_;
-  std::vector<internal::GeoArrowVertex>* points_out_;
-  std::vector<int>* ring_lengths_out_;
-  std::vector<int>* polygon_lengths_out_;
+  OutputGeometry* output_;
   std::vector<Graph::EdgeLoop> edge_loops_;
 };
 
 struct RebuildExec {
-  using arg0_t = GeoArrowGeographyInputView;
-  using out_t = GeoArrowOutputBuilder;
-
   RebuildExec(const S2Builder::Options& options = S2Builder::Options())
       : builder_options_(options) {
     builder_.Init(builder_options_);
@@ -768,17 +887,11 @@ struct RebuildExec {
   void Exec(const GeoArrowGeography& value0, GeoArrowOutputBuilder* out) {
     builder_.Reset();
     edge_tracker_.Clear();
-
-    native_points_.clear();
-    line_lengths_.clear();
-    line_vertices_.clear();
-    ring_lengths_.clear();
-    polygon_lengths_.clear();
-    polygon_vertices_.clear();
+    output_.Clear();
 
     // Start a layer that collects point vertices
-    builder_.StartLayer(absl::make_unique<GeoArrowPointVectorLayer>(
-        &edge_tracker_, &native_points_));
+    builder_.StartLayer(
+        absl::make_unique<GeoArrowPointVectorLayer>(&edge_tracker_, &output_));
 
     edge_tracker_.Add(value0.points());
     value0.points()->geom().VisitVertices([&](const S2Point& v) {
@@ -787,17 +900,15 @@ struct RebuildExec {
     });
 
     // Start a layer that collects polyline vertices
-    auto lines_layer = absl::make_unique<GeoArrowPolylinesLayer>(
-        &edge_tracker_, &line_vertices_, &line_lengths_);
-    builder_.StartLayer(std::move(lines_layer));
+    builder_.StartLayer(
+        absl::make_unique<GeoArrowPolylinesLayer>(&edge_tracker_, &output_));
 
     edge_tracker_.Add(value0.lines());
     builder_.AddShape(*value0.lines());
 
     // Start a layer that collects polygon vertices
-    auto polygon_layer = absl::make_unique<GeoArrowPolygonLayer>(
-        &edge_tracker_, &polygon_vertices_, &ring_lengths_, &polygon_lengths_);
-    builder_.StartLayer(std::move(polygon_layer));
+    builder_.StartLayer(
+        absl::make_unique<GeoArrowPolygonLayer>(&edge_tracker_, &output_));
 
     edge_tracker_.Add(value0.polygons());
     builder_.AddShape(*value0.polygons());
@@ -813,117 +924,13 @@ struct RebuildExec {
     // Write the output. For unary input we write the same output dimensions as
     // the input
     out->SetDimensions(value0.dimensions());
-
-    bool has_points = !native_points_.empty();
-    bool has_lines = !line_lengths_.empty();
-    bool has_polygons = !polygon_lengths_.empty();
-    int num_types = has_points + has_lines + has_polygons;
-
-    // If there are no outputs, write an empty attempting to preserve the input
-    // geometry type.
-    if (num_types == 0) {
-      out->AppendEmpty(value0.geometry_type());
-      return;
-    }
-
-    // If there is only one type of output, write it directly
-    if (num_types == 1) {
-      out->FeatureStart();
-      if (has_points) WritePointOutput(out);
-      if (has_lines) WriteLinesOuput(out);
-      if (has_polygons) WritePolygonOutput(out);
-      out->FeatureEnd();
-      return;
-    }
-
-    // Otherwise, write a GEOMETRYCOLLECTION with any of the available output
-    out->FeatureStart();
-    out->GeomStart(GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION);
-    if (has_points) WritePointOutput(out);
-    if (has_lines) WriteLinesOuput(out);
-    if (has_polygons) WritePolygonOutput(out);
-    out->GeomEnd();
-    out->FeatureEnd();
-  }
-
-  void WritePointOutput(out_t* out) {
-    if (native_points_.size() == 1) {
-      out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
-      out->WriteCoord(native_points_[0]);
-      out->GeomEnd();
-    } else if (native_points_.size() > 1) {
-      out->GeomStart(GEOARROW_GEOMETRY_TYPE_MULTIPOINT);
-      for (const auto& pt : native_points_) {
-        out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
-        out->WriteCoord(pt);
-        out->GeomEnd();
-      }
-      out->GeomEnd();
-    }
-  }
-
-  void WriteLinesOuput(out_t* out) {
-    if (line_lengths_.size() == 1) {
-      out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
-      for (int i = 0; i < line_lengths_[0]; ++i) {
-        out->WriteCoord(line_vertices_[i]);
-      }
-      out->GeomEnd();
-    } else if (line_lengths_.size() > 1) {
-      out->GeomStart(GEOARROW_GEOMETRY_TYPE_MULTILINESTRING);
-      int line_vertex_id = 0;
-      for (int line_length : line_lengths_) {
-        out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
-        for (int i = 0; i < line_length; ++i) {
-          out->WriteCoord(line_vertices_[line_vertex_id++]);
-        }
-        out->GeomEnd();
-      }
-      out->GeomEnd();
-    }
-  }
-
-  void WritePolygonOutput(out_t* out) {
-    int ring_id = 0;
-    int vertex_id = 0;
-    if (polygon_lengths_.size() == 1) {
-      out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
-      for (int r = 0; r < polygon_lengths_[0]; ++r) {
-        out->RingStart();
-        for (int i = 0; i < ring_lengths_[ring_id]; ++i) {
-          out->WriteCoord(polygon_vertices_[vertex_id++]);
-        }
-        out->RingEnd();
-        ++ring_id;
-      }
-      out->GeomEnd();
-    } else if (polygon_lengths_.size() > 1) {
-      out->GeomStart(GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON);
-      for (int polygon_length : polygon_lengths_) {
-        out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
-        for (int r = 0; r < polygon_length; ++r) {
-          out->RingStart();
-          for (int i = 0; i < ring_lengths_[ring_id]; ++i) {
-            out->WriteCoord(polygon_vertices_[vertex_id++]);
-          }
-          out->RingEnd();
-          ++ring_id;
-        }
-        out->GeomEnd();
-      }
-      out->GeomEnd();
-    }
+    output_.WriteTo(out, value0.geometry_type());
   }
 
   S2Builder builder_;
   S2Builder::Options builder_options_;
   EdgeTracker edge_tracker_;
-  std::vector<internal::GeoArrowVertex> native_points_;
-  std::vector<int> line_lengths_;
-  std::vector<internal::GeoArrowVertex> line_vertices_;
-  std::vector<int> ring_lengths_;
-  std::vector<int> polygon_lengths_;
-  std::vector<internal::GeoArrowVertex> polygon_vertices_;
+  OutputGeometry output_;
 };
 
 struct ReducePrecisionExec {
