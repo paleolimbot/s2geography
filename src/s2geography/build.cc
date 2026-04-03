@@ -450,6 +450,7 @@ struct EdgeTracker {
     num_edges_.clear();
     num_edges_.push_back(0);
     edge_count_ = 0;
+    shapes_.clear();
   }
 
   /// \brief Add a tracked shape
@@ -804,7 +805,12 @@ struct OutputGeometry {
           }
         }
       }
-      hole_parent[j] = best_shell;
+
+      if (best_shell == -1) {
+        throw Exception("Can't find shell for polygon hole");
+      } else {
+        hole_parent[j] = best_shell;
+      }
     }
 
     // Build polygon_lengths_ and ring_order_: each shell followed by its
@@ -1146,12 +1152,12 @@ struct SimplifyExec {
   void Exec(arg0_t::c_type value, double tolerance, out_t* out) {
     // If the grid size changed since the last iteration, we need to recreate
     // the snap function and reinitialize the builder with the new options
-    if (tolerance != last_tolerance_) {
-      if (tolerance < 0) {
-        // PostGIS seems to do this
-        tolerance = -tolerance;
-      }
+    if (tolerance < 0) {
+      // PostGIS seems to do this
+      tolerance = -tolerance;
+    }
 
+    if (tolerance != last_tolerance_) {
       // Create the identity snap function
       S1Angle tolerance_angle =
           S1Angle::Radians(tolerance / S2Earth::RadiusMeters());
