@@ -496,7 +496,6 @@ struct OutputGeometry {
     polygon_vertices_.clear();
     current_line_length_ = 0;
     current_ring_length_ = 0;
-    current_polygon_ring_count_ = 0;
   }
 
   void AddPoint(const internal::GeoArrowVertex& v) { points_.push_back(v); }
@@ -519,17 +518,11 @@ struct OutputGeometry {
   void FinishRing() {
     ring_lengths_.push_back(current_ring_length_);
     current_ring_length_ = 0;
-    ++current_polygon_ring_count_;
-  }
-
-  void FinishPolygon() {
-    polygon_lengths_.push_back(current_polygon_ring_count_);
-    current_polygon_ring_count_ = 0;
   }
 
   bool has_points() const { return !points_.empty(); }
   bool has_lines() const { return !line_lengths_.empty(); }
-  bool has_polygons() const { return !polygon_lengths_.empty(); }
+  bool has_polygons() const { return !ring_lengths_.empty(); }
   int num_types() const { return has_points() + has_lines() + has_polygons(); }
 
   void WriteTo(GeoArrowOutputBuilder* out, uint8_t geometry_type) {
@@ -595,6 +588,8 @@ struct OutputGeometry {
   }
 
   void WritePolygonOutput(GeoArrowOutputBuilder* out) {
+    GroupRings();
+
     int ring_id = 0;
     int vertex_id = 0;
     if (polygon_lengths_.size() == 1) {
@@ -626,6 +621,174 @@ struct OutputGeometry {
     }
   }
 
+  void BuildRingNodes() {
+    ring_nodes_.resize(ring_lengths_.size());
+    const uint8_t* base =
+        reinterpret_cast<const uint8_t*>(polygon_vertices_.data());
+    int vertex_offset = 0;
+    for (size_t i = 0; i < ring_lengths_.size(); ++i) {
+      struct GeoArrowBufferView coords;
+      coords.data = base + vertex_offset * sizeof(internal::GeoArrowVertex);
+      coords.size_bytes =
+          ring_lengths_[i] * sizeof(internal::GeoArrowVertex);
+      GeoArrowGeometryNodeSetInterleaved(&ring_nodes_[i],
+                                         GEOARROW_GEOMETRY_TYPE_LINESTRING,
+                                         GEOARROW_DIMENSIONS_XYZM, coords);
+      vertex_offset += ring_lengths_[i];
+    }
+  }
+
+  void GroupRings() {
+    polygon_lengths_.clear();
+    int num_rings = static_cast<int>(ring_lengths_.size());
+
+    if (num_rings == 0) {
+      return;
+    }
+
+    // Fast path: single ring -> single polygon
+    if (num_rings == 1) {
+      polygon_lengths_.push_back(1);
+      return;
+    }
+
+    // Build ring nodes so we can use GeoArrowLoop for area/containment
+    BuildRingNodes();
+
+    // Classify shells vs holes using signed area.
+    // S2Builder outputs directed edges with interior to the left, so
+    // shells are CCW (positive signed area) and holes are CW (negative).
+    ring_signed_areas_.resize(num_rings);
+    std::vector<int> shells;
+    std::vector<int> holes;
+
+    for (int i = 0; i < num_rings; ++i) {
+      GeoArrowLoop loop(&ring_nodes_[i], &scratch_);
+      ring_signed_areas_[i] = loop.GetSignedArea();
+      if (ring_signed_areas_[i] >= 0) {
+        shells.push_back(i);
+      } else {
+        holes.push_back(i);
+      }
+    }
+
+    // Common case: exactly one shell with zero or more holes
+    if (shells.size() == 1) {
+      polygon_lengths_.push_back(num_rings);
+      // Reorder rings: shell first, then holes (already in order if shell
+      // was the first ring written, but may not be in general)
+      if (shells[0] != 0) {
+        ReorderRings(shells, holes);
+      }
+      return;
+    }
+
+    // Multiple shells: build S2Loops for containment checks, which are
+    // more efficient than brute force when checking multiple holes.
+    std::vector<std::unique_ptr<S2Loop>> s2loops(shells.size());
+    for (size_t s = 0; s < shells.size(); ++s) {
+      GeoArrowLoop loop(&ring_nodes_[shells[s]], &scratch_);
+      std::vector<S2Point> vertices;
+      vertices.reserve(loop.size() - 1);
+      loop.VisitVertices(0, loop.size() - 1, [&](const S2Point& pt) {
+        vertices.push_back(pt);
+        return true;
+      });
+      s2loops[s] = absl::make_unique<S2Loop>(vertices);
+      // Normalize so that Contains() works correctly
+      s2loops[s]->Normalize();
+    }
+
+    // Match each hole to its containing shell.
+    // Among all containing shells, pick the smallest (by area).
+    std::vector<int> hole_parent(holes.size(), -1);
+    for (size_t j = 0; j < holes.size(); ++j) {
+      GeoArrowLoop hole_loop(&ring_nodes_[holes[j]], &scratch_);
+      S2Point test_point = hole_loop.vertex(0);
+      int best_shell = -1;
+      double best_area = std::numeric_limits<double>::max();
+      for (size_t s = 0; s < shells.size(); ++s) {
+        if (s2loops[s]->Contains(test_point)) {
+          double area = s2loops[s]->GetArea();
+          if (area < best_area) {
+            best_area = area;
+            best_shell = static_cast<int>(s);
+          }
+        }
+      }
+      hole_parent[j] = best_shell;
+    }
+
+    // Build polygon_lengths_ and reorder rings: each shell followed by its
+    // holes
+    ReorderGroupedRings(shells, holes, hole_parent);
+  }
+
+  void ReorderRings(const std::vector<int>& shells,
+                    const std::vector<int>& holes) {
+    std::vector<internal::GeoArrowVertex> reordered_vertices;
+    std::vector<int> reordered_lengths;
+    reordered_vertices.reserve(polygon_vertices_.size());
+    reordered_lengths.reserve(ring_lengths_.size());
+
+    auto appendRing = [&](int ring_idx) {
+      int offset = 0;
+      for (int r = 0; r < ring_idx; ++r) offset += ring_lengths_[r];
+      reordered_vertices.insert(reordered_vertices.end(),
+                                polygon_vertices_.begin() + offset,
+                                polygon_vertices_.begin() + offset +
+                                    ring_lengths_[ring_idx]);
+      reordered_lengths.push_back(ring_lengths_[ring_idx]);
+    };
+
+    for (int s : shells) appendRing(s);
+    for (int h : holes) appendRing(h);
+
+    polygon_vertices_ = std::move(reordered_vertices);
+    ring_lengths_ = std::move(reordered_lengths);
+  }
+
+  void ReorderGroupedRings(const std::vector<int>& shells,
+                           const std::vector<int>& holes,
+                           const std::vector<int>& hole_parent) {
+    std::vector<internal::GeoArrowVertex> reordered_vertices;
+    std::vector<int> reordered_lengths;
+    reordered_vertices.reserve(polygon_vertices_.size());
+    reordered_lengths.reserve(ring_lengths_.size());
+
+    // Precompute ring start offsets
+    std::vector<int> ring_offsets(ring_lengths_.size());
+    int offset = 0;
+    for (size_t i = 0; i < ring_lengths_.size(); ++i) {
+      ring_offsets[i] = offset;
+      offset += ring_lengths_[i];
+    }
+
+    auto appendRing = [&](int ring_idx) {
+      int off = ring_offsets[ring_idx];
+      reordered_vertices.insert(reordered_vertices.end(),
+                                polygon_vertices_.begin() + off,
+                                polygon_vertices_.begin() + off +
+                                    ring_lengths_[ring_idx]);
+      reordered_lengths.push_back(ring_lengths_[ring_idx]);
+    };
+
+    for (size_t s = 0; s < shells.size(); ++s) {
+      int ring_count = 1;
+      appendRing(shells[s]);
+      for (size_t j = 0; j < holes.size(); ++j) {
+        if (hole_parent[j] == static_cast<int>(s)) {
+          appendRing(holes[j]);
+          ++ring_count;
+        }
+      }
+      polygon_lengths_.push_back(ring_count);
+    }
+
+    polygon_vertices_ = std::move(reordered_vertices);
+    ring_lengths_ = std::move(reordered_lengths);
+  }
+
   std::vector<internal::GeoArrowVertex> points_;
   std::vector<int> line_lengths_;
   std::vector<internal::GeoArrowVertex> line_vertices_;
@@ -634,7 +797,9 @@ struct OutputGeometry {
   std::vector<internal::GeoArrowVertex> polygon_vertices_;
   int current_line_length_{0};
   int current_ring_length_{0};
-  int current_polygon_ring_count_{0};
+  std::vector<struct GeoArrowGeometryNode> ring_nodes_;
+  std::vector<double> ring_signed_areas_;
+  std::vector<S2Point> scratch_;
 };
 
 class GeoArrowPointVectorLayer : public S2Builder::Layer {
@@ -764,87 +929,9 @@ class GeoArrowPolygonLayer : public S2Builder::Layer {
       return;
     }
 
-    if (edge_loops_.empty()) {
-      return;
-    }
-
-    int num_loops = static_cast<int>(edge_loops_.size());
-
-    // Fast path: single loop -> single polygon with one ring
-    if (num_loops == 1) {
-      WriteLoop(g, 0);
-      output_->FinishPolygon();
-      return;
-    }
-
-    // Build temporary S2Loops from graph vertices. Since the edges coming
-    // from the builder are directed with interior to the left, loops are
-    // already properly oriented: shells are CCW (normalized) and holes are
-    // CW (not normalized). We do NOT call Normalize() so that we can
-    // determine shell vs hole from the orientation.
-    std::vector<std::unique_ptr<S2Loop>> s2loops(num_loops);
-    std::vector<bool> is_shell(num_loops);
-    std::vector<int> shells;
-    std::vector<int> holes;
-
-    for (int i = 0; i < num_loops; ++i) {
-      std::vector<S2Point> vertices;
-      vertices.reserve(edge_loops_[i].size());
-      for (EdgeId edge_id : edge_loops_[i]) {
-        vertices.push_back(g.vertex(g.edge(edge_id).first));
-      }
-      s2loops[i] = absl::make_unique<S2Loop>(vertices);
-      is_shell[i] = s2loops[i]->IsNormalized();
-      if (is_shell[i]) {
-        shells.push_back(i);
-      } else {
-        // Normalize so that containment checks work correctly
-        s2loops[i]->Normalize();
-        holes.push_back(i);
-      }
-    }
-
-    // Common case: exactly one shell with zero or more holes
-    if (shells.size() == 1) {
-      WriteLoop(g, shells[0]);
-      for (int hole_idx : holes) {
-        WriteLoop(g, hole_idx);
-      }
-      output_->FinishPolygon();
-      return;
-    }
-
-    // Multiple shells: match each hole to its containing shell.
-    // hole_parent[j] = index into shells[] for the shell containing hole j,
-    // or -1 if unmatched.
-    std::vector<int> hole_parent(holes.size(), -1);
-    for (size_t j = 0; j < holes.size(); ++j) {
-      // Use a vertex of the hole to find which shell contains it.
-      // Among all containing shells, pick the smallest (most nested).
-      S2Point test_point = s2loops[holes[j]]->vertex(0);
-      int best_shell = -1;
-      double best_area = std::numeric_limits<double>::max();
-      for (size_t s = 0; s < shells.size(); ++s) {
-        if (s2loops[shells[s]]->Contains(test_point)) {
-          double area = s2loops[shells[s]]->GetArea();
-          if (area < best_area) {
-            best_area = area;
-            best_shell = static_cast<int>(s);
-          }
-        }
-      }
-      hole_parent[j] = best_shell;
-    }
-
-    // Write each shell followed by its holes as a separate polygon
-    for (size_t s = 0; s < shells.size(); ++s) {
-      WriteLoop(g, shells[s]);
-      for (size_t j = 0; j < holes.size(); ++j) {
-        if (hole_parent[j] == static_cast<int>(s)) {
-          WriteLoop(g, holes[j]);
-        }
-      }
-      output_->FinishPolygon();
+    // Write all loops as rings; polygon grouping is deferred to OutputGeometry
+    for (int i = 0; i < static_cast<int>(edge_loops_.size()); ++i) {
+      WriteLoop(g, i);
     }
   }
 
