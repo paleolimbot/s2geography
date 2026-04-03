@@ -386,7 +386,50 @@ INSTANTIATE_TEST_SUITE_P(
         UnaryUnionGridSizeParam{
             "multipoint_distinct_zm",
             "MULTIPOINT ZM (0.01 1.01 10 100, 2.01 3.01 20 200)", 1.0,
-            "MULTIPOINT ZM (0 1 10 100, 2 3 20 200)"}
+            "MULTIPOINT ZM (0 1 10 100, 2 3 20 200)"},
+
+        // Polygon: single ring, no snapping (single loop fast path)
+        UnaryUnionGridSizeParam{"polygon_simple",
+                                "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))", -1,
+                                "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
+        // Polygon: single ring with snapping
+        UnaryUnionGridSizeParam{
+            "polygon_snap",
+            "POLYGON ((0.001 0.001, 10.001 0.001, 10.001 10.001, "
+            "0.001 10.001, 0.001 0.001))",
+            1.0, "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
+        // Polygon: shell with one hole (one shell + holes branch)
+        UnaryUnionGridSizeParam{"polygon_with_hole",
+                                "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
+                                "(5 5, 5 15, 15 15, 15 5, 5 5))",
+                                -1,
+                                "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
+                                "(5 5, 5 15, 15 15, 15 5, 5 5))"},
+        // Multipolygon: two disjoint shells (multiple shells, no holes)
+        UnaryUnionGridSizeParam{"multipolygon_disjoint",
+                                "MULTIPOLYGON (((0 0, 5 0, 5 5, 0 5, 0 0)), "
+                                "((10 10, 15 10, 15 15, 10 15, 10 10)))",
+                                -1,
+                                "MULTIPOLYGON (((0 0, 5 0, 5 5, 0 5, 0 0)), "
+                                "((10 10, 15 10, 15 15, 10 15, 10 10)))"},
+        // Multipolygon: two shells, one with a hole (multiple shells +
+        // holes)
+        UnaryUnionGridSizeParam{"multipolygon_with_hole",
+                                "MULTIPOLYGON (((0 0, 20 0, 20 20, 0 20, 0 0), "
+                                "(5 5, 5 15, 15 15, 15 5, 5 5)), "
+                                "((30 30, 40 30, 40 40, 30 40, 30 30)))",
+                                -1,
+                                "MULTIPOLYGON (((0 0, 20 0, 20 20, 0 20, 0 0), "
+                                "(5 5, 5 15, 15 15, 15 5, 5 5)), "
+                                "((30 30, 40 30, 40 40, 30 40, 30 30)))"}
+        // Multipolygon: overlapping shells not yet merged into a single polygon
+        // UnaryUnionGridSizeParam{
+        //     "multipolygon_overlapping",
+        //     "MULTIPOLYGON (((0 0, 3 0, 3 3, 0 3, 0 0)), "
+        //     "((1 1, 4 1, 4 4, 1 4, 1 1)))",
+        //     -1,
+        //     "MULTIPOLYGON (((0 0, 3 0, 3 3, 0 3, 0 0)), "
+        //     "((1 1, 4 1, 4 4, 1 4, 1 1)))"}
 
         ),
     [](const ::testing::TestParamInfo<UnaryUnionGridSizeParam>& info) {
