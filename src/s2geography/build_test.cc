@@ -223,9 +223,9 @@ TEST(Build, SedonaUdfSymDifference) {
       {"GEOMETRYCOLLECTION EMPTY", "MULTIPOINT ((0 0), (0 1))", std::nullopt}));
 }
 
-TEST(Build, SedonaUdfSnapToGrid) {
+TEST(Build, SedonaUdfReducePrecision) {
   struct SedonaCScalarKernel kernel;
-  s2geography::sedona_udf::SnapToGridKernel(&kernel);
+  s2geography::sedona_udf::ReducePrecisionKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
@@ -242,13 +242,14 @@ TEST(Build, SedonaUdfSnapToGrid) {
       out_array.get(), {"POINT (0 0)", "POINT (0 0)", std::nullopt}));
 }
 
-struct SnapToGridParam {
+struct ReducePrecisionParam {
   std::string name;
   std::optional<std::string> input_wkt;
   std::optional<double> grid_size;
   std::optional<std::string> expected_wkt;
 
-  friend std::ostream& operator<<(std::ostream& os, const SnapToGridParam& p) {
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const ReducePrecisionParam& p) {
     os << (p.input_wkt ? *p.input_wkt : "null")
        << " grid_size=" << (p.grid_size ? std::to_string(*p.grid_size) : "null")
        << " -> " << (p.expected_wkt ? *p.expected_wkt : "null");
@@ -256,13 +257,14 @@ struct SnapToGridParam {
   }
 };
 
-class SnapToGridTest : public ::testing::TestWithParam<SnapToGridParam> {};
+class ReducePrecisionTest
+    : public ::testing::TestWithParam<ReducePrecisionParam> {};
 
-TEST_P(SnapToGridTest, SedonaUdf) {
+TEST_P(ReducePrecisionTest, SedonaUdf) {
   const auto& p = GetParam();
 
   struct SedonaCScalarKernel kernel;
-  s2geography::sedona_udf::SnapToGridKernel(&kernel);
+  s2geography::sedona_udf::ReducePrecisionKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
@@ -279,137 +281,155 @@ TEST_P(SnapToGridTest, SedonaUdf) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    Build, SnapToGridTest,
+    Build, ReducePrecisionTest,
     ::testing::Values(
         // Null inputs
-        SnapToGridParam{"null_geom", std::nullopt, 1.0, std::nullopt},
-        SnapToGridParam{"null_grid_size", "POINT (0 0)", std::nullopt,
-                        std::nullopt},
-        SnapToGridParam{"null_both", std::nullopt, std::nullopt, std::nullopt},
+        ReducePrecisionParam{"null_geom", std::nullopt, 1.0, std::nullopt},
+        ReducePrecisionParam{"null_grid_size", "POINT (0 0)", std::nullopt,
+                             std::nullopt},
+        ReducePrecisionParam{"null_both", std::nullopt, std::nullopt,
+                             std::nullopt},
 
         // Point snapping to whole degrees (grid_size = 1.0)
-        SnapToGridParam{"point_on_grid", "POINT (0 0)", 1.0, "POINT (0 0)"},
-        SnapToGridParam{"point_not_on_grid", "POINT (0.001 0.001)", 1.0,
-                        "POINT (0 0)"},
-        SnapToGridParam{"point_no_snap", "POINT (0.001 0.001)", -1,
-                        "POINT (0.001 0.001)"},
+        ReducePrecisionParam{"point_on_grid", "POINT (0 0)", 1.0,
+                             "POINT (0 0)"},
+        ReducePrecisionParam{"point_not_on_grid", "POINT (0.001 0.001)", 1.0,
+                             "POINT (0 0)"},
+        ReducePrecisionParam{"point_no_snap", "POINT (0.001 0.001)", -1,
+                             "POINT (0.001 0.001)"},
 
         // Point snapping to 0.1 degree grid (grid_size = 0.1)
-        SnapToGridParam{"point_tenth_degree_on_grid", "POINT (0.1 0.1)", 0.1,
-                        "POINT (0.1 0.1)"},
-        SnapToGridParam{"point_tenth_degree_snap", "POINT (0.12 0.12)", 0.1,
-                        "POINT (0.1 0.1)"},
+        ReducePrecisionParam{"point_tenth_degree_on_grid", "POINT (0.1 0.1)",
+                             0.1, "POINT (0.1 0.1)"},
+        ReducePrecisionParam{"point_tenth_degree_snap", "POINT (0.12 0.12)",
+                             0.1, "POINT (0.1 0.1)"},
 
         // Multipoint: two nearby points snap to same location
-        SnapToGridParam{"multipoint_merge",
-                        "MULTIPOINT ((0.001 0.001), (0.002 0.002))", 1.0,
-                        "POINT (0 0)"},
+        ReducePrecisionParam{"multipoint_merge",
+                             "MULTIPOINT ((0.001 0.001), (0.002 0.002))", 1.0,
+                             "POINT (0 0)"},
         // Multipoint: points remain distinct after snapping
-        SnapToGridParam{"multipoint_distinct", "MULTIPOINT ((0 0), (10 10))",
-                        1.0, "MULTIPOINT ((0 0), (10 10))"},
+        ReducePrecisionParam{"multipoint_distinct",
+                             "MULTIPOINT ((0 0), (10 10))", 1.0,
+                             "MULTIPOINT ((0 0), (10 10))"},
 
         // Linestring: no snapping needed
-        SnapToGridParam{"linestring_on_grid", "LINESTRING (0 0, 10 10)", 1.0,
-                        "LINESTRING (0 0, 10 10)"},
+        ReducePrecisionParam{"linestring_on_grid", "LINESTRING (0 0, 10 10)",
+                             1.0, "LINESTRING (0 0, 10 10)"},
         // Linestring: endpoints snap to grid
-        SnapToGridParam{"linestring_snap",
-                        "LINESTRING (0.001 0.001, 10.001 10.001)", 1.0,
-                        "LINESTRING (0 0, 10 10)"},
+        ReducePrecisionParam{"linestring_snap",
+                             "LINESTRING (0.001 0.001, 10.001 10.001)", 1.0,
+                             "LINESTRING (0 0, 10 10)"},
+        // Linestring: midpoints snap together on a grid
+        ReducePrecisionParam{"linestring_midpoint_snap",
+                             "LINESTRING (0 0, 4.9 4.9, 5.1 5.1, 10 10)", 1.0,
+                             "LINESTRING (0 0, 5 5, 10 10)"},
+        // Linestring: component collapses because the endpoints snap together
+        ReducePrecisionParam{"linestring_collapse",
+                             "LINESTRING (0.01 0.02, 0.03 0.04)", 1.0,
+                             "LINESTRING EMPTY"},
         // Linestring: no snapping with negative grid size
-        SnapToGridParam{"linestring_no_snap",
-                        "LINESTRING (0.001 0.001, 10.001 10.001)", -1,
-                        "LINESTRING (0.001 0.001, 10.001 10.001)"},
+        ReducePrecisionParam{"linestring_no_snap",
+                             "LINESTRING (0.001 0.001, 10.001 10.001)", -1,
+                             "LINESTRING (0.001 0.001, 10.001 10.001)"},
         // Linestring with Z
-        SnapToGridParam{"linestring_z", "LINESTRING Z (0 0 100, 10 10 200)",
-                        1.0, "LINESTRING Z (0 0 100, 10 10 200)"},
+        ReducePrecisionParam{"linestring_z",
+                             "LINESTRING Z (0 0 100, 10 10 200)", 1.0,
+                             "LINESTRING Z (0 0 100, 10 10 200)"},
         // Linestring with Z and snapping (Z values are interpolated when
         // endpoints are snapped, so they won't be exact)
-        SnapToGridParam{"linestring_snap_z",
-                        "LINESTRING Z (0.001 0.001 100, 10.001 10.001 200)",
-                        1.0, "LINESTRING Z (0 0 100.010024, 10 10 199.99005)"},
+        ReducePrecisionParam{
+            "linestring_snap_z",
+            "LINESTRING Z (0.001 0.001 100, 10.001 10.001 200)", 1.0,
+            "LINESTRING Z (0 0 100.010024, 10 10 199.99005)"},
         // Linestring with M
-        SnapToGridParam{"linestring_m", "LINESTRING M (0 0 100, 10 10 200)",
-                        1.0, "LINESTRING M (0 0 100, 10 10 200)"},
+        ReducePrecisionParam{"linestring_m",
+                             "LINESTRING M (0 0 100, 10 10 200)", 1.0,
+                             "LINESTRING M (0 0 100, 10 10 200)"},
         // Linestring with ZM
-        SnapToGridParam{"linestring_zm",
-                        "LINESTRING ZM (0 0 100 1000, 10 10 200 2000)", 1.0,
-                        "LINESTRING ZM (0 0 100 1000, 10 10 200 2000)"},
+        ReducePrecisionParam{
+            "linestring_zm", "LINESTRING ZM (0 0 100 1000, 10 10 200 2000)",
+            1.0, "LINESTRING ZM (0 0 100 1000, 10 10 200 2000)"},
         // Check Z handling
-        SnapToGridParam{"point_on_grid_z", "POINT Z (0 1 10)", 1.0,
-                        "POINT Z (0 1 10)"},
-        SnapToGridParam{"point_no_snap_z", "POINT Z (0.01 1.01 10)", 1.0,
-                        "POINT Z (0 1 10)"},
-        SnapToGridParam{"point_not_on_grid_z", "POINT Z (0.01 1.01 10)", 1.0,
-                        "POINT Z (0 1 10)"},
-        SnapToGridParam{"multipoint_merge_z",
-                        "MULTIPOINT Z (0.01 1.01 10, 0.01 1.01 20)", 1.0,
-                        "POINT Z (0 1 10)"},
-        SnapToGridParam{"multipoint_distinct_z",
-                        "MULTIPOINT Z (0.01 1.01 10, 2.01 3.01 20)", 1.0,
-                        "MULTIPOINT Z (0 1 10, 2 3 20)"},
+        ReducePrecisionParam{"point_on_grid_z", "POINT Z (0 1 10)", 1.0,
+                             "POINT Z (0 1 10)"},
+        ReducePrecisionParam{"point_no_snap_z", "POINT Z (0.01 1.01 10)", 1.0,
+                             "POINT Z (0 1 10)"},
+        ReducePrecisionParam{"point_not_on_grid_z", "POINT Z (0.01 1.01 10)",
+                             1.0, "POINT Z (0 1 10)"},
+        ReducePrecisionParam{"multipoint_merge_z",
+                             "MULTIPOINT Z (0.01 1.01 10, 0.01 1.01 20)", 1.0,
+                             "POINT Z (0 1 10)"},
+        ReducePrecisionParam{"multipoint_distinct_z",
+                             "MULTIPOINT Z (0.01 1.01 10, 2.01 3.01 20)", 1.0,
+                             "MULTIPOINT Z (0 1 10, 2 3 20)"},
 
         // Check M handling
-        SnapToGridParam{"point_on_grid_m", "POINT M (0 1 10)", 1.0,
-                        "POINT M (0 1 10)"},
-        SnapToGridParam{"point_no_snap_m", "POINT M (0.01 1.01 10)", 1.0,
-                        "POINT M (0 1 10)"},
-        SnapToGridParam{"point_not_on_grid_m", "POINT M (0.01 1.01 10)", 1.0,
-                        "POINT M (0 1 10)"},
-        SnapToGridParam{"multipoint_merge_m",
-                        "MULTIPOINT M (0.01 1.01 10, 0.01 1.01 20)", 1.0,
-                        "POINT M (0 1 10)"},
-        SnapToGridParam{"multipoint_distinct_m",
-                        "MULTIPOINT M (0.01 1.01 10, 2.01 3.01 20)", 1.0,
-                        "MULTIPOINT M (0 1 10, 2 3 20)"},
+        ReducePrecisionParam{"point_on_grid_m", "POINT M (0 1 10)", 1.0,
+                             "POINT M (0 1 10)"},
+        ReducePrecisionParam{"point_no_snap_m", "POINT M (0.01 1.01 10)", 1.0,
+                             "POINT M (0 1 10)"},
+        ReducePrecisionParam{"point_not_on_grid_m", "POINT M (0.01 1.01 10)",
+                             1.0, "POINT M (0 1 10)"},
+        ReducePrecisionParam{"multipoint_merge_m",
+                             "MULTIPOINT M (0.01 1.01 10, 0.01 1.01 20)", 1.0,
+                             "POINT M (0 1 10)"},
+        ReducePrecisionParam{"multipoint_distinct_m",
+                             "MULTIPOINT M (0.01 1.01 10, 2.01 3.01 20)", 1.0,
+                             "MULTIPOINT M (0 1 10, 2 3 20)"},
 
         // Check POINT ZM handling
-        SnapToGridParam{"point_on_grid_zm", "POINT ZM (0 1 10 100)", 1.0,
-                        "POINT ZM (0 1 10 100)"},
-        SnapToGridParam{"point_no_snap_zm", "POINT ZM (0.01 1.01 10 100)", 1.0,
-                        "POINT ZM (0 1 10 100)"},
-        SnapToGridParam{"point_not_on_grid_zm", "POINT ZM (0.01 1.01 10 100)",
-                        1.0, "POINT ZM (0 1 10 100)"},
-        SnapToGridParam{"multipoint_merge_zm",
-                        "MULTIPOINT ZM (0.01 1.01 10 100, 0.01 1.01 20 200)",
-                        1.0, "POINT ZM (0 1 10 100)"},
-        SnapToGridParam{"multipoint_distinct_zm",
-                        "MULTIPOINT ZM (0.01 1.01 10 100, 2.01 3.01 20 200)",
-                        1.0, "MULTIPOINT ZM (0 1 10 100, 2 3 20 200)"},
+        ReducePrecisionParam{"point_on_grid_zm", "POINT ZM (0 1 10 100)", 1.0,
+                             "POINT ZM (0 1 10 100)"},
+        ReducePrecisionParam{"point_no_snap_zm", "POINT ZM (0.01 1.01 10 100)",
+                             1.0, "POINT ZM (0 1 10 100)"},
+        ReducePrecisionParam{"point_not_on_grid_zm",
+                             "POINT ZM (0.01 1.01 10 100)", 1.0,
+                             "POINT ZM (0 1 10 100)"},
+        ReducePrecisionParam{
+            "multipoint_merge_zm",
+            "MULTIPOINT ZM (0.01 1.01 10 100, 0.01 1.01 20 200)", 1.0,
+            "POINT ZM (0 1 10 100)"},
+        ReducePrecisionParam{
+            "multipoint_distinct_zm",
+            "MULTIPOINT ZM (0.01 1.01 10 100, 2.01 3.01 20 200)", 1.0,
+            "MULTIPOINT ZM (0 1 10 100, 2 3 20 200)"},
 
         // Polygon: single ring, no snapping (single loop fast path)
-        SnapToGridParam{"polygon_simple",
-                        "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))", -1,
-                        "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
+        ReducePrecisionParam{"polygon_simple",
+                             "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))", -1,
+                             "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
         // Polygon: single ring with snapping
-        SnapToGridParam{"polygon_snap",
-                        "POLYGON ((0.001 0.001, 10.001 0.001, 10.001 10.001, "
-                        "0.001 10.001, 0.001 0.001))",
-                        1.0, "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
+        ReducePrecisionParam{
+            "polygon_snap",
+            "POLYGON ((0.001 0.001, 10.001 0.001, 10.001 10.001, "
+            "0.001 10.001, 0.001 0.001))",
+            1.0, "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
         // Polygon: shell with one hole (one shell + holes branch)
-        SnapToGridParam{"polygon_with_hole",
-                        "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
-                        "(5 5, 5 15, 15 15, 15 5, 5 5))",
-                        -1,
-                        "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
-                        "(5 5, 5 15, 15 15, 15 5, 5 5))"},
+        ReducePrecisionParam{"polygon_with_hole",
+                             "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
+                             "(5 5, 5 15, 15 15, 15 5, 5 5))",
+                             -1,
+                             "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
+                             "(5 5, 5 15, 15 15, 15 5, 5 5))"},
         // Multipolygon: two disjoint shells (multiple shells, no holes)
-        SnapToGridParam{"multipolygon_disjoint",
-                        "MULTIPOLYGON (((0 0, 5 0, 5 5, 0 5, 0 0)), "
-                        "((10 10, 15 10, 15 15, 10 15, 10 10)))",
-                        -1,
-                        "MULTIPOLYGON (((0 0, 5 0, 5 5, 0 5, 0 0)), "
-                        "((10 10, 15 10, 15 15, 10 15, 10 10)))"},
+        ReducePrecisionParam{"multipolygon_disjoint",
+                             "MULTIPOLYGON (((0 0, 5 0, 5 5, 0 5, 0 0)), "
+                             "((10 10, 15 10, 15 15, 10 15, 10 10)))",
+                             -1,
+                             "MULTIPOLYGON (((0 0, 5 0, 5 5, 0 5, 0 0)), "
+                             "((10 10, 15 10, 15 15, 10 15, 10 10)))"},
         // Multipolygon: two shells, one with a hole (multiple shells +
         // holes)
-        SnapToGridParam{"multipolygon_with_hole",
-                        "MULTIPOLYGON (((0 0, 20 0, 20 20, 0 20, 0 0), "
-                        "(5 5, 5 15, 15 15, 15 5, 5 5)), "
-                        "((30 30, 40 30, 40 40, 30 40, 30 30)))",
-                        -1,
-                        "MULTIPOLYGON (((0 0, 20 0, 20 20, 0 20, 0 0), "
-                        "(5 5, 5 15, 15 15, 15 5, 5 5)), "
-                        "((30 30, 40 30, 40 40, 30 40, 30 30)))"}),
-    [](const ::testing::TestParamInfo<SnapToGridParam>& info) {
+        ReducePrecisionParam{"multipolygon_with_hole",
+                             "MULTIPOLYGON (((0 0, 20 0, 20 20, 0 20, 0 0), "
+                             "(5 5, 5 15, 15 15, 15 5, 5 5)), "
+                             "((30 30, 40 30, 40 40, 30 40, 30 30)))",
+                             -1,
+                             "MULTIPOLYGON (((0 0, 20 0, 20 20, 0 20, 0 0), "
+                             "(5 5, 5 15, 15 15, 15 5, 5 5)), "
+                             "((30 30, 40 30, 40 40, 30 40, 30 30)))"}),
+    [](const ::testing::TestParamInfo<ReducePrecisionParam>& info) {
       return info.param.name;
     });
 

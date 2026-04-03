@@ -625,7 +625,7 @@ class GeoArrowPolygonLayer : public S2Builder::Layer {
   GraphOptions graph_options() const override {
     return GraphOptions(S2Builder::EdgeType::DIRECTED,
                         GraphOptions::DegenerateEdges::DISCARD,
-                        GraphOptions::DuplicateEdges::KEEP,
+                        GraphOptions::DuplicateEdges::MERGE,
                         GraphOptions::SiblingPairs::DISCARD);
   }
 
@@ -819,8 +819,15 @@ struct RebuildExec {
     bool has_polygons = !polygon_lengths_.empty();
     int num_types = has_points + has_lines + has_polygons;
 
+    // If there are no outputs, write an empty attempting to preserve the input
+    // geometry type.
+    if (num_types == 0) {
+      out->AppendEmpty(value0.geometry_type());
+      return;
+    }
+
     // If there is only one type of output, write it directly
-    if (num_types <= 1) {
+    if (num_types == 1) {
       out->FeatureStart();
       if (has_points) WritePointOutput(out);
       if (has_lines) WriteLinesOuput(out);
@@ -919,7 +926,7 @@ struct RebuildExec {
   std::vector<internal::GeoArrowVertex> polygon_vertices_;
 };
 
-struct SnapToGridExec {
+struct ReducePrecisionExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = DoubleInputView;
   using out_t = GeoArrowOutputBuilder;
@@ -989,8 +996,8 @@ void UnionKernel(struct SedonaCScalarKernel* out) {
       out, "st_union");
 }
 
-void SnapToGridKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<SnapToGridExec>(out, "st_snaptogrid");
+void ReducePrecisionKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<ReducePrecisionExec>(out, "st_reduceprecision");
 }
 
 }  // namespace sedona_udf

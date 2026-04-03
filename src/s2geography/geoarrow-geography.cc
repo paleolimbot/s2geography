@@ -579,6 +579,14 @@ std::optional<S2Point> GeoArrowGeography::Point() const {
   }
 }
 
+uint8_t GeoArrowGeography::geometry_type() const {
+  if (geom_.size_nodes == 0) {
+    return GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION;
+  } else {
+    return geom_.root->geometry_type;
+  }
+}
+
 uint8_t GeoArrowGeography::dimensions() const {
   if (geom_.size_nodes == 0) {
     return GEOARROW_DIMENSIONS_XY;

@@ -341,6 +341,12 @@ class GeoArrowGeography {
   /// \brief Returns true if this geography has no edges
   bool is_empty() const;
 
+  /// \brief Returns the input geometry type
+  ///
+  /// This may be used to more accurately propagate the input geometry type to
+  /// the output for operations that require it.
+  uint8_t geometry_type() const;
+
   /// \brief Returns the coordinate dimensions (e.g., XY, XYZ, XYM, XYZM)
   ///
   /// For geometries with mixed dimension components (e.g., GEOMETRYCOLLECTION

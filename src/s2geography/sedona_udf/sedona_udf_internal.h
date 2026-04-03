@@ -271,10 +271,22 @@ class GeoArrowOutputBuilder {
   }
 
   /// \brief Append an empty geometry of a specified type
-  void AppendEmpty(enum GeoArrowGeometryType geometry_type =
-                       GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION) {
+  void AppendEmpty(
+      uint8_t geometry_type = GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION) {
+    switch (geometry_type) {
+      case GEOARROW_GEOMETRY_TYPE_POINT:
+      case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+      case GEOARROW_GEOMETRY_TYPE_POLYGON:
+      case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+      case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
+      case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
+        break;
+      default:
+        throw Exception("Unknown geometry type ID");
+    }
+
     FeatureStart();
-    GeomStart(geometry_type);
+    GeomStart(static_cast<GeoArrowGeometryType>(geometry_type));
     GeomEnd();
     FeatureEnd();
   }
