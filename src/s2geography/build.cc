@@ -929,6 +929,7 @@ class GeoArrowPointVectorLayer : public S2Builder::Layer {
   OutputGeometry* output_;
 };
 
+/// \brief Output layer that collects line edge collections in the graph
 class GeoArrowPolylinesLayer : public S2Builder::Layer {
  public:
   using GraphOptions = S2Builder::GraphOptions;
@@ -977,6 +978,7 @@ class GeoArrowPolylinesLayer : public S2Builder::Layer {
   OutputGeometry* output_;
 };
 
+/// \brief Output layer that collects polygon edge collections in the graph
 class GeoArrowPolygonLayer : public S2Builder::Layer {
  public:
   using GraphOptions = S2Builder::GraphOptions;
@@ -984,7 +986,8 @@ class GeoArrowPolygonLayer : public S2Builder::Layer {
   using EdgeId = Graph::EdgeId;
   using InputEdgeId = Graph::InputEdgeId;
 
-  GeoArrowPolygonLayer(OutputGeometry* output, EdgeTracker* edge_tracker)
+  GeoArrowPolygonLayer(OutputGeometry* output,
+                       EdgeTracker* edge_tracker = nullptr)
       : edge_tracker_(edge_tracker), output_(output) {}
 
   GraphOptions graph_options() const override {
