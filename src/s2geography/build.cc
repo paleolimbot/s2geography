@@ -513,7 +513,7 @@ struct EdgeTracker {
 /// output. To mediate this, we use the OutputGeometry to buffer one output
 /// feature at a time.
 ///
-/// This strucutre also takes care of reordering polygon rings to align with
+/// This structure also takes care of reordering polygon rings to align with
 /// shell/hole expectations of simple features output (i.e., oriented rings are
 /// written to this object and reordering only occurs on output).
 ///

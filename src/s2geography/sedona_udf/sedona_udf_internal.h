@@ -280,6 +280,7 @@ class GeoArrowOutputBuilder {
       case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
       case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
       case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
+      case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
         break;
       default:
         throw Exception("Unknown geometry type ID");
