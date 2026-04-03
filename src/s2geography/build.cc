@@ -11,6 +11,9 @@
 #include <s2/s2earth.h>
 #include <s2/s2loop.h>
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
 #include <sstream>
 
 #include "s2geography/accessors.h"
@@ -867,7 +870,7 @@ void VisitTrackedVertices(const S2Builder::Graph& g, const EdgeTracker& tracker,
 
   for (int edge_id : edge_loop) {
     S2Point pt = g.vertex(g.edge(edge_id).second);
-    PopulateVertex(g, tracker, edge_loop[0], pt, &vt);
+    PopulateVertex(g, tracker, edge_id, pt, &vt);
     visit(vt);
   }
 }
@@ -927,7 +930,7 @@ class GeoArrowPointVectorLayer : public S2Builder::Layer {
       // output, use the EdgeTracker to resolve input edges. Otherwise, just
       // write 2D points based on the builder-derived vertex.
       if (edge_tracker_) {
-        PopulateVertex(g, *edge_tracker_, edge.first, pt, &vt);
+        PopulateVertex(g, *edge_tracker_, edge_id, pt, &vt);
       } else {
         vt.SetPoint(pt);
       }
@@ -1145,8 +1148,8 @@ struct SimplifyExec {
     // the snap function and reinitialize the builder with the new options
     if (tolerance != last_tolerance_) {
       if (tolerance < 0) {
-        throw Exception(
-            "Can't set tolerance to a negative value in ST_Simplify()");
+        // PostGIS seems to do this
+        tolerance = -tolerance;
       }
 
       // Create the identity snap function

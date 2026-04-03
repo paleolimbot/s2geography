@@ -350,10 +350,55 @@ INSTANTIATE_TEST_SUITE_P(
         ReducePrecisionParam{
             "linestring_zm", "LINESTRING ZM (0 0 100 1000, 10 10 200 2000)",
             1.0, "LINESTRING ZM (0 0 100 1000, 10 10 200 2000)"},
+
+        // Multilinestring: no snapping needed
+        ReducePrecisionParam{"multilinestring_on_grid",
+                             "MULTILINESTRING ((0 0, 10 10), (20 20, 30 30))",
+                             1.0,
+                             "MULTILINESTRING ((0 0, 10 10), (20 20, 30 30))"},
+        // Multilinestring: endpoints snap to grid
+        ReducePrecisionParam{"multilinestring_snap",
+                             "MULTILINESTRING ((0.001 0.001, 10.001 10.001), "
+                             "(20.001 20.001, 30.001 30.001))",
+                             1.0,
+                             "MULTILINESTRING ((0 0, 10 10), (20 20, 30 30))"},
+        // Multilinestring: midpoints snap together on a grid
+        ReducePrecisionParam{
+            "multilinestring_midpoint_snap",
+            "MULTILINESTRING ((0 0, 4.9 4.9, 5.1 5.1, 10 10), "
+            "(20 20, 24.9 24.9, 25.1 25.1, 30 30))",
+            1.0, "MULTILINESTRING ((0 0, 5 5, 10 10), (20 20, 25 25, 30 30))"},
+        // Multilinestring: one component collapses because endpoints snap
+        // together
+        ReducePrecisionParam{
+            "multilinestring_partial_collapse",
+            "MULTILINESTRING ((0 0, 10 10), (0.01 0.02, 0.03 0.04))", 1.0,
+            "LINESTRING (0 0, 10 10)"},
+        // Multilinestring with Z
+        ReducePrecisionParam{
+            "multilinestring_z",
+            "MULTILINESTRING Z ((0 0 100, 10 10 200), (20 20 300, 30 30 400))",
+            1.0,
+            "MULTILINESTRING Z ((0 0 100, 10 10 200), "
+            "(20 20 300, 30 30 400))"},
+        // Multilinestring with M
+        ReducePrecisionParam{
+            "multilinestring_m",
+            "MULTILINESTRING M ((0 0 100, 10 10 200), (20 20 300, 30 30 400))",
+            1.0,
+            "MULTILINESTRING M ((0 0 100, 10 10 200), "
+            "(20 20 300, 30 30 400))"},
+        // Multilinestring with ZM
+        ReducePrecisionParam{
+            "multilinestring_zm",
+            "MULTILINESTRING ZM ((0 0 100 1000, 10 10 200 2000), "
+            "(20 20 300 3000, 30 30 400 4000))",
+            1.0,
+            "MULTILINESTRING ZM ((0 0 100 1000, 10 10 200 2000), "
+            "(20 20 300 3000, 30 30 400 4000))"},
+
         // Check Z handling
         ReducePrecisionParam{"point_on_grid_z", "POINT Z (0 1 10)", 1.0,
-                             "POINT Z (0 1 10)"},
-        ReducePrecisionParam{"point_no_snap_z", "POINT Z (0.01 1.01 10)", 1.0,
                              "POINT Z (0 1 10)"},
         ReducePrecisionParam{"point_not_on_grid_z", "POINT Z (0.01 1.01 10)",
                              1.0, "POINT Z (0 1 10)"},
@@ -367,8 +412,6 @@ INSTANTIATE_TEST_SUITE_P(
         // Check M handling
         ReducePrecisionParam{"point_on_grid_m", "POINT M (0 1 10)", 1.0,
                              "POINT M (0 1 10)"},
-        ReducePrecisionParam{"point_no_snap_m", "POINT M (0.01 1.01 10)", 1.0,
-                             "POINT M (0 1 10)"},
         ReducePrecisionParam{"point_not_on_grid_m", "POINT M (0.01 1.01 10)",
                              1.0, "POINT M (0 1 10)"},
         ReducePrecisionParam{"multipoint_merge_m",
@@ -381,8 +424,6 @@ INSTANTIATE_TEST_SUITE_P(
         // Check POINT ZM handling
         ReducePrecisionParam{"point_on_grid_zm", "POINT ZM (0 1 10 100)", 1.0,
                              "POINT ZM (0 1 10 100)"},
-        ReducePrecisionParam{"point_no_snap_zm", "POINT ZM (0.01 1.01 10 100)",
-                             1.0, "POINT ZM (0 1 10 100)"},
         ReducePrecisionParam{"point_not_on_grid_zm",
                              "POINT ZM (0.01 1.01 10 100)", 1.0,
                              "POINT ZM (0 1 10 100)"},
@@ -516,6 +557,9 @@ INSTANTIATE_TEST_SUITE_P(
         // Multipoint: large tolerance merges nearby points
         SimplifyParam{"multipoint_merge", "MULTIPOINT ((0 0), (0.001 0.001))",
                       1000000.0, "POINT (0 0)"},
+        // Multipoint: large negative tolerance also merges nearby points
+        SimplifyParam{"negative_tolerance", "MULTIPOINT ((0 0), (0.001 0.001))",
+                      -1000000.0, "POINT (0 0)"},
 
         // Linestring: zero tolerance is identity
         SimplifyParam{"linestring_zero_tolerance", "LINESTRING (0 0, 10 0)",

@@ -118,8 +118,7 @@ struct GeoArrowVertex {
   /// \brief The ZM portion of the coordinate
   ///
   /// Whether these values are missing, Z, M, or ZM depends on the
-  /// dimensions of the sequence. These will be NaN in the event that
-  /// there is no Z or M present in the source sequence.
+  /// dimensions of the sequence.
   double zm[2] = {0.0, 0.0};
 
   void SetPoint(const S2Point& pt) {
