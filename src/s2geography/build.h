@@ -109,6 +109,7 @@ void DifferenceKernel(struct SedonaCScalarKernel* out);
 void SymDifferenceKernel(struct SedonaCScalarKernel* out);
 void IntersectionKernel(struct SedonaCScalarKernel* out);
 void UnionKernel(struct SedonaCScalarKernel* out);
+void UnaryUnionGridSizeKernel(struct SedonaCScalarKernel* out);
 }  // namespace sedona_udf
 
 }  // namespace s2geography

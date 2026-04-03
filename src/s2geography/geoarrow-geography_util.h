@@ -112,15 +112,21 @@ bool VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
 /// Z and M values.
 struct GeoArrowVertex {
   /// \brief The longitude (X) value
-  double lng;
+  double lng{};
   /// \brief The latitude (Y) values
-  double lat;
+  double lat{};
   /// \brief The ZM portion of the coordinate
   ///
   /// Whether these values are missing, Z, M, or ZM depends on the
   /// dimensions of the sequence. These will be NaN in the event that
   /// there is no Z or M present in the source sequence.
-  double zm[2];
+  double zm[2] = {0.0, 0.0};
+
+  void SetPoint(const S2Point& pt) {
+    S2LatLng ll(pt);
+    lng = ll.lng().degrees();
+    lat = ll.lat().degrees();
+  }
 
   /// \brief Return the S2Point representation of this vertex
   S2Point ToPoint() const { return S2LatLng::FromDegrees(lat, lng).ToPoint(); }
@@ -156,9 +162,9 @@ struct GeoArrowVertex {
 /// information.
 struct GeoArrowEdge {
   /// \brief The first vertex of the edge
-  GeoArrowVertex v0;
+  GeoArrowVertex v0{};
   /// \brief The second vertex of the edge
-  GeoArrowVertex v1;
+  GeoArrowVertex v1{};
 
   /// \brief Interpolate a value along this edge
   ///
@@ -174,6 +180,15 @@ struct GeoArrowEdge {
   ///   to minimize roundtrip rounding errors)
   /// - z and m values are interpolated linearly
   GeoArrowVertex Interpolate(const S2Point& point);
+
+  /// \brief Normalize the order of zm values such that this object
+  /// always represents, x, y, z, and m (in that order)
+  GeoArrowEdge Normalize(uint8_t dimensions) {
+    GeoArrowEdge e = *this;
+    e.v0 = v0.Normalize(dimensions);
+    e.v1 = v1.Normalize(dimensions);
+    return e;
+  }
 
   friend bool operator==(const GeoArrowEdge& a, const GeoArrowEdge& b) {
     return a.v0 == b.v0 && a.v1 == b.v1;

@@ -7,6 +7,7 @@
 #include <s2/s2builderutil_s2point_vector_layer.h>
 #include <s2/s2builderutil_s2polygon_layer.h>
 #include <s2/s2builderutil_s2polyline_vector_layer.h>
+#include <s2/s2builderutil_snap_functions.h>
 
 #include <sstream>
 
@@ -434,75 +435,154 @@ std::unique_ptr<Geography> S2UnionAggregator::Finalize() {
 
 namespace sedona_udf {
 
+struct EdgeTracker {
+  EdgeTracker() { Clear(); }
+
+  void Clear() {
+    num_edges_.clear();
+    num_edges_.push_back(0);
+    edge_count_ = 0;
+  }
+
+  void Add(const S2Shape* shape) {
+    shapes_.push_back(shape);
+    edge_count_ += shape->num_edges();
+    num_edges_.push_back(edge_count_);
+  }
+
+  std::pair<const S2Shape*, int> ResolveSource(int edge_id) {
+    auto it = std::upper_bound(num_edges_.begin(), num_edges_.end(), edge_id);
+    int shape_idx = static_cast<int>(std::distance(num_edges_.begin(), it)) - 1;
+    return {shapes_[shape_idx], edge_id - num_edges_[shape_idx]};
+  }
+
+  internal::GeoArrowEdge ResolveEdge(int edge_id) {
+    auto src = ResolveSource(edge_id);
+    switch (src.first->dimension()) {
+      case 0: {
+        const auto* points =
+            reinterpret_cast<const GeoArrowPointShape*>(src.first);
+        return points->native_edge(src.second).Normalize(points->dimensions());
+      }
+      case 1: {
+        const auto* lines =
+            reinterpret_cast<const GeoArrowLaxPolylineShape*>(src.first);
+        return lines->native_edge(src.second).Normalize(lines->dimensions());
+      }
+      case 2: {
+        const auto* polygons =
+            reinterpret_cast<const GeoArrowLaxPolygonShape*>(src.first);
+        return polygons->native_edge(src.second)
+            .Normalize(polygons->dimensions());
+      }
+      default:
+        throw Exception("Unexpected value of dimension()");
+    }
+  }
+
+  std::vector<int> num_edges_;
+  int edge_count_;
+  std::vector<const S2Shape*> shapes_;
+};
+
+/// \brief A reference to a source edge, used as a label payload
+struct SourceEdgeRef {
+  int shape_id;
+  int edge_id;
+};
+
+/// \brief An S2Builder layer that collects degenerate edges (points) and
+/// resolves them back to native GeoArrow vertices via labels.
+///
+/// Like s2builderutil::S2PointVectorLayer, this layer expects all edges to be
+/// degenerate. It uses Graph::LabelFetcher to retrieve source (shape_id,
+/// edge_id) references that were attached as labels when the edges were added
+/// to the builder, then resolves those references against the source
+/// GeoArrowGeography to recover lossless lon/lat/z/m coordinates.
 class GeoArrowPointVectorLayer : public S2Builder::Layer {
  public:
   using GraphOptions = S2Builder::GraphOptions;
   using Graph = S2Builder::Graph;
   using EdgeId = Graph::EdgeId;
+  using InputEdgeId = Graph::InputEdgeId;
 
-  GeoArrowPointVectorLayer(const GeoArrowPointShape* source,
-                           std::vector<internal::GeoArrowVertex>* points_out,
-                           int32_t input_edge_id_offset = 0)
-      : source_(source),
-        points_out_(points_out),
-        input_edge_id_offset_(input_edge_id_offset) {}
+  GeoArrowPointVectorLayer(EdgeTracker* edge_tracker,
+                           std::vector<internal::GeoArrowVertex>* points_out)
+      : edge_tracker_(edge_tracker), points_out_(points_out) {}
 
   GraphOptions graph_options() const override {
     return GraphOptions(
-        S2Builder::EdgeType::DIRECTED,
-        GraphOptions::DegenerateEdges::KEEP,
-        GraphOptions::DuplicateEdges::MERGE,
-        GraphOptions::SiblingPairs::KEEP);
+        S2Builder::EdgeType::DIRECTED, GraphOptions::DegenerateEdges::KEEP,
+        GraphOptions::DuplicateEdges::MERGE, GraphOptions::SiblingPairs::KEEP);
   }
 
   void Build(const Graph& g, S2Error* error) override {
-    for (EdgeId edge_id = 0;
-         static_cast<size_t>(edge_id) < g.edges().size();
+    for (EdgeId edge_id = 0; static_cast<size_t>(edge_id) < g.edges().size();
          ++edge_id) {
+      // Resolve the edge
       const auto& edge = g.edge(edge_id);
-
       if (edge.first != edge.second) {
         *error = S2Error::InvalidArgument("Found non-degenerate edges");
         continue;
       }
 
-      // Resolve the output edge back to an input edge, then to a native vertex
-      for (auto input_id : g.input_edge_ids(edge_id)) {
-        int source_edge = static_cast<int>(input_id - input_edge_id_offset_);
-        auto native = source_->native_vertex(source_edge);
-        // For degenerate (point) edges, v0 == v1
-        points_out_->push_back(native.Normalize(source_->dimensions()));
+      // Resolve the vertex as an S2Point
+      S2Point pt = g.vertex(edge.first);
+      internal::GeoArrowVertex vt;
+
+      // GEOS seems to always return the first Z or M it encounters for point
+      // output
+      for (InputEdgeId input_edge_id : g.input_edge_ids(edge_id)) {
+        auto e = edge_tracker_->ResolveEdge(input_edge_id);
+        vt = e.v0;
+        break;
       }
+
+      // If this vertex was snapped to a new location, set its vertex
+      if (pt != vt.ToPoint()) {
+        vt.SetPoint(pt);
+      }
+
+      // Write to the output
+      Write(vt);
     }
   }
 
+  void Write(const internal::GeoArrowVertex& v) { points_out_->push_back(v); }
+
  private:
-  const GeoArrowPointShape* source_;
+  EdgeTracker* edge_tracker_;
   std::vector<internal::GeoArrowVertex>* points_out_;
-  int32_t input_edge_id_offset_;
+  GraphOptions::DuplicateEdges duplicate_edges_;
 };
 
 struct RebuildExec {
   using arg0_t = GeoArrowGeographyInputView;
   using out_t = GeoArrowOutputBuilder;
 
-  RebuildExec() {
+  RebuildExec(const S2Builder::Options& options = S2Builder::Options())
+      : builder_options_(options) {
     builder_.Init(builder_options_);
   }
 
-  void Exec(arg0_t::c_type value0, out_t* out) {
+  void Exec(const GeoArrowGeography& value0, GeoArrowOutputBuilder* out) {
     builder_.Reset();
     native_points_.clear();
+    edge_tracker_.Clear();
 
-    // Start a layer that collects native point vertices
+    // Start a layer that collects point vertices
     builder_.StartLayer(absl::make_unique<GeoArrowPointVectorLayer>(
-        value0.points(), &native_points_));
-    builder_.AddShape(*value0.points());
+        &edge_tracker_, &native_points_));
 
+    edge_tracker_.Add(value0.points());
+    value0.points()->geom().VisitVertices([&](const S2Point& v) {
+      builder_.AddPoint(v);
+      return true;
+    });
 
     // TODO: add GeoArrow-aware layers for lines and polygons
-    builder_.AddShape(*value0.lines());
-    builder_.AddShape(*value0.polygons());
+    // builder_.AddShape(*value0.lines());
+    // builder_.AddShape(*value0.polygons());
 
     // build the output
     S2Error error;
@@ -512,10 +592,33 @@ struct RebuildExec {
       throw Exception(ss.str());
     }
 
-    // Write native point output to the GeoArrowOutputBuilder
-    // TODO: handle lines and polygons; write a complete geometry
+    // Write the output
+
+    // If there is only point output, write it
+    if (!native_points_.empty()) {
+      out->FeatureStart();
+      WritePointOutput(out);
+      out->FeatureEnd();
+      return;
+    }
+
+    // TODO: check for only polyline output
+
+    // TODO: check for only polgon output
+
+    // Otherwise, write a GEOMETRYCOLLECTION with any of the available output
+    out->FeatureStart();
+    out->GeomStart(GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION);
+    WritePointOutput(out);
+    out->GeomEnd();
+    out->FeatureEnd();
+  }
+
+  void WritePointOutput(out_t* out) {
     if (native_points_.size() == 1) {
-      out->AppendPoint(native_points_[0]);
+      out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
+      out->WriteCoord(native_points_[0]);
+      out->GeomEnd();
     } else if (native_points_.size() > 1) {
       out->FeatureStart();
       out->GeomStart(GEOARROW_GEOMETRY_TYPE_MULTIPOINT);
@@ -525,15 +628,40 @@ struct RebuildExec {
         out->GeomEnd();
       }
       out->GeomEnd();
-      out->FeatureEnd();
-    } else {
-      out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_POINT);
     }
   }
 
   S2Builder builder_;
   S2Builder::Options builder_options_;
+  EdgeTracker edge_tracker_;
   std::vector<internal::GeoArrowVertex> native_points_;
+};
+
+struct UnaryUnionGridSizeExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = DoubleInputView;
+  using out_t = GeoArrowOutputBuilder;
+
+  void Exec(arg0_t::c_type value, double grid_size, out_t* out) {
+    // If the grid size changed since the last iteration, we need to recreate
+    // the snap function and reinitialize the builder with the new options
+    if (grid_size != last_grid_size_) {
+      int exponent = static_cast<int>(std::round(-std::log10(grid_size)));
+      exponent =
+          std::max(s2builderutil::IntLatLngSnapFunction::kMinExponent,
+                   std::min(s2builderutil::IntLatLngSnapFunction::kMaxExponent,
+                            exponent));
+      s2builderutil::IntLatLngSnapFunction snap(exponent);
+      rebuild_.builder_options_.set_snap_function(snap);
+      rebuild_.builder_.Init(rebuild_.builder_options_);
+      last_grid_size_ = grid_size;
+    }
+
+    rebuild_.Exec(value, out);
+  }
+
+  RebuildExec rebuild_;
+  double last_grid_size_{-100};
 };
 
 template <S2BooleanOperation::OpType op_type>
@@ -571,6 +699,10 @@ void IntersectionKernel(struct SedonaCScalarKernel* out) {
 void UnionKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<BooleanOperationExec<S2BooleanOperation::OpType::UNION>>(
       out, "st_union");
+}
+
+void UnaryUnionGridSizeKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<UnaryUnionGridSizeExec>(out, "st_unaryunion");
 }
 
 }  // namespace sedona_udf

@@ -223,4 +223,23 @@ TEST(Build, SedonaUdfSymDifference) {
       {"GEOMETRYCOLLECTION EMPTY", "MULTIPOINT ((0 0), (0 1))", std::nullopt}));
 }
 
+TEST(Build, SedonaUdfUnaryUnionGridSize) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::UnaryUnionGridSizeKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+                        {{"POINT (0 0)", "POINT (0.001 0.001)", std::nullopt}},
+                        {{1.0, 1.0, std::nullopt}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(
+      out_array.get(), {"POINT (0 0)", "POINT (0 0)", std::nullopt}));
+}
+
 }  // namespace s2geography
