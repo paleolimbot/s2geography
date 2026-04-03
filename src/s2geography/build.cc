@@ -485,20 +485,6 @@ struct EdgeTracker {
   std::vector<const S2Shape*> shapes_;
 };
 
-/// \brief A reference to a source edge, used as a label payload
-struct SourceEdgeRef {
-  int shape_id;
-  int edge_id;
-};
-
-/// \brief An S2Builder layer that collects degenerate edges (points) and
-/// resolves them back to native GeoArrow vertices via labels.
-///
-/// Like s2builderutil::S2PointVectorLayer, this layer expects all edges to be
-/// degenerate. It uses Graph::LabelFetcher to retrieve source (shape_id,
-/// edge_id) references that were attached as labels when the edges were added
-/// to the builder, then resolves those references against the source
-/// GeoArrowGeography to recover lossless lon/lat/z/m coordinates.
 class GeoArrowPointVectorLayer : public S2Builder::Layer {
  public:
   using GraphOptions = S2Builder::GraphOptions;
@@ -553,7 +539,69 @@ class GeoArrowPointVectorLayer : public S2Builder::Layer {
  private:
   EdgeTracker* edge_tracker_;
   std::vector<internal::GeoArrowVertex>* points_out_;
-  GraphOptions::DuplicateEdges duplicate_edges_;
+};
+
+class GeoArrowPolylinesLayer : public S2Builder::Layer {
+ public:
+  using GraphOptions = S2Builder::GraphOptions;
+  using Graph = S2Builder::Graph;
+  using EdgeId = Graph::EdgeId;
+  using InputEdgeId = Graph::InputEdgeId;
+
+  GeoArrowPolylinesLayer(EdgeTracker* edge_tracker,
+                         std::vector<internal::GeoArrowVertex>* points_out,
+                         std::vector<int>* lengths_out)
+      : edge_tracker_(edge_tracker),
+        points_out_(points_out),
+        lengths_out_(lengths_out) {}
+
+  GraphOptions graph_options() const override {
+    return GraphOptions(S2Builder::EdgeType::DIRECTED,
+                        GraphOptions::DegenerateEdges::DISCARD,
+                        GraphOptions::DuplicateEdges::MERGE,
+                        GraphOptions::SiblingPairs::DISCARD);
+  }
+
+  void Build(const Graph& g, S2Error* error) override {
+    std::vector<Graph::EdgePolyline> edge_polylines =
+        g.GetPolylines(Graph::PolylineType::WALK);
+
+    for (const auto& edge_polyline : edge_polylines) {
+      Start();
+
+      // Write the first vertex of the polyline
+      EdgeId first_edge_id = edge_polyline[0];
+      S2Point first_pt = g.vertex(g.edge(first_edge_id).first);
+      for (InputEdgeId input_edge_id : g.input_edge_ids(first_edge_id)) {
+        Write(edge_tracker_->ResolveEdge(input_edge_id).Interpolate(first_pt));
+        break;
+      }
+
+      // Write the second vertex of each edge
+      for (EdgeId edge_id : edge_polyline) {
+        S2Point pt = g.vertex(g.edge(edge_id).second);
+        for (InputEdgeId input_edge_id : g.input_edge_ids(edge_id)) {
+          Write(edge_tracker_->ResolveEdge(input_edge_id).Interpolate(pt));
+          break;
+        }
+      }
+
+      lengths_out_->push_back(current_length_);
+    }
+  }
+
+  void Start() { current_length_ = 0; }
+
+  void Write(const internal::GeoArrowVertex& v) {
+    points_out_->push_back(v);
+    ++current_length_;
+  }
+
+ private:
+  EdgeTracker* edge_tracker_;
+  std::vector<int>* lengths_out_;
+  std::vector<internal::GeoArrowVertex>* points_out_;
+  int current_length_{0};
 };
 
 struct RebuildExec {
@@ -567,8 +615,11 @@ struct RebuildExec {
 
   void Exec(const GeoArrowGeography& value0, GeoArrowOutputBuilder* out) {
     builder_.Reset();
-    native_points_.clear();
     edge_tracker_.Clear();
+
+    native_points_.clear();
+    line_lengths_.clear();
+    line_vertices_.clear();
 
     // Start a layer that collects point vertices
     builder_.StartLayer(absl::make_unique<GeoArrowPointVectorLayer>(
@@ -580,8 +631,15 @@ struct RebuildExec {
       return true;
     });
 
-    // TODO: add GeoArrow-aware layers for lines and polygons
-    // builder_.AddShape(*value0.lines());
+    // Start a layer that collects polyline vertices
+    auto lines_layer = absl::make_unique<GeoArrowPolylinesLayer>(
+        &edge_tracker_, &line_vertices_, &line_lengths_);
+    builder_.StartLayer(std::move(lines_layer));
+
+    edge_tracker_.Add(value0.lines());
+    builder_.AddShape(*value0.lines());
+
+    // TODO: add GeoArrow-aware layer for polygons
     // builder_.AddShape(*value0.polygons());
 
     // build the output
@@ -597,21 +655,27 @@ struct RebuildExec {
     out->SetDimensions(value0.dimensions());
 
     // If there is only point output, write it
-    if (!native_points_.empty()) {
+    if (!native_points_.empty() && line_lengths_.empty()) {
       out->FeatureStart();
       WritePointOutput(out);
       out->FeatureEnd();
       return;
     }
 
-    // TODO: check for only polyline output
+    if (!line_lengths_.empty() && native_points_.empty()) {
+      out->FeatureStart();
+      WriteLinesOuput(out);
+      out->FeatureEnd();
+      return;
+    }
 
-    // TODO: check for only polgon output
+    // TODO: check for only polygon output
 
     // Otherwise, write a GEOMETRYCOLLECTION with any of the available output
     out->FeatureStart();
     out->GeomStart(GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION);
     WritePointOutput(out);
+    WriteLinesOuput(out);
     out->GeomEnd();
     out->FeatureEnd();
   }
@@ -632,10 +696,33 @@ struct RebuildExec {
     }
   }
 
+  void WriteLinesOuput(out_t* out) {
+    if (line_lengths_.size() == 1) {
+      out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+      for (int i = 0; i < line_lengths_[0]; ++i) {
+        out->WriteCoord(line_vertices_[i]);
+      }
+      out->GeomEnd();
+    } else if (native_points_.size() > 1) {
+      out->GeomStart(GEOARROW_GEOMETRY_TYPE_MULTILINESTRING);
+      int line_vertex_id = 0;
+      for (int line_length : line_lengths_) {
+        out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+        for (int i = 0; i < line_length; ++i) {
+          out->WriteCoord(line_vertices_[line_vertex_id++]);
+        }
+        out->GeomEnd();
+      }
+      out->GeomEnd();
+    }
+  }
+
   S2Builder builder_;
   S2Builder::Options builder_options_;
   EdgeTracker edge_tracker_;
   std::vector<internal::GeoArrowVertex> native_points_;
+  std::vector<int> line_lengths_;
+  std::vector<internal::GeoArrowVertex> line_vertices_;
 };
 
 struct UnaryUnionGridSizeExec {

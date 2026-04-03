@@ -313,7 +313,36 @@ INSTANTIATE_TEST_SUITE_P(
                                 "MULTIPOINT ((0 0), (10 10))", 1.0,
                                 "MULTIPOINT ((0 0), (10 10))"},
 
-        // Check ZM handling
+        // Linestring: no snapping needed
+        UnaryUnionGridSizeParam{"linestring_on_grid", "LINESTRING (0 0, 10 10)",
+                                1.0, "LINESTRING (0 0, 10 10)"},
+        // Linestring: endpoints snap to grid
+        UnaryUnionGridSizeParam{"linestring_snap",
+                                "LINESTRING (0.001 0.001, 10.001 10.001)", 1.0,
+                                "LINESTRING (0 0, 10 10)"},
+        // Linestring: no snapping with negative grid size
+        UnaryUnionGridSizeParam{"linestring_no_snap",
+                                "LINESTRING (0.001 0.001, 10.001 10.001)", -1,
+                                "LINESTRING (0.001 0.001, 10.001 10.001)"},
+        // Linestring with Z
+        UnaryUnionGridSizeParam{"linestring_z",
+                                "LINESTRING Z (0 0 100, 10 10 200)", 1.0,
+                                "LINESTRING Z (0 0 100, 10 10 200)"},
+        // Linestring with Z and snapping (Z values are interpolated when
+        // endpoints are snapped, so they won't be exact)
+        UnaryUnionGridSizeParam{
+            "linestring_snap_z",
+            "LINESTRING Z (0.001 0.001 100, 10.001 10.001 200)", 1.0,
+            "LINESTRING Z (0 0 100.010024, 10 10 199.99005)"},
+        // Linestring with M
+        UnaryUnionGridSizeParam{"linestring_m",
+                                "LINESTRING M (0 0 100, 10 10 200)", 1.0,
+                                "LINESTRING M (0 0 100, 10 10 200)"},
+        // Linestring with ZM
+        UnaryUnionGridSizeParam{
+            "linestring_zm", "LINESTRING ZM (0 0 100 1000, 10 10 200 2000)",
+            1.0, "LINESTRING ZM (0 0 100 1000, 10 10 200 2000)"},
+        // Check Z handling
         UnaryUnionGridSizeParam{"point_on_grid_z", "POINT Z (0 1 10)", 1.0,
                                 "POINT Z (0 1 10)"},
         UnaryUnionGridSizeParam{"point_no_snap_z", "POINT Z (0.01 1.01 10)",
@@ -341,7 +370,7 @@ INSTANTIATE_TEST_SUITE_P(
                                 "MULTIPOINT M (0.01 1.01 10, 2.01 3.01 20)",
                                 1.0, "MULTIPOINT M (0 1 10, 2 3 20)"},
 
-        // Check ZM handling
+        // Check POINT ZM handling
         UnaryUnionGridSizeParam{"point_on_grid_zm", "POINT ZM (0 1 10 100)",
                                 1.0, "POINT ZM (0 1 10 100)"},
         UnaryUnionGridSizeParam{"point_no_snap_zm",
