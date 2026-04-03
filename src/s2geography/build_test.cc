@@ -406,6 +406,11 @@ INSTANTIATE_TEST_SUITE_P(
             "0.001 10.001, 0.001 0.001))",
             1.0, "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
         // Polygon: shell with one hole (one shell + holes branch)
+        ReducePrecisionParam{"polygon_with_collapsed_hole",
+                             "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
+                             "(5 5, 5 5.1, 5.1 5.1, 5.1 5, 5 5))",
+                             1, "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0))"},
+        // Polygon: shell with a hole that collapses
         ReducePrecisionParam{"polygon_with_hole",
                              "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
                              "(5 5, 5 15, 15 15, 15 5, 5 5))",
