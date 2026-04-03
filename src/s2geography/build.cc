@@ -757,6 +757,18 @@ struct OutputGeometry {
       return;
     }
 
+    // Another common case: there are no holes, so each ring becomes
+    // its own polygon
+    if (holes.empty()) {
+      ring_order_.clear();
+      ring_order_.reserve(num_rings);
+      for (int s : shells) {
+        polygon_lengths_.push_back(1);
+        ring_order_.push_back(s);
+      }
+      return;
+    }
+
     // Multiple shells: build S2Loops for containment checks, which are
     // more efficient than brute force when checking multiple holes.
     std::vector<std::unique_ptr<S2Loop>> s2loops(shells.size());
