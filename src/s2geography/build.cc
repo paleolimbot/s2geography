@@ -508,8 +508,9 @@ class GeoArrowPointVectorLayer : public S2Builder::Layer {
          ++edge_id) {
       // Resolve the edge
       const auto& edge = g.edge(edge_id);
+
+      // We only collect degenerate edges to output as points
       if (edge.first != edge.second) {
-        *error = S2Error::InvalidArgument("Found non-degenerate edges");
         continue;
       }
 
