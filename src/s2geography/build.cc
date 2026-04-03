@@ -8,6 +8,7 @@
 #include <s2/s2builderutil_s2polygon_layer.h>
 #include <s2/s2builderutil_s2polyline_vector_layer.h>
 #include <s2/s2builderutil_snap_functions.h>
+#include <s2/s2earth.h>
 #include <s2/s2loop.h>
 
 #include <sstream>
@@ -979,6 +980,11 @@ class GeoArrowPolylinesLayer : public S2Builder::Layer {
 };
 
 /// \brief Output layer that collects polygon edge collections in the graph
+///
+/// Note that this does not in any way consider input polygons that partially
+/// overlapped (i.e., this is not a unary union). If there were
+/// invalid polygons in the input, there may be invalid polygons created in
+/// the output.
 class GeoArrowPolygonLayer : public S2Builder::Layer {
  public:
   using GraphOptions = S2Builder::GraphOptions;
@@ -1027,6 +1033,8 @@ class GeoArrowPolygonLayer : public S2Builder::Layer {
   std::vector<Graph::EdgeLoop> edge_loops_;
 };
 
+/// \brief A helper Exec for ReducePrecision and Simplify, which both are a
+/// version of adding input to the builder and rebuilding the output.
 struct RebuildExec {
   RebuildExec(const S2Builder::Options& options = S2Builder::Options())
       : builder_options_(options) {
@@ -1115,6 +1123,39 @@ struct ReducePrecisionExec {
   double last_grid_size_{-100};
 };
 
+struct SimplifyExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = DoubleInputView;
+  using out_t = GeoArrowOutputBuilder;
+
+  void Exec(arg0_t::c_type value, double tolerance, out_t* out) {
+    // If the grid size changed since the last iteration, we need to recreate
+    // the snap function and reinitialize the builder with the new options
+    if (tolerance != last_tolerance_) {
+      if (tolerance < 0) {
+        throw Exception(
+            "Can't set tolerance to a negative value in ST_Simplify()");
+      }
+
+      // Create the identity snap function
+      S1Angle tolerance_angle =
+          S1Angle::Radians(tolerance / S2Earth::RadiusMeters());
+      s2builderutil::IdentitySnapFunction snap(tolerance_angle);
+      rebuild_.builder_options_.set_snap_function(snap);
+
+      rebuild_.builder_options_.set_simplify_edge_chains(true);
+
+      rebuild_.builder_.Init(rebuild_.builder_options_);
+      last_tolerance_ = tolerance;
+    }
+
+    rebuild_.Exec(value, out);
+  }
+
+  RebuildExec rebuild_;
+  double last_tolerance_{-100};
+};
+
 template <S2BooleanOperation::OpType op_type>
 struct BooleanOperationExec {
   using arg0_t = GeoArrowGeographyInputView;
@@ -1154,6 +1195,10 @@ void UnionKernel(struct SedonaCScalarKernel* out) {
 
 void ReducePrecisionKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<ReducePrecisionExec>(out, "st_reduceprecision");
+}
+
+void SimplifyKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<SimplifyExec>(out, "st_simplify");
 }
 
 }  // namespace sedona_udf

@@ -438,4 +438,129 @@ INSTANTIATE_TEST_SUITE_P(
       return info.param.name;
     });
 
+TEST(Build, SedonaUdfSimplify) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::SimplifyKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+      {{"POINT (0 0)", "LINESTRING (0 0, 10 0)", std::nullopt}},
+      {{0.0, 0.0, std::nullopt}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(
+      out_array.get(),
+      {"POINT (0 0)", "LINESTRING (0 0, 10 0)", std::nullopt}));
+}
+
+struct SimplifyParam {
+  std::string name;
+  std::optional<std::string> input_wkt;
+  std::optional<double> tolerance;
+  std::optional<std::string> expected_wkt;
+
+  friend std::ostream& operator<<(std::ostream& os, const SimplifyParam& p) {
+    os << (p.input_wkt ? *p.input_wkt : "null")
+       << " tolerance=" << (p.tolerance ? std::to_string(*p.tolerance) : "null")
+       << " -> " << (p.expected_wkt ? *p.expected_wkt : "null");
+    return os;
+  }
+};
+
+class SimplifyTest : public ::testing::TestWithParam<SimplifyParam> {};
+
+TEST_P(SimplifyTest, SedonaUdf) {
+  const auto& p = GetParam();
+
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::SimplifyKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+                        {{p.input_wkt}}, {{p.tolerance}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(
+      TestResultGeography(out_array.get(), {p.expected_wkt}));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Build, SimplifyTest,
+    ::testing::Values(
+        // Null inputs
+        SimplifyParam{"null_geom", std::nullopt, 0.0, std::nullopt},
+        SimplifyParam{"null_tolerance", "POINT (0 0)", std::nullopt,
+                      std::nullopt},
+        SimplifyParam{"null_both", std::nullopt, std::nullopt, std::nullopt},
+
+        // Point: unaffected by simplification (no edges)
+        SimplifyParam{"point_zero_tolerance", "POINT (0 0)", 0.0,
+                      "POINT (0 0)"},
+        SimplifyParam{"point_large_tolerance", "POINT (0 0)", 1000000.0,
+                      "POINT (0 0)"},
+
+        // Multipoint: zero tolerance preserves all points
+        SimplifyParam{"multipoint_zero_tolerance",
+                      "MULTIPOINT ((0 0), (10 10))", 0.0,
+                      "MULTIPOINT ((0 0), (10 10))"},
+        // Multipoint: large tolerance merges nearby points
+        SimplifyParam{"multipoint_merge", "MULTIPOINT ((0 0), (0.001 0.001))",
+                      1000000.0, "POINT (0 0)"},
+
+        // Linestring: zero tolerance is identity
+        SimplifyParam{"linestring_zero_tolerance", "LINESTRING (0 0, 10 0)",
+                      0.0, "LINESTRING (0 0, 10 0)"},
+        // Linestring: zero tolerance preserves intermediate vertex
+        SimplifyParam{"linestring_zero_tolerance_3pt",
+                      "LINESTRING (0 0, 5 1, 10 0)", 0.0,
+                      "LINESTRING (0 0, 5 1, 10 0)"},
+        // Linestring: large tolerance removes intermediate vertex
+        SimplifyParam{"linestring_simplify", "LINESTRING (0 0, 5 1, 10 0)",
+                      200000.0, "LINESTRING (0 0, 10 0)"},
+        // Linestring: small tolerance keeps intermediate vertex
+        SimplifyParam{"linestring_keep_vertex", "LINESTRING (0 0, 5 1, 10 0)",
+                      50000.0, "LINESTRING (0 0, 5 1, 10 0)"},
+        // Linestring: collapse when endpoints merge
+        SimplifyParam{"linestring_collapse", "LINESTRING (0 0, 0.0001 0.0001)",
+                      1000000.0, "LINESTRING EMPTY"},
+
+        // Linestring with Z: zero tolerance preserves Z
+        SimplifyParam{"linestring_z_zero_tolerance",
+                      "LINESTRING Z (0 0 100, 10 0 200)", 0.0,
+                      "LINESTRING Z (0 0 100, 10 0 200)"},
+        // Linestring with M: zero tolerance preserves M
+        SimplifyParam{"linestring_m_zero_tolerance",
+                      "LINESTRING M (0 0 100, 10 0 200)", 0.0,
+                      "LINESTRING M (0 0 100, 10 0 200)"},
+        // Linestring with ZM: zero tolerance preserves ZM
+        SimplifyParam{"linestring_zm_zero_tolerance",
+                      "LINESTRING ZM (0 0 100 1000, 10 0 200 2000)", 0.0,
+                      "LINESTRING ZM (0 0 100 1000, 10 0 200 2000)"},
+
+        // Point with Z
+        SimplifyParam{"point_z", "POINT Z (0 1 10)", 0.0, "POINT Z (0 1 10)"},
+        // Point with M
+        SimplifyParam{"point_m", "POINT M (0 1 10)", 0.0, "POINT M (0 1 10)"},
+        // Point with ZM
+        SimplifyParam{"point_zm", "POINT ZM (0 1 10 100)", 0.0,
+                      "POINT ZM (0 1 10 100)"}
+
+        // Polygon tests not included here because they currently test the same
+        // code paths as the precision reducer.
+
+        ),
+    [](const ::testing::TestParamInfo<SimplifyParam>& info) {
+      return info.param.name;
+    });
+
 }  // namespace s2geography
