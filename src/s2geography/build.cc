@@ -491,11 +491,11 @@ struct OutputGeometry {
     points_.clear();
     line_lengths_.clear();
     line_vertices_.clear();
-    ring_lengths_.clear();
+    ring_offsets_.assign(1, 0);
+    ring_order_.clear();
     polygon_lengths_.clear();
     polygon_vertices_.clear();
     current_line_length_ = 0;
-    current_ring_length_ = 0;
   }
 
   void AddPoint(const internal::GeoArrowVertex& v) { points_.push_back(v); }
@@ -512,17 +512,15 @@ struct OutputGeometry {
 
   void AddRingVertex(const internal::GeoArrowVertex& v) {
     polygon_vertices_.push_back(v);
-    ++current_ring_length_;
   }
 
   void FinishRing() {
-    ring_lengths_.push_back(current_ring_length_);
-    current_ring_length_ = 0;
+    ring_offsets_.push_back(static_cast<int>(polygon_vertices_.size()));
   }
 
   bool has_points() const { return !points_.empty(); }
   bool has_lines() const { return !line_lengths_.empty(); }
-  bool has_polygons() const { return !ring_lengths_.empty(); }
+  bool has_polygons() const { return ring_offsets_.size() > 1; }
   int num_types() const { return has_points() + has_lines() + has_polygons(); }
 
   void WriteTo(GeoArrowOutputBuilder* out, uint8_t geometry_type) {
@@ -590,17 +588,16 @@ struct OutputGeometry {
   void WritePolygonOutput(GeoArrowOutputBuilder* out) {
     GroupRings();
 
-    int ring_id = 0;
-    int vertex_id = 0;
+    int order_id = 0;
     if (polygon_lengths_.size() == 1) {
       out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
       for (int r = 0; r < polygon_lengths_[0]; ++r) {
+        int ri = ring_order_[order_id++];
         out->RingStart();
-        for (int i = 0; i < ring_lengths_[ring_id]; ++i) {
-          out->WriteCoord(polygon_vertices_[vertex_id++]);
+        for (int i = ring_offsets_[ri]; i < ring_offsets_[ri + 1]; ++i) {
+          out->WriteCoord(polygon_vertices_[i]);
         }
         out->RingEnd();
-        ++ring_id;
       }
       out->GeomEnd();
     } else if (polygon_lengths_.size() > 1) {
@@ -608,12 +605,12 @@ struct OutputGeometry {
       for (int polygon_length : polygon_lengths_) {
         out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
         for (int r = 0; r < polygon_length; ++r) {
+          int ri = ring_order_[order_id++];
           out->RingStart();
-          for (int i = 0; i < ring_lengths_[ring_id]; ++i) {
-            out->WriteCoord(polygon_vertices_[vertex_id++]);
+          for (int i = ring_offsets_[ri]; i < ring_offsets_[ri + 1]; ++i) {
+            out->WriteCoord(polygon_vertices_[i]);
           }
           out->RingEnd();
-          ++ring_id;
         }
         out->GeomEnd();
       }
@@ -622,33 +619,34 @@ struct OutputGeometry {
   }
 
   void BuildRingNodes() {
-    ring_nodes_.resize(ring_lengths_.size());
+    int num_rings = static_cast<int>(ring_offsets_.size()) - 1;
+    ring_nodes_.resize(num_rings);
     const uint8_t* base =
         reinterpret_cast<const uint8_t*>(polygon_vertices_.data());
-    int vertex_offset = 0;
-    for (size_t i = 0; i < ring_lengths_.size(); ++i) {
+    for (int i = 0; i < num_rings; ++i) {
       struct GeoArrowBufferView coords;
-      coords.data = base + vertex_offset * sizeof(internal::GeoArrowVertex);
-      coords.size_bytes =
-          ring_lengths_[i] * sizeof(internal::GeoArrowVertex);
+      coords.data = base + ring_offsets_[i] * sizeof(internal::GeoArrowVertex);
+      coords.size_bytes = (ring_offsets_[i + 1] - ring_offsets_[i]) *
+                          sizeof(internal::GeoArrowVertex);
       GeoArrowGeometryNodeSetInterleaved(&ring_nodes_[i],
                                          GEOARROW_GEOMETRY_TYPE_LINESTRING,
                                          GEOARROW_DIMENSIONS_XYZM, coords);
-      vertex_offset += ring_lengths_[i];
     }
   }
 
   void GroupRings() {
     polygon_lengths_.clear();
-    int num_rings = static_cast<int>(ring_lengths_.size());
+    int num_rings = static_cast<int>(ring_offsets_.size()) - 1;
 
     if (num_rings == 0) {
+      ring_order_.clear();
       return;
     }
 
     // Fast path: single ring -> single polygon
     if (num_rings == 1) {
       polygon_lengths_.push_back(1);
+      ring_order_ = {0};
       return;
     }
 
@@ -675,11 +673,10 @@ struct OutputGeometry {
     // Common case: exactly one shell with zero or more holes
     if (shells.size() == 1) {
       polygon_lengths_.push_back(num_rings);
-      // Reorder rings: shell first, then holes (already in order if shell
-      // was the first ring written, but may not be in general)
-      if (shells[0] != 0) {
-        ReorderRings(shells, holes);
-      }
+      ring_order_.clear();
+      ring_order_.reserve(num_rings);
+      ring_order_.push_back(shells[0]);
+      for (int h : holes) ring_order_.push_back(h);
       return;
     }
 
@@ -687,16 +684,15 @@ struct OutputGeometry {
     // more efficient than brute force when checking multiple holes.
     std::vector<std::unique_ptr<S2Loop>> s2loops(shells.size());
     for (size_t s = 0; s < shells.size(); ++s) {
-      GeoArrowLoop loop(&ring_nodes_[shells[s]], &scratch_);
-      std::vector<S2Point> vertices;
-      vertices.reserve(loop.size() - 1);
+      GeoArrowChain loop(&ring_nodes_[shells[s]]);
+      scratch_.clear();
+      scratch_.reserve(loop.size() - 1);
       loop.VisitVertices(0, loop.size() - 1, [&](const S2Point& pt) {
-        vertices.push_back(pt);
+        scratch_.push_back(pt);
         return true;
       });
-      s2loops[s] = absl::make_unique<S2Loop>(vertices);
-      // Normalize so that Contains() works correctly
-      s2loops[s]->Normalize();
+      s2loops[s] = absl::make_unique<S2Loop>(scratch_, S2Debug::DISABLE);
+      S2GEOGRAPHY_DCHECK(s2loops[s]->IsValid());
     }
 
     // Match each hole to its containing shell.
@@ -709,7 +705,7 @@ struct OutputGeometry {
       double best_area = std::numeric_limits<double>::max();
       for (size_t s = 0; s < shells.size(); ++s) {
         if (s2loops[s]->Contains(test_point)) {
-          double area = s2loops[s]->GetArea();
+          double area = ring_signed_areas_[shells[s]];
           if (area < best_area) {
             best_area = area;
             best_shell = static_cast<int>(s);
@@ -719,84 +715,31 @@ struct OutputGeometry {
       hole_parent[j] = best_shell;
     }
 
-    // Build polygon_lengths_ and reorder rings: each shell followed by its
+    // Build polygon_lengths_ and ring_order_: each shell followed by its
     // holes
-    ReorderGroupedRings(shells, holes, hole_parent);
-  }
-
-  void ReorderRings(const std::vector<int>& shells,
-                    const std::vector<int>& holes) {
-    std::vector<internal::GeoArrowVertex> reordered_vertices;
-    std::vector<int> reordered_lengths;
-    reordered_vertices.reserve(polygon_vertices_.size());
-    reordered_lengths.reserve(ring_lengths_.size());
-
-    auto appendRing = [&](int ring_idx) {
-      int offset = 0;
-      for (int r = 0; r < ring_idx; ++r) offset += ring_lengths_[r];
-      reordered_vertices.insert(reordered_vertices.end(),
-                                polygon_vertices_.begin() + offset,
-                                polygon_vertices_.begin() + offset +
-                                    ring_lengths_[ring_idx]);
-      reordered_lengths.push_back(ring_lengths_[ring_idx]);
-    };
-
-    for (int s : shells) appendRing(s);
-    for (int h : holes) appendRing(h);
-
-    polygon_vertices_ = std::move(reordered_vertices);
-    ring_lengths_ = std::move(reordered_lengths);
-  }
-
-  void ReorderGroupedRings(const std::vector<int>& shells,
-                           const std::vector<int>& holes,
-                           const std::vector<int>& hole_parent) {
-    std::vector<internal::GeoArrowVertex> reordered_vertices;
-    std::vector<int> reordered_lengths;
-    reordered_vertices.reserve(polygon_vertices_.size());
-    reordered_lengths.reserve(ring_lengths_.size());
-
-    // Precompute ring start offsets
-    std::vector<int> ring_offsets(ring_lengths_.size());
-    int offset = 0;
-    for (size_t i = 0; i < ring_lengths_.size(); ++i) {
-      ring_offsets[i] = offset;
-      offset += ring_lengths_[i];
-    }
-
-    auto appendRing = [&](int ring_idx) {
-      int off = ring_offsets[ring_idx];
-      reordered_vertices.insert(reordered_vertices.end(),
-                                polygon_vertices_.begin() + off,
-                                polygon_vertices_.begin() + off +
-                                    ring_lengths_[ring_idx]);
-      reordered_lengths.push_back(ring_lengths_[ring_idx]);
-    };
-
+    ring_order_.clear();
+    ring_order_.reserve(num_rings);
     for (size_t s = 0; s < shells.size(); ++s) {
       int ring_count = 1;
-      appendRing(shells[s]);
+      ring_order_.push_back(shells[s]);
       for (size_t j = 0; j < holes.size(); ++j) {
         if (hole_parent[j] == static_cast<int>(s)) {
-          appendRing(holes[j]);
+          ring_order_.push_back(holes[j]);
           ++ring_count;
         }
       }
       polygon_lengths_.push_back(ring_count);
     }
-
-    polygon_vertices_ = std::move(reordered_vertices);
-    ring_lengths_ = std::move(reordered_lengths);
   }
 
   std::vector<internal::GeoArrowVertex> points_;
   std::vector<int> line_lengths_;
   std::vector<internal::GeoArrowVertex> line_vertices_;
-  std::vector<int> ring_lengths_;
+  std::vector<int> ring_offsets_;
+  std::vector<int> ring_order_;
   std::vector<int> polygon_lengths_;
   std::vector<internal::GeoArrowVertex> polygon_vertices_;
   int current_line_length_{0};
-  int current_ring_length_{0};
   std::vector<struct GeoArrowGeometryNode> ring_nodes_;
   std::vector<double> ring_signed_areas_;
   std::vector<S2Point> scratch_;
