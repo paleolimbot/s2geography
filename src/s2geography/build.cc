@@ -918,7 +918,7 @@ struct RebuildExec {
   std::vector<internal::GeoArrowVertex> polygon_vertices_;
 };
 
-struct UnaryUnionGridSizeExec {
+struct SnapToGridExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = DoubleInputView;
   using out_t = GeoArrowOutputBuilder;
@@ -988,8 +988,8 @@ void UnionKernel(struct SedonaCScalarKernel* out) {
       out, "st_union");
 }
 
-void UnaryUnionGridSizeKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<UnaryUnionGridSizeExec>(out, "st_unaryunion");
+void SnapToGridKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<SnapToGridExec>(out, "st_snaptogrid");
 }
 
 }  // namespace sedona_udf

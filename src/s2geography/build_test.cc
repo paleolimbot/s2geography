@@ -223,9 +223,9 @@ TEST(Build, SedonaUdfSymDifference) {
       {"GEOMETRYCOLLECTION EMPTY", "MULTIPOINT ((0 0), (0 1))", std::nullopt}));
 }
 
-TEST(Build, SedonaUdfUnaryUnionGridSize) {
+TEST(Build, SedonaUdfSnapToGrid) {
   struct SedonaCScalarKernel kernel;
-  s2geography::sedona_udf::UnaryUnionGridSizeKernel(&kernel);
+  s2geography::sedona_udf::SnapToGridKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
@@ -242,14 +242,13 @@ TEST(Build, SedonaUdfUnaryUnionGridSize) {
       out_array.get(), {"POINT (0 0)", "POINT (0 0)", std::nullopt}));
 }
 
-struct UnaryUnionGridSizeParam {
+struct SnapToGridParam {
   std::string name;
   std::optional<std::string> input_wkt;
   std::optional<double> grid_size;
   std::optional<std::string> expected_wkt;
 
-  friend std::ostream& operator<<(std::ostream& os,
-                                  const UnaryUnionGridSizeParam& p) {
+  friend std::ostream& operator<<(std::ostream& os, const SnapToGridParam& p) {
     os << (p.input_wkt ? *p.input_wkt : "null")
        << " grid_size=" << (p.grid_size ? std::to_string(*p.grid_size) : "null")
        << " -> " << (p.expected_wkt ? *p.expected_wkt : "null");
@@ -257,14 +256,13 @@ struct UnaryUnionGridSizeParam {
   }
 };
 
-class UnaryUnionGridSizeTest
-    : public ::testing::TestWithParam<UnaryUnionGridSizeParam> {};
+class SnapToGridTest : public ::testing::TestWithParam<SnapToGridParam> {};
 
-TEST_P(UnaryUnionGridSizeTest, SedonaUdf) {
+TEST_P(SnapToGridTest, SedonaUdf) {
   const auto& p = GetParam();
 
   struct SedonaCScalarKernel kernel;
-  s2geography::sedona_udf::UnaryUnionGridSizeKernel(&kernel);
+  s2geography::sedona_udf::SnapToGridKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
@@ -281,158 +279,137 @@ TEST_P(UnaryUnionGridSizeTest, SedonaUdf) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    Build, UnaryUnionGridSizeTest,
+    Build, SnapToGridTest,
     ::testing::Values(
         // Null inputs
-        UnaryUnionGridSizeParam{"null_geom", std::nullopt, 1.0, std::nullopt},
-        UnaryUnionGridSizeParam{"null_grid_size", "POINT (0 0)", std::nullopt,
-                                std::nullopt},
-        UnaryUnionGridSizeParam{"null_both", std::nullopt, std::nullopt,
-                                std::nullopt},
+        SnapToGridParam{"null_geom", std::nullopt, 1.0, std::nullopt},
+        SnapToGridParam{"null_grid_size", "POINT (0 0)", std::nullopt,
+                        std::nullopt},
+        SnapToGridParam{"null_both", std::nullopt, std::nullopt, std::nullopt},
 
         // Point snapping to whole degrees (grid_size = 1.0)
-        UnaryUnionGridSizeParam{"point_on_grid", "POINT (0 0)", 1.0,
-                                "POINT (0 0)"},
-        UnaryUnionGridSizeParam{"point_not_on_grid", "POINT (0.001 0.001)", 1.0,
-                                "POINT (0 0)"},
-        UnaryUnionGridSizeParam{"point_no_snap", "POINT (0.001 0.001)", -1,
-                                "POINT (0.001 0.001)"},
+        SnapToGridParam{"point_on_grid", "POINT (0 0)", 1.0, "POINT (0 0)"},
+        SnapToGridParam{"point_not_on_grid", "POINT (0.001 0.001)", 1.0,
+                        "POINT (0 0)"},
+        SnapToGridParam{"point_no_snap", "POINT (0.001 0.001)", -1,
+                        "POINT (0.001 0.001)"},
 
         // Point snapping to 0.1 degree grid (grid_size = 0.1)
-        UnaryUnionGridSizeParam{"point_tenth_degree_on_grid", "POINT (0.1 0.1)",
-                                0.1, "POINT (0.1 0.1)"},
-        UnaryUnionGridSizeParam{"point_tenth_degree_snap", "POINT (0.12 0.12)",
-                                0.1, "POINT (0.1 0.1)"},
+        SnapToGridParam{"point_tenth_degree_on_grid", "POINT (0.1 0.1)", 0.1,
+                        "POINT (0.1 0.1)"},
+        SnapToGridParam{"point_tenth_degree_snap", "POINT (0.12 0.12)", 0.1,
+                        "POINT (0.1 0.1)"},
 
         // Multipoint: two nearby points snap to same location
-        UnaryUnionGridSizeParam{"multipoint_merge",
-                                "MULTIPOINT ((0.001 0.001), (0.002 0.002))",
-                                1.0, "POINT (0 0)"},
+        SnapToGridParam{"multipoint_merge",
+                        "MULTIPOINT ((0.001 0.001), (0.002 0.002))", 1.0,
+                        "POINT (0 0)"},
         // Multipoint: points remain distinct after snapping
-        UnaryUnionGridSizeParam{"multipoint_distinct",
-                                "MULTIPOINT ((0 0), (10 10))", 1.0,
-                                "MULTIPOINT ((0 0), (10 10))"},
+        SnapToGridParam{"multipoint_distinct", "MULTIPOINT ((0 0), (10 10))",
+                        1.0, "MULTIPOINT ((0 0), (10 10))"},
 
         // Linestring: no snapping needed
-        UnaryUnionGridSizeParam{"linestring_on_grid", "LINESTRING (0 0, 10 10)",
-                                1.0, "LINESTRING (0 0, 10 10)"},
+        SnapToGridParam{"linestring_on_grid", "LINESTRING (0 0, 10 10)", 1.0,
+                        "LINESTRING (0 0, 10 10)"},
         // Linestring: endpoints snap to grid
-        UnaryUnionGridSizeParam{"linestring_snap",
-                                "LINESTRING (0.001 0.001, 10.001 10.001)", 1.0,
-                                "LINESTRING (0 0, 10 10)"},
+        SnapToGridParam{"linestring_snap",
+                        "LINESTRING (0.001 0.001, 10.001 10.001)", 1.0,
+                        "LINESTRING (0 0, 10 10)"},
         // Linestring: no snapping with negative grid size
-        UnaryUnionGridSizeParam{"linestring_no_snap",
-                                "LINESTRING (0.001 0.001, 10.001 10.001)", -1,
-                                "LINESTRING (0.001 0.001, 10.001 10.001)"},
+        SnapToGridParam{"linestring_no_snap",
+                        "LINESTRING (0.001 0.001, 10.001 10.001)", -1,
+                        "LINESTRING (0.001 0.001, 10.001 10.001)"},
         // Linestring with Z
-        UnaryUnionGridSizeParam{"linestring_z",
-                                "LINESTRING Z (0 0 100, 10 10 200)", 1.0,
-                                "LINESTRING Z (0 0 100, 10 10 200)"},
+        SnapToGridParam{"linestring_z", "LINESTRING Z (0 0 100, 10 10 200)",
+                        1.0, "LINESTRING Z (0 0 100, 10 10 200)"},
         // Linestring with Z and snapping (Z values are interpolated when
         // endpoints are snapped, so they won't be exact)
-        UnaryUnionGridSizeParam{
-            "linestring_snap_z",
-            "LINESTRING Z (0.001 0.001 100, 10.001 10.001 200)", 1.0,
-            "LINESTRING Z (0 0 100.010024, 10 10 199.99005)"},
+        SnapToGridParam{"linestring_snap_z",
+                        "LINESTRING Z (0.001 0.001 100, 10.001 10.001 200)",
+                        1.0, "LINESTRING Z (0 0 100.010024, 10 10 199.99005)"},
         // Linestring with M
-        UnaryUnionGridSizeParam{"linestring_m",
-                                "LINESTRING M (0 0 100, 10 10 200)", 1.0,
-                                "LINESTRING M (0 0 100, 10 10 200)"},
+        SnapToGridParam{"linestring_m", "LINESTRING M (0 0 100, 10 10 200)",
+                        1.0, "LINESTRING M (0 0 100, 10 10 200)"},
         // Linestring with ZM
-        UnaryUnionGridSizeParam{
-            "linestring_zm", "LINESTRING ZM (0 0 100 1000, 10 10 200 2000)",
-            1.0, "LINESTRING ZM (0 0 100 1000, 10 10 200 2000)"},
+        SnapToGridParam{"linestring_zm",
+                        "LINESTRING ZM (0 0 100 1000, 10 10 200 2000)", 1.0,
+                        "LINESTRING ZM (0 0 100 1000, 10 10 200 2000)"},
         // Check Z handling
-        UnaryUnionGridSizeParam{"point_on_grid_z", "POINT Z (0 1 10)", 1.0,
-                                "POINT Z (0 1 10)"},
-        UnaryUnionGridSizeParam{"point_no_snap_z", "POINT Z (0.01 1.01 10)",
-                                1.0, "POINT Z (0 1 10)"},
-        UnaryUnionGridSizeParam{"point_not_on_grid_z", "POINT Z (0.01 1.01 10)",
-                                1.0, "POINT Z (0 1 10)"},
-        UnaryUnionGridSizeParam{"multipoint_merge_z",
-                                "MULTIPOINT Z (0.01 1.01 10, 0.01 1.01 20)",
-                                1.0, "POINT Z (0 1 10)"},
-        UnaryUnionGridSizeParam{"multipoint_distinct_z",
-                                "MULTIPOINT Z (0.01 1.01 10, 2.01 3.01 20)",
-                                1.0, "MULTIPOINT Z (0 1 10, 2 3 20)"},
+        SnapToGridParam{"point_on_grid_z", "POINT Z (0 1 10)", 1.0,
+                        "POINT Z (0 1 10)"},
+        SnapToGridParam{"point_no_snap_z", "POINT Z (0.01 1.01 10)", 1.0,
+                        "POINT Z (0 1 10)"},
+        SnapToGridParam{"point_not_on_grid_z", "POINT Z (0.01 1.01 10)", 1.0,
+                        "POINT Z (0 1 10)"},
+        SnapToGridParam{"multipoint_merge_z",
+                        "MULTIPOINT Z (0.01 1.01 10, 0.01 1.01 20)", 1.0,
+                        "POINT Z (0 1 10)"},
+        SnapToGridParam{"multipoint_distinct_z",
+                        "MULTIPOINT Z (0.01 1.01 10, 2.01 3.01 20)", 1.0,
+                        "MULTIPOINT Z (0 1 10, 2 3 20)"},
 
         // Check M handling
-        UnaryUnionGridSizeParam{"point_on_grid_m", "POINT M (0 1 10)", 1.0,
-                                "POINT M (0 1 10)"},
-        UnaryUnionGridSizeParam{"point_no_snap_m", "POINT M (0.01 1.01 10)",
-                                1.0, "POINT M (0 1 10)"},
-        UnaryUnionGridSizeParam{"point_not_on_grid_m", "POINT M (0.01 1.01 10)",
-                                1.0, "POINT M (0 1 10)"},
-        UnaryUnionGridSizeParam{"multipoint_merge_m",
-                                "MULTIPOINT M (0.01 1.01 10, 0.01 1.01 20)",
-                                1.0, "POINT M (0 1 10)"},
-        UnaryUnionGridSizeParam{"multipoint_distinct_m",
-                                "MULTIPOINT M (0.01 1.01 10, 2.01 3.01 20)",
-                                1.0, "MULTIPOINT M (0 1 10, 2 3 20)"},
+        SnapToGridParam{"point_on_grid_m", "POINT M (0 1 10)", 1.0,
+                        "POINT M (0 1 10)"},
+        SnapToGridParam{"point_no_snap_m", "POINT M (0.01 1.01 10)", 1.0,
+                        "POINT M (0 1 10)"},
+        SnapToGridParam{"point_not_on_grid_m", "POINT M (0.01 1.01 10)", 1.0,
+                        "POINT M (0 1 10)"},
+        SnapToGridParam{"multipoint_merge_m",
+                        "MULTIPOINT M (0.01 1.01 10, 0.01 1.01 20)", 1.0,
+                        "POINT M (0 1 10)"},
+        SnapToGridParam{"multipoint_distinct_m",
+                        "MULTIPOINT M (0.01 1.01 10, 2.01 3.01 20)", 1.0,
+                        "MULTIPOINT M (0 1 10, 2 3 20)"},
 
         // Check POINT ZM handling
-        UnaryUnionGridSizeParam{"point_on_grid_zm", "POINT ZM (0 1 10 100)",
-                                1.0, "POINT ZM (0 1 10 100)"},
-        UnaryUnionGridSizeParam{"point_no_snap_zm",
-                                "POINT ZM (0.01 1.01 10 100)", 1.0,
-                                "POINT ZM (0 1 10 100)"},
-        UnaryUnionGridSizeParam{"point_not_on_grid_zm",
-                                "POINT ZM (0.01 1.01 10 100)", 1.0,
-                                "POINT ZM (0 1 10 100)"},
-        UnaryUnionGridSizeParam{
-            "multipoint_merge_zm",
-            "MULTIPOINT ZM (0.01 1.01 10 100, 0.01 1.01 20 200)", 1.0,
-            "POINT ZM (0 1 10 100)"},
-        UnaryUnionGridSizeParam{
-            "multipoint_distinct_zm",
-            "MULTIPOINT ZM (0.01 1.01 10 100, 2.01 3.01 20 200)", 1.0,
-            "MULTIPOINT ZM (0 1 10 100, 2 3 20 200)"},
+        SnapToGridParam{"point_on_grid_zm", "POINT ZM (0 1 10 100)", 1.0,
+                        "POINT ZM (0 1 10 100)"},
+        SnapToGridParam{"point_no_snap_zm", "POINT ZM (0.01 1.01 10 100)", 1.0,
+                        "POINT ZM (0 1 10 100)"},
+        SnapToGridParam{"point_not_on_grid_zm", "POINT ZM (0.01 1.01 10 100)",
+                        1.0, "POINT ZM (0 1 10 100)"},
+        SnapToGridParam{"multipoint_merge_zm",
+                        "MULTIPOINT ZM (0.01 1.01 10 100, 0.01 1.01 20 200)",
+                        1.0, "POINT ZM (0 1 10 100)"},
+        SnapToGridParam{"multipoint_distinct_zm",
+                        "MULTIPOINT ZM (0.01 1.01 10 100, 2.01 3.01 20 200)",
+                        1.0, "MULTIPOINT ZM (0 1 10 100, 2 3 20 200)"},
 
         // Polygon: single ring, no snapping (single loop fast path)
-        UnaryUnionGridSizeParam{"polygon_simple",
-                                "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))", -1,
-                                "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
+        SnapToGridParam{"polygon_simple",
+                        "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))", -1,
+                        "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
         // Polygon: single ring with snapping
-        UnaryUnionGridSizeParam{
-            "polygon_snap",
-            "POLYGON ((0.001 0.001, 10.001 0.001, 10.001 10.001, "
-            "0.001 10.001, 0.001 0.001))",
-            1.0, "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
+        SnapToGridParam{"polygon_snap",
+                        "POLYGON ((0.001 0.001, 10.001 0.001, 10.001 10.001, "
+                        "0.001 10.001, 0.001 0.001))",
+                        1.0, "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
         // Polygon: shell with one hole (one shell + holes branch)
-        UnaryUnionGridSizeParam{"polygon_with_hole",
-                                "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
-                                "(5 5, 5 15, 15 15, 15 5, 5 5))",
-                                -1,
-                                "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
-                                "(5 5, 5 15, 15 15, 15 5, 5 5))"},
+        SnapToGridParam{"polygon_with_hole",
+                        "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
+                        "(5 5, 5 15, 15 15, 15 5, 5 5))",
+                        -1,
+                        "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
+                        "(5 5, 5 15, 15 15, 15 5, 5 5))"},
         // Multipolygon: two disjoint shells (multiple shells, no holes)
-        UnaryUnionGridSizeParam{"multipolygon_disjoint",
-                                "MULTIPOLYGON (((0 0, 5 0, 5 5, 0 5, 0 0)), "
-                                "((10 10, 15 10, 15 15, 10 15, 10 10)))",
-                                -1,
-                                "MULTIPOLYGON (((0 0, 5 0, 5 5, 0 5, 0 0)), "
-                                "((10 10, 15 10, 15 15, 10 15, 10 10)))"},
+        SnapToGridParam{"multipolygon_disjoint",
+                        "MULTIPOLYGON (((0 0, 5 0, 5 5, 0 5, 0 0)), "
+                        "((10 10, 15 10, 15 15, 10 15, 10 10)))",
+                        -1,
+                        "MULTIPOLYGON (((0 0, 5 0, 5 5, 0 5, 0 0)), "
+                        "((10 10, 15 10, 15 15, 10 15, 10 10)))"},
         // Multipolygon: two shells, one with a hole (multiple shells +
         // holes)
-        UnaryUnionGridSizeParam{"multipolygon_with_hole",
-                                "MULTIPOLYGON (((0 0, 20 0, 20 20, 0 20, 0 0), "
-                                "(5 5, 5 15, 15 15, 15 5, 5 5)), "
-                                "((30 30, 40 30, 40 40, 30 40, 30 30)))",
-                                -1,
-                                "MULTIPOLYGON (((0 0, 20 0, 20 20, 0 20, 0 0), "
-                                "(5 5, 5 15, 15 15, 15 5, 5 5)), "
-                                "((30 30, 40 30, 40 40, 30 40, 30 30)))"}
-        // Multipolygon: overlapping shells not yet merged into a single polygon
-        // UnaryUnionGridSizeParam{
-        //     "multipolygon_overlapping",
-        //     "MULTIPOLYGON (((0 0, 3 0, 3 3, 0 3, 0 0)), "
-        //     "((1 1, 4 1, 4 4, 1 4, 1 1)))",
-        //     -1,
-        //     "MULTIPOLYGON (((0 0, 3 0, 3 3, 0 3, 0 0)), "
-        //     "((1 1, 4 1, 4 4, 1 4, 1 1)))"}
-
-        ),
-    [](const ::testing::TestParamInfo<UnaryUnionGridSizeParam>& info) {
+        SnapToGridParam{"multipolygon_with_hole",
+                        "MULTIPOLYGON (((0 0, 20 0, 20 20, 0 20, 0 0), "
+                        "(5 5, 5 15, 15 15, 15 5, 5 5)), "
+                        "((30 30, 40 30, 40 40, 30 40, 30 30)))",
+                        -1,
+                        "MULTIPOLYGON (((0 0, 20 0, 20 20, 0 20, 0 0), "
+                        "(5 5, 5 15, 15 15, 15 5, 5 5)), "
+                        "((30 30, 40 30, 40 40, 30 40, 30 30)))"}),
+    [](const ::testing::TestParamInfo<SnapToGridParam>& info) {
       return info.param.name;
     });
 
