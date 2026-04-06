@@ -572,6 +572,33 @@ struct OutputGeometry {
     ring_offsets_.push_back(static_cast<int>(polygon_vertices_.size()));
   }
 
+  void AddGeography(const GeoArrowGeography& geog) {
+    geog.points()->geom().VisitVertices([&](internal::GeoArrowVertex& v) {
+      AddPoint(v.Normalize(geog.points()->dimensions()));
+      return true;
+    });
+
+    geog.lines()->geom().VisitChains([&](const GeoArrowChain& chain) {
+      chain.VisitNativeVertices([&](internal::GeoArrowVertex& v) {
+        AddLineVertex(v.Normalize(geog.points()->dimensions()));
+        return true;
+      });
+      FinishLine();
+    });
+
+    // TODO: one of the important optimizations here is not having to
+    // recalculate the nesting, so we have to find a way to propagate the
+    // information we know about the input to the output.
+    geog.polygons()->geom().VisitLoops(
+        &scratch_, [&](const GeoArrowLoop& loop) {
+          loop.VisitNativeVertices([&](internal::GeoArrowVertex& v) {
+            AddRingVertex(v.Normalize(geog.points()->dimensions()));
+            return true;
+          });
+          FinishRing();
+        });
+  }
+
   /// \brief Return true if any points were added to the output
   bool has_points() const { return !points_.empty(); }
 
@@ -1175,6 +1202,68 @@ struct SimplifyExec {
 
   RebuildExec rebuild_;
   double last_tolerance_{-100};
+};
+
+struct UnionOperationExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
+  using out_t = GeoArrowOutputBuilder;
+
+  UnionOperationExec() {
+    options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
+  }
+
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
+    // Check for cases we can use to avoid building output using the
+    // S2BooleanOperation
+    if (value1.is_empty()) {
+      out->AppendGeometry(value0.geom());
+      return;
+    } else if (value0.is_empty()) {
+      out->AppendGeometry(value1.geom());
+      return;
+    }
+
+    // Output dimensions will be the shared dimensions of the inputs
+    out->SetDimensionsCommon(value0.dimensions(), value1.dimensions());
+    output_.Clear();
+    intersection_.clear();
+
+    // If there is no potential intersection between the two, we don't need to
+    // do any calculation, just regurgitate both geometries into the output. For
+    // now we buffer this into the OutputGeometry to consistently handle
+    // organizing points, lines, and polygons into the appropriate output type.
+    S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
+                                 &intersection_);
+    if (intersection_.empty()) {
+      output_.AddGeography(value0);
+      output_.AddGeography(value1);
+      output_.WriteTo(out);
+      return;
+    }
+
+    // Otherwise, we need the S2BooleanOperation
+    s2builderutil::LayerVector layers(3);
+    layers[0] = absl::make_unique<GeoArrowPointVectorLayer>(&output_);
+    layers[1] = absl::make_unique<GeoArrowPolylinesLayer>(&output_);
+    layers[2] = absl::make_unique<GeoArrowPolygonLayer>(&output_);
+
+    S2BooleanOperation op(S2BooleanOperation::OpType::UNION,
+                          s2builderutil::NormalizeClosedSet(std::move(layers)),
+                          options_);
+    S2Error error;
+    if (!op.Build(value0.ShapeIndex(), value1.ShapeIndex(), &error)) {
+      std::stringstream ss;
+      ss << error;
+      throw Exception(ss.str());
+    }
+
+    output_.WriteTo(out);
+  }
+
+  S2BooleanOperation::Options options_;
+  std::vector<S2CellId> intersection_;
+  OutputGeometry output_;
 };
 
 template <S2BooleanOperation::OpType op_type>
