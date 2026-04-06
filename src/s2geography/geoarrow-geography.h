@@ -65,6 +65,7 @@ class GeoArrowPointShape : public S2Shape {
 
   int num_vertices() const;
   S2Point vertex(int v) const;
+  internal::GeoArrowVertex native_vertex(int v) const;
 
   int num_edges() const override;
   Edge edge(int e) const override;
@@ -340,6 +341,12 @@ class GeoArrowGeography {
   /// \brief Returns true if this geography has no edges
   bool is_empty() const;
 
+  /// \brief Returns the input geometry type
+  ///
+  /// This may be used to more accurately propagate the input geometry type to
+  /// the output for operations that require it.
+  uint8_t geometry_type() const;
+
   /// \brief Returns the coordinate dimensions (e.g., XY, XYZ, XYM, XYZM)
   ///
   /// For geometries with mixed dimension components (e.g., GEOMETRYCOLLECTION
@@ -380,6 +387,8 @@ class GeoArrowGeography {
   /// This may be accessed even if the underlying geometry is non-polygon
   /// (will represent a polygon with zero chains).
   const GeoArrowLaxPolygonShape* polygons() const;
+
+  const GeoArrowGeometryView geom() const { return geom_; }
 
   /// \brief Visit all vertices in this geography
   template <typename Visit>

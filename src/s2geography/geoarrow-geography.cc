@@ -119,6 +119,10 @@ S2Point GeoArrowPointShape::vertex(int v) const {
   return GeoArrowChain(geom_.root() + v).vertex(0);
 }
 
+internal::GeoArrowVertex GeoArrowPointShape::native_vertex(int v) const {
+  return GeoArrowChain(geom_.root() + v).native_vertex(0);
+}
+
 int GeoArrowPointShape::num_edges() const { return num_vertices(); }
 
 S2Shape::Edge GeoArrowPointShape::edge(int e) const {
@@ -572,6 +576,14 @@ std::optional<S2Point> GeoArrowGeography::Point() const {
       }
     default:
       return std::nullopt;
+  }
+}
+
+uint8_t GeoArrowGeography::geometry_type() const {
+  if (geom_.size_nodes == 0) {
+    return GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION;
+  } else {
+    return geom_.root->geometry_type;
   }
 }
 

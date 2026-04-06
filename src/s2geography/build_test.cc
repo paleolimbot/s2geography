@@ -223,4 +223,388 @@ TEST(Build, SedonaUdfSymDifference) {
       {"GEOMETRYCOLLECTION EMPTY", "MULTIPOINT ((0 0), (0 1))", std::nullopt}));
 }
 
+TEST(Build, SedonaUdfReducePrecision) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::ReducePrecisionKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+                        {{"POINT (0 0)", "POINT (0.001 0.001)", std::nullopt}},
+                        {{1.0, 1.0, std::nullopt}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(
+      out_array.get(), {"POINT (0 0)", "POINT (0 0)", std::nullopt}));
+}
+
+struct ReducePrecisionParam {
+  std::string name;
+  std::optional<std::string> input_wkt;
+  std::optional<double> grid_size;
+  std::optional<std::string> expected_wkt;
+
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const ReducePrecisionParam& p) {
+    os << (p.input_wkt ? *p.input_wkt : "null")
+       << " grid_size=" << (p.grid_size ? std::to_string(*p.grid_size) : "null")
+       << " -> " << (p.expected_wkt ? *p.expected_wkt : "null");
+    return os;
+  }
+};
+
+class ReducePrecisionTest
+    : public ::testing::TestWithParam<ReducePrecisionParam> {};
+
+TEST_P(ReducePrecisionTest, SedonaUdf) {
+  const auto& p = GetParam();
+
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::ReducePrecisionKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+                        {{p.input_wkt}}, {{p.grid_size}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(
+      TestResultGeography(out_array.get(), {p.expected_wkt}));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Build, ReducePrecisionTest,
+    ::testing::Values(
+        // Null inputs
+        ReducePrecisionParam{"null_geom", std::nullopt, 1.0, std::nullopt},
+        ReducePrecisionParam{"null_grid_size", "POINT (0 0)", std::nullopt,
+                             std::nullopt},
+        ReducePrecisionParam{"null_both", std::nullopt, std::nullopt,
+                             std::nullopt},
+
+        // Point snapping to whole degrees (grid_size = 1.0)
+        ReducePrecisionParam{"point_on_grid", "POINT (0 0)", 1.0,
+                             "POINT (0 0)"},
+        ReducePrecisionParam{"point_not_on_grid", "POINT (0.001 0.001)", 1.0,
+                             "POINT (0 0)"},
+        ReducePrecisionParam{"point_no_snap", "POINT (0.001 0.001)", -1,
+                             "POINT (0.001 0.001)"},
+
+        // Point snapping to 0.1 degree grid (grid_size = 0.1)
+        ReducePrecisionParam{"point_tenth_degree_on_grid", "POINT (0.1 0.1)",
+                             0.1, "POINT (0.1 0.1)"},
+        ReducePrecisionParam{"point_tenth_degree_snap", "POINT (0.12 0.12)",
+                             0.1, "POINT (0.1 0.1)"},
+
+        // Multipoint: two nearby points snap to same location
+        ReducePrecisionParam{"multipoint_merge",
+                             "MULTIPOINT ((0.001 0.001), (0.002 0.002))", 1.0,
+                             "POINT (0 0)"},
+        // Multipoint: points remain distinct after snapping
+        ReducePrecisionParam{"multipoint_distinct",
+                             "MULTIPOINT ((0 0), (10 10))", 1.0,
+                             "MULTIPOINT ((0 0), (10 10))"},
+
+        // Linestring: no snapping needed
+        ReducePrecisionParam{"linestring_on_grid", "LINESTRING (0 0, 10 10)",
+                             1.0, "LINESTRING (0 0, 10 10)"},
+        // Linestring: endpoints snap to grid
+        ReducePrecisionParam{"linestring_snap",
+                             "LINESTRING (0.001 0.001, 10.001 10.001)", 1.0,
+                             "LINESTRING (0 0, 10 10)"},
+        // Linestring: midpoints snap together on a grid
+        ReducePrecisionParam{"linestring_midpoint_snap",
+                             "LINESTRING (0 0, 4.9 4.9, 5.1 5.1, 10 10)", 1.0,
+                             "LINESTRING (0 0, 5 5, 10 10)"},
+        // Linestring: component collapses because the endpoints snap together
+        ReducePrecisionParam{"linestring_collapse",
+                             "LINESTRING (0.01 0.02, 0.03 0.04)", 1.0,
+                             "LINESTRING EMPTY"},
+        // Linestring: no snapping with negative grid size
+        ReducePrecisionParam{"linestring_no_snap",
+                             "LINESTRING (0.001 0.001, 10.001 10.001)", -1,
+                             "LINESTRING (0.001 0.001, 10.001 10.001)"},
+        // Linestring with Z
+        ReducePrecisionParam{"linestring_z",
+                             "LINESTRING Z (0 0 100, 10 10 200)", 1.0,
+                             "LINESTRING Z (0 0 100, 10 10 200)"},
+        // Linestring with Z and snapping (Z values are interpolated when
+        // endpoints are snapped, so they won't be exact)
+        ReducePrecisionParam{
+            "linestring_snap_z",
+            "LINESTRING Z (0.001 0.001 100, 10.001 10.001 200)", 1.0,
+            "LINESTRING Z (0 0 100.010024, 10 10 199.99005)"},
+        // Linestring with M
+        ReducePrecisionParam{"linestring_m",
+                             "LINESTRING M (0 0 100, 10 10 200)", 1.0,
+                             "LINESTRING M (0 0 100, 10 10 200)"},
+        // Linestring with ZM
+        ReducePrecisionParam{
+            "linestring_zm", "LINESTRING ZM (0 0 100 1000, 10 10 200 2000)",
+            1.0, "LINESTRING ZM (0 0 100 1000, 10 10 200 2000)"},
+
+        // Multilinestring: no snapping needed
+        ReducePrecisionParam{"multilinestring_on_grid",
+                             "MULTILINESTRING ((0 0, 10 10), (20 20, 30 30))",
+                             1.0,
+                             "MULTILINESTRING ((0 0, 10 10), (20 20, 30 30))"},
+        // Multilinestring: endpoints snap to grid
+        ReducePrecisionParam{"multilinestring_snap",
+                             "MULTILINESTRING ((0.001 0.001, 10.001 10.001), "
+                             "(20.001 20.001, 30.001 30.001))",
+                             1.0,
+                             "MULTILINESTRING ((0 0, 10 10), (20 20, 30 30))"},
+        // Multilinestring: midpoints snap together on a grid
+        ReducePrecisionParam{
+            "multilinestring_midpoint_snap",
+            "MULTILINESTRING ((0 0, 4.9 4.9, 5.1 5.1, 10 10), "
+            "(20 20, 24.9 24.9, 25.1 25.1, 30 30))",
+            1.0, "MULTILINESTRING ((0 0, 5 5, 10 10), (20 20, 25 25, 30 30))"},
+        // Multilinestring: one component collapses because endpoints snap
+        // together
+        ReducePrecisionParam{
+            "multilinestring_partial_collapse",
+            "MULTILINESTRING ((0 0, 10 10), (0.01 0.02, 0.03 0.04))", 1.0,
+            "LINESTRING (0 0, 10 10)"},
+        // Multilinestring with Z
+        ReducePrecisionParam{
+            "multilinestring_z",
+            "MULTILINESTRING Z ((0 0 100, 10 10 200), (20 20 300, 30 30 400))",
+            1.0,
+            "MULTILINESTRING Z ((0 0 100, 10 10 200), "
+            "(20 20 300, 30 30 400))"},
+        // Multilinestring with M
+        ReducePrecisionParam{
+            "multilinestring_m",
+            "MULTILINESTRING M ((0 0 100, 10 10 200), (20 20 300, 30 30 400))",
+            1.0,
+            "MULTILINESTRING M ((0 0 100, 10 10 200), "
+            "(20 20 300, 30 30 400))"},
+        // Multilinestring with ZM
+        ReducePrecisionParam{
+            "multilinestring_zm",
+            "MULTILINESTRING ZM ((0 0 100 1000, 10 10 200 2000), "
+            "(20 20 300 3000, 30 30 400 4000))",
+            1.0,
+            "MULTILINESTRING ZM ((0 0 100 1000, 10 10 200 2000), "
+            "(20 20 300 3000, 30 30 400 4000))"},
+
+        // Check Z handling
+        ReducePrecisionParam{"point_on_grid_z", "POINT Z (0 1 10)", 1.0,
+                             "POINT Z (0 1 10)"},
+        ReducePrecisionParam{"point_not_on_grid_z", "POINT Z (0.01 1.01 10)",
+                             1.0, "POINT Z (0 1 10)"},
+        ReducePrecisionParam{"multipoint_merge_z",
+                             "MULTIPOINT Z (0.01 1.01 10, 0.01 1.01 20)", 1.0,
+                             "POINT Z (0 1 10)"},
+        ReducePrecisionParam{"multipoint_distinct_z",
+                             "MULTIPOINT Z (0.01 1.01 10, 2.01 3.01 20)", 1.0,
+                             "MULTIPOINT Z (0 1 10, 2 3 20)"},
+
+        // Check M handling
+        ReducePrecisionParam{"point_on_grid_m", "POINT M (0 1 10)", 1.0,
+                             "POINT M (0 1 10)"},
+        ReducePrecisionParam{"point_not_on_grid_m", "POINT M (0.01 1.01 10)",
+                             1.0, "POINT M (0 1 10)"},
+        ReducePrecisionParam{"multipoint_merge_m",
+                             "MULTIPOINT M (0.01 1.01 10, 0.01 1.01 20)", 1.0,
+                             "POINT M (0 1 10)"},
+        ReducePrecisionParam{"multipoint_distinct_m",
+                             "MULTIPOINT M (0.01 1.01 10, 2.01 3.01 20)", 1.0,
+                             "MULTIPOINT M (0 1 10, 2 3 20)"},
+
+        // Check POINT ZM handling
+        ReducePrecisionParam{"point_on_grid_zm", "POINT ZM (0 1 10 100)", 1.0,
+                             "POINT ZM (0 1 10 100)"},
+        ReducePrecisionParam{"point_not_on_grid_zm",
+                             "POINT ZM (0.01 1.01 10 100)", 1.0,
+                             "POINT ZM (0 1 10 100)"},
+        ReducePrecisionParam{
+            "multipoint_merge_zm",
+            "MULTIPOINT ZM (0.01 1.01 10 100, 0.01 1.01 20 200)", 1.0,
+            "POINT ZM (0 1 10 100)"},
+        ReducePrecisionParam{
+            "multipoint_distinct_zm",
+            "MULTIPOINT ZM (0.01 1.01 10 100, 2.01 3.01 20 200)", 1.0,
+            "MULTIPOINT ZM (0 1 10 100, 2 3 20 200)"},
+
+        // Polygon: single ring, no snapping (single loop fast path)
+        ReducePrecisionParam{"polygon_simple",
+                             "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))", -1,
+                             "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
+        // Polygon: single ring with snapping
+        ReducePrecisionParam{
+            "polygon_snap",
+            "POLYGON ((0.001 0.001, 10.001 0.001, 10.001 10.001, "
+            "0.001 10.001, 0.001 0.001))",
+            1.0, "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
+        // Polygon: shell with one hole (one shell + holes branch)
+        ReducePrecisionParam{"polygon_with_collapsed_hole",
+                             "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
+                             "(5 5, 5 5.1, 5.1 5.1, 5.1 5, 5 5))",
+                             1, "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0))"},
+        // Polygon: shell with a hole that collapses
+        ReducePrecisionParam{"polygon_with_hole",
+                             "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
+                             "(5 5, 5 15, 15 15, 15 5, 5 5))",
+                             -1,
+                             "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
+                             "(5 5, 5 15, 15 15, 15 5, 5 5))"},
+        // Multipolygon: two disjoint shells (multiple shells, no holes)
+        ReducePrecisionParam{"multipolygon_disjoint",
+                             "MULTIPOLYGON (((0 0, 5 0, 5 5, 0 5, 0 0)), "
+                             "((10 10, 15 10, 15 15, 10 15, 10 10)))",
+                             -1,
+                             "MULTIPOLYGON (((0 0, 5 0, 5 5, 0 5, 0 0)), "
+                             "((10 10, 15 10, 15 15, 10 15, 10 10)))"},
+        // Multipolygon: two shells, one with a hole (multiple shells +
+        // holes)
+        ReducePrecisionParam{"multipolygon_with_hole",
+                             "MULTIPOLYGON (((0 0, 20 0, 20 20, 0 20, 0 0), "
+                             "(5 5, 5 15, 15 15, 15 5, 5 5)), "
+                             "((30 30, 40 30, 40 40, 30 40, 30 30)))",
+                             -1,
+                             "MULTIPOLYGON (((0 0, 20 0, 20 20, 0 20, 0 0), "
+                             "(5 5, 5 15, 15 15, 15 5, 5 5)), "
+                             "((30 30, 40 30, 40 40, 30 40, 30 30)))"}),
+    [](const ::testing::TestParamInfo<ReducePrecisionParam>& info) {
+      return info.param.name;
+    });
+
+TEST(Build, SedonaUdfSimplify) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::SimplifyKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+      {{"POINT (0 0)", "LINESTRING (0 0, 10 0)", std::nullopt}},
+      {{0.0, 0.0, std::nullopt}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(
+      out_array.get(),
+      {"POINT (0 0)", "LINESTRING (0 0, 10 0)", std::nullopt}));
+}
+
+struct SimplifyParam {
+  std::string name;
+  std::optional<std::string> input_wkt;
+  std::optional<double> tolerance;
+  std::optional<std::string> expected_wkt;
+
+  friend std::ostream& operator<<(std::ostream& os, const SimplifyParam& p) {
+    os << (p.input_wkt ? *p.input_wkt : "null")
+       << " tolerance=" << (p.tolerance ? std::to_string(*p.tolerance) : "null")
+       << " -> " << (p.expected_wkt ? *p.expected_wkt : "null");
+    return os;
+  }
+};
+
+class SimplifyTest : public ::testing::TestWithParam<SimplifyParam> {};
+
+TEST_P(SimplifyTest, SedonaUdf) {
+  const auto& p = GetParam();
+
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::SimplifyKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+                        {{p.input_wkt}}, {{p.tolerance}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(
+      TestResultGeography(out_array.get(), {p.expected_wkt}));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Build, SimplifyTest,
+    ::testing::Values(
+        // Null inputs
+        SimplifyParam{"null_geom", std::nullopt, 0.0, std::nullopt},
+        SimplifyParam{"null_tolerance", "POINT (0 0)", std::nullopt,
+                      std::nullopt},
+        SimplifyParam{"null_both", std::nullopt, std::nullopt, std::nullopt},
+
+        // Point: unaffected by simplification (no edges)
+        SimplifyParam{"point_zero_tolerance", "POINT (0 0)", 0.0,
+                      "POINT (0 0)"},
+        SimplifyParam{"point_large_tolerance", "POINT (0 0)", 1000000.0,
+                      "POINT (0 0)"},
+
+        // Multipoint: zero tolerance preserves all points
+        SimplifyParam{"multipoint_zero_tolerance",
+                      "MULTIPOINT ((0 0), (10 10))", 0.0,
+                      "MULTIPOINT ((0 0), (10 10))"},
+        // Multipoint: large tolerance merges nearby points
+        SimplifyParam{"multipoint_merge", "MULTIPOINT ((0 0), (0.001 0.001))",
+                      1000000.0, "POINT (0 0)"},
+        // Multipoint: large negative tolerance also merges nearby points
+        SimplifyParam{"negative_tolerance", "MULTIPOINT ((0 0), (0.001 0.001))",
+                      -1000000.0, "POINT (0 0)"},
+
+        // Linestring: zero tolerance is identity
+        SimplifyParam{"linestring_zero_tolerance", "LINESTRING (0 0, 10 0)",
+                      0.0, "LINESTRING (0 0, 10 0)"},
+        // Linestring: zero tolerance preserves intermediate vertex
+        SimplifyParam{"linestring_zero_tolerance_3pt",
+                      "LINESTRING (0 0, 5 1, 10 0)", 0.0,
+                      "LINESTRING (0 0, 5 1, 10 0)"},
+        // Linestring: large tolerance removes intermediate vertex
+        SimplifyParam{"linestring_simplify", "LINESTRING (0 0, 5 1, 10 0)",
+                      200000.0, "LINESTRING (0 0, 10 0)"},
+        // Linestring: small tolerance keeps intermediate vertex
+        SimplifyParam{"linestring_keep_vertex", "LINESTRING (0 0, 5 1, 10 0)",
+                      50000.0, "LINESTRING (0 0, 5 1, 10 0)"},
+        // Linestring: collapse when endpoints merge
+        SimplifyParam{"linestring_collapse", "LINESTRING (0 0, 0.0001 0.0001)",
+                      1000000.0, "LINESTRING EMPTY"},
+
+        // Linestring with Z: zero tolerance preserves Z
+        SimplifyParam{"linestring_z_zero_tolerance",
+                      "LINESTRING Z (0 0 100, 10 0 200)", 0.0,
+                      "LINESTRING Z (0 0 100, 10 0 200)"},
+        // Linestring with M: zero tolerance preserves M
+        SimplifyParam{"linestring_m_zero_tolerance",
+                      "LINESTRING M (0 0 100, 10 0 200)", 0.0,
+                      "LINESTRING M (0 0 100, 10 0 200)"},
+        // Linestring with ZM: zero tolerance preserves ZM
+        SimplifyParam{"linestring_zm_zero_tolerance",
+                      "LINESTRING ZM (0 0 100 1000, 10 0 200 2000)", 0.0,
+                      "LINESTRING ZM (0 0 100 1000, 10 0 200 2000)"},
+
+        // Point with Z
+        SimplifyParam{"point_z", "POINT Z (0 1 10)", 0.0, "POINT Z (0 1 10)"},
+        // Point with M
+        SimplifyParam{"point_m", "POINT M (0 1 10)", 0.0, "POINT M (0 1 10)"},
+        // Point with ZM
+        SimplifyParam{"point_zm", "POINT ZM (0 1 10 100)", 0.0,
+                      "POINT ZM (0 1 10 100)"}
+
+        // Polygon tests not included here because they currently test the same
+        // code paths as the precision reducer.
+
+        ),
+    [](const ::testing::TestParamInfo<SimplifyParam>& info) {
+      return info.param.name;
+    });
+
 }  // namespace s2geography
