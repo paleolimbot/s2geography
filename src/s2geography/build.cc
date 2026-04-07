@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
 #include <limits>
 #include <sstream>
 
@@ -1243,38 +1244,27 @@ class TestGeometry {
     return *this;
   }
 
-  std::string ToWKT(int precision = 16) const {
-    struct GeoArrowWKTWriter writer;
-    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKTWriterInit(&writer));
-    writer.precision = precision;
+  std::string ToHexWKB() const {
+    struct GeoArrowWKBWriter writer;
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBWriterInit(&writer));
 
-    struct GeoArrowVisitor v;
-    GeoArrowVisitorInitVoid(&v);
-    GeoArrowWKTWriterInitVisitor(&writer, &v);
-
-    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowGeometryViewVisit(geom(), &v));
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBWriterAppend(&writer, geom()));
 
     nanoarrow::UniqueArray out;
-    GEOARROW_THROW_NOT_OK(nullptr, S2GeographyGeoArrowWKTWriterFinish(
-                                       &writer, out.get(), nullptr));
-    GeoArrowWKTWriterReset(&writer);
+    GEOARROW_THROW_NOT_OK(nullptr,
+                          GeoArrowWKBWriterFinish(&writer, out.get(), nullptr));
+    GeoArrowWKBWriterReset(&writer);
 
     auto* offsets = reinterpret_cast<const int32_t*>(out->buffers[1]);
-    auto* data = reinterpret_cast<const char*>(out->buffers[2]);
-    std::string string_out(data, offsets[1]);
+    auto* data = reinterpret_cast<const uint8_t*>(out->buffers[2]);
+    int32_t len = offsets[1];
 
-    // Work around a bug in the WKT writer for empty points
-    if (string_out == "POINT (nan nan)") {
-      return "POINT EMPTY";
-    } else if (string_out == "POINT Z (nan nan nan)") {
-      return "POINT Z EMPTY";
-    } else if (string_out == "POINT M (nan nan nan)") {
-      return "POINT M EMPTY";
-    } else if (string_out == "POINT ZM (nan nan nan nan)") {
-      return "POINT ZM EMPTY";
+    std::ostringstream ss;
+    ss << std::hex << std::setfill('0');
+    for (int32_t i = 0; i < len; ++i) {
+      ss << std::setw(2) << static_cast<int>(data[i]);
     }
-
-    return string_out;
+    return ss.str();
   }
 
   struct GeoArrowGeometryView geom() const {
@@ -1352,7 +1342,7 @@ struct UnionOperationExec {
       TestGeometry v1(value1.geom());
 
       std::stringstream ss;
-      ss << error << "\nLHS: " << v0.ToWKT() << "\nRHS: " << v1.ToWKT();
+      ss << error << "\nLHS: " << v0.ToHexWKB() << "\nRHS: " << v1.ToHexWKB();
       throw Exception(ss.str());
     }
 
