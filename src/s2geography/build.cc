@@ -1223,6 +1223,30 @@ struct SimplifyExec {
   double last_tolerance_{-100};
 };
 
+/// \brief Run an S2BooleanOperation with the standard 3-layer closed-set
+/// output (points, polylines, polygons).
+void BuildOverlay(S2BooleanOperation::OpType op_type,
+                  const S2ShapeIndex& index0, const S2ShapeIndex& index1,
+                  const S2BooleanOperation::Options& options,
+                  OutputGeometry* output) {
+  // Note: we can't share op between iterations of the loop if we use
+  // the closed set normalizer, which is not designed for this.
+  s2builderutil::LayerVector layers(3);
+  layers[0] = absl::make_unique<GeoArrowPointVectorLayer>(output);
+  layers[1] = absl::make_unique<GeoArrowPolylinesLayer>(output);
+  layers[2] = absl::make_unique<GeoArrowPolygonLayer>(output);
+
+  S2BooleanOperation op(
+      op_type, s2builderutil::NormalizeClosedSet(std::move(layers)), options);
+
+  S2Error error;
+  if (!op.Build(index0, index1, &error)) {
+    std::stringstream ss;
+    ss << error;
+    throw Exception(ss.str());
+  }
+}
+
 struct UnionOperationExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
@@ -1263,23 +1287,8 @@ struct UnionOperationExec {
       return;
     }
 
-    // Note: we can't share op between iterations of the loop if we use
-    // the closed set normalizer, which is not designed for this.
-    s2builderutil::LayerVector layers(3);
-    layers[0] = absl::make_unique<GeoArrowPointVectorLayer>(&output_);
-    layers[1] = absl::make_unique<GeoArrowPolylinesLayer>(&output_);
-    layers[2] = absl::make_unique<GeoArrowPolygonLayer>(&output_);
-
-    S2BooleanOperation op(S2BooleanOperation::OpType::UNION,
-                          s2builderutil::NormalizeClosedSet(std::move(layers)),
-                          options_);
-
-    S2Error error;
-    if (!op.Build(value0.ShapeIndex(), value1.ShapeIndex(), &error)) {
-      std::stringstream ss;
-      ss << error;
-      throw Exception(ss.str());
-    }
+    BuildOverlay(S2BooleanOperation::OpType::UNION, value0.ShapeIndex(),
+                 value1.ShapeIndex(), options_, &output_);
 
     output_.WriteTo(out);
   }
@@ -1321,24 +1330,8 @@ struct IntersectionOperationExec {
       return;
     }
 
-    // Note: we can't share op between iterations of the loop if we use
-    // the closed set normalizer, which is not designed for this.
-    s2builderutil::LayerVector layers(3);
-    layers[0] = absl::make_unique<GeoArrowPointVectorLayer>(&output_);
-    layers[1] = absl::make_unique<GeoArrowPolylinesLayer>(&output_);
-    layers[2] = absl::make_unique<GeoArrowPolygonLayer>(&output_);
-
-    S2BooleanOperation op(S2BooleanOperation::OpType::INTERSECTION,
-                          s2builderutil::NormalizeClosedSet(std::move(layers)),
-                          options_);
-
-    S2Error error;
-    if (!op.Build(value0.ShapeIndex(), value1.ShapeIndex(), &error)) {
-      std::stringstream ss;
-      ss << error;
-      throw Exception(ss.str());
-    }
-
+    BuildOverlay(S2BooleanOperation::OpType::INTERSECTION, value0.ShapeIndex(),
+                 value1.ShapeIndex(), options_, &output_);
     output_.WriteTo(out, OutputEmptyGeometryType(value0, value1));
   }
 
@@ -1401,24 +1394,8 @@ struct DifferenceOperationExec {
       return;
     }
 
-    // Note: we can't share op between iterations of the loop if we use
-    // the closed set normalizer, which is not designed for this.
-    s2builderutil::LayerVector layers(3);
-    layers[0] = absl::make_unique<GeoArrowPointVectorLayer>(&output_);
-    layers[1] = absl::make_unique<GeoArrowPolylinesLayer>(&output_);
-    layers[2] = absl::make_unique<GeoArrowPolygonLayer>(&output_);
-
-    S2BooleanOperation op(S2BooleanOperation::OpType::DIFFERENCE,
-                          s2builderutil::NormalizeClosedSet(std::move(layers)),
-                          options_);
-
-    S2Error error;
-    if (!op.Build(value0.ShapeIndex(), value1.ShapeIndex(), &error)) {
-      std::stringstream ss;
-      ss << error;
-      throw Exception(ss.str());
-    }
-
+    BuildOverlay(S2BooleanOperation::OpType::DIFFERENCE, value0.ShapeIndex(),
+                 value1.ShapeIndex(), options_, &output_);
     output_.WriteTo(out, OutputEmptyGeometryType(value0));
   }
 
@@ -1484,24 +1461,8 @@ struct SymDifferenceOperationExec {
       return;
     }
 
-    // Note: we can't share op between iterations of the loop if we use
-    // the closed set normalizer, which is not designed for this.
-    s2builderutil::LayerVector layers(3);
-    layers[0] = absl::make_unique<GeoArrowPointVectorLayer>(&output_);
-    layers[1] = absl::make_unique<GeoArrowPolylinesLayer>(&output_);
-    layers[2] = absl::make_unique<GeoArrowPolygonLayer>(&output_);
-
-    S2BooleanOperation op(S2BooleanOperation::OpType::SYMMETRIC_DIFFERENCE,
-                          s2builderutil::NormalizeClosedSet(std::move(layers)),
-                          options_);
-
-    S2Error error;
-    if (!op.Build(value0.ShapeIndex(), value1.ShapeIndex(), &error)) {
-      std::stringstream ss;
-      ss << error;
-      throw Exception(ss.str());
-    }
-
+    BuildOverlay(S2BooleanOperation::OpType::SYMMETRIC_DIFFERENCE,
+                 value0.ShapeIndex(), value1.ShapeIndex(), options_, &output_);
     output_.WriteTo(out, OutputEmptyGeometryType(value0, value1));
   }
 
