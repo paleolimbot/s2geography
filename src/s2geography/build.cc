@@ -632,12 +632,11 @@ struct OutputGeometry {
   /// (typically
   ///   the input geometry type is propagated)
   /// - Single points are written as POINT; multiple points are written as
-  /// MULTIPOINT
+  ///   MULTIPOINT
   /// - Single linestrings are written as LINESTRING; multiple linestrings are
-  /// written as
-  ///   MULTILINESTRING
+  ///   written as MULTILINESTRING
   /// - Single polygons are written as POLYGON; multiple polygons are written as
-  /// MULTIPOLYGON
+  ///   MULTIPOLYGON
   /// - More than one of the above is written as a GEOMETRYCOLLECTION
   ///
   /// This is the point at which the nesting of any output polygon rings are
@@ -1290,6 +1289,64 @@ struct UnionOperationExec {
   OutputGeometry output_;
 };
 
+struct IntersectionOperationExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
+  using out_t = GeoArrowOutputBuilder;
+
+  IntersectionOperationExec() {
+    options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
+  }
+
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
+    // If either input is empty, the intersection is empty
+    if (value0.is_empty() || value1.is_empty()) {
+      out->AppendEmpty();
+      return;
+    }
+
+    // Output dimensions are always XY here because we don't have a good way
+    // to propagate the source edge IDs into the S2BooleanOperation (the
+    // value lexicon option is not yet supported).
+    out->SetDimensions(GEOARROW_DIMENSIONS_XY);
+    output_.Clear();
+    intersection_.clear();
+
+    // If there is no potential intersection between the two coverings,
+    // the result is empty.
+    S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
+                                 &intersection_);
+    if (intersection_.empty()) {
+      out->AppendEmpty();
+      return;
+    }
+
+    // Note: we can't share op between iterations of the loop if we use
+    // the closed set normalizer, which is not designed for this.
+    s2builderutil::LayerVector layers(3);
+    layers[0] = absl::make_unique<GeoArrowPointVectorLayer>(&output_);
+    layers[1] = absl::make_unique<GeoArrowPolylinesLayer>(&output_);
+    layers[2] = absl::make_unique<GeoArrowPolygonLayer>(&output_);
+
+    S2BooleanOperation op(S2BooleanOperation::OpType::INTERSECTION,
+                          s2builderutil::NormalizeClosedSet(std::move(layers)),
+                          options_);
+
+    S2Error error;
+    if (!op.Build(value0.ShapeIndex(), value1.ShapeIndex(), &error)) {
+      std::stringstream ss;
+      ss << error;
+      throw Exception(ss.str());
+    }
+
+    output_.WriteTo(out);
+  }
+
+  S2BooleanOperation::Options options_;
+  std::vector<S2CellId> intersection_;
+  OutputGeometry output_;
+};
+
 template <S2BooleanOperation::OpType op_type>
 struct BooleanOperationExec {
   using arg0_t = GeoArrowGeographyInputView;
@@ -1317,9 +1374,7 @@ void SymDifferenceKernel(struct SedonaCScalarKernel* out) {
 }
 
 void IntersectionKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<
-      BooleanOperationExec<S2BooleanOperation::OpType::INTERSECTION>>(
-      out, "st_intersection");
+  InitBinaryKernel<IntersectionOperationExec>(out, "st_intersection");
 }
 
 void UnionKernel(struct SedonaCScalarKernel* out) {
