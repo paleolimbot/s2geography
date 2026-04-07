@@ -1349,7 +1349,7 @@ struct UnionOperationExec {
     S2Error error;
     if (!op_->Build(value0.ShapeIndex(), value1.ShapeIndex(), &error)) {
       TestGeometry v0(value0.geom());
-      TestGeometry v1(value0.geom());
+      TestGeometry v1(value1.geom());
 
       std::stringstream ss;
       ss << error << "\nLHS: " << v0.ToWKT() << "\nRHS: " << v1.ToWKT();
