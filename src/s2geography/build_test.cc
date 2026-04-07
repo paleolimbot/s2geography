@@ -2,11 +2,46 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "nanoarrow/nanoarrow.hpp"
 #include "s2geography/s2geography_gtest_util.h"
 #include "s2geography/sedona_udf/sedona_udf_test_internal.h"
 
 namespace s2geography {
+
+// Decode a hex string to a binary string
+static std::string HexToBytes(const std::string& hex) {
+  std::string bytes;
+  bytes.reserve(hex.size() / 2);
+  for (size_t i = 0; i + 1 < hex.size(); i += 2) {
+    unsigned int byte;
+    sscanf(hex.c_str() + i, "%02x", &byte);
+    bytes.push_back(static_cast<char>(byte));
+  }
+  return bytes;
+}
+
+// Create a WKB binary array from hex-encoded WKB strings (bypasses WKT parsing)
+static nanoarrow::UniqueArray ArgWkbFromHex(
+    const std::vector<std::optional<std::string>>& hex_values) {
+  nanoarrow::UniqueArray array;
+  NANOARROW_THROW_NOT_OK(
+      ArrowArrayInitFromType(array.get(), NANOARROW_TYPE_BINARY));
+  NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(array.get()));
+  for (const auto& value : hex_values) {
+    if (!value.has_value()) {
+      NANOARROW_THROW_NOT_OK(ArrowArrayAppendNull(array.get(), 1));
+    } else {
+      std::string bytes = HexToBytes(*value);
+      ArrowBufferView bv{reinterpret_cast<const uint8_t*>(bytes.data()),
+                         static_cast<int64_t>(bytes.size())};
+      NANOARROW_THROW_NOT_OK(ArrowArrayAppendBytes(array.get(), bv));
+    }
+  }
+  NANOARROW_THROW_NOT_OK(ArrowArrayFinishBuildingDefault(array.get(), nullptr));
+  return array;
+}
 
 void TestRebuild(const std::string& wkt, std::string expected = "",
                  const GlobalOptions& options = GlobalOptions()) {
@@ -759,5 +794,66 @@ INSTANTIATE_TEST_SUITE_P(
     [](const ::testing::TestParamInfo<SimplifyParam>& info) {
       return info.param.name;
     });
+
+TEST(Build, SedonaUdfUnionEdgesDoNotFormLoops) {
+  // Regression test: these two polygons caused "Given edges do not form loops
+  // (indegree != outdegree)" in the union operation.
+  std::string lhs_hex =
+      "0103000000010000000b000000"
+      "cadd759c0650dfbf14c25d18634b1ac0"
+      "909952701405993f609979680a611bc0"
+      "9caac61a3f2ee33f8fc294bd7a0c1bc0"
+      "343629169441f03f10f307c4006e19c0"
+      "e022261aa3d7f13fe079125ced2317c0"
+      "69ef40b0657ceb3f1422a9f21c0e15c0"
+      "69d7067d7318d63fc84a8da275f813c0"
+      "6ca802e37267cdbf9921724d054d14c0"
+      "e76b4ccac5aee4bf18f1fe467feb15c0"
+      "414546d2e3dae7bf486af4ae923518c0"
+      "cadd759c0650dfbf14c25d18634b1ac0";
+  std::string rhs_hex =
+      "0103000000010000000b000000"
+      "18d1cdf1087921c03678525b589ef3bf"
+      "f649b030530222c0903f8559e43bf3bf"
+      "756a0ceba07822c0911b4670d171f5bf"
+      "046e7e02c2ae22c0ec3ce67ff567f9bf"
+      "ad95e586099022c0f9955f7ef29afdbf"
+      "6861546f332822c02971e342163800c0"
+      "8ae87130e99e21c07c0dca43506900c0"
+      "0bc815769b2821c0f73ed370b39cfebf"
+      "7cc4a35e7af220c09c1d33618fa6fabf"
+      "d39c3cda321121c08fc4b9629273f6bf"
+      "18d1cdf1087921c03678525b589ef3bf";
+
+  // Remove any spaces/newlines from the hex literals
+  lhs_hex.erase(std::remove_if(lhs_hex.begin(), lhs_hex.end(), ::isspace),
+                lhs_hex.end());
+  rhs_hex.erase(std::remove_if(rhs_hex.begin(), rhs_hex.end(), ::isspace),
+                rhs_hex.end());
+
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::UnionKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
+
+  // Build WKB arrays directly from hex (no WKT round-trip)
+  auto lhs_array = ArgWkbFromHex({lhs_hex});
+  auto rhs_array = ArgWkbFromHex({rhs_hex});
+
+  struct ArrowArray out_array;
+  std::vector<struct ArrowArray*> args = {lhs_array.get(), rhs_array.get()};
+  ASSERT_EQ(impl.execute(&impl, args.data(),
+                         static_cast<int64_t>(args.size()), 1, &out_array),
+            0)
+      << impl.get_last_error(&impl);
+
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  // If we got here without error, the union succeeded. Verify we got one row.
+  ASSERT_EQ(out_array.length, 1);
+  out_array.release(&out_array);
+}
 
 }  // namespace s2geography
