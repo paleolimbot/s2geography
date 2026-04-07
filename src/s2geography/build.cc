@@ -1440,18 +1440,90 @@ struct DifferenceOperationExec {
   OutputGeometry output_;
 };
 
-template <S2BooleanOperation::OpType op_type>
-struct BooleanOperationExec {
+struct SymDifferenceOperationExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = WkbGeographyOutputBuilder;
+  using out_t = GeoArrowOutputBuilder;
 
-  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
-    out->Append(*s2_boolean_operation(value0.ShapeIndex(), value1.ShapeIndex(),
-                                      op_type, options_));
+  SymDifferenceOperationExec() {
+    options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
   }
 
-  GlobalOptions options_;
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
+    // If both inputs are empty, the symmetric difference is empty
+    if (value0.is_empty() && value1.is_empty()) {
+      out->AppendEmpty(OutputEmptyGeometryType(value0, value1));
+      return;
+    }
+
+    // If one input is empty, the symmetric difference is the other
+    if (value0.is_empty()) {
+      out->AppendGeometry(value1.geom());
+      return;
+    }
+    if (value1.is_empty()) {
+      out->AppendGeometry(value0.geom());
+      return;
+    }
+
+    // Output dimensions are always XY here because we don't have a good way
+    // to propagate the source edge IDs into the S2BooleanOperation (the
+    // value lexicon option is not yet supported).
+    out->SetDimensions(GEOARROW_DIMENSIONS_XY);
+    output_.Clear();
+    intersection_.clear();
+
+    // If there is no potential intersection between the two coverings,
+    // the result is both inputs combined (nothing overlaps).
+    S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
+                                 &intersection_);
+    if (intersection_.empty()) {
+      output_.AddGeography(value0);
+      output_.AddGeography(value1);
+      output_.WriteTo(out);
+      return;
+    }
+
+    // Note: we can't share op between iterations of the loop if we use
+    // the closed set normalizer, which is not designed for this.
+    s2builderutil::LayerVector layers(3);
+    layers[0] = absl::make_unique<GeoArrowPointVectorLayer>(&output_);
+    layers[1] = absl::make_unique<GeoArrowPolylinesLayer>(&output_);
+    layers[2] = absl::make_unique<GeoArrowPolygonLayer>(&output_);
+
+    S2BooleanOperation op(S2BooleanOperation::OpType::SYMMETRIC_DIFFERENCE,
+                          s2builderutil::NormalizeClosedSet(std::move(layers)),
+                          options_);
+
+    S2Error error;
+    if (!op.Build(value0.ShapeIndex(), value1.ShapeIndex(), &error)) {
+      std::stringstream ss;
+      ss << error;
+      throw Exception(ss.str());
+    }
+
+    output_.WriteTo(out, OutputEmptyGeometryType(value0, value1));
+  }
+
+  uint8_t OutputEmptyGeometryType(arg0_t::c_type value0,
+                                  arg0_t::c_type value1) {
+    uint8_t out_dimensions =
+        std::min(value0.max_dimension(), value1.max_dimension());
+    switch (out_dimensions) {
+      case 0:
+        return GEOARROW_GEOMETRY_TYPE_POINT;
+      case 1:
+        return GEOARROW_GEOMETRY_TYPE_LINESTRING;
+      case 2:
+        return GEOARROW_GEOMETRY_TYPE_POLYGON;
+      default:
+        return GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION;
+    }
+  }
+
+  S2BooleanOperation::Options options_;
+  std::vector<S2CellId> intersection_;
+  OutputGeometry output_;
 };
 
 void DifferenceKernel(struct SedonaCScalarKernel* out) {
@@ -1459,9 +1531,7 @@ void DifferenceKernel(struct SedonaCScalarKernel* out) {
 }
 
 void SymDifferenceKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<
-      BooleanOperationExec<S2BooleanOperation::OpType::SYMMETRIC_DIFFERENCE>>(
-      out, "st_symdifference");
+  InitBinaryKernel<SymDifferenceOperationExec>(out, "st_symdifference");
 }
 
 void IntersectionKernel(struct SedonaCScalarKernel* out) {
