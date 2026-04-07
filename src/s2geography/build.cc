@@ -1206,6 +1206,94 @@ struct SimplifyExec {
   double last_tolerance_{-100};
 };
 
+// Temporary, for debug output
+class TestGeometry {
+ public:
+  TestGeometry() : oriented_(false) {
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowGeometryInit(&geom_));
+  }
+
+  explicit TestGeometry(struct GeoArrowGeometryView geom) : oriented_(false) {
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowGeometryInit(&geom_));
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowGeometryShallowCopy(geom, &geom_));
+  }
+
+  ~TestGeometry() { GeoArrowGeometryReset(&geom_); }
+
+  TestGeometry(const TestGeometry&) = delete;
+  TestGeometry& operator=(const TestGeometry&) = delete;
+
+  TestGeometry(TestGeometry&& other) noexcept
+      : geom_(other.geom_),
+        label_(std::move(other.label_)),
+        oriented_(other.oriented_),
+        data_(std::move(other.data_)) {
+    GeoArrowGeometryInit(&other.geom_);
+  }
+
+  TestGeometry& operator=(TestGeometry&& other) noexcept {
+    if (this != &other) {
+      GeoArrowGeometryReset(&geom_);
+      geom_ = other.geom_;
+      GeoArrowGeometryInit(&other.geom_);
+      label_ = std::move(other.label_);
+      oriented_ = other.oriented_;
+      data_ = std::move(other.data_);
+    }
+    return *this;
+  }
+
+  std::string ToWKT(int precision = 16) const {
+    struct GeoArrowWKTWriter writer;
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKTWriterInit(&writer));
+    writer.precision = precision;
+
+    struct GeoArrowVisitor v;
+    GeoArrowVisitorInitVoid(&v);
+    GeoArrowWKTWriterInitVisitor(&writer, &v);
+
+    GEOARROW_THROW_NOT_OK(nullptr, GeoArrowGeometryViewVisit(geom(), &v));
+
+    nanoarrow::UniqueArray out;
+    GEOARROW_THROW_NOT_OK(nullptr, S2GeographyGeoArrowWKTWriterFinish(
+                                       &writer, out.get(), nullptr));
+    GeoArrowWKTWriterReset(&writer);
+
+    auto* offsets = reinterpret_cast<const int32_t*>(out->buffers[1]);
+    auto* data = reinterpret_cast<const char*>(out->buffers[2]);
+    std::string string_out(data, offsets[1]);
+
+    // Work around a bug in the WKT writer for empty points
+    if (string_out == "POINT (nan nan)") {
+      return "POINT EMPTY";
+    } else if (string_out == "POINT Z (nan nan nan)") {
+      return "POINT Z EMPTY";
+    } else if (string_out == "POINT M (nan nan nan)") {
+      return "POINT M EMPTY";
+    } else if (string_out == "POINT ZM (nan nan nan nan)") {
+      return "POINT ZM EMPTY";
+    }
+
+    return string_out;
+  }
+
+  struct GeoArrowGeometryView geom() const {
+    return GeoArrowGeometryAsView(&geom_);
+  }
+
+  bool oriented() const { return oriented_; }
+
+  void set_oriented(bool oriented) { oriented_ = oriented; }
+
+  std::string_view label() const { return label_; }
+
+ private:
+  struct GeoArrowGeometry geom_;
+  std::string label_;
+  bool oriented_;
+  std::vector<uint8_t> data_;
+};
+
 struct UnionOperationExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
@@ -1260,8 +1348,11 @@ struct UnionOperationExec {
 
     S2Error error;
     if (!op_->Build(value0.ShapeIndex(), value1.ShapeIndex(), &error)) {
+      TestGeometry v0(value0.geom());
+      TestGeometry v1(value0.geom());
+
       std::stringstream ss;
-      ss << error;
+      ss << error << "\nLHS: " << v0.ToWKT() << "\nRHS: " << v1.ToWKT();
       throw Exception(ss.str());
     }
 
