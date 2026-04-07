@@ -1291,18 +1291,6 @@ struct UnionOperationExec {
 
   UnionOperationExec() {
     options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
-
-    // We can use a common S2BooleanOperation for all iterations if needed.
-    // The S2BooleanOperation doesn't reuse any scratch space but it does save
-    // a tiny bit of effort to set this up in advance.
-    s2builderutil::LayerVector layers(3);
-    layers[0] = absl::make_unique<GeoArrowPointVectorLayer>(&output_);
-    layers[1] = absl::make_unique<GeoArrowPolylinesLayer>(&output_);
-    layers[2] = absl::make_unique<GeoArrowPolygonLayer>(&output_);
-
-    op_ = std::make_unique<S2BooleanOperation>(
-        S2BooleanOperation::OpType::UNION,
-        s2builderutil::NormalizeClosedSet(std::move(layers)), options_);
   }
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
@@ -1336,8 +1324,19 @@ struct UnionOperationExec {
       return;
     }
 
+    // Note: we can't share op between iterations of the loop if we use
+    // the closed set normalizer, which is not designed for this.
+    s2builderutil::LayerVector layers(3);
+    layers[0] = absl::make_unique<GeoArrowPointVectorLayer>(&output_);
+    layers[1] = absl::make_unique<GeoArrowPolylinesLayer>(&output_);
+    layers[2] = absl::make_unique<GeoArrowPolygonLayer>(&output_);
+
+    S2BooleanOperation op(S2BooleanOperation::OpType::UNION,
+                          s2builderutil::NormalizeClosedSet(std::move(layers)),
+                          options_);
+
     S2Error error;
-    if (!op_->Build(value0.ShapeIndex(), value1.ShapeIndex(), &error)) {
+    if (!op.Build(value0.ShapeIndex(), value1.ShapeIndex(), &error)) {
       TestGeometry v0(value0.geom());
       TestGeometry v1(value1.geom());
 
@@ -1350,7 +1349,6 @@ struct UnionOperationExec {
   }
 
   S2BooleanOperation::Options options_;
-  std::unique_ptr<S2BooleanOperation> op_;
   std::vector<S2CellId> intersection_;
   OutputGeometry output_;
 };
