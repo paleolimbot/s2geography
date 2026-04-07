@@ -573,17 +573,18 @@ struct OutputGeometry {
   }
 
   void AddGeography(const GeoArrowGeography& geog) {
-    geog.points()->geom().VisitVertices([&](internal::GeoArrowVertex& v) {
+    geog.points()->geom().VisitNativeVertices([&](internal::GeoArrowVertex v) {
       AddPoint(v.Normalize(geog.points()->dimensions()));
       return true;
     });
 
     geog.lines()->geom().VisitChains([&](const GeoArrowChain& chain) {
-      chain.VisitNativeVertices([&](internal::GeoArrowVertex& v) {
+      chain.VisitNativeVertices([&](internal::GeoArrowVertex v) {
         AddLineVertex(v.Normalize(geog.points()->dimensions()));
         return true;
       });
       FinishLine();
+      return true;
     });
 
     // TODO: one of the important optimizations here is not having to
@@ -591,11 +592,12 @@ struct OutputGeometry {
     // information we know about the input to the output.
     geog.polygons()->geom().VisitLoops(
         &scratch_, [&](const GeoArrowLoop& loop) {
-          loop.VisitNativeVertices([&](internal::GeoArrowVertex& v) {
+          loop.VisitNativeVertices([&](internal::GeoArrowVertex v) {
             AddRingVertex(v.Normalize(geog.points()->dimensions()));
             return true;
           });
           FinishRing();
+          return true;
         });
   }
 
