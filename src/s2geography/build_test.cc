@@ -462,6 +462,114 @@ TEST(Build, SedonaUdfDifference) {
       {"GEOMETRYCOLLECTION EMPTY", "POINT (0 1)", std::nullopt}));
 }
 
+struct DifferenceParam {
+  std::string name;
+  std::optional<std::string> input_wkt_a;
+  std::optional<std::string> input_wkt_b;
+  std::optional<std::string> expected_wkt;
+
+  friend std::ostream& operator<<(std::ostream& os, const DifferenceParam& p) {
+    os << (p.input_wkt_a ? *p.input_wkt_a : "null") << " | "
+       << (p.input_wkt_b ? *p.input_wkt_b : "null") << " -> "
+       << (p.expected_wkt ? *p.expected_wkt : "null");
+    return os;
+  }
+};
+
+class DifferenceTest : public ::testing::TestWithParam<DifferenceParam> {};
+
+TEST_P(DifferenceTest, SedonaUdf) {
+  const auto& p = GetParam();
+
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::DifferenceKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+      {{p.input_wkt_a}, {p.input_wkt_b}}, {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(
+      TestResultGeography(out_array.get(), {p.expected_wkt}));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Build, DifferenceTest,
+    ::testing::Values(
+        // Null inputs
+        DifferenceParam{"null_a", std::nullopt, "POINT (0 0)", std::nullopt},
+        DifferenceParam{"null_b", "POINT (0 0)", std::nullopt, std::nullopt},
+        DifferenceParam{"null_both", std::nullopt, std::nullopt, std::nullopt},
+
+        // Branch: value0 is empty -> empty result
+        DifferenceParam{"empty_a", "POINT EMPTY", "POINT (0 0)",
+                        "GEOMETRYCOLLECTION EMPTY"},
+
+        // Branch: value1 is empty -> return value0
+        DifferenceParam{"empty_b_point", "POINT (0 0)", "POINT EMPTY",
+                        "POINT (0 0)"},
+        DifferenceParam{
+            "empty_b_polygon", "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
+            "POLYGON EMPTY", "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
+
+        // Branch: coverings don't intersect -> return value0
+        DifferenceParam{"point_very_far", "POINT (0 0)", "POINT (180 0)",
+                        "POINT (0 0)"},
+        DifferenceParam{"polygon_very_far",
+                        "POLYGON ((0 0, 5 0, 5 5, 0 5, 0 0))",
+                        "POLYGON ((170 -5, 175 -5, 175 0, 170 0, 170 -5))",
+                        "POLYGON ((0 0, 5 0, 5 5, 0 5, 0 0))"},
+
+        // Point - Point: same -> empty
+        DifferenceParam{"point_same", "POINT (0 0)", "POINT (0 0)",
+                        "POINT EMPTY"},
+        // Point - Point: different (but coverings overlap)
+        DifferenceParam{"point_different", "POINT (0 0)", "POINT (0 1)",
+                        "POINT (0 0)"},
+
+        // Linestring - Linestring: same -> empty
+        DifferenceParam{"linestring_same", "LINESTRING (0 0, 10 0)",
+                        "LINESTRING (0 0, 10 0)", "LINESTRING EMPTY"},
+        // Linestring - Linestring: disjoint (coverings may overlap)
+        DifferenceParam{"linestring_disjoint", "LINESTRING (0 0, 10 0)",
+                        "LINESTRING (0 10, 10 10)", "LINESTRING (0 0, 10 0)"},
+
+        // Polygon - Polygon: same -> empty
+        DifferenceParam{
+            "polygon_same", "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
+            "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))", "POLYGON EMPTY"},
+        // Polygon - Polygon: disjoint (coverings may overlap)
+        DifferenceParam{"polygon_disjoint",
+                        "POLYGON ((0 0, 5 0, 5 5, 0 5, 0 0))",
+                        "POLYGON ((10 10, 15 10, 15 15, 10 15, 10 10))",
+                        "POLYGON ((0 0, 5 0, 5 5, 0 5, 0 0))"},
+        // Polygon - Polygon: overlapping
+        DifferenceParam{"polygon_overlap",
+                        "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
+                        "POLYGON ((5 5, 15 5, 15 15, 5 15, 5 5))",
+                        "POLYGON ((5 10.037423, 0 10, 0 0, 10 0, 10 5.019002, "
+                        "5 5, 5 10.037423))"},
+        // Polygon - Polygon: A contains B
+        DifferenceParam{"polygon_a_contains_b",
+                        "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0))",
+                        "POLYGON ((5 5, 10 5, 10 10, 5 10, 5 5))",
+                        "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0), "
+                        "(5 10, 10 10, 10 5, 5 5, 5 10))"},
+        // Polygon - Polygon: B contains A -> empty
+        DifferenceParam{
+            "polygon_b_contains_a", "POLYGON ((5 5, 10 5, 10 10, 5 10, 5 5))",
+            "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0))", "POLYGON EMPTY"}
+
+        ),
+    [](const ::testing::TestParamInfo<DifferenceParam>& info) {
+      return info.param.name;
+    });
+
 TEST(Build, SedonaUdfSymDifference) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::SymDifferenceKernel(&kernel);
