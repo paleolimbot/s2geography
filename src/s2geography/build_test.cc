@@ -161,8 +161,7 @@ TEST(Build, SedonaUdfIntersection) {
   kernel.release(&kernel);
 
   ASSERT_NO_FATAL_FAILURE(TestResultGeography(
-      out_array.get(),
-      {"POINT (0 0)", "GEOMETRYCOLLECTION EMPTY", std::nullopt}));
+      out_array.get(), {"POINT (0 0)", "POINT EMPTY", std::nullopt}));
 }
 
 TEST(Build, SedonaUdfUnion) {
@@ -360,7 +359,7 @@ INSTANTIATE_TEST_SUITE_P(
         IntersectionParam{"point_same", "POINT (0 0)", "POINT (0 0)",
                           "POINT (0 0)"},
         IntersectionParam{"point_different", "POINT (0 0)", "POINT (0 1)",
-                          "GEOMETRYCOLLECTION EMPTY"},
+                          "POINT EMPTY"},
 
         // Multipoint + Point
         IntersectionParam{"multipoint_point_overlap",
@@ -368,17 +367,16 @@ INSTANTIATE_TEST_SUITE_P(
                           "POINT (0 0)"},
         IntersectionParam{"multipoint_point_disjoint",
                           "MULTIPOINT ((0 0), (1 1))", "POINT (2 2)",
-                          "GEOMETRYCOLLECTION EMPTY"},
+                          "POINT EMPTY"},
 
         // Point + Point: very far disjoint (triggers early-return for
         // definitely not intersecting)
         IntersectionParam{"point_very_far", "POINT (0 0)", "POINT (180 0)",
-                          "GEOMETRYCOLLECTION EMPTY"},
+                          "POINT EMPTY"},
 
         // Linestring + Linestring
         IntersectionParam{"linestring_disjoint", "LINESTRING (0 0, 10 0)",
-                          "LINESTRING (0 10, 10 10)",
-                          "GEOMETRYCOLLECTION EMPTY"},
+                          "LINESTRING (0 10, 10 10)", "LINESTRING EMPTY"},
         IntersectionParam{"linestring_same", "LINESTRING (0 0, 10 0)",
                           "LINESTRING (0 0, 10 0)", "LINESTRING (0 0, 10 0)"},
         // Linestring + Linestring: crossing
@@ -386,20 +384,19 @@ INSTANTIATE_TEST_SUITE_P(
                           "LINESTRING (-5 0, 5 0)", "POINT (0 0)"},
 
         // Polygon + Polygon: disjoint
-        IntersectionParam{"polygon_disjoint",
-                          "POLYGON ((0 0, 5 0, 5 5, 0 5, 0 0))",
-                          "POLYGON ((10 10, 15 10, 15 15, 10 15, 10 10))",
-                          "GEOMETRYCOLLECTION EMPTY"},
+        IntersectionParam{
+            "polygon_disjoint", "POLYGON ((0 0, 5 0, 5 5, 0 5, 0 0))",
+            "POLYGON ((10 10, 15 10, 15 15, 10 15, 10 10))", "POLYGON EMPTY"},
         // Polygon + Polygon: identical
         IntersectionParam{"polygon_same",
                           "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
                           "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
                           "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
         // Polygon + Polygon: overlapping
-        IntersectionParam{"polygon_overlap",
-                          "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
-                          "POLYGON ((5 5, 15 5, 15 15, 5 15, 5 5))",
-                          "POLYGON ((5 5, 10 5.019002, 10 10, 5 10.037423, 5 5))"},
+        IntersectionParam{
+            "polygon_overlap", "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
+            "POLYGON ((5 5, 15 5, 15 15, 5 15, 5 5))",
+            "POLYGON ((5 5, 10 5.019002, 10 10, 5 10.037423, 5 5))"},
         // Polygon + Polygon: one contains the other
         IntersectionParam{"polygon_contains",
                           "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0))",
@@ -411,8 +408,7 @@ INSTANTIATE_TEST_SUITE_P(
                           "LINESTRING (0 0, 10 0)", "POINT (0 0)"},
         // Point + Linestring: point off line
         IntersectionParam{"point_off_linestring", "POINT (5 5)",
-                          "LINESTRING (0 0, 10 0)",
-                          "GEOMETRYCOLLECTION EMPTY"},
+                          "LINESTRING (0 0, 10 0)", "POINT EMPTY"},
 
         // Point + Polygon: point inside
         IntersectionParam{"point_inside_polygon", "POINT (5 5)",
@@ -421,22 +417,20 @@ INSTANTIATE_TEST_SUITE_P(
         // Point + Polygon: point outside
         IntersectionParam{"point_outside_polygon", "POINT (20 20)",
                           "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
-                          "GEOMETRYCOLLECTION EMPTY"},
+                          "POINT EMPTY"},
         // Point + Polygon: point on boundary
         IntersectionParam{"point_on_polygon_boundary", "POINT (10 5)",
                           "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
                           "POINT (10 5)"},
 
         // Linestring + Polygon: line inside
-        IntersectionParam{"linestring_inside_polygon",
-                          "LINESTRING (2 5, 8 5)",
+        IntersectionParam{"linestring_inside_polygon", "LINESTRING (2 5, 8 5)",
                           "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
                           "LINESTRING (2 5, 8 5)"},
         // Linestring + Polygon: line outside
-        IntersectionParam{"linestring_outside_polygon",
-                          "LINESTRING (20 0, 30 0)",
-                          "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
-                          "GEOMETRYCOLLECTION EMPTY"},
+        IntersectionParam{
+            "linestring_outside_polygon", "LINESTRING (20 0, 30 0)",
+            "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))", "LINESTRING EMPTY"},
         // Linestring + Polygon: line crossing boundary
         IntersectionParam{"linestring_crossing_polygon",
                           "LINESTRING (-5 5, 5 5)",

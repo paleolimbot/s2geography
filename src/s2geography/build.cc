@@ -1317,7 +1317,7 @@ struct IntersectionOperationExec {
     S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
                                  &intersection_);
     if (intersection_.empty()) {
-      out->AppendEmpty();
+      out->AppendEmpty(OutputEmptyGeometryType(value0, value1));
       return;
     }
 
@@ -1339,7 +1339,23 @@ struct IntersectionOperationExec {
       throw Exception(ss.str());
     }
 
-    output_.WriteTo(out);
+    output_.WriteTo(out, OutputEmptyGeometryType(value0, value1));
+  }
+
+  uint8_t OutputEmptyGeometryType(arg0_t::c_type value0,
+                                  arg1_t::c_type value1) {
+    uint8_t out_dimensions =
+        std::min(value0.max_dimension(), value1.max_dimension());
+    switch (out_dimensions) {
+      case 0:
+        return GEOARROW_GEOMETRY_TYPE_POINT;
+      case 1:
+        return GEOARROW_GEOMETRY_TYPE_LINESTRING;
+      case 2:
+        return GEOARROW_GEOMETRY_TYPE_POLYGON;
+      default:
+        return GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION;
+    }
   }
 
   S2BooleanOperation::Options options_;
