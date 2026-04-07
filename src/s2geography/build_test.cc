@@ -228,6 +228,20 @@ INSTANTIATE_TEST_SUITE_P(
         BinaryOpParam{"null_b", "POINT (0 0)", std::nullopt, std::nullopt},
         BinaryOpParam{"null_both", std::nullopt, std::nullopt, std::nullopt},
 
+        // Empty inputs
+        BinaryOpParam{"both_empty", "POINT EMPTY", "POINT EMPTY",
+                      "POINT EMPTY"},
+        BinaryOpParam{"empty_a_point", "POINT EMPTY", "POINT (0 0)",
+                      "POINT (0 0)"},
+        BinaryOpParam{"empty_b_point", "POINT (0 0)", "POINT EMPTY",
+                      "POINT (0 0)"},
+        BinaryOpParam{"empty_a_polygon", "POLYGON EMPTY",
+                      "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
+                      "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
+        BinaryOpParam{
+            "empty_b_polygon", "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
+            "POLYGON EMPTY", "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
+
         // Point + Point
         BinaryOpParam{"point_same", "POINT (0 0)", "POINT (0 0)",
                       "POINT (0 0)"},
@@ -341,6 +355,20 @@ INSTANTIATE_TEST_SUITE_P(
         BinaryOpParam{"null_a", std::nullopt, "POINT (0 0)", std::nullopt},
         BinaryOpParam{"null_b", "POINT (0 0)", std::nullopt, std::nullopt},
         BinaryOpParam{"null_both", std::nullopt, std::nullopt, std::nullopt},
+
+        // Empty inputs
+        BinaryOpParam{"both_empty", "POINT EMPTY", "POINT EMPTY",
+                      "GEOMETRYCOLLECTION EMPTY"},
+        BinaryOpParam{"empty_a_point", "POINT EMPTY", "POINT (0 0)",
+                      "GEOMETRYCOLLECTION EMPTY"},
+        BinaryOpParam{"empty_b_point", "POINT (0 0)", "POINT EMPTY",
+                      "GEOMETRYCOLLECTION EMPTY"},
+        BinaryOpParam{"empty_a_polygon", "POLYGON EMPTY",
+                      "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
+                      "GEOMETRYCOLLECTION EMPTY"},
+        BinaryOpParam{"empty_b_polygon",
+                      "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
+                      "POLYGON EMPTY", "GEOMETRYCOLLECTION EMPTY"},
 
         // Point + Point
         BinaryOpParam{"point_same", "POINT (0 0)", "POINT (0 0)",
