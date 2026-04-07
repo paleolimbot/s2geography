@@ -1307,8 +1307,7 @@ void IntersectionKernel(struct SedonaCScalarKernel* out) {
 }
 
 void UnionKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<BooleanOperationExec<S2BooleanOperation::OpType::UNION>>(
-      out, "st_union");
+  InitBinaryKernel<UnionOperationExec>(out, "st_union");
 }
 
 void ReducePrecisionKernel(struct SedonaCScalarKernel* out) {

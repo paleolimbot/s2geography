@@ -180,7 +180,7 @@ TEST(Build, SedonaUdfUnion) {
 
   ASSERT_NO_FATAL_FAILURE(TestResultGeography(
       out_array.get(),
-      {"POINT (0 0)", "MULTIPOINT ((0 0), (0 1))", std::nullopt}));
+      {"POINT (0 0)", "MULTIPOINT ((0 1), (0 0))", std::nullopt}));
 }
 
 struct UnionParam {
@@ -251,8 +251,7 @@ INSTANTIATE_TEST_SUITE_P(
                    "LINESTRING (0 10, 10 10)",
                    "MULTILINESTRING ((0 0, 10 0), (0 10, 10 10))"},
         UnionParam{"linestring_same", "LINESTRING (0 0, 10 0)",
-                   "LINESTRING (0 0, 10 0)",
-                   "MULTILINESTRING ((0 0, 10 0), (0 0, 10 0))"},
+                   "LINESTRING (0 0, 10 0)", "LINESTRING (0 0, 10 0)"},
         // Linestring + Linestring: very close disjoint
         UnionParam{"linestring_very_close", "LINESTRING (0 0, 10 0)",
                    "LINESTRING (0 0.001, 10 0.001)",
