@@ -581,7 +581,7 @@ struct OutputGeometry {
 
     geog.lines()->geom().VisitChains([&](const GeoArrowChain& chain) {
       chain.VisitNativeVertices([&](internal::GeoArrowVertex v) {
-        AddLineVertex(v.Normalize(geog.points()->dimensions()));
+        AddLineVertex(v.Normalize(chain.dimensions()));
         return true;
       });
       FinishLine();
@@ -595,7 +595,7 @@ struct OutputGeometry {
     geog.polygons()->geom().VisitLoops(
         &scratch_, [&](const GeoArrowLoop& loop) {
           loop.VisitNativeVertices([&](internal::GeoArrowVertex v) {
-            AddRingVertex(v.Normalize(geog.points()->dimensions()));
+            AddRingVertex(v.Normalize(loop.dimensions()));
             return true;
           });
           FinishRing();
@@ -1341,9 +1341,9 @@ struct IntersectionOperationExec {
 
   uint8_t OutputEmptyGeometryType(arg0_t::c_type value0,
                                   arg1_t::c_type value1) {
-    uint8_t out_dimensions =
+    int out_dimension =
         std::min(value0.max_dimension(), value1.max_dimension());
-    switch (out_dimensions) {
+    switch (out_dimension) {
       case 0:
         return GEOARROW_GEOMETRY_TYPE_POINT;
       case 1:
@@ -1471,10 +1471,10 @@ struct SymDifferenceOperationExec {
   }
 
   uint8_t OutputEmptyGeometryType(arg0_t::c_type value0,
-                                  arg0_t::c_type value1) {
-    uint8_t out_dimensions =
+                                  arg1_t::c_type value1) {
+    int out_dimension =
         std::min(value0.max_dimension(), value1.max_dimension());
-    switch (out_dimensions) {
+    switch (out_dimension) {
       case 0:
         return GEOARROW_GEOMETRY_TYPE_POINT;
       case 1:

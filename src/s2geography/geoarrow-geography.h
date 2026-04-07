@@ -363,7 +363,7 @@ class GeoArrowGeography {
   int dimension() const;
 
   /// \brief Returns the maximum dimension (0 for point, 1 for linestring, 2 for
-  /// polygon, -1 for the empty geometrycollection).
+  /// polygon, -1 for the empty geometry collection).
   ///
   /// This version is the output of ST_Dimension(), which returns the greatest
   /// dimension of the output. This value affects some outputs (e.g., return
