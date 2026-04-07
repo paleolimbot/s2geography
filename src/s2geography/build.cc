@@ -1223,6 +1223,8 @@ struct SimplifyExec {
   double last_tolerance_{-100};
 };
 
+namespace {
+
 /// \brief Run an S2BooleanOperation with the standard 3-layer closed-set
 /// output (points, polylines, polygons).
 void BuildOverlay(S2BooleanOperation::OpType op_type,
@@ -1246,6 +1248,8 @@ void BuildOverlay(S2BooleanOperation::OpType op_type,
     throw Exception(ss.str());
   }
 }
+
+}  // namespace
 
 struct UnionOperationExec {
   using arg0_t = GeoArrowGeographyInputView;
