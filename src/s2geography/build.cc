@@ -536,6 +536,7 @@ struct OutputGeometry {
     polygon_lengths_.clear();
     polygon_vertices_.clear();
     current_line_length_ = 0;
+    nesting_known_ = false;
   }
 
   /// \brief Add a point to the output
@@ -587,9 +588,10 @@ struct OutputGeometry {
       return true;
     });
 
-    // TODO: one of the important optimizations here is not having to
-    // recalculate the nesting, so we have to find a way to propagate the
-    // information we know about the input to the output.
+    // Propagate nesting from the input: VisitLoops visits shells followed
+    // by their holes, so we can build polygon_lengths_/ring_order_ directly.
+    int ring_base = static_cast<int>(ring_offsets_.size()) - 1;
+    int ring_idx = 0;
     geog.polygons()->geom().VisitLoops(
         &scratch_, [&](const GeoArrowLoop& loop) {
           loop.VisitNativeVertices([&](internal::GeoArrowVertex v) {
@@ -597,8 +599,17 @@ struct OutputGeometry {
             return true;
           });
           FinishRing();
+
+          ring_order_.push_back(ring_base + ring_idx);
+          if (loop.is_hole()) {
+            polygon_lengths_.back() += 1;
+          } else {
+            polygon_lengths_.push_back(1);
+          }
+          ++ring_idx;
           return true;
         });
+    nesting_known_ = true;
   }
 
   /// \brief Return true if any points were added to the output
@@ -745,6 +756,12 @@ struct OutputGeometry {
   }
 
   void GroupRings() {
+    // If nesting was already determined (e.g., propagated from input via
+    // AddGeography), skip the expensive recomputation.
+    if (nesting_known_) {
+      return;
+    }
+
     polygon_lengths_.clear();
     int num_rings = static_cast<int>(ring_offsets_.size()) - 1;
 
@@ -867,6 +884,7 @@ struct OutputGeometry {
   std::vector<int> polygon_lengths_;
   std::vector<internal::GeoArrowVertex> polygon_vertices_;
   int current_line_length_{0};
+  bool nesting_known_{false};
   std::vector<struct GeoArrowGeometryNode> ring_nodes_;
   std::vector<double> ring_signed_areas_;
   std::vector<S2Point> scratch_;
