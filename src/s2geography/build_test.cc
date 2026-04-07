@@ -183,6 +183,130 @@ TEST(Build, SedonaUdfUnion) {
       {"POINT (0 0)", "MULTIPOINT ((0 0), (0 1))", std::nullopt}));
 }
 
+struct UnionParam {
+  std::string name;
+  std::optional<std::string> input_wkt_a;
+  std::optional<std::string> input_wkt_b;
+  std::optional<std::string> expected_wkt;
+
+  friend std::ostream& operator<<(std::ostream& os, const UnionParam& p) {
+    os << (p.input_wkt_a ? *p.input_wkt_a : "null") << " | "
+       << (p.input_wkt_b ? *p.input_wkt_b : "null") << " -> "
+       << (p.expected_wkt ? *p.expected_wkt : "null");
+    return os;
+  }
+};
+
+class UnionTest : public ::testing::TestWithParam<UnionParam> {};
+
+TEST_P(UnionTest, SedonaUdf) {
+  const auto& p = GetParam();
+
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::UnionKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+      {{p.input_wkt_a}, {p.input_wkt_b}}, {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(
+      TestResultGeography(out_array.get(), {p.expected_wkt}));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Build, UnionTest,
+    ::testing::Values(
+        // Null inputs
+        UnionParam{"null_a", std::nullopt, "POINT (0 0)", std::nullopt},
+        UnionParam{"null_b", "POINT (0 0)", std::nullopt, std::nullopt},
+        UnionParam{"null_both", std::nullopt, std::nullopt, std::nullopt},
+
+        // Point + Point
+        UnionParam{"point_same", "POINT (0 0)", "POINT (0 0)", "POINT (0 0)"},
+        UnionParam{"point_different", "POINT (0 0)", "POINT (0 1)",
+                   "MULTIPOINT ((0 0), (0 1))"},
+
+        // Multipoint + Point
+        UnionParam{"multipoint_point", "MULTIPOINT ((0 0), (1 1))",
+                   "POINT (2 2)", "MULTIPOINT ((0 0), (1 1), (2 2))"},
+        UnionParam{"multipoint_point_overlap", "MULTIPOINT ((0 0), (1 1))",
+                   "POINT (0 0)", "MULTIPOINT ((0 0), (1 1))"},
+
+        // Point + Point: very close disjoint (triggers non-early-return path)
+        UnionParam{"point_very_close", "POINT (0 0)", "POINT (0 0.001)",
+                   "MULTIPOINT ((0 0), (0 0.001))"},
+        // Point + Point: very far disjoint (triggers early-return for
+        // definitely not intersecting)
+        UnionParam{"point_very_far", "POINT (0 0)", "POINT (180 0)",
+                   "MULTIPOINT ((0 0), (180 0))"},
+
+        // Linestring + Linestring
+        UnionParam{"linestring_disjoint", "LINESTRING (0 0, 10 0)",
+                   "LINESTRING (0 10, 10 10)",
+                   "MULTILINESTRING ((0 0, 10 0), (0 10, 10 10))"},
+        UnionParam{"linestring_same", "LINESTRING (0 0, 10 0)",
+                   "LINESTRING (0 0, 10 0)",
+                   "MULTILINESTRING ((0 0, 10 0), (0 0, 10 0))"},
+        // Linestring + Linestring: very close disjoint
+        UnionParam{"linestring_very_close", "LINESTRING (0 0, 10 0)",
+                   "LINESTRING (0 0.001, 10 0.001)",
+                   "MULTILINESTRING ((0 0, 10 0), (0 0.001, 10 0.001))"},
+        // Linestring + Linestring: very far disjoint (near-antipodal)
+        UnionParam{"linestring_very_far", "LINESTRING (0 0, 10 0)",
+                   "LINESTRING (170 0, 180 0)",
+                   "MULTILINESTRING ((0 0, 10 0), (170 0, 180 0))"},
+
+        // Polygon + Polygon: disjoint
+        UnionParam{"polygon_disjoint", "POLYGON ((0 0, 5 0, 5 5, 0 5, 0 0))",
+                   "POLYGON ((10 10, 15 10, 15 15, 10 15, 10 10))",
+                   "MULTIPOLYGON (((0 0, 5 0, 5 5, 0 5, 0 0)), "
+                   "((10 10, 15 10, 15 15, 10 15, 10 10)))"},
+        // Polygon + Polygon: identical
+        UnionParam{"polygon_same", "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
+                   "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
+                   "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
+        // Polygon + Polygon: very close disjoint
+        UnionParam{"polygon_very_close", "POLYGON ((0 0, 5 0, 5 5, 0 5, 0 0))",
+                   "POLYGON ((5.001 0, 10 0, 10 5, 5.001 5, 5.001 0))",
+                   "MULTIPOLYGON (((0 0, 5 0, 5 5, 0 5, 0 0)), "
+                   "((5.001 0, 10 0, 10 5, 5.001 5, 5.001 0)))"},
+        // Polygon + Polygon: very far disjoint (near-antipodal)
+        UnionParam{"polygon_very_far", "POLYGON ((0 0, 5 0, 5 5, 0 5, 0 0))",
+                   "POLYGON ((170 -5, 175 -5, 175 0, 170 0, 170 -5))",
+                   "MULTIPOLYGON (((0 0, 5 0, 5 5, 0 5, 0 0)), "
+                   "((170 -5, 175 -5, 175 0, 170 0, 170 -5)))"},
+
+        // Point + Linestring: mixed dimension
+        UnionParam{"point_linestring", "POINT (5 5)", "LINESTRING (0 0, 10 0)",
+                   "GEOMETRYCOLLECTION (POINT (5 5), LINESTRING (0 0, 10 0))"},
+        // Point + Polygon: mixed dimension
+        UnionParam{"point_polygon", "POINT (5 5)",
+                   "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
+                   "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
+        // Point outside polygon
+        UnionParam{"point_outside_polygon", "POINT (20 20)",
+                   "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
+                   "GEOMETRYCOLLECTION (POINT (20 20), "
+                   "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0)))"},
+        // Linestring + Polygon
+        UnionParam{"linestring_polygon", "LINESTRING (0 0, 10 0)",
+                   "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
+                   "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"},
+        // Linestring outside polygon
+        UnionParam{"linestring_outside_polygon", "LINESTRING (20 0, 30 0)",
+                   "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
+                   "GEOMETRYCOLLECTION (LINESTRING (20 0, 30 0), "
+                   "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0)))"}),
+    [](const ::testing::TestParamInfo<UnionParam>& info) {
+      return info.param.name;
+    });
+
 TEST(Build, SedonaUdfDifference) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::DifferenceKernel(&kernel);
