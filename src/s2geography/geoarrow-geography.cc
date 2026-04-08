@@ -627,6 +627,24 @@ int GeoArrowGeography::dimension() const {
   }
 }
 
+int GeoArrowGeography::max_dimension() const {
+  if (!polygons_.is_empty()) {
+    return 2;
+  }
+
+  if (!lines_.is_empty()) {
+    return 1;
+  }
+
+  if (!points_.is_empty()) {
+    return 0;
+  }
+
+  // If we're in a completely empty situation, use the declared geometry type to
+  // determine the dimension.
+  return dimension();
+}
+
 int GeoArrowGeography::num_edges() const {
   return points_.num_edges() + lines_.num_edges() + polygons_.num_edges();
 }

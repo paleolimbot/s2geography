@@ -356,7 +356,19 @@ class GeoArrowGeography {
 
   /// \brief Returns the dimension (0 for point, 1 for linestring, 2 for
   /// polygon), or -1 for geometry collections
+  ///
+  /// This version is closest to the concept of S2Shape::dimension() with the
+  /// addition of -1 for geometry collections (which can't be represented by
+  /// a single S2Shape).
   int dimension() const;
+
+  /// \brief Returns the maximum dimension (0 for point, 1 for linestring, 2 for
+  /// polygon, -1 for the empty geometry collection).
+  ///
+  /// This version is the output of ST_Dimension(), which returns the greatest
+  /// dimension of the output. This value affects some outputs (e.g., return
+  /// type of the empty intersection).
+  int max_dimension() const;
 
   /// \brief Returns the total number of edges of all shapes in this geography
   int num_edges() const;

@@ -1263,6 +1263,7 @@ TEST_F(GeoArrowGeographyTest, DefaultConstructor) {
   EXPECT_TRUE(geog.is_empty());
   EXPECT_EQ(geog.num_shapes(), 0);
   EXPECT_EQ(geog.dimension(), -1);
+  EXPECT_EQ(geog.max_dimension(), -1);
   ASSERT_EQ(geog.Covering().size(), 0);
 
   auto point = MakeGeography("POINT (0 0)");
@@ -1280,6 +1281,7 @@ TEST_F(GeoArrowGeographyTest, InitGeometryZeroNodes) {
   EXPECT_TRUE(geog.is_empty());
   EXPECT_EQ(geog.num_shapes(), 0);
   EXPECT_EQ(geog.dimension(), -1);
+  EXPECT_EQ(geog.max_dimension(), -1);
   ASSERT_EQ(geog.Covering().size(), 0);
 
   auto point = MakeGeography("POINT (0 0)");
@@ -1294,6 +1296,7 @@ TEST_F(GeoArrowGeographyTest, InitGeometryZeroNodes) {
 TEST_F(GeoArrowGeographyTest, Point) {
   auto geog = MakeGeography("POINT (1 2)");
   EXPECT_EQ(geog.dimension(), 0);
+  EXPECT_EQ(geog.max_dimension(), 0);
   EXPECT_EQ(geog.num_shapes(), 1);
   // Check twice because the value is cached
   ASSERT_EQ(geog.Covering().size(), 1);
@@ -1310,6 +1313,7 @@ TEST_F(GeoArrowGeographyTest, Point) {
 TEST_F(GeoArrowGeographyTest, MultiPoint) {
   auto geog = MakeGeography("MULTIPOINT ((0 0), (1 1), (2 2))");
   EXPECT_EQ(geog.dimension(), 0);
+  EXPECT_EQ(geog.max_dimension(), 0);
   EXPECT_EQ(geog.num_shapes(), 1);
   // Check twice because the value is cached
   ASSERT_EQ(geog.Covering().size(), 3);
@@ -1343,6 +1347,7 @@ TEST_F(GeoArrowGeographyTest, PointNativeEdge) {
 TEST_F(GeoArrowGeographyTest, EmptyPoint) {
   auto geog = MakeGeography("POINT EMPTY");
   EXPECT_EQ(geog.dimension(), 0);
+  EXPECT_EQ(geog.max_dimension(), 0);
   EXPECT_EQ(geog.num_shapes(), 1);
   ASSERT_EQ(geog.Covering().size(), 0);
 
@@ -1354,6 +1359,7 @@ TEST_F(GeoArrowGeographyTest, EmptyPoint) {
 TEST_F(GeoArrowGeographyTest, Linestring) {
   auto geog = MakeGeography("LINESTRING (0 0, 1 1, 2 2)");
   EXPECT_EQ(geog.dimension(), 1);
+  EXPECT_EQ(geog.max_dimension(), 1);
   EXPECT_EQ(geog.num_shapes(), 1);
   ASSERT_GT(geog.Covering().size(), 0);
 
@@ -1392,6 +1398,7 @@ TEST_F(GeoArrowGeographyTest, LinestringNativeEdge) {
 TEST_F(GeoArrowGeographyTest, MultiLinestring) {
   auto geog = MakeGeography("MULTILINESTRING ((0 0, 1 1), (2 2, 3 3, 4 4))");
   EXPECT_EQ(geog.dimension(), 1);
+  EXPECT_EQ(geog.max_dimension(), 1);
   EXPECT_EQ(geog.num_shapes(), 1);
   ASSERT_GT(geog.Covering().size(), 0);
 
@@ -1403,6 +1410,7 @@ TEST_F(GeoArrowGeographyTest, MultiLinestring) {
 TEST_F(GeoArrowGeographyTest, Polygon) {
   auto geog = MakeGeography("POLYGON ((0 0, 1 0, 0 1, 0 0))");
   EXPECT_EQ(geog.dimension(), 2);
+  EXPECT_EQ(geog.max_dimension(), 2);
   EXPECT_EQ(geog.num_shapes(), 1);
   ASSERT_GT(geog.Covering().size(), 0);
 
@@ -1445,6 +1453,7 @@ TEST_F(GeoArrowGeographyTest, MultiPolygon) {
       "MULTIPOLYGON (((0 0, 1 0, 0 1, 0 0)), "
       "((10 10, 11 10, 10 11, 10 10)))");
   EXPECT_EQ(geog.dimension(), 2);
+  EXPECT_EQ(geog.max_dimension(), 2);
   EXPECT_EQ(geog.num_shapes(), 1);
   ASSERT_GT(geog.Covering().size(), 0);
 

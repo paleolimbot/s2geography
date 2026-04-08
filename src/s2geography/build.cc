@@ -536,6 +536,7 @@ struct OutputGeometry {
     polygon_lengths_.clear();
     polygon_vertices_.clear();
     current_line_length_ = 0;
+    nesting_known_ = false;
   }
 
   /// \brief Add a point to the output
@@ -572,6 +573,45 @@ struct OutputGeometry {
     ring_offsets_.push_back(static_cast<int>(polygon_vertices_.size()));
   }
 
+  void AddGeography(const GeoArrowGeography& geog) {
+    geog.points()->geom().VisitNativeVertices([&](internal::GeoArrowVertex v) {
+      AddPoint(v.Normalize(geog.points()->dimensions()));
+      return true;
+    });
+
+    geog.lines()->geom().VisitChains([&](const GeoArrowChain& chain) {
+      chain.VisitNativeVertices([&](internal::GeoArrowVertex v) {
+        AddLineVertex(v.Normalize(chain.dimensions()));
+        return true;
+      });
+      FinishLine();
+      return true;
+    });
+
+    // Propagate nesting from the input: VisitLoops visits shells followed
+    // by their holes, so we can build polygon_lengths_/ring_order_ directly.
+    int ring_base = static_cast<int>(ring_offsets_.size()) - 1;
+    int ring_idx = 0;
+    geog.polygons()->geom().VisitLoops(
+        &scratch_, [&](const GeoArrowLoop& loop) {
+          loop.VisitNativeVertices([&](internal::GeoArrowVertex v) {
+            AddRingVertex(v.Normalize(loop.dimensions()));
+            return true;
+          });
+          FinishRing();
+
+          ring_order_.push_back(ring_base + ring_idx);
+          if (loop.is_hole()) {
+            polygon_lengths_.back() += 1;
+          } else {
+            polygon_lengths_.push_back(1);
+          }
+          ++ring_idx;
+          return true;
+        });
+    nesting_known_ = true;
+  }
+
   /// \brief Return true if any points were added to the output
   bool has_points() const { return !points_.empty(); }
 
@@ -592,12 +632,11 @@ struct OutputGeometry {
   /// (typically
   ///   the input geometry type is propagated)
   /// - Single points are written as POINT; multiple points are written as
-  /// MULTIPOINT
+  ///   MULTIPOINT
   /// - Single linestrings are written as LINESTRING; multiple linestrings are
-  /// written as
-  ///   MULTILINESTRING
+  ///   written as MULTILINESTRING
   /// - Single polygons are written as POLYGON; multiple polygons are written as
-  /// MULTIPOLYGON
+  ///   MULTIPOLYGON
   /// - More than one of the above is written as a GEOMETRYCOLLECTION
   ///
   /// This is the point at which the nesting of any output polygon rings are
@@ -716,6 +755,12 @@ struct OutputGeometry {
   }
 
   void GroupRings() {
+    // If nesting was already determined (e.g., propagated from input via
+    // AddGeography), skip the expensive recomputation.
+    if (nesting_known_) {
+      return;
+    }
+
     polygon_lengths_.clear();
     int num_rings = static_cast<int>(ring_offsets_.size()) - 1;
 
@@ -838,6 +883,7 @@ struct OutputGeometry {
   std::vector<int> polygon_lengths_;
   std::vector<internal::GeoArrowVertex> polygon_vertices_;
   int current_line_length_{0};
+  bool nesting_known_{false};
   std::vector<struct GeoArrowGeometryNode> ring_nodes_;
   std::vector<double> ring_signed_areas_;
   std::vector<S2Point> scratch_;
@@ -1177,41 +1223,307 @@ struct SimplifyExec {
   double last_tolerance_{-100};
 };
 
-template <S2BooleanOperation::OpType op_type>
-struct BooleanOperationExec {
+namespace {
+
+/// \brief Run an S2BooleanOperation with the standard 3-layer closed-set
+/// output (points, polylines, polygons).
+void BuildOverlay(S2BooleanOperation::OpType op_type,
+                  const S2ShapeIndex& index0, const S2ShapeIndex& index1,
+                  const S2BooleanOperation::Options& options,
+                  OutputGeometry* output) {
+  // Note: we can't share op between iterations of the loop if we use
+  // the closed set normalizer, which is not designed for this.
+  s2builderutil::LayerVector layers(3);
+  layers[0] = absl::make_unique<GeoArrowPointVectorLayer>(output);
+  layers[1] = absl::make_unique<GeoArrowPolylinesLayer>(output);
+  layers[2] = absl::make_unique<GeoArrowPolygonLayer>(output);
+
+  S2BooleanOperation op(
+      op_type, s2builderutil::NormalizeClosedSet(std::move(layers)), options);
+
+  S2Error error;
+  if (!op.Build(index0, index1, &error)) {
+    std::stringstream ss;
+    ss << error;
+    throw Exception(ss.str());
+  }
+}
+
+}  // namespace
+
+struct UnionOperationExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = WkbGeographyOutputBuilder;
+  using out_t = GeoArrowOutputBuilder;
 
-  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
-    out->Append(*s2_boolean_operation(value0.ShapeIndex(), value1.ShapeIndex(),
-                                      op_type, options_));
+  UnionOperationExec() {
+    options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
   }
 
-  GlobalOptions options_;
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
+    // Check for cases we can use to avoid building output using the
+    // S2BooleanOperation
+    if (value0.is_empty() && value1.is_empty()) {
+      out->AppendEmpty(OutputEmptyGeometryType(value0, value1));
+      return;
+    } else if (value1.is_empty()) {
+      out->AppendGeometry(value0.geom());
+      return;
+    } else if (value0.is_empty()) {
+      out->AppendGeometry(value1.geom());
+      return;
+    }
+
+    // Output dimensions are always XY here because we don't have a good way
+    // to propagate the source edge IDs into the S2BooleanOperation (the
+    // value lexicon option is not yet supported).
+    out->SetDimensions(GEOARROW_DIMENSIONS_XY);
+    output_.Clear();
+    intersection_.clear();
+
+    // If there is no potential intersection between the two, we don't need to
+    // do any calculation, just regurgitate both geometries into the output. For
+    // now we buffer this into the OutputGeometry to consistently handle
+    // organizing points, lines, and polygons into the appropriate output type.
+    S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
+                                 &intersection_);
+    if (intersection_.empty()) {
+      output_.AddGeography(value0);
+      output_.AddGeography(value1);
+      output_.WriteTo(out);
+      return;
+    }
+
+    BuildOverlay(S2BooleanOperation::OpType::UNION, value0.ShapeIndex(),
+                 value1.ShapeIndex(), options_, &output_);
+
+    output_.WriteTo(out);
+  }
+
+  uint8_t OutputEmptyGeometryType(arg0_t::c_type value0,
+                                  arg1_t::c_type value1) {
+    int out_dimension =
+        std::max(value0.max_dimension(), value1.max_dimension());
+    switch (out_dimension) {
+      case 0:
+        return GEOARROW_GEOMETRY_TYPE_POINT;
+      case 1:
+        return GEOARROW_GEOMETRY_TYPE_LINESTRING;
+      case 2:
+        return GEOARROW_GEOMETRY_TYPE_POLYGON;
+      default:
+        return GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION;
+    }
+  }
+
+  S2BooleanOperation::Options options_;
+  std::vector<S2CellId> intersection_;
+  OutputGeometry output_;
+};
+
+struct IntersectionOperationExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
+  using out_t = GeoArrowOutputBuilder;
+
+  IntersectionOperationExec() {
+    options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
+  }
+
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
+    // If either input is empty, the intersection is empty
+    if (value0.is_empty() || value1.is_empty()) {
+      out->AppendEmpty();
+      return;
+    }
+
+    // Output dimensions are always XY here because we don't have a good way
+    // to propagate the source edge IDs into the S2BooleanOperation (the
+    // value lexicon option is not yet supported).
+    out->SetDimensions(GEOARROW_DIMENSIONS_XY);
+    output_.Clear();
+    intersection_.clear();
+
+    // If there is no potential intersection between the two coverings,
+    // the result is empty.
+    S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
+                                 &intersection_);
+    if (intersection_.empty()) {
+      out->AppendEmpty(OutputEmptyGeometryType(value0, value1));
+      return;
+    }
+
+    BuildOverlay(S2BooleanOperation::OpType::INTERSECTION, value0.ShapeIndex(),
+                 value1.ShapeIndex(), options_, &output_);
+    output_.WriteTo(out, OutputEmptyGeometryType(value0, value1));
+  }
+
+  uint8_t OutputEmptyGeometryType(arg0_t::c_type value0,
+                                  arg1_t::c_type value1) {
+    int out_dimension =
+        std::min(value0.max_dimension(), value1.max_dimension());
+    switch (out_dimension) {
+      case 0:
+        return GEOARROW_GEOMETRY_TYPE_POINT;
+      case 1:
+        return GEOARROW_GEOMETRY_TYPE_LINESTRING;
+      case 2:
+        return GEOARROW_GEOMETRY_TYPE_POLYGON;
+      default:
+        return GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION;
+    }
+  }
+
+  S2BooleanOperation::Options options_;
+  std::vector<S2CellId> intersection_;
+  OutputGeometry output_;
+};
+
+struct DifferenceOperationExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
+  using out_t = GeoArrowOutputBuilder;
+
+  DifferenceOperationExec() {
+    options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
+  }
+
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
+    // If the first input is empty, the difference is empty
+    if (value0.is_empty()) {
+      out->AppendEmpty();
+      return;
+    }
+
+    // If the second input is empty, the difference is the first input
+    if (value1.is_empty()) {
+      out->AppendGeometry(value0.geom());
+      return;
+    }
+
+    // Output dimensions are always XY here because we don't have a good way
+    // to propagate the source edge IDs into the S2BooleanOperation (the
+    // value lexicon option is not yet supported).
+    out->SetDimensions(GEOARROW_DIMENSIONS_XY);
+    output_.Clear();
+    intersection_.clear();
+
+    // If there is no potential intersection between the two coverings,
+    // the result is the first input (nothing to subtract).
+    S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
+                                 &intersection_);
+    if (intersection_.empty()) {
+      out->AppendGeometry(value0.geom());
+      return;
+    }
+
+    BuildOverlay(S2BooleanOperation::OpType::DIFFERENCE, value0.ShapeIndex(),
+                 value1.ShapeIndex(), options_, &output_);
+    output_.WriteTo(out, OutputEmptyGeometryType(value0));
+  }
+
+  uint8_t OutputEmptyGeometryType(arg0_t::c_type value0) {
+    switch (value0.max_dimension()) {
+      case 0:
+        return GEOARROW_GEOMETRY_TYPE_POINT;
+      case 1:
+        return GEOARROW_GEOMETRY_TYPE_LINESTRING;
+      case 2:
+        return GEOARROW_GEOMETRY_TYPE_POLYGON;
+      default:
+        return GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION;
+    }
+  }
+
+  S2BooleanOperation::Options options_;
+  std::vector<S2CellId> intersection_;
+  OutputGeometry output_;
+};
+
+struct SymDifferenceOperationExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
+  using out_t = GeoArrowOutputBuilder;
+
+  SymDifferenceOperationExec() {
+    options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
+  }
+
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
+    // If both inputs are empty, the symmetric difference is empty
+    if (value0.is_empty() && value1.is_empty()) {
+      out->AppendEmpty(OutputEmptyGeometryType(value0, value1));
+      return;
+    }
+
+    // If one input is empty, the symmetric difference is the other
+    if (value0.is_empty()) {
+      out->AppendGeometry(value1.geom());
+      return;
+    }
+    if (value1.is_empty()) {
+      out->AppendGeometry(value0.geom());
+      return;
+    }
+
+    // Output dimensions are always XY here because we don't have a good way
+    // to propagate the source edge IDs into the S2BooleanOperation (the
+    // value lexicon option is not yet supported).
+    out->SetDimensions(GEOARROW_DIMENSIONS_XY);
+    output_.Clear();
+    intersection_.clear();
+
+    // If there is no potential intersection between the two coverings,
+    // the result is both inputs combined (nothing overlaps).
+    S2CellUnion::GetIntersection(value0.Covering(), value1.Covering(),
+                                 &intersection_);
+    if (intersection_.empty()) {
+      output_.AddGeography(value0);
+      output_.AddGeography(value1);
+      output_.WriteTo(out);
+      return;
+    }
+
+    BuildOverlay(S2BooleanOperation::OpType::SYMMETRIC_DIFFERENCE,
+                 value0.ShapeIndex(), value1.ShapeIndex(), options_, &output_);
+    output_.WriteTo(out, OutputEmptyGeometryType(value0, value1));
+  }
+
+  uint8_t OutputEmptyGeometryType(arg0_t::c_type value0,
+                                  arg1_t::c_type value1) {
+    int out_dimension =
+        std::min(value0.max_dimension(), value1.max_dimension());
+    switch (out_dimension) {
+      case 0:
+        return GEOARROW_GEOMETRY_TYPE_POINT;
+      case 1:
+        return GEOARROW_GEOMETRY_TYPE_LINESTRING;
+      case 2:
+        return GEOARROW_GEOMETRY_TYPE_POLYGON;
+      default:
+        return GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION;
+    }
+  }
+
+  S2BooleanOperation::Options options_;
+  std::vector<S2CellId> intersection_;
+  OutputGeometry output_;
 };
 
 void DifferenceKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<
-      BooleanOperationExec<S2BooleanOperation::OpType::DIFFERENCE>>(
-      out, "st_difference");
+  InitBinaryKernel<DifferenceOperationExec>(out, "st_difference");
 }
 
 void SymDifferenceKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<
-      BooleanOperationExec<S2BooleanOperation::OpType::SYMMETRIC_DIFFERENCE>>(
-      out, "st_symdifference");
+  InitBinaryKernel<SymDifferenceOperationExec>(out, "st_symdifference");
 }
 
 void IntersectionKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<
-      BooleanOperationExec<S2BooleanOperation::OpType::INTERSECTION>>(
-      out, "st_intersection");
+  InitBinaryKernel<IntersectionOperationExec>(out, "st_intersection");
 }
 
 void UnionKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<BooleanOperationExec<S2BooleanOperation::OpType::UNION>>(
-      out, "st_union");
+  InitBinaryKernel<UnionOperationExec>(out, "st_union");
 }
 
 void ReducePrecisionKernel(struct SedonaCScalarKernel* out) {
