@@ -1511,6 +1511,148 @@ struct SymDifferenceOperationExec {
   OutputGeometry output_;
 };
 
+namespace {
+
+bool StrCaseEqual(const std::string& a, const std::string& b) {
+  if (a.size() != b.size()) return false;
+  for (size_t i = 0; i < a.size(); ++i) {
+    if (std::tolower(static_cast<unsigned char>(a[i])) !=
+        std::tolower(static_cast<unsigned char>(b[i])))
+      return false;
+  }
+  return true;
+}
+
+double ParseDouble(const std::string& value, const char* param_name) {
+  try {
+    size_t pos;
+    double result = std::stod(value, &pos);
+    if (pos != value.size()) throw std::invalid_argument("trailing chars");
+    return result;
+  } catch (const std::exception&) {
+    throw Exception(std::string("Invalid ") + param_name + " value: '" +
+                    value + "'. Expected a valid number");
+  }
+}
+
+int ParseInt(const std::string& value, const char* param_name) {
+  try {
+    size_t pos;
+    int result = std::stoi(value, &pos);
+    if (pos != value.size()) throw std::invalid_argument("trailing chars");
+    return result;
+  } catch (const std::exception&) {
+    throw Exception(std::string("Invalid ") + param_name + " value: '" +
+                    value + "'. Expected a valid number");
+  }
+}
+
+}  // namespace
+
+CapStyle ParseCapStyle(const std::string& value) {
+  if (StrCaseEqual(value, "round")) {
+    return CapStyle::kRound;
+  } else if (StrCaseEqual(value, "flat") || StrCaseEqual(value, "butt")) {
+    return CapStyle::kFlat;
+  } else if (StrCaseEqual(value, "square")) {
+    return CapStyle::kSquare;
+  }
+  throw Exception("Invalid endcap style: '" + value +
+                  "'. Valid options: round, flat, butt, square");
+}
+
+JoinStyle ParseJoinStyle(const std::string& value) {
+  if (StrCaseEqual(value, "round")) {
+    return JoinStyle::kRound;
+  } else if (StrCaseEqual(value, "mitre") || StrCaseEqual(value, "miter")) {
+    return JoinStyle::kMitre;
+  } else if (StrCaseEqual(value, "bevel")) {
+    return JoinStyle::kBevel;
+  }
+  throw Exception("Invalid join style: '" + value +
+                  "'. Valid options: round, mitre, miter, bevel");
+}
+
+bool ParseSingleSided(const std::string& value) {
+  if (StrCaseEqual(value, "both")) {
+    return false;
+  } else if (StrCaseEqual(value, "left") || StrCaseEqual(value, "right")) {
+    return true;
+  }
+  throw Exception("Invalid side: '" + value +
+                  "'. Valid options: both, left, right");
+}
+
+std::pair<bool, bool> ParseBufferSideStyle(const std::string& params) {
+  bool left = false;
+  bool right = false;
+  std::istringstream iss(params);
+  std::string tok;
+  while (iss >> tok) {
+    auto eq_pos = tok.find('=');
+    if (eq_pos == std::string::npos) continue;
+    std::string key = tok.substr(0, eq_pos);
+    std::string val = tok.substr(eq_pos + 1);
+    if (StrCaseEqual(key, "side")) {
+      if (StrCaseEqual(val, "left")) {
+        left = true;
+        right = false;
+      } else if (StrCaseEqual(val, "right")) {
+        right = true;
+        left = false;
+      }
+    }
+  }
+  return {left, right};
+}
+
+/// Parameters are space-separated key=value pairs (case-insensitive).
+/// Supported keys: endcap, join, side, mitre_limit, miter_limit,
+/// quad_segs, quadrant_segments.
+BufferParams BufferParams::Parse(const std::string& params_str) {
+  BufferParams params;
+  if (params_str.empty()) return params;
+
+  bool end_cap_specified = false;
+  std::istringstream iss(params_str);
+  std::string param;
+
+  while (iss >> param) {
+    auto eq_pos = param.find('=');
+    if (eq_pos == std::string::npos) {
+      throw Exception("Missing value for buffer parameter: " + param);
+    }
+
+    std::string key = param.substr(0, eq_pos);
+    std::string value = param.substr(eq_pos + 1);
+
+    if (StrCaseEqual(key, "endcap")) {
+      params.end_cap_style = ParseCapStyle(value);
+      end_cap_specified = true;
+    } else if (StrCaseEqual(key, "join")) {
+      params.join_style = ParseJoinStyle(value);
+    } else if (StrCaseEqual(key, "side")) {
+      params.single_sided = ParseSingleSided(value);
+      if (params.single_sided && !end_cap_specified) {
+        params.end_cap_style = CapStyle::kSquare;
+      }
+    } else if (StrCaseEqual(key, "mitre_limit") ||
+               StrCaseEqual(key, "miter_limit")) {
+      params.mitre_limit = ParseDouble(value, "mitre_limit");
+    } else if (StrCaseEqual(key, "quad_segs") ||
+               StrCaseEqual(key, "quadrant_segments")) {
+      params.quadrant_segments = ParseInt(value, "quadrant_segments");
+    } else {
+      throw Exception(
+          "Invalid buffer parameter: " + key +
+          " (accept: 'endcap', 'join', 'mitre_limit', 'miter_limit', "
+          "'quad_segs', 'quadrant_segments' and 'side')");
+    }
+  }
+
+  return params;
+}
+
 struct BufferExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = DoubleInputView;
