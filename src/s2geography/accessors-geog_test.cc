@@ -549,8 +549,7 @@ INSTANTIATE_TEST_SUITE_P(
         UnaryGeographyScalarParam{"linestring", "LINESTRING (0 0, 0 1)",
                                   "POINT (0 1)"},
         UnaryGeographyScalarParam{"linestring_three_vertices",
-                                  "LINESTRING (0 0, 0 1, 0 5)",
-                                  "POINT (0 1)"},
+                                  "LINESTRING (0 0, 0 1, 0 5)", "POINT (0 1)"},
         UnaryGeographyScalarParam{"multilinestring",
                                   "MULTILINESTRING ((0 0, 0 1), (10 0, 10 5))",
                                   "POINT (10 0)"},
@@ -569,9 +568,9 @@ INSTANTIATE_TEST_SUITE_P(
         // Polygons
         UnaryGeographyScalarParam{"triangle", "POLYGON ((0 0, 0 1, 1 0, 0 0))",
                                   "POINT (0.224466 0.224464)"},
-        UnaryGeographyScalarParam{
-            "square", "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))",
-            "POINT (0.450237 0.450223)"},
+        UnaryGeographyScalarParam{"square",
+                                  "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))",
+                                  "POINT (0.450237 0.450223)"},
         UnaryGeographyScalarParam{
             "polygon_with_hole",
             "POLYGON ((0 0, 0 2, 2 0, 0 0), (0.1 0.1, 0.1 0.5, 0.5 "
