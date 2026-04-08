@@ -1609,12 +1609,12 @@ std::pair<bool, bool> ParseBufferSideStyle(const std::string& params) {
 /// Parameters are space-separated key=value pairs (case-insensitive).
 /// Supported keys: endcap, join, side, mitre_limit, miter_limit,
 /// quad_segs, quadrant_segments.
-BufferParams BufferParams::Parse(const std::string& params_str) {
+BufferParams BufferParams::Parse(std::string_view params_str) {
   BufferParams params;
   if (params_str.empty()) return params;
 
   bool end_cap_specified = false;
-  std::istringstream iss(params_str);
+  std::istringstream iss((std::string(params_str)));
   std::string param;
 
   while (iss >> param) {
@@ -1653,12 +1653,14 @@ BufferParams BufferParams::Parse(const std::string& params_str) {
   return params;
 }
 
-struct BufferExec {
+struct BufferParamsExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = DoubleInputView;
+  using arg2_t = StringInputView;
   using out_t = GeoArrowOutputBuilder;
 
-  void Exec(arg0_t::c_type value, arg1_t::c_type distance, out_t* out) {
+  void Exec(arg0_t::c_type value, arg1_t::c_type distance,
+            arg2_t::c_type params, out_t* out) {
     // For what will definitely be empty or degenerate output, we return POLYGON
     // EMPTY
     if (value.is_empty() || (value.max_dimension() < 2 && distance <= 0)) {
@@ -1666,7 +1668,6 @@ struct BufferExec {
       return;
     }
 
-    std::string params;
     if (distance != last_distance_ || last_params_ != params) {
       BufferParams parsed = BufferParams::Parse(params);
 
@@ -1681,7 +1682,6 @@ struct BufferExec {
     }
 
     output_.Clear();
-
     S2BufferOperation op;
     op.Init(std::make_unique<GeoArrowPolygonLayer>(&output_), options_);
 
@@ -1704,10 +1704,38 @@ struct BufferExec {
     output_.WriteTo(out, GEOARROW_GEOMETRY_TYPE_POLYGON);
   }
 
-  double last_distance_;
+  double last_distance_{-std::numeric_limits<double>::infinity()};
   std::string last_params_;
   S2BufferOperation::Options options_;
   OutputGeometry output_;
+};
+
+struct BufferQuadSegsExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = DoubleInputView;
+  using arg2_t = DoubleInputView;
+  using out_t = GeoArrowOutputBuilder;
+
+  void Exec(arg0_t::c_type value, arg1_t::c_type distance,
+            arg2_t::c_type n_quad_segs, out_t* out) {
+    std::string params =
+        std::string("quad_segs=") + std::to_string(n_quad_segs);
+    buffer_params_.Exec(value, distance, params, out);
+  }
+
+  BufferParamsExec buffer_params_;
+};
+
+struct BufferExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = DoubleInputView;
+  using out_t = GeoArrowOutputBuilder;
+
+  void Exec(arg0_t::c_type value, arg1_t::c_type distance, out_t* out) {
+    buffer_params_.Exec(value, distance, "", out);
+  }
+
+  BufferParamsExec buffer_params_;
 };
 
 void DifferenceKernel(struct SedonaCScalarKernel* out) {
@@ -1736,6 +1764,14 @@ void SimplifyKernel(struct SedonaCScalarKernel* out) {
 
 void BufferKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<BufferExec>(out, "st_buffer");
+}
+
+void BufferQuadSegsKernel(struct SedonaCScalarKernel* out) {
+  InitTernaryKernel<BufferQuadSegsExec>(out, "st_buffer");
+}
+
+void BufferParamsKernel(struct SedonaCScalarKernel* out) {
+  InitTernaryKernel<BufferParamsExec>(out, "st_buffer");
 }
 
 }  // namespace sedona_udf

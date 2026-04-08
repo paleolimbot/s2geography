@@ -5,7 +5,7 @@
 #include <s2/s2builderutil_s2polygon_layer.h>
 #include <s2/s2builderutil_s2polyline_vector_layer.h>
 
-#include <string>
+#include <string_view>
 
 #include "s2geography/aggregator.h"
 #include "s2geography/geography.h"
@@ -134,19 +134,7 @@ struct BufferParams {
   int quadrant_segments = 8;
 
   /// \brief Parse a PostGIS-style buffer parameter string.
-  static BufferParams Parse(const std::string& params_str);
-
-  friend bool operator==(const BufferParams& a, const BufferParams& b) {
-    return a.end_cap_style == b.end_cap_style &&
-           a.join_style == b.join_style &&
-           a.single_sided == b.single_sided &&
-           a.mitre_limit == b.mitre_limit &&
-           a.quadrant_segments == b.quadrant_segments;
-  }
-
-  friend bool operator!=(const BufferParams& a, const BufferParams& b) {
-    return !(a == b);
-  }
+  static BufferParams Parse(const std::string_view params_str);
 };
 
 }  // namespace sedona_udf
