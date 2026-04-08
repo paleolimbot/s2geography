@@ -124,53 +124,6 @@ using BoolOutputBuilder = ArrowOutputBuilder<bool, NANOARROW_TYPE_BOOL>;
 using IntOutputBuilder = ArrowOutputBuilder<int32_t, NANOARROW_TYPE_INT32>;
 using DoubleOutputBuilder = ArrowOutputBuilder<double, NANOARROW_TYPE_DOUBLE>;
 
-/// \brief Output builder for Geography as WKB
-///
-/// This builder handles output from functions that return geometry
-/// and exports the output as WKB. This is probably slow in many cases
-/// and could possibly be accelerated by returning the "encoded" form
-/// or by circumventing the GeoArrow writer entirely to build point output
-/// (other than the boolean operation, functions that return geographies
-/// mostly return points or line segments).
-class WkbGeographyOutputBuilder {
- public:
-  using c_type = const Geography&;
-
-  WkbGeographyOutputBuilder() {
-    writer_.Init(geoarrow::Writer::OutputType::kWKB, geoarrow::ExportOptions());
-  }
-  WkbGeographyOutputBuilder(const WkbGeographyOutputBuilder&) = delete;
-  WkbGeographyOutputBuilder& operator=(const WkbGeographyOutputBuilder&) =
-      delete;
-
-  void InitOutputType(struct ArrowSchema* out) {
-    ::geoarrow::Wkb()
-        .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
-        .InitSchema(out);
-  }
-
-  void InitOutputTypeWithCrs(struct ArrowSchema* out, const std::string& crs) {
-    ::geoarrow::Wkb()
-        .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
-        .WithCrs(crs)
-        .InitSchema(out);
-  }
-
-  void Reserve(int64_t additional_size) {
-    // The current geoarrow writer doesn't provide any support for this;
-    // however, it does support multiple cylces of Append/Finish.
-  }
-
-  void AppendNull() { writer_.WriteNull(); }
-
-  void Append(c_type value) { writer_.WriteGeography(value); }
-
-  void Finish(struct ArrowArray* out) { writer_.Finish(out); }
-
- private:
-  geoarrow::Writer writer_;
-};
-
 /// \brief Low-level output builder for Geography as WKB
 ///
 /// This builder handles output from functions that return geometry

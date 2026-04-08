@@ -330,17 +330,21 @@ struct S2CentroidExec {
 
 struct S2ConvexHullExec {
   using arg0_t = GeoArrowGeographyInputView;
-  using out_t = WkbGeographyOutputBuilder;
+  using out_t = GeoArrowOutputBuilder;
 
   void Exec(arg0_t::c_type value, out_t* out) {
     if (value.is_empty()) {
-      out->Append(GeographyCollection());
+      out->AppendEmpty();
       return;
     }
 
     auto maybe_point = value.Point();
     if (maybe_point) {
-      out->Append(PointGeography(*maybe_point));
+      out->FeatureStart();
+      out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
+      out->WriteCoord(*maybe_point);
+      out->GeomEnd();
+      out->FeatureEnd();
       return;
     }
 
@@ -415,15 +419,29 @@ struct S2ConvexHullExec {
           }
           auto polyline =
               std::make_unique<S2Polyline>(std::vector<S2Point>{pa, pb});
-          out->Append(PolylineGeography(std::move(polyline)));
+          out->FeatureStart();
+          out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+          out->WriteCoord(pa);
+          out->WriteCoord(pb);
+          out->GeomEnd();
+          out->FeatureEnd();
           return;
         }
       }
     }
 
-    auto polygon = std::make_unique<S2Polygon>();
-    polygon->Init(std::move(hull_loop));
-    out->Append(PolygonGeography(std::move(polygon)));
+    out->FeatureStart();
+    out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
+    out->RingStart();
+
+    for (int i = 0; i < hull_loop->num_vertices(); i++) {
+      out->WriteCoord(hull_loop->vertex(i));
+    }
+    out->WriteCoord(hull_loop->vertex(0));
+
+    out->RingEnd();
+    out->GeomEnd();
+    out->FeatureEnd();
   }
 
   std::vector<S2Point> scratch_;
@@ -431,11 +449,15 @@ struct S2ConvexHullExec {
 
 struct S2PointOnSurfaceExec {
   using arg0_t = GeographyInputView;
-  using out_t = WkbGeographyOutputBuilder;
+  using out_t = GeoArrowOutputBuilder;
 
   void Exec(arg0_t::c_type value, out_t* out) {
     S2Point pt = s2_point_on_surface(value, coverer_);
-    out->Append(PointGeography(pt));
+    out->FeatureStart();
+    out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
+    out->WriteCoord(pt);
+    out->GeomEnd();
+    out->FeatureEnd();
   }
 
   S2RegionCoverer coverer_;
