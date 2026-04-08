@@ -1263,7 +1263,10 @@ struct UnionOperationExec {
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     // Check for cases we can use to avoid building output using the
     // S2BooleanOperation
-    if (value1.is_empty()) {
+    if (value0.is_empty() && value1.is_empty()) {
+      out->AppendEmpty(OutputEmptyGeometryType(value0, value1));
+      return;
+    } else if (value1.is_empty()) {
       out->AppendGeometry(value0.geom());
       return;
     } else if (value0.is_empty()) {
@@ -1295,6 +1298,22 @@ struct UnionOperationExec {
                  value1.ShapeIndex(), options_, &output_);
 
     output_.WriteTo(out);
+  }
+
+  uint8_t OutputEmptyGeometryType(arg0_t::c_type value0,
+                                  arg1_t::c_type value1) {
+    int out_dimension =
+        std::max(value0.max_dimension(), value1.max_dimension());
+    switch (out_dimension) {
+      case 0:
+        return GEOARROW_GEOMETRY_TYPE_POINT;
+      case 1:
+        return GEOARROW_GEOMETRY_TYPE_LINESTRING;
+      case 2:
+        return GEOARROW_GEOMETRY_TYPE_POLYGON;
+      default:
+        return GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION;
+    }
   }
 
   S2BooleanOperation::Options options_;
