@@ -2,6 +2,7 @@
 #include "s2geography/build.h"
 
 #include <s2/s2boolean_operation.h>
+#include <s2/s2buffer_operation.h>
 #include <s2/s2builder.h>
 #include <s2/s2builderutil_closed_set_normalizer.h>
 #include <s2/s2builderutil_s2point_vector_layer.h>
@@ -1510,6 +1511,42 @@ struct SymDifferenceOperationExec {
   OutputGeometry output_;
 };
 
+struct BufferExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = DoubleInputView;
+  using out_t = GeoArrowOutputBuilder;
+
+  void Exec(arg0_t::c_type value, arg1_t::c_type distance, out_t* out) {
+    // For what will definitely be empty or degenerate output, we return POLYGON
+    // EMPTY
+    if (value.is_empty() || (value.max_dimension() < 2 && distance <= 0)) {
+      out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_POLYGON);
+      return;
+    }
+
+    double n_quad_seg = 8.0;
+
+    S2BufferOperation::Options options;
+    options.set_buffer_radius(
+        S1Angle::Radians(distance / S2Earth::RadiusMeters()));
+    options.set_circle_segments(n_quad_seg * 4);
+
+    S2BufferOperation op;
+    op.Init(std::make_unique<GeoArrowPolygonLayer>(&output_), options);
+
+    S2Error error;
+    if (!op.Build(&error)) {
+      std::stringstream ss;
+      ss << error;
+      throw Exception(ss.str());
+    }
+
+    output_.WriteTo(out, GEOARROW_GEOMETRY_TYPE_POLYGON);
+  }
+
+  OutputGeometry output_;
+};
+
 void DifferenceKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<DifferenceOperationExec>(out, "st_difference");
 }
@@ -1532,6 +1569,10 @@ void ReducePrecisionKernel(struct SedonaCScalarKernel* out) {
 
 void SimplifyKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<SimplifyExec>(out, "st_simplify");
+}
+
+void BufferKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<BufferExec>(out, "st_buffer");
 }
 
 }  // namespace sedona_udf
