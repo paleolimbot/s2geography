@@ -1526,6 +1526,8 @@ struct BufferExec {
 
     double n_quad_seg = 8.0;
 
+    output_.Clear();
+
     S2BufferOperation::Options options;
     options.set_buffer_radius(
         S1Angle::Radians(distance / S2Earth::RadiusMeters()));
@@ -1533,6 +1535,15 @@ struct BufferExec {
 
     S2BufferOperation op;
     op.Init(std::make_unique<GeoArrowPolygonLayer>(&output_), options);
+
+    // AddShape doesn't handle dimension-0 shapes (points); use AddPoint for
+    // each point vertex instead.
+    value.points()->geom().VisitVertices([&](const S2Point& v) {
+      op.AddPoint(v);
+      return true;
+    });
+    op.AddShape(*value.lines());
+    op.AddShape(*value.polygons());
 
     S2Error error;
     if (!op.Build(&error)) {
