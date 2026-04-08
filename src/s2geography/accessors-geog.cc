@@ -239,6 +239,85 @@ struct Centroid {
   }
 };
 
+namespace {
+std::optional<internal::GeoArrowVertex> CentroidVertex(
+    GeoArrowGeography& value, std::vector<S2Point>* scratch) {
+  // Compute in decreasing dimensionality and return early, because
+  // centroids of lower dimension do not count towards the final value
+  // if the geography has mixed dimension.
+  if (!value.polygons()->is_empty()) {
+    Centroid c;
+
+    value.polygons()->geom().VisitLoops(scratch, [&](GeoArrowLoop loop) {
+      c.pt += loop.GetCentroid();
+
+      // This part is probably slow, so skip if we don't have to
+      if (loop.dimensions() != GEOARROW_DIMENSIONS_XY) {
+        // Calculate the ring boundary's ZM centroid
+        Centroid loop_c;
+        loop.VisitNativeEdges([&](const internal::GeoArrowEdge& e) {
+          double length = S1Angle(e.v0.ToPoint(), e.v1.ToPoint()).radians();
+          loop_c.MergeZM(e.v0, length);
+          loop_c.MergeZM(e.v1, length);
+          return true;
+        });
+
+        // Merge its contribution to the polygon centroid scaled
+        // to its (absolute) area. Holes contribute negative XY
+        // space but not necessarily negative ZM space.
+        loop_c.Normalize();
+        c.MergeZM(loop_c.vt, std::abs(loop.GetSignedArea()));
+      }
+
+      return true;
+    });
+
+    return c.Finalize();
+  }
+
+  if (!value.lines()->is_empty()) {
+    Centroid c;
+
+    value.lines()->geom().VisitNativeEdges(
+        [&](const internal::GeoArrowEdge& e) {
+          S2Point segment_centroid =
+              S2::TrueCentroid(e.v0.ToPoint(), e.v1.ToPoint());
+          c.pt += segment_centroid;
+
+          return true;
+        });
+
+    // This part is probably slow, so skip if we don't have to
+    if (value.dimensions() != GEOARROW_DIMENSIONS_XY) {
+      value.lines()->geom().VisitNativeEdges(
+          [&](const internal::GeoArrowEdge& e) {
+            double length = S1Angle(e.v0.ToPoint(), e.v1.ToPoint()).radians();
+            c.MergeZM(e.v0, length);
+            c.MergeZM(e.v1, length);
+            return true;
+          });
+    }
+
+    return c.Finalize();
+  }
+
+  if (!value.points()->is_empty()) {
+    Centroid c;
+
+    value.points()->geom().VisitNativeVertices(
+        [&](const internal::GeoArrowVertex& v) {
+          c.pt += v.ToPoint();
+          c.MergeZM(v);
+          return true;
+        });
+
+    return c.Finalize();
+  }
+
+  return std::nullopt;
+}
+}  // namespace
+
 struct S2CentroidExec {
   using arg0_t = GeoArrowGeographyInputView;
   using out_t = GeoArrowOutputBuilder;
@@ -246,83 +325,12 @@ struct S2CentroidExec {
   void Exec(arg0_t::c_type value, out_t* out) {
     // Output dimensions == input dimensions
     out->SetDimensions(value.dimensions());
-
-    // Compute in decreasing dimensionality and return early, because
-    // centroids of lower dimension do not count towards the final value
-    // if the geography has mixed dimension.
-    if (!value.polygons()->is_empty()) {
-      Centroid c;
-
-      value.polygons()->geom().VisitLoops(&scratch_, [&](GeoArrowLoop loop) {
-        c.pt += loop.GetCentroid();
-
-        // This part is probably slow, so skip if we don't have to
-        if (loop.dimensions() != GEOARROW_DIMENSIONS_XY) {
-          // Calculate the ring boundary's ZM centroid
-          Centroid loop_c;
-          loop.VisitNativeEdges([&](const internal::GeoArrowEdge& e) {
-            double length = S1Angle(e.v0.ToPoint(), e.v1.ToPoint()).radians();
-            loop_c.MergeZM(e.v0, length);
-            loop_c.MergeZM(e.v1, length);
-            return true;
-          });
-
-          // Merge its contribution to the polygon centroid scaled
-          // to its (absolute) area. Holes contribute negative XY
-          // space but not necessarily negative ZM space.
-          loop_c.Normalize();
-          c.MergeZM(loop_c.vt, std::abs(loop.GetSignedArea()));
-        }
-
-        return true;
-      });
-
-      out->AppendPoint(c.Finalize(), value.dimensions());
-      return;
+    auto centroid = CentroidVertex(value, &scratch_);
+    if (centroid) {
+      out->AppendPoint((*centroid).Normalize(value.dimensions()));
+    } else {
+      out->AppendEmpty();
     }
-
-    if (!value.lines()->is_empty()) {
-      Centroid c;
-
-      value.lines()->geom().VisitNativeEdges(
-          [&](const internal::GeoArrowEdge& e) {
-            S2Point segment_centroid =
-                S2::TrueCentroid(e.v0.ToPoint(), e.v1.ToPoint());
-            c.pt += segment_centroid;
-
-            return true;
-          });
-
-      // This part is probably slow, so skip if we don't have to
-      if (value.dimensions() != GEOARROW_DIMENSIONS_XY) {
-        value.lines()->geom().VisitNativeEdges(
-            [&](const internal::GeoArrowEdge& e) {
-              double length = S1Angle(e.v0.ToPoint(), e.v1.ToPoint()).radians();
-              c.MergeZM(e.v0, length);
-              c.MergeZM(e.v1, length);
-              return true;
-            });
-      }
-
-      out->AppendPoint(c.Finalize(), value.dimensions());
-      return;
-    }
-
-    if (!value.points()->is_empty()) {
-      Centroid c;
-
-      value.points()->geom().VisitNativeVertices(
-          [&](const internal::GeoArrowVertex& v) {
-            c.pt += v.ToPoint();
-            c.MergeZM(v);
-            return true;
-          });
-
-      out->AppendPoint(c.Finalize(), value.dimensions());
-      return;
-    }
-
-    out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION);
   }
 
   std::vector<S2Point> scratch_;
@@ -330,17 +338,21 @@ struct S2CentroidExec {
 
 struct S2ConvexHullExec {
   using arg0_t = GeoArrowGeographyInputView;
-  using out_t = WkbGeographyOutputBuilder;
+  using out_t = GeoArrowOutputBuilder;
 
   void Exec(arg0_t::c_type value, out_t* out) {
     if (value.is_empty()) {
-      out->Append(GeographyCollection());
+      out->AppendEmpty();
       return;
     }
 
     auto maybe_point = value.Point();
     if (maybe_point) {
-      out->Append(PointGeography(*maybe_point));
+      out->FeatureStart();
+      out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
+      out->WriteCoord(*maybe_point);
+      out->GeomEnd();
+      out->FeatureEnd();
       return;
     }
 
@@ -413,32 +425,107 @@ struct S2ConvexHullExec {
             pa = v1;
             pb = v2;
           }
-          auto polyline =
-              std::make_unique<S2Polyline>(std::vector<S2Point>{pa, pb});
-          out->Append(PolylineGeography(std::move(polyline)));
+
+          out->FeatureStart();
+          out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+          out->WriteCoord(pa);
+          out->WriteCoord(pb);
+          out->GeomEnd();
+          out->FeatureEnd();
           return;
         }
       }
     }
 
-    auto polygon = std::make_unique<S2Polygon>();
-    polygon->Init(std::move(hull_loop));
-    out->Append(PolygonGeography(std::move(polygon)));
+    out->FeatureStart();
+    out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
+    out->RingStart();
+
+    for (int i = 0; i < hull_loop->num_vertices(); i++) {
+      out->WriteCoord(hull_loop->vertex(i));
+    }
+    out->WriteCoord(hull_loop->vertex(0));
+
+    out->RingEnd();
+    out->GeomEnd();
+    out->FeatureEnd();
   }
 
   std::vector<S2Point> scratch_;
 };
 
 struct S2PointOnSurfaceExec {
-  using arg0_t = GeographyInputView;
-  using out_t = WkbGeographyOutputBuilder;
+  using arg0_t = GeoArrowGeographyInputView;
+  using out_t = GeoArrowOutputBuilder;
 
   void Exec(arg0_t::c_type value, out_t* out) {
-    S2Point pt = s2_point_on_surface(value, coverer_);
-    out->Append(PointGeography(pt));
+    // In general, we can propagate output dimensions
+    out->SetDimensions(value.dimensions());
+
+    if (value.is_empty()) {
+      out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_POINT);
+      return;
+    }
+
+    int dimension = value.max_dimension();
+    internal::GeoArrowVertex vt;
+    if (dimension == 2) {
+      // There's no easy way to propagate ZM coordinates here yet
+      out->SetDimensions(GEOARROW_DIMENSIONS_XY);
+
+      std::unique_ptr<S2Region> region = value.Region();
+      S2CellUnion covering = coverer_.GetInteriorCovering(*region);
+
+      // Use the first vertex in the event of a degenerate polygon
+      S2Point pt;
+      value.polygons()->geom().VisitVertices([&](const S2Point& v) {
+        pt = v;
+        return false;
+      });
+
+      // Take center of cell with smallest level (biggest)
+      int min_level = 31;
+
+      for (const S2CellId& id : covering) {
+        if (id.level() < min_level) {
+          pt = id.ToPoint();
+          min_level = id.level();
+        }
+      }
+
+      vt.SetPoint(pt);
+    } else {
+      auto centroid = CentroidVertex(value, &scratch_);
+      S2GEOGRAPHY_DCHECK(centroid.has_value());
+      S2Point centroid_pt = centroid->ToPoint();
+      S1ChordAngle nearest_dist = S1ChordAngle::Infinity();
+
+      value.lines()->geom().VisitNativeVertices(
+          [&](const internal::GeoArrowVertex& v) {
+            S1ChordAngle dist(v.ToPoint(), centroid_pt);
+            if (dist < nearest_dist) {
+              vt = v.Normalize(value.lines()->dimensions());
+              nearest_dist = dist;
+            }
+            return true;
+          });
+
+      value.points()->geom().VisitNativeVertices(
+          [&](const internal::GeoArrowVertex& v) {
+            S1ChordAngle dist(v.ToPoint(), centroid_pt);
+            if (dist < nearest_dist) {
+              vt = v.Normalize(value.points()->dimensions());
+              nearest_dist = dist;
+            }
+            return true;
+          });
+    }
+
+    out->AppendPoint(vt);
   }
 
   S2RegionCoverer coverer_;
+  std::vector<S2Point> scratch_;
 };
 
 void CentroidKernel(struct SedonaCScalarKernel* out) {
