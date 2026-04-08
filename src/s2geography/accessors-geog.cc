@@ -425,8 +425,7 @@ struct S2ConvexHullExec {
             pa = v1;
             pb = v2;
           }
-          auto polyline =
-              std::make_unique<S2Polyline>(std::vector<S2Point>{pa, pb});
+
           out->FeatureStart();
           out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
           out->WriteCoord(pa);
@@ -477,9 +476,16 @@ struct S2PointOnSurfaceExec {
       std::unique_ptr<S2Region> region = value.Region();
       S2CellUnion covering = coverer_.GetInteriorCovering(*region);
 
+      // Use the first vertex in the event of a degenerate polygon
+      S2Point pt;
+      value.polygons()->geom().VisitVertices([&](const S2Point& v) {
+        pt = v;
+        return false;
+      });
+
       // Take center of cell with smallest level (biggest)
       int min_level = 31;
-      S2Point pt;
+
       for (const S2CellId& id : covering) {
         if (id.level() < min_level) {
           pt = id.ToPoint();
