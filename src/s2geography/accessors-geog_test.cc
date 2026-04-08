@@ -90,6 +90,27 @@ TEST(AccessorsGeog, SedonaUdfConvexHullArray) {
                         "POLYGON ((0 0, 1 0, 0 1, 0 0))", std::nullopt}));
 }
 
+TEST(AccessorsGeog, SedonaUdfPointOnSurfaceArray) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::PointOnSurfaceKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(
+      TestInitKernel(&kernel, &impl, {ARROW_TYPE_WKB}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB},
+                        {{"POINT (0 1)", "LINESTRING (0 0, 0 1)",
+                          "POLYGON ((0 0, 0 1, 1 0, 0 0))", std::nullopt}},
+                        {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(
+      out_array.get(), {"POINT (0 1)", "POINT (0 1)",
+                        "POINT (0.224466 0.224464)", std::nullopt}));
+}
+
 struct UnaryDoubleScalarParam {
   std::string name;
   std::optional<std::string> input;
@@ -491,6 +512,76 @@ INSTANTIATE_TEST_SUITE_P(
             "MULTIPOLYGON (((0 0, 0 2, 2 0, 0 0), (0.1 0.1, 0.1 0.5, "
             "0.5 0.1, 0.1 0.1)), ((10 10, 10 11, 11 10, 10 10)))",
             "POLYGON ((0 0, 2 0, 11 10, 10 11, 0 2, 0 0))"}
+
+        ),
+    [](const ::testing::TestParamInfo<UnaryGeographyScalarParam>& info) {
+      return info.param.name;
+    });
+
+class PointOnSurfaceScalarTest
+    : public ::testing::TestWithParam<UnaryGeographyScalarParam> {};
+
+TEST_P(PointOnSurfaceScalarTest, SedonaUdf) {
+  ASSERT_NO_FATAL_FAILURE(TestUnaryScalarGeography(
+      s2geography::sedona_udf::PointOnSurfaceKernel, GetParam()));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AccessorsGeog, PointOnSurfaceScalarTest,
+    ::testing::Values(
+        // Nulls
+        UnaryGeographyScalarParam{"null_point_on_surface", std::nullopt,
+                                  std::nullopt},
+
+        // Empties
+        UnaryGeographyScalarParam{"point_empty", "POINT EMPTY", "POINT EMPTY"},
+        UnaryGeographyScalarParam{"linestring_empty", "LINESTRING EMPTY",
+                                  "POINT EMPTY"},
+        UnaryGeographyScalarParam{"polygon_empty", "POLYGON EMPTY",
+                                  "POINT EMPTY"},
+
+        // Points
+        UnaryGeographyScalarParam{"point", "POINT (0 1)", "POINT (0 1)"},
+        UnaryGeographyScalarParam{"multipoint", "MULTIPOINT ((0 0), (0 1))",
+                                  "POINT (0 1)"},
+
+        // Linestrings
+        UnaryGeographyScalarParam{"linestring", "LINESTRING (0 0, 0 1)",
+                                  "POINT (0 1)"},
+        UnaryGeographyScalarParam{"linestring_three_vertices",
+                                  "LINESTRING (0 0, 0 1, 0 5)",
+                                  "POINT (0 1)"},
+        UnaryGeographyScalarParam{"multilinestring",
+                                  "MULTILINESTRING ((0 0, 0 1), (10 0, 10 5))",
+                                  "POINT (10 0)"},
+
+        // Linestrings with Z/M
+        UnaryGeographyScalarParam{"linestring_z",
+                                  "LINESTRING Z (0 0 10, 0 1 11)",
+                                  "POINT Z (0 1 11)"},
+        UnaryGeographyScalarParam{"linestring_m",
+                                  "LINESTRING M (0 0 10, 0 1 11)",
+                                  "POINT M (0 1 11)"},
+        UnaryGeographyScalarParam{"linestring_zm",
+                                  "LINESTRING ZM (0 0 10 20, 0 1 11 21)",
+                                  "POINT ZM (0 1 11 21)"},
+
+        // Polygons
+        UnaryGeographyScalarParam{"triangle", "POLYGON ((0 0, 0 1, 1 0, 0 0))",
+                                  "POINT (0.224466 0.224464)"},
+        UnaryGeographyScalarParam{
+            "square", "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))",
+            "POINT (0.450237 0.450223)"},
+        UnaryGeographyScalarParam{
+            "polygon_with_hole",
+            "POLYGON ((0 0, 0 2, 2 0, 0 0), (0.1 0.1, 0.1 0.5, 0.5 "
+            "0.1, 0.1 0.1))",
+            "POINT (1.058613 0.45016)"},
+        UnaryGeographyScalarParam{
+            "multipolygon",
+            "MULTIPOLYGON (((0 0, 0 1, 1 0, 0 0)), ((10 10, 10 11, "
+            "11 10, 10 10)))",
+            "POINT (0.224466 0.224464)"}
 
         ),
     [](const ::testing::TestParamInfo<UnaryGeographyScalarParam>& info) {
