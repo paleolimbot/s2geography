@@ -1530,8 +1530,8 @@ double ParseDouble(const std::string& value, const char* param_name) {
     if (pos != value.size()) throw std::invalid_argument("trailing chars");
     return result;
   } catch (const std::exception&) {
-    throw Exception(std::string("Invalid ") + param_name + " value: '" +
-                    value + "'. Expected a valid number");
+    throw Exception(std::string("Invalid ") + param_name + " value: '" + value +
+                    "'. Expected a valid number");
   }
 }
 
@@ -1542,8 +1542,8 @@ int ParseInt(const std::string& value, const char* param_name) {
     if (pos != value.size()) throw std::invalid_argument("trailing chars");
     return result;
   } catch (const std::exception&) {
-    throw Exception(std::string("Invalid ") + param_name + " value: '" +
-                    value + "'. Expected a valid number");
+    throw Exception(std::string("Invalid ") + param_name + " value: '" + value +
+                    "'. Expected a valid number");
   }
 }
 
@@ -1666,17 +1666,24 @@ struct BufferExec {
       return;
     }
 
-    double n_quad_seg = 8.0;
+    std::string params;
+    if (distance != last_distance_ || last_params_ != params) {
+      BufferParams parsed = BufferParams::Parse(params);
+
+      S2BufferOperation::Options options;
+      options.set_buffer_radius(
+          S1Angle::Radians(distance / S2Earth::RadiusMeters()));
+      options.set_circle_segments(parsed.quadrant_segments * 4.0);
+
+      options_ = options;
+      last_distance_ = distance;
+      last_params_ = params;
+    }
 
     output_.Clear();
 
-    S2BufferOperation::Options options;
-    options.set_buffer_radius(
-        S1Angle::Radians(distance / S2Earth::RadiusMeters()));
-    options.set_circle_segments(n_quad_seg * 4);
-
     S2BufferOperation op;
-    op.Init(std::make_unique<GeoArrowPolygonLayer>(&output_), options);
+    op.Init(std::make_unique<GeoArrowPolygonLayer>(&output_), options_);
 
     // AddShape doesn't handle dimension-0 shapes (points); use AddPoint for
     // each point vertex instead.
@@ -1697,6 +1704,9 @@ struct BufferExec {
     output_.WriteTo(out, GEOARROW_GEOMETRY_TYPE_POLYGON);
   }
 
+  double last_distance_;
+  std::string last_params_;
+  S2BufferOperation::Options options_;
   OutputGeometry output_;
 };
 
