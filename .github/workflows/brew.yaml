@@ -37,36 +37,3 @@ jobs:
         run: |
           cd build
           ctest -T test --output-on-failure .
-
-  sanitizers:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install dependencies
-        run: brew install abseil s2geometry nanoarrow
-
-      - name: Configure s2geography
-        shell: bash -l {0}
-        run: |
-          cmake -S . -B build \
-            -DCMAKE_CXX_STANDARD=17 \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DS2GEOGRAPHY_BUILD_TESTS=ON \
-            -DS2GEOGRAPHY_SANITIZERS=ON \
-            -DS2GEOGRAPHY_S2_SOURCE=BREW
-
-      - name: Build s2geography
-        shell: bash -l {0}
-        run: |
-          cmake --build build
-
-      - name: Run tests
-        shell: bash -l {0}
-        env:
-          ASAN_OPTIONS: detect_leaks=0
-          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
-        run: |
-          cd build
-          ctest -T test --output-on-failure .

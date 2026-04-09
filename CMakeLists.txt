@@ -34,8 +34,12 @@ option(S2GEOGRAPHY_BUILD_TESTS "Build tests" OFF)
 option(S2GEOGRAPHY_EXTRA_WARNINGS
        "Enable extra compiler warnings in debug mode" OFF)
 option(S2GEOGRAPHY_CODE_COVERAGE "Enable coverage reporting" OFF)
-option(S2GEOGRAPHY_SANITIZERS
-       "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(
+  S2GEOGRAPHY_SANITIZERS
+  "Build with AddressSanitizer and UndefinedBehaviorSanitizer. \
+   Note that this requires that s2geometry and abseil are also \
+   built and linked with sanitizer support."
+  OFF)
 option(S2GEOGRAPHY_BUILD_EXAMPLES "Build s2geography examples" OFF)
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 
