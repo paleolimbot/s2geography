@@ -141,7 +141,7 @@ struct S2LineInterpolatePointExec {
 
     S1Angle target = fraction * length_sum;
     int num_edges = value0.lines()->num_edges();
-    int edge_idx;
+    int edge_idx = 0;
     if (num_edges <= kMaxEdgesLinearSearch) {
       for (size_t i = 1; i < cumulative_lengths_.size(); ++i) {
         if (target < cumulative_lengths_[i]) {

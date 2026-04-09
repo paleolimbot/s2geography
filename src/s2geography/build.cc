@@ -966,6 +966,7 @@ class GeoArrowPointVectorLayer : public S2Builder::Layer {
   }
 
   void Build(const Graph& g, S2Error* error) override {
+    S2GEOGRAPHY_UNUSED(error);
     internal::GeoArrowVertex vt;
 
     for (EdgeId edge_id = 0; static_cast<size_t>(edge_id) < g.edges().size();
@@ -1020,6 +1021,7 @@ class GeoArrowPolylinesLayer : public S2Builder::Layer {
   }
 
   void Build(const Graph& g, S2Error* error) override {
+    S2GEOGRAPHY_UNUSED(error);
     std::vector<Graph::EdgePolyline> edge_polylines =
         g.GetPolylines(Graph::PolylineType::WALK);
 

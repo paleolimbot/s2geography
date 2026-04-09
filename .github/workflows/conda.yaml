@@ -72,6 +72,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DS2GEOGRAPHY_BUILD_TESTS=ON \
+            -DS2GEOGRAPHY_EXTRA_WARNINGS=ON \
             -DS2GEOGRAPHY_S2_SOURCE=CONDA
 
       - name: Build s2geography

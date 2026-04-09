@@ -309,7 +309,7 @@ target_link_libraries(
 
 # Set somewhat aggressive compiler warning flags
 if(S2GEOGRAPHY_EXTRA_WARNINGS)
-  if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(
       s2geography
       PRIVATE $<$<CONFIG:Debug>:-Wall
@@ -321,8 +321,9 @@ if(S2GEOGRAPHY_EXTRA_WARNINGS)
               -Wunused-result
               -Wconversion
               -Wno-sign-conversion>)
-  elseif(CMAKE_C_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID
-                                                      STREQUAL "Clang")
+    target_compile_options(s2geography PRIVATE -Wno-misleading-indentation)
+  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_CXX_COMPILER_ID
+                                                         STREQUAL "Clang")
     target_compile_options(
       s2geography
       PRIVATE $<$<CONFIG:Debug>:-Wall
@@ -331,7 +332,8 @@ if(S2GEOGRAPHY_EXTRA_WARNINGS)
               -Wpedantic
               -Wdocumentation
               -Wconversion
-              -Wno-sign-conversion>)
+              -Wno-sign-conversion
+              -Wno-nullability-extension>)
   endif()
 endif()
 

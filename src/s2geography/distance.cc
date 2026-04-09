@@ -503,8 +503,6 @@ struct S2MaxDistanceExec {
   using arg1_t = GeoArrowGeographyInputView;
   using out_t = DoubleOutputBuilder;
 
-  void Init(const std::unordered_map<std::string, std::string>& options) {}
-
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     out->Append(s2_max_distance(value0.ShapeIndex(), value1.ShapeIndex()) *
                 S2Earth::RadiusMeters());
