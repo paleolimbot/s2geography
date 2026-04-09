@@ -1,13 +1,8 @@
 ---
-Checks: >
-  -*,
-  bugprone-*,
-  modernize-*,
-  performance-*,
-  readability-*,
-  -bugprone-easily-swappable-parameters,
-  -modernize-use-trailing-return-type,
-  -readability-magic-numbers,
-  -readability-identifier-length,
-HeaderFilterRegex: 'src/s2geography/.*'
-WarningsAsErrors: ''
+Checks: >-
+  clang-analyzer-*,
+  -clang-analyzer-core.CallAndMessage,
+  -clang-analyzer-optin.performance.Padding,
+  -clang-analyzer-security.insecureAPI.rand,
+  -clang-diagnostic-c2y-extensions
+FormatStyle: google
