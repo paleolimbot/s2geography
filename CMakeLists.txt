@@ -34,6 +34,7 @@ option(S2GEOGRAPHY_BUILD_TESTS "Build tests" OFF)
 option(S2GEOGRAPHY_EXTRA_WARNINGS
        "Enable extra compiler warnings in debug mode" OFF)
 option(S2GEOGRAPHY_CODE_COVERAGE "Enable coverage reporting" OFF)
+option(S2GEOGRAPHY_CLANG_TIDY "Run clang-tidy during build" OFF)
 option(S2GEOGRAPHY_BUILD_EXAMPLES "Build s2geography examples" OFF)
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 
@@ -278,6 +279,17 @@ add_library(
 
 if(NOT BUILD_SHARED_LIBS)
   set_target_properties(s2geography PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
+
+if(S2GEOGRAPHY_CLANG_TIDY)
+  find_program(CLANG_TIDY_PROGRAM clang-tidy)
+  if(CLANG_TIDY_PROGRAM)
+    set_target_properties(s2geography PROPERTIES CXX_CLANG_TIDY
+                                                 "${CLANG_TIDY_PROGRAM}")
+    message(STATUS "clang-tidy enabled: ${CLANG_TIDY_PROGRAM}")
+  else()
+    message(WARNING "clang-tidy requested but not found")
+  endif()
 endif()
 
 target_include_directories(
