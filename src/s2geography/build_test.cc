@@ -1386,12 +1386,12 @@ TEST(Build, SedonaUdfBufferQuadSegs) {
   struct SedonaCScalarKernelImpl impl;
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
       &kernel, &impl,
-      {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE, NANOARROW_TYPE_DOUBLE},
+      {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE, NANOARROW_TYPE_INT32},
       ARROW_TYPE_WKB));
 
   nanoarrow::UniqueArray out_array;
   ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
-      &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE, NANOARROW_TYPE_DOUBLE},
+      &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE, NANOARROW_TYPE_INT32},
       {{"POINT (0 0)", "POINT (0 0)"}}, {{100000.0, 100000.0}, {4.0, 2.0}},
       out_array.get()));
   impl.release(&impl);
