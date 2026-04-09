@@ -138,6 +138,4 @@ jobs:
 
       - name: Run clang-tidy
         run: |
-          run-clang-tidy -p build \
-            -header-filter='src/s2geography/.*' \
-            'src/s2geography/.*\.(cc|h)$'
+          ./ci/scripts/run-clang-tidy.sh . build/

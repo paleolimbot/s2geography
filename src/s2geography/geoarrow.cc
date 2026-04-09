@@ -398,7 +398,7 @@ class CollectionConstructor : public Constructor {
         polyline_constructor_(options),
         polygon_constructor_(options),
         collection_constructor_(nullptr),
-        active_constructor_(nullptr),
+        // active_constructor_(nullptr),
         level_(0) {}
 
   GeoArrowErrorCode geom_start(GeoArrowGeometryType geometry_type,
@@ -485,7 +485,7 @@ class CollectionConstructor : public Constructor {
   std::unique_ptr<CollectionConstructor> collection_constructor_;
 
  protected:
-  Constructor* active_constructor_{nullptr};
+  Constructor* active_constructor_;
   int level_;
   std::vector<std::unique_ptr<Geography>> features_;
 };
