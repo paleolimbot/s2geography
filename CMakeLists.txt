@@ -323,7 +323,7 @@ if(S2GEOGRAPHY_EXTRA_WARNINGS)
               -Wno-sign-conversion>)
     target_compile_options(s2geography PRIVATE -Wno-misleading-indentation)
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_CXX_COMPILER_ID
-                                                         STREQUAL "Clang")
+                                                        STREQUAL "Clang")
     target_compile_options(
       s2geography
       PRIVATE $<$<CONFIG:Debug>:-Wall
