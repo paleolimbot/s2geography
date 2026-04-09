@@ -1418,9 +1418,7 @@ TEST(Build, SedonaUdfBufferQuadSegs) {
 TEST(BufferParamsParse, Empty) {
   auto p = sedona_udf::BufferParams::Parse("");
   EXPECT_EQ(p.end_cap_style, sedona_udf::CapStyle::kRound);
-  EXPECT_EQ(p.join_style, sedona_udf::JoinStyle::kRound);
   EXPECT_EQ(p.side, sedona_udf::BufferSide::kBoth);
-  EXPECT_DOUBLE_EQ(p.mitre_limit, 5.0);
   EXPECT_EQ(p.quadrant_segments, 8);
 }
 
@@ -1439,11 +1437,6 @@ TEST(BufferParamsParse, EndcapButt) {
   EXPECT_EQ(p.end_cap_style, sedona_udf::CapStyle::kFlat);
 }
 
-TEST(BufferParamsParse, EndcapSquare) {
-  auto p = sedona_udf::BufferParams::Parse("endcap=square");
-  EXPECT_EQ(p.end_cap_style, sedona_udf::CapStyle::kSquare);
-}
-
 TEST(BufferParamsParse, EndcapCaseInsensitive) {
   auto p = sedona_udf::BufferParams::Parse("ENDCAP=ROUND");
   EXPECT_EQ(p.end_cap_style, sedona_udf::CapStyle::kRound);
@@ -1451,26 +1444,6 @@ TEST(BufferParamsParse, EndcapCaseInsensitive) {
 
 TEST(BufferParamsParse, EndcapInvalid) {
   EXPECT_THROW(sedona_udf::BufferParams::Parse("endcap=invalid"), Exception);
-}
-
-TEST(BufferParamsParse, JoinRound) {
-  auto p = sedona_udf::BufferParams::Parse("join=round");
-  EXPECT_EQ(p.join_style, sedona_udf::JoinStyle::kRound);
-}
-
-TEST(BufferParamsParse, JoinMitre) {
-  auto p = sedona_udf::BufferParams::Parse("join=mitre");
-  EXPECT_EQ(p.join_style, sedona_udf::JoinStyle::kMitre);
-}
-
-TEST(BufferParamsParse, JoinMiter) {
-  auto p = sedona_udf::BufferParams::Parse("join=miter");
-  EXPECT_EQ(p.join_style, sedona_udf::JoinStyle::kMitre);
-}
-
-TEST(BufferParamsParse, JoinBevel) {
-  auto p = sedona_udf::BufferParams::Parse("join=bevel");
-  EXPECT_EQ(p.join_style, sedona_udf::JoinStyle::kBevel);
 }
 
 TEST(BufferParamsParse, JoinInvalid) {
@@ -1485,14 +1458,14 @@ TEST(BufferParamsParse, SideBoth) {
 TEST(BufferParamsParse, SideLeft) {
   auto p = sedona_udf::BufferParams::Parse("side=left");
   EXPECT_EQ(p.side, sedona_udf::BufferSide::kLeft);
-  // When side is single-sided and endcap not explicitly set, defaults to square
-  EXPECT_EQ(p.end_cap_style, sedona_udf::CapStyle::kSquare);
+  // When side is single-sided and endcap not explicitly set, defaults to flat
+  EXPECT_EQ(p.end_cap_style, sedona_udf::CapStyle::kFlat);
 }
 
 TEST(BufferParamsParse, SideRight) {
   auto p = sedona_udf::BufferParams::Parse("side=right");
   EXPECT_EQ(p.side, sedona_udf::BufferSide::kRight);
-  EXPECT_EQ(p.end_cap_style, sedona_udf::CapStyle::kSquare);
+  EXPECT_EQ(p.end_cap_style, sedona_udf::CapStyle::kFlat);
 }
 
 TEST(BufferParamsParse, SideWithExplicitEndcap) {
@@ -1504,16 +1477,6 @@ TEST(BufferParamsParse, SideWithExplicitEndcap) {
 
 TEST(BufferParamsParse, SideInvalid) {
   EXPECT_THROW(sedona_udf::BufferParams::Parse("side=invalid"), Exception);
-}
-
-TEST(BufferParamsParse, MitreLimit) {
-  auto p = sedona_udf::BufferParams::Parse("mitre_limit=2.5");
-  EXPECT_DOUBLE_EQ(p.mitre_limit, 2.5);
-}
-
-TEST(BufferParamsParse, MiterLimit) {
-  auto p = sedona_udf::BufferParams::Parse("miter_limit=3.0");
-  EXPECT_DOUBLE_EQ(p.mitre_limit, 3.0);
 }
 
 TEST(BufferParamsParse, MitreLimitInvalid) {
@@ -1535,12 +1498,10 @@ TEST(BufferParamsParse, QuadSegsInvalid) {
 }
 
 TEST(BufferParamsParse, MultipleParams) {
-  auto p = sedona_udf::BufferParams::Parse(
-      "endcap=flat join=mitre mitre_limit=2.0 quad_segs=4");
+  auto p = sedona_udf::BufferParams::Parse("endcap=flat quad_segs=4 side=left");
   EXPECT_EQ(p.end_cap_style, sedona_udf::CapStyle::kFlat);
-  EXPECT_EQ(p.join_style, sedona_udf::JoinStyle::kMitre);
-  EXPECT_DOUBLE_EQ(p.mitre_limit, 2.0);
   EXPECT_EQ(p.quadrant_segments, 4);
+  EXPECT_EQ(p.side, sedona_udf::BufferSide::kLeft);
 }
 
 TEST(BufferParamsParse, UnknownParam) {

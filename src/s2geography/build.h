@@ -118,8 +118,7 @@ void BufferQuadSegsKernel(struct SedonaCScalarKernel* out);
 void BufferParamsKernel(struct SedonaCScalarKernel* out);
 
 // Exposed for testing
-enum class CapStyle { kRound, kFlat, kSquare };
-enum class JoinStyle { kRound, kMitre, kBevel };
+enum class CapStyle { kRound, kFlat };
 enum class BufferSide { kLeft, kRight, kBoth };
 
 /// \brief Parsed PostGIS-style buffer parameters.
@@ -128,12 +127,10 @@ enum class BufferSide { kLeft, kRight, kBoth };
 /// (case-insensitive). Supported keys: endcap, join, side, mitre_limit,
 /// miter_limit, quad_segs, quadrant_segments.
 ///
-/// Example: "endcap=round join=mitre quad_segs=4"
+/// Example: "endcap=round quad_segs=4"
 struct BufferParams {
   CapStyle end_cap_style = CapStyle::kRound;
-  JoinStyle join_style = JoinStyle::kRound;
   BufferSide side = BufferSide::kBoth;
-  double mitre_limit = 5.0;
   int quadrant_segments = 8;
 
   /// \brief Parse a PostGIS-style buffer parameter string.

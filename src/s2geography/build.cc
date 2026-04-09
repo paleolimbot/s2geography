@@ -13,9 +13,11 @@
 #include <s2/s2loop.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <limits>
 #include <sstream>
+#include <stdexcept>
 
 #include "s2geography/accessors.h"
 #include "s2geography/geography_interface.h"
@@ -1523,18 +1525,6 @@ bool StrCaseEqual(const std::string& a, const std::string& b) {
   return true;
 }
 
-double ParseDouble(const std::string& value, const char* param_name) {
-  try {
-    size_t pos;
-    double result = std::stod(value, &pos);
-    if (pos != value.size()) throw std::invalid_argument("trailing chars");
-    return result;
-  } catch (const std::exception&) {
-    throw Exception(std::string("Invalid ") + param_name + " value: '" + value +
-                    "'. Expected a valid number");
-  }
-}
-
 int ParseInt(const std::string& value, const char* param_name) {
   try {
     size_t pos;
@@ -1547,31 +1537,15 @@ int ParseInt(const std::string& value, const char* param_name) {
   }
 }
 
-}  // namespace
-
 CapStyle ParseCapStyle(const std::string& value) {
   if (StrCaseEqual(value, "round")) {
     return CapStyle::kRound;
   } else if (StrCaseEqual(value, "flat") || StrCaseEqual(value, "butt")) {
     return CapStyle::kFlat;
-  } else if (StrCaseEqual(value, "square")) {
-    return CapStyle::kSquare;
   }
   throw Exception("Invalid endcap style: '" + value +
-                  "'. Valid options: round, flat, butt, square");
-}
-
-JoinStyle ParseJoinStyle(const std::string& value) {
-  if (StrCaseEqual(value, "round")) {
-    return JoinStyle::kRound;
-  } else if (StrCaseEqual(value, "mitre") || StrCaseEqual(value, "miter")) {
-    return JoinStyle::kMitre;
-  } else if (StrCaseEqual(value, "bevel")) {
-    return JoinStyle::kBevel;
-  }
-
-  throw Exception("Invalid join style: '" + value +
-                  "'. Valid options: round, mitre, miter, bevel");
+                  "'. Valid options: round, flat, butt (square not supported "
+                  "for geography)");
 }
 
 BufferSide ParseBufferSide(const std::string& value) {
@@ -1586,6 +1560,8 @@ BufferSide ParseBufferSide(const std::string& value) {
   throw Exception("Invalid side: '" + value +
                   "'. Valid options: both, left, right");
 }
+
+}  // namespace
 
 /// Parameters are space-separated key=value pairs (case-insensitive).
 /// Supported keys: endcap, join, side, mitre_limit, miter_limit,
@@ -1610,24 +1586,20 @@ BufferParams BufferParams::Parse(std::string_view params_str) {
     if (StrCaseEqual(key, "endcap")) {
       params.end_cap_style = ParseCapStyle(value);
       end_cap_specified = true;
-    } else if (StrCaseEqual(key, "join")) {
-      params.join_style = ParseJoinStyle(value);
     } else if (StrCaseEqual(key, "side")) {
       params.side = ParseBufferSide(value);
       if (params.side != BufferSide::kBoth && !end_cap_specified) {
-        params.end_cap_style = CapStyle::kSquare;
+        // In PostGIS this defaults to square ends; however, s2geometry doesn't
+        // support that
+        params.end_cap_style = CapStyle::kFlat;
       }
-    } else if (StrCaseEqual(key, "mitre_limit") ||
-               StrCaseEqual(key, "miter_limit")) {
-      params.mitre_limit = ParseDouble(value, "mitre_limit");
     } else if (StrCaseEqual(key, "quad_segs") ||
                StrCaseEqual(key, "quadrant_segments")) {
       params.quadrant_segments = ParseInt(value, "quadrant_segments");
     } else {
-      throw Exception(
-          "Invalid buffer parameter: " + key +
-          " (accept: 'endcap', 'join', 'mitre_limit', 'miter_limit', "
-          "'quad_segs', 'quadrant_segments' and 'side')");
+      throw Exception("Invalid buffer parameter: " + key +
+                      " (accept: 'endcap', 'join', 'quad_segs', "
+                      "'quadrant_segments' and 'side')");
     }
   }
 
@@ -1653,8 +1625,8 @@ struct BufferParamsExec {
       BufferParams parsed = BufferParams::Parse(params);
 
       S2BufferOperation::Options options;
-      options.set_buffer_radius(
-          S1Angle::Radians(distance / S2Earth::RadiusMeters()));
+      auto buffer_angle = S1Angle::Radians(distance / S2Earth::RadiusMeters());
+      options.set_buffer_radius(buffer_angle);
       options.set_circle_segments(parsed.quadrant_segments * 4.0);
 
       switch (parsed.end_cap_style) {
@@ -1664,18 +1636,6 @@ struct BufferParamsExec {
         case CapStyle::kFlat:
           options.set_end_cap_style(S2BufferOperation::EndCapStyle::FLAT);
           break;
-        case CapStyle::kSquare:
-          throw Exception(std::string("Unsupported cap style in params ") +
-                          std::string(params));
-          break;
-      }
-
-      switch (parsed.join_style) {
-        case JoinStyle::kRound:
-          break;
-        default:
-          throw Exception(std::string("Unsupported join style in params ") +
-                          std::string(params));
       }
 
       switch (parsed.side) {
@@ -1727,13 +1687,13 @@ struct BufferParamsExec {
 struct BufferQuadSegsExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = DoubleInputView;
-  using arg2_t = DoubleInputView;
+  using arg2_t = IntInputView;
   using out_t = GeoArrowOutputBuilder;
 
   void Exec(arg0_t::c_type value, arg1_t::c_type distance,
             arg2_t::c_type n_quad_segs, out_t* out) {
-    std::string params = std::string("quad_segs=") +
-                         std::to_string(static_cast<int>(n_quad_segs));
+    std::string params =
+        std::string("quad_segs=") + std::to_string(n_quad_segs);
     buffer_params_.Exec(value, distance, params, out);
   }
 
