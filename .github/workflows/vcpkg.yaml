@@ -8,8 +8,8 @@ permissions:
   contents: read
 
 env:
-  # At update to s2geometry 0.13.1
-  VCPKG_REF: 580d480f750618f8affeb77abbb956e6eeaee0ce
+  # April 2026
+  VCPKG_REF: 0c2764ebcc4776aed35f9946c81a8c1efe149a03
 
 name: vcpkg
 
