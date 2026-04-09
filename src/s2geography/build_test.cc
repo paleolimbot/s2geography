@@ -1380,6 +1380,41 @@ INSTANTIATE_TEST_SUITE_P(
       return info.param.name;
     });
 
+TEST(Build, SedonaUdfBufferQuadSegs) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::BufferQuadSegsKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl,
+      {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE, NANOARROW_TYPE_DOUBLE},
+      ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE, NANOARROW_TYPE_DOUBLE},
+      {{"POINT (0 0)", "POINT (0 0)"}}, {{100000.0, 100000.0}, {4.0, 2.0}},
+      out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  // quad_segs=4 produces 4*4+1=17 vertices; quad_segs=2 produces 4*2+1=9
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(
+      out_array.get(), {"POLYGON ((-0.899308 0.004766, -0.832686 -0.339735, "
+                        "-0.639303 -0.632523, -0.348578 -0.829023, "
+                        "-0.004767 -0.899308, 0.339771 -0.832671, "
+                        "0.632562 -0.639264, 0.829038 -0.348541, "
+                        "0.899308 -0.004766, 0.832686 0.339735, "
+                        "0.639303 0.632523, 0.348578 0.829023, "
+                        "0.004767 0.899308, -0.339771 0.832671, "
+                        "-0.632562 0.639264, -0.829038 0.348541, "
+                        "-0.899308 0.004766))",
+                        "POLYGON ((-0.899308 0.004766, -0.639303 -0.632523, "
+                        "-0.004767 -0.899308, 0.632562 -0.639264, "
+                        "0.899308 -0.004766, 0.639303 0.632523, "
+                        "0.004767 0.899308, -0.632562 0.639264, "
+                        "-0.899308 0.004766))"}));
+}
+
 TEST(BufferParamsParse, Empty) {
   auto p = sedona_udf::BufferParams::Parse("");
   EXPECT_EQ(p.end_cap_style, sedona_udf::CapStyle::kRound);

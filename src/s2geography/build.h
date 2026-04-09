@@ -114,6 +114,7 @@ void UnionKernel(struct SedonaCScalarKernel* out);
 void ReducePrecisionKernel(struct SedonaCScalarKernel* out);
 void SimplifyKernel(struct SedonaCScalarKernel* out);
 void BufferKernel(struct SedonaCScalarKernel* out);
+void BufferQuadSegsKernel(struct SedonaCScalarKernel* out);
 void BufferParamsKernel(struct SedonaCScalarKernel* out);
 
 // Exposed for testing

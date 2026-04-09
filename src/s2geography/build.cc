@@ -1732,8 +1732,8 @@ struct BufferQuadSegsExec {
 
   void Exec(arg0_t::c_type value, arg1_t::c_type distance,
             arg2_t::c_type n_quad_segs, out_t* out) {
-    std::string params =
-        std::string("quad_segs=") + std::to_string(n_quad_segs);
+    std::string params = std::string("quad_segs=") +
+                         std::to_string(static_cast<int>(n_quad_segs));
     buffer_params_.Exec(value, distance, params, out);
   }
 
