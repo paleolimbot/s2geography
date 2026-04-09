@@ -574,9 +574,12 @@ std::optional<S2Point> GeoArrowGeography::Point() const {
       if (points_.num_edges() == 1) {
         return points_.edge(0).v0;
       }
+      break;
     default:
-      return std::nullopt;
+      break;
   }
+
+  return std::nullopt;
 }
 
 uint8_t GeoArrowGeography::geometry_type() const {
