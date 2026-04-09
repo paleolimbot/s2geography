@@ -2,6 +2,7 @@
 #include "s2geography/build.h"
 
 #include <s2/s2boolean_operation.h>
+#include <s2/s2buffer_operation.h>
 #include <s2/s2builder.h>
 #include <s2/s2builderutil_closed_set_normalizer.h>
 #include <s2/s2builderutil_s2point_vector_layer.h>
@@ -12,9 +13,11 @@
 #include <s2/s2loop.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <limits>
 #include <sstream>
+#include <stdexcept>
 
 #include "s2geography/accessors.h"
 #include "s2geography/geography_interface.h"
@@ -1510,6 +1513,208 @@ struct SymDifferenceOperationExec {
   OutputGeometry output_;
 };
 
+namespace {
+
+bool StrCaseEqual(const std::string& a, const std::string& b) {
+  if (a.size() != b.size()) return false;
+  for (size_t i = 0; i < a.size(); ++i) {
+    if (std::tolower(static_cast<unsigned char>(a[i])) !=
+        std::tolower(static_cast<unsigned char>(b[i])))
+      return false;
+  }
+  return true;
+}
+
+int ParseInt(const std::string& value, const char* param_name) {
+  try {
+    size_t pos;
+    int result = std::stoi(value, &pos);
+    if (pos != value.size()) throw std::invalid_argument("trailing chars");
+    return result;
+  } catch (const std::exception&) {
+    throw Exception(std::string("Invalid ") + param_name + " value: '" + value +
+                    "'. Expected a valid number");
+  }
+}
+
+CapStyle ParseCapStyle(const std::string& value) {
+  if (StrCaseEqual(value, "round")) {
+    return CapStyle::kRound;
+  } else if (StrCaseEqual(value, "flat") || StrCaseEqual(value, "butt")) {
+    return CapStyle::kFlat;
+  }
+  throw Exception("Invalid endcap style: '" + value +
+                  "'. Valid options: round, flat, butt (square not supported "
+                  "for geography)");
+}
+
+BufferSide ParseBufferSide(const std::string& value) {
+  if (StrCaseEqual(value, "both")) {
+    return BufferSide::kBoth;
+  } else if (StrCaseEqual(value, "left")) {
+    return BufferSide::kLeft;
+  } else if (StrCaseEqual(value, "right")) {
+    return BufferSide::kRight;
+  }
+
+  throw Exception("Invalid side: '" + value +
+                  "'. Valid options: both, left, right");
+}
+
+}  // namespace
+
+/// Parameters are space-separated key=value pairs (case-insensitive).
+/// Supported keys: endcap, join, side, quad_segs, and quadrant_segments.
+BufferParams BufferParams::Parse(std::string_view params_str) {
+  BufferParams params;
+  if (params_str.empty()) return params;
+
+  bool end_cap_specified = false;
+  std::istringstream iss((std::string(params_str)));
+  std::string param;
+
+  while (iss >> param) {
+    auto eq_pos = param.find('=');
+    if (eq_pos == std::string::npos) {
+      throw Exception("Missing value for buffer parameter: " + param);
+    }
+
+    std::string key = param.substr(0, eq_pos);
+    std::string value = param.substr(eq_pos + 1);
+
+    if (StrCaseEqual(key, "endcap")) {
+      params.end_cap_style = ParseCapStyle(value);
+      end_cap_specified = true;
+    } else if (StrCaseEqual(key, "side")) {
+      params.side = ParseBufferSide(value);
+      if (params.side != BufferSide::kBoth && !end_cap_specified) {
+        // In PostGIS this defaults to square ends; however, s2geometry doesn't
+        // support that
+        params.end_cap_style = CapStyle::kFlat;
+      }
+    } else if (StrCaseEqual(key, "quad_segs") ||
+               StrCaseEqual(key, "quadrant_segments")) {
+      params.quadrant_segments = ParseInt(value, "quadrant_segments");
+    } else {
+      throw Exception(
+          "Invalid buffer parameter: " + key +
+          " (accept: 'endcap', 'quad_segs', 'quadrant_segments' and 'side')");
+    }
+  }
+
+  return params;
+}
+
+struct BufferParamsExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = DoubleInputView;
+  using arg2_t = StringInputView;
+  using out_t = GeoArrowOutputBuilder;
+
+  void Exec(arg0_t::c_type value, arg1_t::c_type distance,
+            arg2_t::c_type params, out_t* out) {
+    // For what will definitely be empty or degenerate output, we return POLYGON
+    // EMPTY
+    if (value.is_empty() || (value.max_dimension() < 2 && distance <= 0)) {
+      out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_POLYGON);
+      return;
+    }
+
+    if (distance != last_distance_ || last_params_ != params) {
+      BufferParams parsed = BufferParams::Parse(params);
+
+      S2BufferOperation::Options options;
+      auto buffer_angle = S1Angle::Radians(distance / S2Earth::RadiusMeters());
+      options.set_buffer_radius(buffer_angle);
+
+      if (parsed.quadrant_segments < 0) {
+        throw Exception("quadrant_segments must be >0 in ST_Buffer()");
+      }
+      options.set_circle_segments(parsed.quadrant_segments * 4.0);
+
+      switch (parsed.end_cap_style) {
+        case CapStyle::kRound:
+          options.set_end_cap_style(S2BufferOperation::EndCapStyle::ROUND);
+          break;
+        case CapStyle::kFlat:
+          options.set_end_cap_style(S2BufferOperation::EndCapStyle::FLAT);
+          break;
+      }
+
+      switch (parsed.side) {
+        case BufferSide::kLeft:
+          options.set_polyline_side(S2BufferOperation::PolylineSide::LEFT);
+          break;
+        case BufferSide::kRight:
+          options.set_polyline_side(S2BufferOperation::PolylineSide::RIGHT);
+          break;
+        case BufferSide::kBoth:
+          options.set_polyline_side(S2BufferOperation::PolylineSide::BOTH);
+          break;
+      }
+
+      options_ = options;
+      last_distance_ = distance;
+      last_params_ = params;
+    }
+
+    output_.Clear();
+    S2BufferOperation op;
+    op.Init(std::make_unique<GeoArrowPolygonLayer>(&output_), options_);
+
+    // AddShape doesn't handle dimension-0 shapes (points); use AddPoint for
+    // each point vertex instead.
+    value.points()->geom().VisitVertices([&](const S2Point& v) {
+      op.AddPoint(v);
+      return true;
+    });
+    op.AddShape(*value.lines());
+    op.AddShape(*value.polygons());
+
+    S2Error error;
+    if (!op.Build(&error)) {
+      std::stringstream ss;
+      ss << error;
+      throw Exception(ss.str());
+    }
+
+    output_.WriteTo(out, GEOARROW_GEOMETRY_TYPE_POLYGON);
+  }
+
+  double last_distance_{-std::numeric_limits<double>::infinity()};
+  std::string last_params_;
+  S2BufferOperation::Options options_;
+  OutputGeometry output_;
+};
+
+struct BufferQuadSegsExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = DoubleInputView;
+  using arg2_t = IntInputView;
+  using out_t = GeoArrowOutputBuilder;
+
+  void Exec(arg0_t::c_type value, arg1_t::c_type distance,
+            arg2_t::c_type n_quad_segs, out_t* out) {
+    std::string params =
+        std::string("quad_segs=") + std::to_string(n_quad_segs);
+    buffer_params_.Exec(value, distance, params, out);
+  }
+
+  BufferParamsExec buffer_params_;
+};
+
+struct BufferExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = DoubleInputView;
+  using out_t = GeoArrowOutputBuilder;
+
+  void Exec(arg0_t::c_type value, arg1_t::c_type distance, out_t* out) {
+    buffer_params_.Exec(value, distance, "", out);
+  }
+
+  BufferParamsExec buffer_params_;
+};
+
 void DifferenceKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<DifferenceOperationExec>(out, "st_difference");
 }
@@ -1532,6 +1737,18 @@ void ReducePrecisionKernel(struct SedonaCScalarKernel* out) {
 
 void SimplifyKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<SimplifyExec>(out, "st_simplify");
+}
+
+void BufferKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<BufferExec>(out, "st_buffer");
+}
+
+void BufferQuadSegsKernel(struct SedonaCScalarKernel* out) {
+  InitTernaryKernel<BufferQuadSegsExec>(out, "st_buffer");
+}
+
+void BufferParamsKernel(struct SedonaCScalarKernel* out) {
+  InitTernaryKernel<BufferParamsExec>(out, "st_buffer");
 }
 
 }  // namespace sedona_udf

@@ -5,6 +5,8 @@
 #include <s2/s2builderutil_s2polygon_layer.h>
 #include <s2/s2builderutil_s2polyline_vector_layer.h>
 
+#include <string_view>
+
 #include "s2geography/aggregator.h"
 #include "s2geography/geography.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
@@ -111,6 +113,29 @@ void IntersectionKernel(struct SedonaCScalarKernel* out);
 void UnionKernel(struct SedonaCScalarKernel* out);
 void ReducePrecisionKernel(struct SedonaCScalarKernel* out);
 void SimplifyKernel(struct SedonaCScalarKernel* out);
+void BufferKernel(struct SedonaCScalarKernel* out);
+void BufferQuadSegsKernel(struct SedonaCScalarKernel* out);
+void BufferParamsKernel(struct SedonaCScalarKernel* out);
+
+// Exposed for testing
+enum class CapStyle { kRound, kFlat };
+enum class BufferSide { kLeft, kRight, kBoth };
+
+/// \brief Parsed PostGIS-style buffer parameters.
+///
+/// Buffer parameters are specified as space-separated key=value pairs
+/// (case-insensitive). Supported keys: endcap, side, quad_segs,
+/// and quadrant_segments.
+///
+/// Example: "endcap=round quad_segs=4"
+struct BufferParams {
+  CapStyle end_cap_style = CapStyle::kRound;
+  BufferSide side = BufferSide::kBoth;
+  int quadrant_segments = 8;
+
+  /// \brief Parse a PostGIS-style buffer parameter string.
+  static BufferParams Parse(const std::string_view params_str);
+};
 
 }  // namespace sedona_udf
 

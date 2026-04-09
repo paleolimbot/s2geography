@@ -501,6 +501,7 @@ class ArrowInputView {
 using BoolInputView = ArrowInputView<bool>;
 using IntInputView = ArrowInputView<int64_t>;
 using DoubleInputView = ArrowInputView<double>;
+using StringInputView = ArrowInputView<std::string_view>;
 
 /// \brief View of GeoArrow input
 ///
@@ -614,6 +615,7 @@ struct KernelData {
   std::string name;
   bool prepare_arg0_scalar{true};
   bool prepare_arg1_scalar{true};
+  bool prepare_arg2_scalar{true};
 };
 
 inline const char* KernelFunctionName(const struct SedonaCScalarKernel* self) {
@@ -841,6 +843,127 @@ class SedonaBinaryKernelAdapter {
   }
 };
 
+/// \brief Sedona C ABI adapter for ternary UDFs (three arguments)
+template <typename Exec>
+class SedonaTernaryKernelAdapter {
+ public:
+  struct ImplData {
+    std::string last_error;
+    std::unique_ptr<typename Exec::arg0_t> arg0;
+    std::unique_ptr<typename Exec::arg1_t> arg1;
+    std::unique_ptr<typename Exec::arg2_t> arg2;
+    std::unique_ptr<typename Exec::out_t> out;
+    Exec exec;
+    bool prepare_arg0_scalar{true};
+    bool prepare_arg1_scalar{true};
+    bool prepare_arg2_scalar{true};
+  };
+
+  static int ImplInit(struct SedonaCScalarKernelImpl* self,
+                      const struct ArrowSchema* const* arg_types,
+                      struct ArrowArray* const* /*scalar_args*/, int64_t n_args,
+                      struct ArrowSchema* out) {
+    auto* data = static_cast<ImplData*>(self->private_data);
+    data->last_error.clear();
+    try {
+      // Check if this kernel applies to the input arguments
+      if (n_args != 3 || !Exec::arg0_t::Matches(arg_types[0]) ||
+          !Exec::arg1_t::Matches(arg_types[1]) ||
+          !Exec::arg2_t::Matches(arg_types[2])) {
+        out->release = nullptr;
+        return NANOARROW_OK;
+      }
+
+      data->arg0 = std::make_unique<typename Exec::arg0_t>(arg_types[0]);
+      data->arg1 = std::make_unique<typename Exec::arg1_t>(arg_types[1]);
+      data->arg2 = std::make_unique<typename Exec::arg2_t>(arg_types[2]);
+      data->arg0->SetPrepareScalar(data->prepare_arg0_scalar);
+      data->arg1->SetPrepareScalar(data->prepare_arg1_scalar);
+      data->arg2->SetPrepareScalar(data->prepare_arg2_scalar);
+      data->out = std::make_unique<typename Exec::out_t>();
+
+      // We don't have a reliable way to check the equality of CRSes, so
+      // here we just return the first CRS.
+      std::string crs_out = data->arg0->GetCrs();
+      if (crs_out.empty()) {
+        data->out->InitOutputType(out);
+      } else {
+        data->out->InitOutputTypeWithCrs(out, crs_out);
+      }
+
+      return 0;
+    } catch (std::exception& e) {
+      data->last_error = e.what();
+      return EINVAL;
+    }
+  }
+
+  static int ImplExecute(struct SedonaCScalarKernelImpl* self,
+                         struct ArrowArray* const* args, int64_t n_args,
+                         int64_t n_rows, struct ArrowArray* out) {
+    auto* data = static_cast<ImplData*>(self->private_data);
+    data->last_error.clear();
+    try {
+      if (n_args != 3) {
+        data->last_error =
+            "Expected three arguments in ternary s2geography kernel";
+        return EINVAL;
+      }
+
+      data->arg0->SetArray(args[0], n_rows);
+      data->arg1->SetArray(args[1], n_rows);
+      data->arg2->SetArray(args[2], n_rows);
+      int64_t num_iterations = ExecuteNumIterations(n_rows, args, n_args);
+      data->out->Reserve(num_iterations);
+
+      for (int64_t i = 0; i < num_iterations; i++) {
+        if (data->arg0->IsNull(i) || data->arg1->IsNull(i) ||
+            data->arg2->IsNull(i)) {
+          data->out->AppendNull();
+        } else {
+          typename Exec::arg0_t::c_type item0 = data->arg0->Get(i);
+          typename Exec::arg1_t::c_type item1 = data->arg1->Get(i);
+          typename Exec::arg2_t::c_type item2 = data->arg2->Get(i);
+          data->exec.Exec(item0, item1, item2, data->out.get());
+        }
+      }
+
+      data->out->Finish(out);
+      return 0;
+    } catch (std::exception& e) {
+      data->last_error = e.what();
+      return EINVAL;
+    }
+  }
+
+  static const char* ImplGetLastError(struct SedonaCScalarKernelImpl* self) {
+    return static_cast<ImplData*>(self->private_data)->last_error.c_str();
+  }
+
+  static void ImplRelease(struct SedonaCScalarKernelImpl* self) {
+    if (self->private_data != nullptr) {
+      delete static_cast<ImplData*>(self->private_data);
+      self->private_data = nullptr;
+    }
+    self->release = nullptr;
+  }
+
+  static void NewImpl(const struct SedonaCScalarKernel* self,
+                      struct SedonaCScalarKernelImpl* out) {
+    auto* kernel_private = static_cast<KernelData*>(self->private_data);
+    auto* impl_private = new ImplData();
+    impl_private->prepare_arg0_scalar = kernel_private->prepare_arg0_scalar;
+    impl_private->prepare_arg1_scalar = kernel_private->prepare_arg1_scalar;
+    impl_private->prepare_arg2_scalar = kernel_private->prepare_arg2_scalar;
+
+    out->private_data = impl_private;
+    out->init = &ImplInit;
+    out->execute = &ImplExecute;
+    out->get_last_error = &ImplGetLastError;
+    out->release = &ImplRelease;
+  }
+};
+
 /// \brief Initialize a SedonaCScalarKernel for a unary Exec
 template <typename Exec>
 void InitUnaryKernel(struct SedonaCScalarKernel* out, const char* name,
@@ -861,6 +984,20 @@ void InitBinaryKernel(struct SedonaCScalarKernel* out, const char* name,
   out->private_data = data;
   out->function_name = &KernelFunctionName;
   out->new_impl = &SedonaBinaryKernelAdapter<Exec>::NewImpl;
+  out->release = &KernelRelease;
+}
+
+/// \brief Initialize a SedonaCScalarKernel for a ternary Exec
+template <typename Exec>
+void InitTernaryKernel(struct SedonaCScalarKernel* out, const char* name,
+                       bool prepare_arg0_scalar = true,
+                       bool prepare_arg1_scalar = true,
+                       bool prepare_arg2_scalar = true) {
+  auto* data = new KernelData{name, prepare_arg0_scalar, prepare_arg1_scalar,
+                              prepare_arg2_scalar};
+  out->private_data = data;
+  out->function_name = &KernelFunctionName;
+  out->new_impl = &SedonaTernaryKernelAdapter<Exec>::NewImpl;
   out->release = &KernelRelease;
 }
 
