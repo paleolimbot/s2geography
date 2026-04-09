@@ -243,7 +243,7 @@ inline nanoarrow::UniqueArray ArgArrow(
 
 // Create an arrow string array argument.
 inline nanoarrow::UniqueArray ArgArrowString(
-    std::vector<std::optional<std::string>> values) {
+    const std::vector<std::optional<std::string>>& values) {
   nanoarrow::UniqueArray array;
   NANOARROW_THROW_NOT_OK(
       ArrowArrayInitFromType(array.get(), NANOARROW_TYPE_STRING));
