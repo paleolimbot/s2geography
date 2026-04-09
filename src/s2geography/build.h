@@ -124,8 +124,8 @@ enum class BufferSide { kLeft, kRight, kBoth };
 /// \brief Parsed PostGIS-style buffer parameters.
 ///
 /// Buffer parameters are specified as space-separated key=value pairs
-/// (case-insensitive). Supported keys: endcap, join, side, mitre_limit,
-/// miter_limit, quad_segs, quadrant_segments.
+/// (case-insensitive). Supported keys: endcap, side, quad_segs,
+/// and quadrant_segments.
 ///
 /// Example: "endcap=round quad_segs=4"
 struct BufferParams {

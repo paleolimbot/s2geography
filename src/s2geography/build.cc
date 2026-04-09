@@ -1564,8 +1564,7 @@ BufferSide ParseBufferSide(const std::string& value) {
 }  // namespace
 
 /// Parameters are space-separated key=value pairs (case-insensitive).
-/// Supported keys: endcap, join, side, mitre_limit, miter_limit,
-/// quad_segs, quadrant_segments.
+/// Supported keys: endcap, join, side, quad_segs, and quadrant_segments.
 BufferParams BufferParams::Parse(std::string_view params_str) {
   BufferParams params;
   if (params_str.empty()) return params;
@@ -1597,9 +1596,9 @@ BufferParams BufferParams::Parse(std::string_view params_str) {
                StrCaseEqual(key, "quadrant_segments")) {
       params.quadrant_segments = ParseInt(value, "quadrant_segments");
     } else {
-      throw Exception("Invalid buffer parameter: " + key +
-                      " (accept: 'endcap', 'join', 'quad_segs', "
-                      "'quadrant_segments' and 'side')");
+      throw Exception(
+          "Invalid buffer parameter: " + key +
+          " (accept: 'endcap', 'quad_segs', 'quadrant_segments' and 'side')");
     }
   }
 
@@ -1627,6 +1626,10 @@ struct BufferParamsExec {
       S2BufferOperation::Options options;
       auto buffer_angle = S1Angle::Radians(distance / S2Earth::RadiusMeters());
       options.set_buffer_radius(buffer_angle);
+
+      if (parsed.quadrant_segments < 0) {
+        throw Exception("quadrant_segments must be >0 in ST_Buffer()");
+      }
       options.set_circle_segments(parsed.quadrant_segments * 4.0);
 
       switch (parsed.end_cap_style) {
