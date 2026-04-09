@@ -34,6 +34,8 @@ option(S2GEOGRAPHY_BUILD_TESTS "Build tests" OFF)
 option(S2GEOGRAPHY_EXTRA_WARNINGS
        "Enable extra compiler warnings in debug mode" OFF)
 option(S2GEOGRAPHY_CODE_COVERAGE "Enable coverage reporting" OFF)
+option(S2GEOGRAPHY_SANITIZERS
+       "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(S2GEOGRAPHY_BUILD_EXAMPLES "Build s2geography examples" OFF)
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 
@@ -306,6 +308,15 @@ target_link_libraries(
   s2geography
   PUBLIC s2::s2 absl::memory absl::str_format OpenSSL::SSL OpenSSL::Crypto
   PRIVATE ${S2GEOGRAPHY_NANOARROW_TARGET} ${S2GEOGRAPHY_GEOARROW_TARGET})
+
+# Sanitizers
+if(S2GEOGRAPHY_SANITIZERS)
+  set(S2GEOGRAPHY_SANITIZER_FLAGS
+      -fsanitize=address,undefined -fno-omit-frame-pointer
+      -fno-sanitize-recover=all)
+  target_compile_options(s2geography PUBLIC ${S2GEOGRAPHY_SANITIZER_FLAGS})
+  target_link_options(s2geography PUBLIC ${S2GEOGRAPHY_SANITIZER_FLAGS})
+endif()
 
 # Set somewhat aggressive compiler warning flags
 if(S2GEOGRAPHY_EXTRA_WARNINGS)
