@@ -398,7 +398,7 @@ class CollectionConstructor : public Constructor {
         polyline_constructor_(options),
         polygon_constructor_(options),
         collection_constructor_(nullptr),
-        // active_constructor_(nullptr),
+        active_constructor_(nullptr),
         level_(0) {}
 
   GeoArrowErrorCode geom_start(GeoArrowGeometryType geometry_type,
