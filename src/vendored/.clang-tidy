@@ -1,0 +1,4 @@
+# In general we want to ignore checks in this directory; however, it's
+# easier to configure run-clang-tidy if we have at least one.
+---
+Checks: '-*,clang-analyzer-core.DivideZero'

@@ -1,0 +1,13 @@
+# gtest triggers several clang-tidy warnings and it is easier to
+# turn them off here.
+# clang-diagnostic-c2y-extensions is because of nanoarrow and
+# geoarrow's __COUNTER__ use, which will be fixed in future versions
+# of both.
+---
+Checks: >-
+  clang-analyzer-*,
+  -clang-analyzer-core.CallAndMessage,
+  -clang-analyzer-optin.performance.Padding,
+  -clang-analyzer-security.insecureAPI.rand,
+  -clang-diagnostic-c2y-extensions
+FormatStyle: google

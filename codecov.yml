@@ -1,0 +1,3 @@
+# Ignore vendored libraries when computing code coverage
+ignore:
+  - "src/vendored/**"
