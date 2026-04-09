@@ -309,6 +309,13 @@ target_link_libraries(
 
 # Set somewhat aggressive compiler warning flags
 if(S2GEOGRAPHY_EXTRA_WARNINGS)
+  # Mark third-party include directories as SYSTEM so that compiler warnings
+  # from dependency headers (e.g., GCC -Wmaybe-uninitialized from inlined
+  # S2/Abseil template code) are suppressed when -Werror is enabled.
+  target_include_directories(
+    s2geography SYSTEM
+    PRIVATE ${s2_INCLUDE_DIRS} ${ABSL_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIRS})
+
   if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(
       s2geography
