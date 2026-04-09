@@ -241,6 +241,28 @@ inline nanoarrow::UniqueArray ArgArrow(
   return array;
 }
 
+// Create an arrow string array argument.
+inline nanoarrow::UniqueArray ArgArrowString(
+    std::vector<std::optional<std::string>> values) {
+  nanoarrow::UniqueArray array;
+  NANOARROW_THROW_NOT_OK(
+      ArrowArrayInitFromType(array.get(), NANOARROW_TYPE_STRING));
+  NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(array.get()));
+
+  for (const auto& value : values) {
+    if (value.has_value()) {
+      ArrowStringView na_value{value->data(),
+                               static_cast<int64_t>(value->size())};
+      NANOARROW_THROW_NOT_OK(ArrowArrayAppendString(array.get(), na_value));
+    } else {
+      NANOARROW_THROW_NOT_OK(ArrowArrayAppendNull(array.get(), 1));
+    }
+  }
+
+  NANOARROW_THROW_NOT_OK(ArrowArrayFinishBuildingDefault(array.get(), nullptr));
+  return array;
+}
+
 // Test utility to create a SedonaCScalarKernelImpl from a kernel, call init,
 // and check its output type.
 inline void TestInitKernel(struct SedonaCScalarKernel* kernel,
@@ -299,6 +321,64 @@ inline void TestExecuteKernel(
     ASSERT_TRUE(arg_type.has_value());
 
     args.push_back(ArgArrow(*arg_type, arg));
+  }
+
+  ASSERT_EQ(arg_type_it, arg_types.end());
+
+  std::vector<struct ArrowArray*> arg_pointers;
+  for (auto& arg : args) {
+    arg_pointers.push_back(arg.get());
+  }
+
+  // Compute n_rows: the maximum length across all args (scalars have length 1)
+  int64_t n_rows = 1;
+  for (auto& arg : args) {
+    if (arg->length > n_rows) {
+      n_rows = arg->length;
+    }
+  }
+
+  ASSERT_EQ(
+      impl->execute(impl, arg_pointers.data(),
+                    static_cast<int64_t>(arg_pointers.size()), n_rows, out),
+      0)
+      << impl->get_last_error(impl);
+}
+
+// Overload that also accepts string arguments after the numeric arguments.
+// This is needed for ST_Buffer() with params.
+inline void TestExecuteKernel(
+    struct SedonaCScalarKernelImpl* impl, std::vector<ArrowTypeOrWKB> arg_types,
+    std::vector<std::vector<std::optional<std::string>>> geography_args,
+    std::vector<std::vector<std::optional<double>>> other_args,
+    std::vector<std::vector<std::optional<std::string>>> string_args,
+    struct ArrowArray* out) {
+  auto arg_type_it = arg_types.begin();
+  std::vector<nanoarrow::UniqueArray> args;
+
+  for (const auto& geometry_arg : geography_args) {
+    ASSERT_NE(arg_type_it, arg_types.end());
+    auto arg_type = *arg_type_it++;
+    ASSERT_FALSE(arg_type.has_value());
+
+    args.push_back(ArgWkb(geometry_arg));
+  }
+
+  for (const auto& arg : other_args) {
+    ASSERT_NE(arg_type_it, arg_types.end());
+    auto arg_type = *arg_type_it++;
+    ASSERT_TRUE(arg_type.has_value());
+
+    args.push_back(ArgArrow(*arg_type, arg));
+  }
+
+  for (const auto& arg : string_args) {
+    ASSERT_NE(arg_type_it, arg_types.end());
+    auto arg_type = *arg_type_it++;
+    ASSERT_TRUE(arg_type.has_value());
+    ASSERT_EQ(*arg_type, NANOARROW_TYPE_STRING);
+
+    args.push_back(ArgArrowString(arg));
   }
 
   ASSERT_EQ(arg_type_it, arg_types.end());

@@ -114,10 +114,12 @@ void UnionKernel(struct SedonaCScalarKernel* out);
 void ReducePrecisionKernel(struct SedonaCScalarKernel* out);
 void SimplifyKernel(struct SedonaCScalarKernel* out);
 void BufferKernel(struct SedonaCScalarKernel* out);
+void BufferParamsKernel(struct SedonaCScalarKernel* out);
 
 // Exposed for testing
 enum class CapStyle { kRound, kFlat, kSquare };
 enum class JoinStyle { kRound, kMitre, kBevel };
+enum class BufferSide { kLeft, kRight, kBoth };
 
 /// \brief Parsed PostGIS-style buffer parameters.
 ///
@@ -129,7 +131,7 @@ enum class JoinStyle { kRound, kMitre, kBevel };
 struct BufferParams {
   CapStyle end_cap_style = CapStyle::kRound;
   JoinStyle join_style = JoinStyle::kRound;
-  bool single_sided = false;
+  BufferSide side = BufferSide::kBoth;
   double mitre_limit = 5.0;
   int quadrant_segments = 8;
 

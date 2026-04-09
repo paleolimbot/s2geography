@@ -1569,41 +1569,22 @@ JoinStyle ParseJoinStyle(const std::string& value) {
   } else if (StrCaseEqual(value, "bevel")) {
     return JoinStyle::kBevel;
   }
+
   throw Exception("Invalid join style: '" + value +
                   "'. Valid options: round, mitre, miter, bevel");
 }
 
-bool ParseSingleSided(const std::string& value) {
+BufferSide ParseBufferSide(const std::string& value) {
   if (StrCaseEqual(value, "both")) {
-    return false;
-  } else if (StrCaseEqual(value, "left") || StrCaseEqual(value, "right")) {
-    return true;
+    return BufferSide::kBoth;
+  } else if (StrCaseEqual(value, "left")) {
+    return BufferSide::kLeft;
+  } else if (StrCaseEqual(value, "right")) {
+    return BufferSide::kRight;
   }
+
   throw Exception("Invalid side: '" + value +
                   "'. Valid options: both, left, right");
-}
-
-std::pair<bool, bool> ParseBufferSideStyle(const std::string& params) {
-  bool left = false;
-  bool right = false;
-  std::istringstream iss(params);
-  std::string tok;
-  while (iss >> tok) {
-    auto eq_pos = tok.find('=');
-    if (eq_pos == std::string::npos) continue;
-    std::string key = tok.substr(0, eq_pos);
-    std::string val = tok.substr(eq_pos + 1);
-    if (StrCaseEqual(key, "side")) {
-      if (StrCaseEqual(val, "left")) {
-        left = true;
-        right = false;
-      } else if (StrCaseEqual(val, "right")) {
-        right = true;
-        left = false;
-      }
-    }
-  }
-  return {left, right};
 }
 
 /// Parameters are space-separated key=value pairs (case-insensitive).
@@ -1632,8 +1613,8 @@ BufferParams BufferParams::Parse(std::string_view params_str) {
     } else if (StrCaseEqual(key, "join")) {
       params.join_style = ParseJoinStyle(value);
     } else if (StrCaseEqual(key, "side")) {
-      params.single_sided = ParseSingleSided(value);
-      if (params.single_sided && !end_cap_specified) {
+      params.side = ParseBufferSide(value);
+      if (params.side != BufferSide::kBoth && !end_cap_specified) {
         params.end_cap_style = CapStyle::kSquare;
       }
     } else if (StrCaseEqual(key, "mitre_limit") ||
@@ -1675,6 +1656,39 @@ struct BufferParamsExec {
       options.set_buffer_radius(
           S1Angle::Radians(distance / S2Earth::RadiusMeters()));
       options.set_circle_segments(parsed.quadrant_segments * 4.0);
+
+      switch (parsed.end_cap_style) {
+        case CapStyle::kRound:
+          options.set_end_cap_style(S2BufferOperation::EndCapStyle::ROUND);
+          break;
+        case CapStyle::kFlat:
+          options.set_end_cap_style(S2BufferOperation::EndCapStyle::FLAT);
+          break;
+        case CapStyle::kSquare:
+          throw Exception(std::string("Unsupported cap style in params ") +
+                          std::string(params));
+          break;
+      }
+
+      switch (parsed.join_style) {
+        case JoinStyle::kRound:
+          break;
+        default:
+          throw Exception(std::string("Unsupported join style in params ") +
+                          std::string(params));
+      }
+
+      switch (parsed.side) {
+        case BufferSide::kLeft:
+          options.set_polyline_side(S2BufferOperation::PolylineSide::LEFT);
+          break;
+        case BufferSide::kRight:
+          options.set_polyline_side(S2BufferOperation::PolylineSide::RIGHT);
+          break;
+        case BufferSide::kBoth:
+          options.set_polyline_side(S2BufferOperation::PolylineSide::BOTH);
+          break;
+      }
 
       options_ = options;
       last_distance_ = distance;

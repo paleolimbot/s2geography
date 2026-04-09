@@ -1202,11 +1202,189 @@ INSTANTIATE_TEST_SUITE_P(
       return info.param.name;
     });
 
+TEST(Build, SedonaUdfBufferParams) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::BufferParamsKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl,
+      {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE, NANOARROW_TYPE_STRING},
+      ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE, NANOARROW_TYPE_STRING},
+      {{"POINT (0 0)", "LINESTRING (0 0, 10 0)", std::nullopt}},
+      {{0.0, 0.0, std::nullopt}}, {{"", "", std::nullopt}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(
+      out_array.get(), {"POLYGON EMPTY", "POLYGON EMPTY", std::nullopt}));
+}
+
+struct BufferParamsOpParam {
+  std::string name;
+  std::optional<std::string> input_wkt;
+  std::optional<double> distance;
+  std::optional<std::string> params;
+  std::optional<std::string> expected_wkt;
+
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const BufferParamsOpParam& p) {
+    os << (p.input_wkt ? *p.input_wkt : "null")
+       << " dist=" << (p.distance ? std::to_string(*p.distance) : "null")
+       << " params=" << (p.params ? *p.params : "null") << " -> "
+       << (p.expected_wkt ? *p.expected_wkt : "null");
+    return os;
+  }
+};
+
+class BufferParamsTest : public ::testing::TestWithParam<BufferParamsOpParam> {
+};
+
+TEST_P(BufferParamsTest, SedonaUdf) {
+  const auto& p = GetParam();
+
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::BufferParamsKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl,
+      {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE, NANOARROW_TYPE_STRING},
+      ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE, NANOARROW_TYPE_STRING},
+      {{p.input_wkt}}, {{p.distance}}, {{p.params}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(
+      TestResultGeography(out_array.get(), {p.expected_wkt}));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Build, BufferParamsTest,
+    ::testing::Values(
+        // Null inputs
+        BufferParamsOpParam{"null_geom", std::nullopt, 100000.0, "",
+                            std::nullopt},
+        BufferParamsOpParam{"null_distance", "POINT (0 0)", std::nullopt, "",
+                            std::nullopt},
+        BufferParamsOpParam{"null_params", "POINT (0 0)", 100000.0,
+                            std::nullopt, std::nullopt},
+        BufferParamsOpParam{"null_all", std::nullopt, std::nullopt,
+                            std::nullopt, std::nullopt},
+
+        // Empty params: same as default BufferKernel
+        BufferParamsOpParam{"empty_params", "POINT (0 0)", 100000.0, "",
+                            "POLYGON ((-0.899308 0.004766, -0.88296 -0.170765, "
+                            "-0.832686 -0.339735, -0.750414 -0.495651, "
+                            "-0.639303 -0.632523, -0.50362 -0.745089, "
+                            "-0.348578 -0.829023, -0.180135 -0.881096, "
+                            "-0.004767 -0.899308, 0.170785 -0.882956, "
+                            "0.339771 -0.832671, 0.495694 -0.750386, "
+                            "0.632562 -0.639264, 0.745118 -0.503577, "
+                            "0.829038 -0.348541, 0.881101 -0.180114, "
+                            "0.899308 -0.004766, 0.88296 0.170765, "
+                            "0.832686 0.339735, 0.750414 0.495651, "
+                            "0.639303 0.632523, 0.50362 0.745089, "
+                            "0.348578 0.829023, 0.180135 0.881096, "
+                            "0.004767 0.899308, -0.170785 0.882956, "
+                            "-0.339771 0.832671, -0.495694 0.750386, "
+                            "-0.632562 0.639264, -0.745118 0.503577, "
+                            "-0.829038 0.348541, -0.881101 0.180114, "
+                            "-0.899308 0.004766))"},
+
+        // endcap=round: explicit round, same result as default
+        BufferParamsOpParam{"endcap_round", "LINESTRING (0 0, 1 0)", 100000.0,
+                            "endcap=round",
+                            "POLYGON ((0 0.89932, -0.175477 0.882036, "
+                            "-0.344206 0.830847, -0.4997 0.747724, "
+                            "-0.635982 0.635862, -0.747816 0.499561, "
+                            "-0.830907 0.344063, -0.882062 0.175343, "
+                            "-0.89932 -0.000115, -0.882017 -0.175569, "
+                            "-0.830818 -0.344276, -0.747688 -0.499753, "
+                            "-0.635819 -0.636025, -0.499508 -0.747852, "
+                            "-0.343993 -0.830936, -0.175251 -0.882081, "
+                            "0 -0.89932, 1 -0.89932, "
+                            "1.175477 -0.882036, 1.344206 -0.830847, "
+                            "1.4997 -0.747724, 1.635982 -0.635862, "
+                            "1.747816 -0.499561, 1.830907 -0.344063, "
+                            "1.882062 -0.175343, 1.89932 0.000115, "
+                            "1.882017 0.175569, 1.830818 0.344276, "
+                            "1.747688 0.499753, 1.635819 0.636025, "
+                            "1.499508 0.747852, 1.343993 0.830936, "
+                            "1.175251 0.882081, 1 0.89932, 0 0.89932))"},
+
+        // endcap=flat: flat cap on linestring (no semicircular endcaps)
+        BufferParamsOpParam{"endcap_flat", "LINESTRING (0 0, 1 0)", 100000.0,
+                            "endcap=flat",
+                            "POLYGON ((0 0.89932, 0 -0.89932, "
+                            "1 -0.89932, 1 0.89932, 0 0.89932))"},
+
+        // side=left endcap=round: only left side of linestring
+        BufferParamsOpParam{"side_left", "LINESTRING (0 0, 1 0)", 100000.0,
+                            "endcap=round side=left",
+                            "POLYGON ((1.89932 0, 1.88204 0.175456, "
+                            "1.830862 0.34417, 1.747752 0.499657, "
+                            "1.635901 0.635943, 1.499604 0.747788, "
+                            "1.344099 0.830892, 1.175364 0.882058, "
+                            "1 0.89932, 0 0.89932, "
+                            "-0.175477 0.882036, -0.344206 0.830847, "
+                            "-0.4997 0.747724, -0.635982 0.635862, "
+                            "-0.747816 0.499561, -0.830907 0.344063, "
+                            "-0.882062 0.175343, -0.89932 0, "
+                            "0 0, 1 0, 1.89932 0))"},
+
+        // side=right endcap=round: only right side of linestring
+        BufferParamsOpParam{"side_right", "LINESTRING (0 0, 1 0)", 100000.0,
+                            "endcap=round side=right",
+                            "POLYGON ((-0.89932 0, -0.88204 -0.175456, "
+                            "-0.830862 -0.34417, -0.747752 -0.499657, "
+                            "-0.635901 -0.635943, -0.499604 -0.747788, "
+                            "-0.344099 -0.830892, -0.175364 -0.882058, "
+                            "0 -0.89932, 1 -0.89932, "
+                            "1.175477 -0.882036, 1.344206 -0.830847, "
+                            "1.4997 -0.747724, 1.635982 -0.635862, "
+                            "1.747816 -0.499561, 1.830907 -0.344063, "
+                            "1.882062 -0.175343, 1.89932 0, "
+                            "1 0, 0 0, -0.89932 0))"},
+
+        // quad_segs=4: fewer circle segments (16 instead of 32 for a full
+        // circle)
+        BufferParamsOpParam{"quad_segs_4", "POINT (0 0)", 100000.0,
+                            "quad_segs=4",
+                            "POLYGON ((-0.899308 0.004766, "
+                            "-0.832686 -0.339735, "
+                            "-0.639303 -0.632523, "
+                            "-0.348578 -0.829023, "
+                            "-0.004767 -0.899308, "
+                            "0.339771 -0.832671, "
+                            "0.632562 -0.639264, "
+                            "0.829038 -0.348541, "
+                            "0.899308 -0.004766, "
+                            "0.832686 0.339735, "
+                            "0.639303 0.632523, "
+                            "0.348578 0.829023, "
+                            "0.004767 0.899308, "
+                            "-0.339771 0.832671, "
+                            "-0.632562 0.639264, "
+                            "-0.829038 0.348541, "
+                            "-0.899308 0.004766))"}
+
+        ),
+    [](const ::testing::TestParamInfo<BufferParamsOpParam>& info) {
+      return info.param.name;
+    });
+
 TEST(BufferParamsParse, Empty) {
   auto p = sedona_udf::BufferParams::Parse("");
   EXPECT_EQ(p.end_cap_style, sedona_udf::CapStyle::kRound);
   EXPECT_EQ(p.join_style, sedona_udf::JoinStyle::kRound);
-  EXPECT_FALSE(p.single_sided);
+  EXPECT_EQ(p.side, sedona_udf::BufferSide::kBoth);
   EXPECT_DOUBLE_EQ(p.mitre_limit, 5.0);
   EXPECT_EQ(p.quadrant_segments, 8);
 }
@@ -1266,25 +1444,25 @@ TEST(BufferParamsParse, JoinInvalid) {
 
 TEST(BufferParamsParse, SideBoth) {
   auto p = sedona_udf::BufferParams::Parse("side=both");
-  EXPECT_FALSE(p.single_sided);
+  EXPECT_EQ(p.side, sedona_udf::BufferSide::kBoth);
 }
 
 TEST(BufferParamsParse, SideLeft) {
   auto p = sedona_udf::BufferParams::Parse("side=left");
-  EXPECT_TRUE(p.single_sided);
+  EXPECT_EQ(p.side, sedona_udf::BufferSide::kLeft);
   // When side is single-sided and endcap not explicitly set, defaults to square
   EXPECT_EQ(p.end_cap_style, sedona_udf::CapStyle::kSquare);
 }
 
 TEST(BufferParamsParse, SideRight) {
   auto p = sedona_udf::BufferParams::Parse("side=right");
-  EXPECT_TRUE(p.single_sided);
+  EXPECT_EQ(p.side, sedona_udf::BufferSide::kRight);
   EXPECT_EQ(p.end_cap_style, sedona_udf::CapStyle::kSquare);
 }
 
 TEST(BufferParamsParse, SideWithExplicitEndcap) {
   auto p = sedona_udf::BufferParams::Parse("endcap=round side=left");
-  EXPECT_TRUE(p.single_sided);
+  EXPECT_EQ(p.side, sedona_udf::BufferSide::kLeft);
   // Endcap was explicitly set before side, so it stays round
   EXPECT_EQ(p.end_cap_style, sedona_udf::CapStyle::kRound);
 }
