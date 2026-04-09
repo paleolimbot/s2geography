@@ -17,6 +17,13 @@ jobs:
       matrix:
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
         build-type: ["Debug", "Release"]
+        exclude:
+          # Conda packages are Release-only; mixing a Release-built S2 with
+          # a Debug-built s2geography on Windows causes CRT heap mismatches
+          # (objects allocated in S2's Release CRT heap are freed via the
+          # Debug CRT heap, triggering _CrtIsValidHeapPointer assertions).
+          - os: windows-latest
+            build-type: Debug
     steps:
       - uses: actions/checkout@v6
 
