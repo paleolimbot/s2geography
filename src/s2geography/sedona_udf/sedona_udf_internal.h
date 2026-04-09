@@ -84,6 +84,7 @@ class ArrowOutputBuilder {
   }
 
   void InitOutputTypeWithCrs(struct ArrowSchema* out, const std::string& crs) {
+    S2GEOGRAPHY_UNUSED(crs);
     InitOutputType(out);
   }
 
@@ -175,6 +176,7 @@ class GeoArrowOutputBuilder {
   }
 
   void Reserve(int64_t additional_size) {
+    S2GEOGRAPHY_UNUSED(additional_size);
     // The current geoarrow writer doesn't provide any support for this;
     // however, it does support multiple cycles of Append/Finish.
   }
@@ -452,7 +454,10 @@ class ArrowInputView {
     }
   }
 
-  static std::string GetCrs(const struct ArrowSchema* type) { return ""; }
+  static std::string GetCrs(const struct ArrowSchema* type) {
+    S2GEOGRAPHY_UNUSED(type);
+    return "";
+  }
 
   ArrowInputView(const struct ArrowSchema* type) {
     NANOARROW_THROW_NOT_OK(
@@ -466,6 +471,7 @@ class ArrowInputView {
   }
 
   void SetArray(const struct ArrowArray* array, int64_t num_rows) {
+    S2GEOGRAPHY_UNUSED(num_rows);
     NANOARROW_THROW_NOT_OK(ArrowArrayViewSetArray(view_.get(), array, nullptr));
 
     if (array->length == 0) {

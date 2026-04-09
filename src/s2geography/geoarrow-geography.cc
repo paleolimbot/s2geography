@@ -208,7 +208,7 @@ void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
         "INT_MAX parts");
   }
 
-  num_chains_ = geom_.size();
+  num_chains_ = static_cast<int>(geom_.size());
   num_edges_.resize(num_chains_ + 1);
   int64_t num_edges = 0;
 
@@ -222,7 +222,7 @@ void GeoArrowLaxPolylineShape::Init(struct GeoArrowGeometryView geom) {
           "INT_MAX edges");
     }
 
-    num_edges_[i++] = num_edges;
+    num_edges_[i++] = static_cast<int>(num_edges);
     return true;
   });
 
@@ -439,8 +439,8 @@ GeoArrowGeography::GeoArrowGeography(GeoArrowGeography&& other)
       points_(std::move(other.points_)),
       lines_(std::move(other.lines_)),
       polygons_(std::move(other.polygons_)),
-      covering_(std::move(other.covering_)),
-      index_() {
+      index_(),
+      covering_(std::move(other.covering_)) {
   // index_ needs to be rebuilt
   index_.Clear();
   indexed_ = false;
@@ -574,9 +574,12 @@ std::optional<S2Point> GeoArrowGeography::Point() const {
       if (points_.num_edges() == 1) {
         return points_.edge(0).v0;
       }
+      break;
     default:
-      return std::nullopt;
+      break;
   }
+
+  return std::nullopt;
 }
 
 uint8_t GeoArrowGeography::geometry_type() const {
