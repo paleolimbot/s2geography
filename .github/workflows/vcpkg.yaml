@@ -99,7 +99,8 @@ jobs:
             asan_options: "detect_leaks=1:detect_stack_use_after_return=1"
             # Abseil lts_20260107 triggers a GCC bug with sanitizers.
             # Pin to a vcpkg release that predates that version.
-            vcpkg_ref: b322364f06308bdd24823f9d8f03fe0cc86fd46f  # 2024.12.16
+            # This is the oldest commit that still contains nanoarrow
+            vcpkg_ref: 1dd481b3236aa23a75a1c7b088fa2b6f51c796f6
           - os: macos-latest
             triplet: arm64-osx-asan
             asan_options: "detect_stack_use_after_return=1"
