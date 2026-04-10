@@ -95,23 +95,17 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            triplet: x64-linux-asan
+            triplet: x64-linux-asan-only
             asan_options: "detect_leaks=1:detect_stack_use_after_return=1"
-            # Abseil lts_20260107 triggers a GCC constexpr bug with sanitizers;
-            # work around it by using GCC 14.
-            cc: gcc-14
-            cxx: g++-14
+            # Abseil lts_20260107 triggers a GCC constexpr bug with UBSAN
+            # (https://github.com/abseil/abseil-cpp/issues/1634).
+            # Use ASAN-only on Linux to keep leak detection working.
+            sanitizer_type: address
           - os: macos-latest
             triplet: arm64-osx-asan
             asan_options: "detect_stack_use_after_return=1"
     steps:
       - uses: actions/checkout@v6
-
-      - name: Install compiler
-        if: matrix.cc
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ${{ matrix.cc }} ${{ matrix.cxx }}
 
       - name: Clone vcpkg
         uses: actions/checkout@v6
@@ -138,13 +132,10 @@ jobs:
         uses: actions/cache@v5
         with:
           path: vcpkg/installed
-          key: vcpkg-installed-asan-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REF }}-${{ matrix.cc }}-2
+          key: vcpkg-installed-asan-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REF }}-2
 
       - name: Install vcpkg dependencies
         if: steps.cache-vcpkg.outputs.cache-hit != 'true'
-        env:
-          CC: ${{ matrix.cc || '' }}
-          CXX: ${{ matrix.cxx || '' }}
         run: |
           ./vcpkg/vcpkg install nanoarrow s2geometry abseil openssl \
             --overlay-triplets=ci/triplets --triplet=${{ matrix.triplet }}
@@ -152,12 +143,11 @@ jobs:
           rm -rf vcpkg/downloads
 
       - name: Build s2geography
-        env:
-          CC: ${{ matrix.cc || '' }}
-          CXX: ${{ matrix.cxx || '' }}
         run: |
           mkdir build && cd build
-          cmake .. -DS2GEOGRAPHY_BUILD_TESTS=ON -DS2GEOGRAPHY_SANITIZERS=ON -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=OFF \
+          cmake .. -DS2GEOGRAPHY_BUILD_TESTS=ON -DS2GEOGRAPHY_SANITIZERS=ON \
+            -DS2GEOGRAPHY_SANITIZER_TYPE=${{ matrix.sanitizer_type || 'address,undefined' }} \
+            -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=OFF \
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/ci/triplets
           cmake --build .
 
