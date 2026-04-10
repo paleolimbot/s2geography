@@ -419,30 +419,7 @@ void DistanceLineUsingShapeIndex(const S2ShapeIndex& value0,
       out->extremal_points =
           Traits::edge_pair_extremal_points(e0.v0, e0.v1, e1.v0, e1.v1);
     } else {
-      // Fallback: the indexed query could not find a matching edge (can happen
-      // for near-antipodal geometries with S2FurthestEdgeQuery). Iterate over
-      // all edges in value1 to find the extremal match.
-      S1ChordAngle best_dist = Traits::default_distance();
-      for (int s = 0; s < value1.num_shape_ids(); ++s) {
-        const S2Shape* shape = value1.shape(s);
-        if (shape == nullptr) continue;
-        for (int e = 0; e < shape->num_edges(); ++e) {
-          S2Shape::Edge e1 = shape->edge(e);
-          auto points =
-              Traits::edge_pair_extremal_points(e0.v0, e0.v1, e1.v0, e1.v1);
-          S1ChordAngle d(points.first, points.second);
-          if (Traits::is_better(d, best_dist)) {
-            out->shape_id1 = s;
-            out->edge_id1 = e;
-            out->extremal_points = points;
-            best_dist = d;
-          }
-        }
-      }
-      if (out->edge_id1 < 0) {
-        *out = {};
-        return;
-      }
+      throw Exception("Failed to find farthest edge pair");
     }
   }
 }
