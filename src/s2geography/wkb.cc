@@ -61,6 +61,10 @@ std::string WKBWriter::WriteFeature(const Geography& geog) {
   const auto data = static_cast<const uint8_t*>(array.buffers[2]);
   std::string result(reinterpret_cast<const char*>(data), offsets[1]);
 
+  if (array.release != nullptr) {
+    array.release(&array);
+  }
+
   return result;
 }
 
