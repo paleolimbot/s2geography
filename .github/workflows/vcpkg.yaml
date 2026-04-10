@@ -97,22 +97,27 @@ jobs:
           - os: ubuntu-latest
             triplet: x64-linux-asan
             asan_options: "detect_leaks=1:detect_stack_use_after_return=1"
-            # Abseil lts_20260107 triggers a GCC bug with sanitizers.
-            # Pin to a vcpkg release that predates that version
-            # (which also predates nanoarrow on vcpkg, so use vendored).
-            vcpkg_ref: 4327b9c40ad4cc726377b7d4bec6ac16ae218458  # 2024.07.22
-            vcpkg_packages: "s2geometry abseil openssl"
+            # Abseil lts_20260107 triggers a GCC constexpr bug with sanitizers;
+            # work around it by using GCC 14.
+            cc: gcc-14
+            cxx: g++-14
           - os: macos-latest
             triplet: arm64-osx-asan
             asan_options: "detect_stack_use_after_return=1"
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install compiler
+        if: matrix.cc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.cc }} ${{ matrix.cxx }}
+
       - name: Clone vcpkg
         uses: actions/checkout@v6
         with:
           repository: microsoft/vcpkg
-          ref: ${{ matrix.vcpkg_ref || env.VCPKG_REF }}
+          ref: ${{ env.VCPKG_REF }}
           path: vcpkg
 
       - name: Set up environment variables and bootstrap vcpkg
@@ -133,17 +138,23 @@ jobs:
         uses: actions/cache@v5
         with:
           path: vcpkg/installed
-          key: vcpkg-installed-asan-${{ runner.os }}-${{ runner.arch }}-${{ matrix.vcpkg_ref || env.VCPKG_REF }}-2
+          key: vcpkg-installed-asan-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REF }}-${{ matrix.cc }}-2
 
       - name: Install vcpkg dependencies
         if: steps.cache-vcpkg.outputs.cache-hit != 'true'
+        env:
+          CC: ${{ matrix.cc || '' }}
+          CXX: ${{ matrix.cxx || '' }}
         run: |
-          ./vcpkg/vcpkg install ${{ matrix.vcpkg_packages || 'nanoarrow s2geometry abseil openssl' }} \
+          ./vcpkg/vcpkg install nanoarrow s2geometry abseil openssl \
             --overlay-triplets=ci/triplets --triplet=${{ matrix.triplet }}
           rm -rf vcpkg/buildtrees
           rm -rf vcpkg/downloads
 
       - name: Build s2geography
+        env:
+          CC: ${{ matrix.cc || '' }}
+          CXX: ${{ matrix.cxx || '' }}
         run: |
           mkdir build && cd build
           cmake .. -DS2GEOGRAPHY_BUILD_TESTS=ON -DS2GEOGRAPHY_SANITIZERS=ON -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=OFF \
