@@ -666,6 +666,44 @@ struct S2ShortestLineExec {
   EdgePair edge_pair_;
 };
 
+struct S2LongestLineExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
+  using out_t = GeoArrowOutputBuilder;
+
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
+    out->SetDimensionsCommon(value0.dimensions(), value1.dimensions());
+
+    DistanceLine<MaxDistanceTraits>(value0, value1, &edge_pair_,
+                                    kFlagComputePoints);
+    if (edge_pair_.is_empty()) {
+      out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+      return;
+    }
+
+    auto native_edge0 =
+        value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
+    auto native_vertex0 =
+        native_edge0.Interpolate(edge_pair_.closest_points.first)
+            .Normalize(value0.dimensions());
+
+    auto native_edge1 =
+        value1.native_edge(edge_pair_.shape_id1, edge_pair_.edge_id1);
+    auto native_vertex1 =
+        native_edge1.Interpolate(edge_pair_.closest_points.second)
+            .Normalize(value1.dimensions());
+
+    out->FeatureStart();
+    out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+    out->WriteCoord(native_vertex0);
+    out->WriteCoord(native_vertex1);
+    out->GeomEnd();
+    out->FeatureEnd();
+  }
+
+  EdgePair edge_pair_;
+};
+
 void ClosestPointKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<S2ClosestPointExec>(out, "st_closestpoint");
 }
@@ -676,8 +714,16 @@ void DistanceKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
                                    prepare_arg1_scalar);
 }
 
-void MaxDistanceKernel(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<S2MaxDistanceExec>(out, "st_maxdistance");
+void MaxDistanceKernel(struct SedonaCScalarKernel* out,
+                       bool prepare_arg0_scalar, bool prepare_arg1_scalar) {
+  InitBinaryKernel<S2MaxDistanceExec>(out, "st_maxdistance",
+                                      prepare_arg0_scalar, prepare_arg1_scalar);
+}
+
+void LongestLineKernel(struct SedonaCScalarKernel* out,
+                       bool prepare_arg0_scalar, bool prepare_arg1_scalar) {
+  InitBinaryKernel<S2LongestLineExec>(out, "st_longestline",
+                                      prepare_arg0_scalar, prepare_arg1_scalar);
 }
 
 void ShortestLineKernel(struct SedonaCScalarKernel* out,
