@@ -100,7 +100,7 @@ jobs:
             # Abseil lts_20260107 triggers a GCC bug with sanitizers.
             # Pin to a vcpkg release that predates that version
             # (which also predates nanoarrow on vcpkg, so use vendored).
-            vcpkg_ref: 1dd481b3236aa23a75a1c7b088fa2b6f51c796f6  # 2024.12.16
+            vcpkg_ref: 4327b9c40ad4cc726377b7d4bec6ac16ae218458  # 2024.07.22
             vcpkg_packages: "s2geometry abseil openssl"
           - os: macos-latest
             triplet: arm64-osx-asan
