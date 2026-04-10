@@ -211,180 +211,398 @@ INSTANTIATE_TEST_SUITE_P(
                                   std::nullopt, "LINESTRING ZM EMPTY",
                                   "LINESTRING ZM EMPTY", "POINT ZM EMPTY"},
 
-        // Point x point
         DistanceScalarScalarParam{
-            "point_distance_same_point", "POINT (0 0)", "POINT (0 0)", 0.0, 0.0,
-            "LINESTRING (0 0, 0 0)", "LINESTRING (0 0, 0 0)", "POINT (0 0)"},
-        DistanceScalarScalarParam{"point_distance_point", "POINT (0 0)",
-                                  "POINT (0 1)", 111195.10117748393,
-                                  111195.10117748393, "LINESTRING (0 0, 0 1)",
-                                  "LINESTRING (0 0, 0 1)", "POINT (0 0)"},
+            // Point x point
+            "point_distance_same_point", "POINT (0 0)", "POINT (0 0)",
+            // Distance
+            0.0,
+            // Max distance
+            0.0,
+            // Shortest line
+            "LINESTRING (0 0, 0 0)",
+            // Longest line
+            "LINESTRING (0 0, 0 0)",
+            // Closest Point
+            "POINT (0 0)"},
+        DistanceScalarScalarParam{
+            // Point x point
+            "point_distance_point", "POINT (0 0)", "POINT (0 1)",
+            // Distance
+            111195.10117748393,
+            // Max distance
+            111195.10117748393,
+            // Shortest line
+            "LINESTRING (0 0, 0 1)",
+            // Longest line
+            "LINESTRING (0 0, 0 1)",
+            // Closest Point
+            "POINT (0 0)"},
 
         DistanceScalarScalarParam{
+            // Point ZM x point ZM -------------------------
             "point_distance_point_zm", "POINT ZM (0 0 1 2)",
-            "POINT ZM (0 1 2 3)", 111195.10117748393, 111195.10117748393,
+            "POINT ZM (0 1 2 3)",
+            // Distance
+            111195.10117748393,
+            // Max distance
+            111195.10117748393,
+            // Shortest line
             "LINESTRING ZM (0 0 1 2, 0 1 2 3)",
-            "LINESTRING ZM (0 0 1 2, 0 1 2 3)", "POINT ZM (0 0 1 2)"},
+            // Longest line
+            "LINESTRING ZM (0 0 1 2, 0 1 2 3)",
+            // Closest Point
+            "POINT ZM (0 0 1 2)"},
 
         DistanceScalarScalarParam{
+            // Point Z x point Z
             "point_distance_point_z", "POINT Z (0 0 1)", "POINT Z (0 1 2)",
-            111195.10117748393, 111195.10117748393,
-            "LINESTRING Z (0 0 1, 0 1 2)", "LINESTRING Z (0 0 1, 0 1 2)",
+            // Distance
+            111195.10117748393,
+            // Max distance
+            111195.10117748393,
+            // Shortest line
+            "LINESTRING Z (0 0 1, 0 1 2)",
+            // Longest line
+            "LINESTRING Z (0 0 1, 0 1 2)",
+            // Closest Point
             "POINT Z (0 0 1)"},
 
         DistanceScalarScalarParam{
+            // Point M x point M
             "point_distance_point_m", "POINT M (0 0 2)", "POINT M (0 1 3)",
-            111195.10117748393, 111195.10117748393,
-            "LINESTRING M (0 0 2, 0 1 3)", "LINESTRING M (0 0 2, 0 1 3)",
+            // Distance
+            111195.10117748393,
+            // Max distance
+            111195.10117748393,
+            // Shortest line
+            "LINESTRING M (0 0 2, 0 1 3)",
+            // Longest line
+            "LINESTRING M (0 0 2, 0 1 3)",
+            // Closest Point
             "POINT M (0 0 2)"},
 
-        // Point x linestring (point on linestring)
-        DistanceScalarScalarParam{"point_distance_linestring_on", "POINT (0 0)",
-                                  "LINESTRING (0 0, 0 1)", 0.0,
-                                  111195.10117748393, "LINESTRING (0 0, 0 0)",
-                                  "LINESTRING (0 0, 0 1)", "POINT (0 0)"},
-        // Point x linestring (point off linestring)
         DistanceScalarScalarParam{
+            // Point x linestring (point on linestring) ----------
+            "point_distance_linestring_on", "POINT (0 0)",
+            "LINESTRING (0 0, 0 1)",
+            // Distance
+            0.0,
+            // Max distance
+            111195.10117748393,
+            // Shortest line
+            "LINESTRING (0 0, 0 0)",
+            // Longest line
+            "LINESTRING (0 0, 0 1)",
+            // Closest Point
+            "POINT (0 0)"},
+        DistanceScalarScalarParam{
+            // Point x linestring (point off linestring) ----------
             "point_distance_linestring_off", "POINT (1 0)",
-            "LINESTRING (0 0, 0 1)", 111195.10117748393, 157249.62809250789,
-            "LINESTRING (1 0, 0 0)", "LINESTRING (1 0, 0 1)", "POINT (1 0)"},
+            "LINESTRING (0 0, 0 1)",
+            // Distance
+            111195.10117748393,
+            // Max distance
+            157249.62809250789,
+            // Shortest line
+            "LINESTRING (1 0, 0 0)",
+            // Longest line
+            "LINESTRING (1 0, 0 1)",
+            // Closest Point
+            "POINT (1 0)"},
 
-        // Point x polygon (point inside)
         DistanceScalarScalarParam{
+            // Point x polygon (point inside)
             "point_distance_polygon_inside", "POINT (0.25 0.25)",
-            "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0, 196566.41390163341,
-            "LINESTRING (0.25 0.25, 0.25 0.25)", "LINESTRING (0.25 0.25, 2 0)",
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            // Distance
+            0.0,
+            // Max distance
+            196566.41390163341,
+            // Shortest line
+            "LINESTRING (0.25 0.25, 0.25 0.25)",
+            // Longest line
+            "LINESTRING (0.25 0.25, 2 0)",
+            // Closest Point
             "POINT (0.25 0.25)"},
-        // Point x polygon (point on boundary)
         DistanceScalarScalarParam{
+            // Point x polygon (point on boundary)
             "point_distance_polygon_boundary", "POINT (0 0)",
-            "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0, 222390.20235496786,
-            "LINESTRING (0 0, 0 0)", "LINESTRING (0 0, 2 0)", "POINT (0 0)"},
-        // Point x polygon (point outside)
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            // Distance
+            0.0,
+            // Max distance
+            222390.20235496786,
+            // Shortest line
+            "LINESTRING (0 0, 0 0)",
+            // Longest line
+            "LINESTRING (0 0, 2 0)",
+            // Closest Point
+            "POINT (0 0)"},
         DistanceScalarScalarParam{
+            // Point x polygon (point outside)
             "point_distance_polygon_outside", "POINT (-1 0)",
-            "POLYGON ((0 0, 2 0, 0 2, 0 0))", 111195.10117748393,
-            333585.3035324518, "LINESTRING (-1 0, 0 0)",
-            "LINESTRING (-1 0, 2 0)", "POINT (-1 0)"},
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            // Distance
+            111195.10117748393,
+            // Max distance
+            333585.3035324518,
+            // Shortest line
+            "LINESTRING (-1 0, 0 0)",
+            // Longest line
+            "LINESTRING (-1 0, 2 0)",
+            // Closest Point
+            "POINT (-1 0)"},
 
-        // Z Point x polygon (point inside)
         DistanceScalarScalarParam{
+            // Z Point x polygon (point inside)
             "point_z_distance_polygon_inside", "POINT Z (0.25 0.25 10)",
-            "POLYGON Z ((0 0 12, 2 0 12, 0 2 12, 0 0 12))", 0.0,
-            196566.41390163341, "LINESTRING Z (0.25 0.25 10, 0.25 0.25 10)",
-            "LINESTRING Z (0.25 0.25 10, 2 0 12)", "POINT Z (0.25 0.25 10)"},
-        // Z Point x polygon (point on boundary)
+            "POLYGON Z ((0 0 12, 2 0 12, 0 2 12, 0 0 12))",
+            // Distance
+            0.0,
+            // Max distance
+            196566.41390163341,
+            // Shortest line
+            "LINESTRING Z (0.25 0.25 10, 0.25 0.25 10)",
+            // Longest line
+            "LINESTRING Z (0.25 0.25 10, 2 0 12)",
+            // Closest Point
+            "POINT Z (0.25 0.25 10)"},
         DistanceScalarScalarParam{
+            // Z Point x polygon (point on boundary)
             "point_z_distance_polygon_boundary", "POINT Z (0 0 10)",
-            "POLYGON Z ((0 0 12, 2 0 12, 0 2 12, 0 0 12))", 0.0,
-            222390.20235496786, "LINESTRING Z (0 0 10, 0 0 12)",
-            "LINESTRING Z (0 0 10, 2 0 12)", "POINT Z (0 0 10)"},
-        // Z Point x polygon (point outside)
+            "POLYGON Z ((0 0 12, 2 0 12, 0 2 12, 0 0 12))",
+            // Distance
+            0.0,
+            // Max distance
+            222390.20235496786,
+            // Shortest line
+            "LINESTRING Z (0 0 10, 0 0 12)",
+            // Longest line
+            "LINESTRING Z (0 0 10, 2 0 12)",
+            // Closest Point
+            "POINT Z (0 0 10)"},
         DistanceScalarScalarParam{
+            // Z Point x polygon (point outside)
             "point_z_distance_polygon_outside", "POINT Z (-1 0 10)",
-            "POLYGON Z ((0 0 12, 2 0 12, 0 2 12, 0 0 12))", 111195.10117748393,
-            333585.3035324518, "LINESTRING Z (-1 0 10, 0 0 12)",
-            "LINESTRING Z (-1 0 10, 2 0 12)", "POINT Z (-1 0 10)"},
+            "POLYGON Z ((0 0 12, 2 0 12, 0 2 12, 0 0 12))",
+            // Distance
+            111195.10117748393,
+            // Max distance
+            333585.3035324518,
+            // Shortest line
+            "LINESTRING Z (-1 0 10, 0 0 12)",
+            // Longest line
+            "LINESTRING Z (-1 0 10, 2 0 12)",
+            // Closest Point
+            "POINT Z (-1 0 10)"},
 
-        // Linestring x polygon (linestring fully inside)
         DistanceScalarScalarParam{
+            // Linestring x polygon (linestring fully inside)
             "linestring_distance_polygon_inside",
             "LINESTRING (0.25 0.25, 0.5 0.5)", "POLYGON ((0 0, 2 0, 0 2, 0 0))",
-            0.0, 196566.41390163341, "LINESTRING (0.25 0.25, 0.25 0.25)",
-            "LINESTRING (0.25 0.25, 2 0)", "POINT (0.25 0.25)"},
-        // Polygon x linestring (linestring fully inside)
+            // Distance
+            0.0,
+            // Max distance
+            196566.41390163341,
+            // Shortest line
+            "LINESTRING (0.25 0.25, 0.25 0.25)",
+            // Longest line
+            "LINESTRING (0.25 0.25, 2 0)",
+            // Closest Point
+            "POINT (0.25 0.25)"},
         DistanceScalarScalarParam{
+            // Polygon x linestring (linestring fully inside)
             "polygon_distance_linestring_inside",
             "POLYGON ((0 0, 2 0, 0 2, 0 0))", "LINESTRING (0.25 0.25, 0.5 0.5)",
-            0.0, 196566.41390163341, "LINESTRING (0.25 0.25, 0.25 0.25)",
-            "LINESTRING (2 0, 0.25 0.25)", "POINT (0.25 0.25)"},
+            // Distance
+            0.0,
+            // Max distance
+            196566.41390163341,
+            // Shortest line
+            "LINESTRING (0.25 0.25, 0.25 0.25)",
+            // Longest line
+            "LINESTRING (2 0, 0.25 0.25)",
+            // Closest Point
+            "POINT (0.25 0.25)"},
 
-        // Linestring x polygon (linestring partially crosses boundary)
         DistanceScalarScalarParam{
+            // Linestring x polygon (linestring partially crosses boundary)
             "linestring_distance_polygon_crossing",
             "LINESTRING (0.25 0.25, 3 3)", "POLYGON ((0 0, 2 0, 0 2, 0 0))",
-            0.0, 471653.02881023812,
+            // Distance
+            0.0,
+            // Max distance
+            471653.02881023812,
+            // Shortest line
             "LINESTRING (0.999743 1.000714, 0.999743 1.000714)",
-            "LINESTRING (3 3, 0 0)", "POINT (0.999743 1.000714)"},
-        // Polygon x linestring (linestring partially crosses boundary)
+            // Longest line
+            "LINESTRING (3 3, 0 0)",
+            // Closest Point
+            "POINT (0.999743 1.000714)"},
         DistanceScalarScalarParam{
+            // Polygon x linestring (linestring partially crosses boundary)
             "polygon_distance_linestring_crossing",
             "POLYGON ((0 0, 2 0, 0 2, 0 0))", "LINESTRING (0.25 0.25, 3 3)",
-            0.0, 471653.02881023812,
+            // Distance
+            0.0,
+            // Max distance
+            471653.02881023812,
+            // Shortest line
             "LINESTRING (0.999743 1.000714, 0.999743 1.000714)",
-            "LINESTRING (0 0, 3 3)", "POINT (0.999743 1.000714)"},
+            // Longest line
+            "LINESTRING (0 0, 3 3)",
+            // Closest Point
+            "POINT (0.999743 1.000714)"},
 
-        // Linestring x polygon (linestring crosses through, neither vertex
-        // inside)
         DistanceScalarScalarParam{
+            // Linestring x polygon (linestring crosses through, neither vertex
+            // inside)
             "linestring_distance_polygon_through", "LINESTRING (-1 0.5, 3 0.5)",
-            "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0, 372880.15844616242,
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            // Distance
+            0.0,
+            // Max distance
+            372880.15844616242,
+            // Shortest line
             "LINESTRING (1.5 0.500286, 1.5 0.500286)",
-            "LINESTRING (3 0.5, 0 2)", "POINT (1.5 0.500286)"},
-        // Polygon x linestring (linestring crosses through, neither vertex
-        // inside)
+            // Longest line
+            "LINESTRING (3 0.5, 0 2)",
+            // Closest Point
+            "POINT (1.5 0.500286)"},
         DistanceScalarScalarParam{
+            // Polygon x linestring (linestring crosses through, neither vertex
+            // inside)
             "polygon_distance_linestring_through",
-            "POLYGON ((0 0, 2 0, 0 2, 0 0))", "LINESTRING (-1 0.5, 3 0.5)", 0.0,
-            372880.15844616242, "LINESTRING (1.5 0.500286, 1.5 0.500286)",
-            "LINESTRING (0 2, 3 0.5)", "POINT (1.5 0.500286)"},
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))", "LINESTRING (-1 0.5, 3 0.5)",
+            // Distance
+            0.0,
+            // Max distance
+            372880.15844616242,
+            // Shortest line
+            "LINESTRING (1.5 0.500286, 1.5 0.500286)",
+            // Longest line
+            "LINESTRING (0 2, 3 0.5)",
+            // Closest Point
+            "POINT (1.5 0.500286)"},
 
-        // Linestring x polygon (linestring fully outside)
         DistanceScalarScalarParam{
+            // Linestring x polygon (linestring fully outside)
             "linestring_distance_polygon_outside", "LINESTRING (3 3, 4 4)",
-            "POLYGON ((0 0, 2 0, 0 2, 0 0))", 314367.35908786184,
-            628758.78426786896, "LINESTRING (3 3, 0.998247 1.00221)",
-            "LINESTRING (4 4, 0 0)", "POINT (3 3)"},
-        // Polygon x linestring (linestring fully outside)
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            // Distance
+            314367.35908786184,
+            // Max distance
+            628758.78426786896,
+            // Shortest line
+            "LINESTRING (3 3, 0.998247 1.00221)",
+            // Longest line
+            "LINESTRING (4 4, 0 0)",
+            // Closest Point
+            "POINT (3 3)"},
         DistanceScalarScalarParam{
+            // Polygon x linestring (linestring fully outside)
             "polygon_distance_linestring_outside",
             "POLYGON ((0 0, 2 0, 0 2, 0 0))", "LINESTRING (3 3, 4 4)",
-            314367.35908786184, 628758.78426786896,
-            "LINESTRING (0.998247 1.00221, 3 3)", "LINESTRING (0 0, 4 4)",
+            // Distance
+            314367.35908786184,
+            // Max distance
+            628758.78426786896,
+            // Shortest line
+            "LINESTRING (0.998247 1.00221, 3 3)",
+            // Longest line
+            "LINESTRING (0 0, 4 4)",
+            // Closest Point
             "POINT (0.998247 1.00221)"},
 
-        // Polygon x polygon (one fully inside the other)
         DistanceScalarScalarParam{
+            // Polygon x polygon (one fully inside the other)
             "polygon_distance_polygon_inside", "POLYGON ((0 0, 2 0, 0 2, 0 0))",
-            "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))", 0.0,
-            218461.11755505961, "LINESTRING (0.1 0.1, 0.1 0.1)", std::nullopt,
+            "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
+            // Distance
+            0.0,
+            // Max distance
+            218461.11755505961,
+            // Shortest line
+            "LINESTRING (0.1 0.1, 0.1 0.1)",
+            // Longest line
+            "LINESTRING (2 0, 0.1 0.5)",
+            // Closest Point
             "POINT (0.1 0.1)"},
-        // Polygon x polygon (one fully inside, reversed)
         DistanceScalarScalarParam{
+            // Polygon x polygon (one fully inside, reversed)
             "polygon_distance_polygon_inside_rev",
             "POLYGON ((0.1 0.1, 0.5 0.1, 0.1 0.5, 0.1 0.1))",
-            "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0, 218461.11755505961,
-            "LINESTRING (0.1 0.1, 0.1 0.1)", std::nullopt, "POINT (0.1 0.1)"},
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            // Distance
+            0.0,
+            // Max distance
+            218461.11755505961,
+            // Shortest line
+            "LINESTRING (0.1 0.1, 0.1 0.1)",
+            // Longest line
+            "LINESTRING (0.1 0.5, 2 0)",
+            // Closest Point
+            "POINT (0.1 0.1)"},
 
-        // Polygon x polygon (partially overlapping)
-        DistanceScalarScalarParam{"polygon_distance_polygon_crossing",
-                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))",
-                                  "POLYGON ((1 0, 3 0, 1 2, 1 0))", 0.0,
-                                  400863.2536725945, "LINESTRING (2 0, 2 0)",
-                                  std::nullopt, "POINT (2 0)"},
-        // Polygon x polygon (partially overlapping, reversed)
-        DistanceScalarScalarParam{"polygon_distance_polygon_crossing_rev",
-                                  "POLYGON ((1 0, 3 0, 1 2, 1 0))",
-                                  "POLYGON ((0 0, 2 0, 0 2, 0 0))", 0.0,
-                                  400863.2536725945, "LINESTRING (2 0, 2 0)",
-                                  std::nullopt, "POINT (2 0)"},
+        DistanceScalarScalarParam{
+            // Polygon x polygon (partially overlapping) ----------
+            "polygon_distance_polygon_crossing",
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))", "POLYGON ((1 0, 3 0, 1 2, 1 0))",
+            // Distance
+            0.0,
+            // Max distance
+            400863.2536725945,
+            // Shortest line
+            "LINESTRING (2 0, 2 0)",
+            // Longest line
+            "LINESTRING (0 2, 3 0)",
+            // Closest Point
+            "POINT (2 0)"},
+        DistanceScalarScalarParam{
+            // Polygon x polygon (partially overlapping, reversed)
+            "polygon_distance_polygon_crossing_rev",
+            "POLYGON ((1 0, 3 0, 1 2, 1 0))", "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            // Distance
+            0.0,
+            // Max distance
+            400863.2536725945,
+            // Shortest line
+            "LINESTRING (2 0, 2 0)",
+            // Longest line
+            "LINESTRING (3 0, 0 2)",
+            // Closest Point
+            "POINT (2 0)"},
 
-        // Polygon x polygon (fully outside)
-        DistanceScalarScalarParam{"polygon_distance_polygon_outside",
-                                  "POLYGON ((0 0, 1 0, 0 1, 0 0))",
-                                  "POLYGON ((30 30, 31 30, 30 31, 30 30))",
-                                  4520972.0955287321, 4677959.9936393471,
-                                  "LINESTRING (0 1, 30 30)",
-                                  "LINESTRING (0 0, 31 30)",
-                                  "POINT (0 1)"},
-        // Polygon x polygon (fully outside, reversed)
-        DistanceScalarScalarParam{"polygon_distance_polygon_outside_rev",
-                                  "POLYGON ((30 30, 31 30, 30 31, 30 30))",
-                                  "POLYGON ((0 0, 1 0, 0 1, 0 0))",
-                                  4520972.0955287321, 4677959.9936393471,
-                                  "LINESTRING (30 30, 0 1)",
-                                  "LINESTRING (31 30, 0 0)",
-                                  "POINT (30 30)"}
+        DistanceScalarScalarParam{
+            // Polygon x polygon (fully outside) ----------
+            "polygon_distance_polygon_outside",
+            "POLYGON ((0 0, 1 0, 0 1, 0 0))",
+            "POLYGON ((30 30, 31 30, 30 31, 30 30))",
+            // Distance
+            4520972.0955287321,
+            // Max distance
+            4677959.9936393471,
+            // Shortest line
+            "LINESTRING (0 1, 30 30)",
+            // Longest line
+            "LINESTRING (0 0, 31 30)",
+            // Closest Point
+            "POINT (0 1)"},
+        DistanceScalarScalarParam{
+            // Polygon x polygon (fully outside, reversed) ----------
+            "polygon_distance_polygon_outside_rev",
+            "POLYGON ((30 30, 31 30, 30 31, 30 30))",
+            "POLYGON ((0 0, 1 0, 0 1, 0 0))",
+            // Distance
+            4520972.0955287321,
+            // Max distance
+            4677959.9936393471,
+            // Shortest line
+            "LINESTRING (30 30, 0 1)",
+            // Longest line
+            "LINESTRING (31 30, 0 0)",
+            // Closest Point
+            "POINT (30 30)"}
 
         ),
     [](const ::testing::TestParamInfo<DistanceScalarScalarParam>& info) {
