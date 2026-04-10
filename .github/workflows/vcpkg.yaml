@@ -99,7 +99,7 @@ jobs:
             asan_options: "detect_leaks=1:detect_stack_use_after_return=1"
             # Abseil lts_20260107 triggers a GCC bug with sanitizers.
             # Pin to a vcpkg release that predates that version.
-            vcpkg_ref: 84bab45d415d22042bd0b9081aea57f362da3f35  # 2025.12.12
+            vcpkg_ref: b322364f06308bdd24823f9d8f03fe0cc86fd46f  # 2024.12.16
           - os: macos-latest
             triplet: arm64-osx-asan
             asan_options: "detect_stack_use_after_return=1"
