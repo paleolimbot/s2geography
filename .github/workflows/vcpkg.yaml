@@ -98,9 +98,10 @@ jobs:
             triplet: x64-linux-asan
             asan_options: "detect_leaks=1:detect_stack_use_after_return=1"
             # Abseil lts_20260107 triggers a GCC bug with sanitizers.
-            # Pin to a vcpkg release that predates that version.
-            # This is the oldest commit that still contains nanoarrow
-            vcpkg_ref: 1dd481b3236aa23a75a1c7b088fa2b6f51c796f6
+            # Pin to a vcpkg release that predates that version
+            # (which also predates nanoarrow on vcpkg, so use vendored).
+            vcpkg_ref: 1dd481b3236aa23a75a1c7b088fa2b6f51c796f6  # 2024.12.16
+            vcpkg_packages: "s2geometry abseil openssl"
           - os: macos-latest
             triplet: arm64-osx-asan
             asan_options: "detect_stack_use_after_return=1"
@@ -137,7 +138,7 @@ jobs:
       - name: Install vcpkg dependencies
         if: steps.cache-vcpkg.outputs.cache-hit != 'true'
         run: |
-          ./vcpkg/vcpkg install nanoarrow s2geometry abseil openssl \
+          ./vcpkg/vcpkg install ${{ matrix.vcpkg_packages || 'nanoarrow s2geometry abseil openssl' }} \
             --overlay-triplets=ci/triplets --triplet=${{ matrix.triplet }}
           rm -rf vcpkg/buildtrees
           rm -rf vcpkg/downloads
