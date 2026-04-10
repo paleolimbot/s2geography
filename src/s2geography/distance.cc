@@ -101,7 +101,7 @@ struct EdgePair {
   int shape_id1{-1};
   int edge_id0{-1};
   int edge_id1{-1};
-  std::pair<S2Point, S2Point> closest_points{};
+  std::pair<S2Point, S2Point> extremal_points{};
   S1ChordAngle distance{S1ChordAngle::Infinity()};
 
   /// \brief Return true if this represents an empty match
@@ -120,10 +120,11 @@ struct EdgePair {
       const GeoArrowGeography& geog0, const GeoArrowGeography& geog1) const {
     if (edge_id0 == -1) {
       auto e = geog1.native_edge(shape_id1, edge_id1);
-      return e.Interpolate(closest_points.second).Normalize(geog1.dimensions());
+      return e.Interpolate(extremal_points.second)
+          .Normalize(geog1.dimensions());
     } else if (edge_id1 == -1) {
       auto e = geog0.native_edge(shape_id0, edge_id0);
-      return e.Interpolate(closest_points.first).Normalize(geog0.dimensions());
+      return e.Interpolate(extremal_points.first).Normalize(geog0.dimensions());
     } else {
       throw Exception(
           "Can't resolve interior vertex of EdgePair where neither result is "
@@ -234,7 +235,7 @@ void DistanceLineOnlyEdgesBruteForce(const GeoArrowGeography& value0,
         out->edge_id1 = resolved1.second;
 
         out->distance = distance_candidate;
-        out->closest_points = points_candidate;
+        out->extremal_points = points_candidate;
       }
 
       return true;
@@ -252,9 +253,7 @@ void DistanceLineOnlyEdgesSemiBruteForce(const S2ShapeIndex& value0,
   S2GEOGRAPHY_DCHECK(value1.polygons()->is_empty());
 
   typename Traits::Query query0(&value0);
-  if constexpr (Traits::kHandlesInteriors) {
-    query0.mutable_options()->set_include_interiors(true);
-  }
+  query0.mutable_options()->set_include_interiors(Traits::kHandlesInteriors);
 
   int edge_id1 = -1;
   value1.VisitEdges([&](S2Shape::Edge& e1) {
@@ -295,7 +294,7 @@ void DistanceLineOnlyEdgesSemiBruteForce(const S2ShapeIndex& value0,
                 S2::GetIntersection(e1.v0, e1.v1, ce.v0(), ce.v1());
           }
 
-          out->closest_points =
+          out->extremal_points =
               std::make_pair(intersection_point, intersection_point);
         }
 
@@ -317,7 +316,7 @@ void DistanceLineOnlyEdgesSemiBruteForce(const S2ShapeIndex& value0,
 
       if (flags & kFlagComputePoints) {
         S2Shape::Edge e0 = query0.GetEdge(result0);
-        out->closest_points =
+        out->extremal_points =
             Traits::edge_pair_extremal_points(e0.v0, e0.v1, e1.v0, e1.v1);
       }
     }
@@ -328,7 +327,7 @@ void DistanceLineOnlyEdgesSemiBruteForce(const S2ShapeIndex& value0,
 
 void ClearanceLineFromPoints(const S2Point& value0, const S2Point& value1,
                              EdgePair* out) {
-  out->closest_points = std::make_pair(value0, value1);
+  out->extremal_points = std::make_pair(value0, value1);
   out->edge_id0 = 0;
   out->edge_id1 = 0;
   out->shape_id0 = 0;
@@ -344,9 +343,7 @@ void DistanceLineUsingShapeIndex(const S2ShapeIndex& value0,
   out->distance = Traits::default_distance();
 
   typename Traits::Query query0(&value0);
-  if constexpr (Traits::kHandlesInteriors) {
-    query0.mutable_options()->set_include_interiors(true);
-  }
+  query0.mutable_options()->set_include_interiors(Traits::kHandlesInteriors);
   query0.mutable_options()->set_max_results(1);
   typename Traits::Query::ShapeIndexTarget target(&value1);
 
@@ -375,12 +372,12 @@ void DistanceLineUsingShapeIndex(const S2ShapeIndex& value0,
           if (!crossing_edges.empty()) {
             auto pt = S2::GetIntersection(e0.v0, e0.v1, crossing_edges[0].v0(),
                                           crossing_edges[0].v1());
-            out->closest_points = std::make_pair(pt, pt);
+            out->extremal_points = std::make_pair(pt, pt);
             out->shape_id1 = crossing_edges[0].id().shape_id;
             out->edge_id1 = crossing_edges[0].id().edge_id;
           } else {
             // Shared vertex, no proper crossing.
-            out->closest_points = std::make_pair(e0.v0, e0.v0);
+            out->extremal_points = std::make_pair(e0.v0, e0.v0);
           }
         } else {
           // Interior match: one fully contains the other. Use a vertex from
@@ -389,7 +386,7 @@ void DistanceLineUsingShapeIndex(const S2ShapeIndex& value0,
             const S2Shape* shape = value1.shape(s);
             if (shape != nullptr && shape->num_edges() > 0) {
               S2Point pt = shape->edge(0).v0;
-              out->closest_points = std::make_pair(pt, pt);
+              out->extremal_points = std::make_pair(pt, pt);
               out->shape_id1 = s;
               out->edge_id1 = 0;
               break;
@@ -409,23 +406,44 @@ void DistanceLineUsingShapeIndex(const S2ShapeIndex& value0,
 
   if (flags & kFlagComputePoints) {
     typename Traits::Query query1(&value1);
-    if constexpr (Traits::kHandlesInteriors) {
-      query1.mutable_options()->set_include_interiors(false);
-    }
+    query1.mutable_options()->set_include_interiors(false);
     query1.mutable_options()->set_max_results(1);
     S2Shape::Edge e0 = query0.GetEdge(result0);
     typename Traits::Query::EdgeTarget target2(e0.v0, e0.v1);
     auto result1 = Traits::find_edge(query1, &target2);
-    if (result1.is_empty()) {
-      return;
+    if (!result1.is_empty()) {
+      out->edge_id1 = result1.edge_id();
+      out->shape_id1 = result1.shape_id();
+      S2Shape::Edge e1 = query1.GetEdge(result1);
+
+      out->extremal_points =
+          Traits::edge_pair_extremal_points(e0.v0, e0.v1, e1.v0, e1.v1);
+    } else {
+      // Fallback: the indexed query could not find a matching edge (can happen
+      // for near-antipodal geometries with S2FurthestEdgeQuery). Iterate over
+      // all edges in value1 to find the extremal match.
+      S1ChordAngle best_dist = Traits::default_distance();
+      for (int s = 0; s < value1.num_shape_ids(); ++s) {
+        const S2Shape* shape = value1.shape(s);
+        if (shape == nullptr) continue;
+        for (int e = 0; e < shape->num_edges(); ++e) {
+          S2Shape::Edge e1 = shape->edge(e);
+          auto points =
+              Traits::edge_pair_extremal_points(e0.v0, e0.v1, e1.v0, e1.v1);
+          S1ChordAngle d(points.first, points.second);
+          if (Traits::is_better(d, best_dist)) {
+            out->shape_id1 = s;
+            out->edge_id1 = e;
+            out->extremal_points = points;
+            best_dist = d;
+          }
+        }
+      }
+      if (out->edge_id1 < 0) {
+        *out = {};
+        return;
+      }
     }
-
-    out->edge_id1 = result1.edge_id();
-    out->shape_id1 = result1.shape_id();
-    S2Shape::Edge e1 = query1.GetEdge(result1);
-
-    out->closest_points =
-        Traits::edge_pair_extremal_points(e0.v0, e0.v1, e1.v0, e1.v1);
   }
 }
 
@@ -437,9 +455,7 @@ void DistanceLineUsingShapeIndexAndPoint(const S2ShapeIndex& value0,
   out->distance = Traits::default_distance();
 
   typename Traits::Query query0(&value0);
-  if constexpr (Traits::kHandlesInteriors) {
-    query0.mutable_options()->set_include_interiors(true);
-  }
+  query0.mutable_options()->set_include_interiors(Traits::kHandlesInteriors);
   query0.mutable_options()->set_max_results(1);
   typename Traits::Query::PointTarget target(value1);
 
@@ -460,7 +476,7 @@ void DistanceLineUsingShapeIndexAndPoint(const S2ShapeIndex& value0,
       out->edge_id1 = 0;
 
       out->distance = S1ChordAngle::Zero();
-      out->closest_points = std::make_pair(value1, value1);
+      out->extremal_points = std::make_pair(value1, value1);
       return;
     }
   }
@@ -473,7 +489,7 @@ void DistanceLineUsingShapeIndexAndPoint(const S2ShapeIndex& value0,
   out->shape_id1 = 0;
 
   S2Point p0 = Traits::project_to_edge(value1, e0.v0, e0.v1);
-  out->closest_points = std::make_pair(p0, value1);
+  out->extremal_points = std::make_pair(p0, value1);
 
   if (flags & kFlagComputeDistance) {
     out->distance = S1ChordAngle(p0, value1);
@@ -517,7 +533,7 @@ void DistanceLine(GeoArrowGeography& value0, GeoArrowGeography& value1,
                                                 *maybe_point0, out, flags);
     std::swap(out->shape_id0, out->shape_id1);
     std::swap(out->edge_id0, out->edge_id1);
-    std::swap(out->closest_points.first, out->closest_points.second);
+    std::swap(out->extremal_points.first, out->extremal_points.second);
   } else if (maybe_point1 && IsAlreadyIndexedOrLargeOrHasPolygons(value0)) {
     DistanceLineUsingShapeIndexAndPoint<Traits>(value0.ShapeIndex(),
                                                 *maybe_point1, out, flags);
@@ -533,17 +549,11 @@ void DistanceLine(GeoArrowGeography& value0, GeoArrowGeography& value1,
                                                 out, flags);
     std::swap(out->shape_id0, out->shape_id1);
     std::swap(out->edge_id0, out->edge_id1);
-    std::swap(out->closest_points.first, out->closest_points.second);
+    std::swap(out->extremal_points.first, out->extremal_points.second);
   } else {
     DistanceLineUsingShapeIndex<Traits>(value0.ShapeIndex(),
                                         value1.ShapeIndex(), out, flags);
   }
-}
-
-// Backward-compatible wrapper used by S2ClosestPointExec, S2ShortestLineExec.
-void ClearanceLine(GeoArrowGeography& value0, GeoArrowGeography& value1,
-                   EdgePair* out, int flags) {
-  DistanceLine<MinDistanceTraits>(value0, value1, out, flags);
 }
 
 struct S2ClosestPointExec {
@@ -558,7 +568,8 @@ struct S2ClosestPointExec {
     // contained and only contains XY values),
     out->SetDimensions(value0.dimensions());
 
-    ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
+    DistanceLine<MinDistanceTraits>(value0, value1, &edge_pair_,
+                                    kFlagComputePoints);
     if (edge_pair_.is_empty()) {
       out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_POINT);
       return;
@@ -570,7 +581,7 @@ struct S2ClosestPointExec {
     } else {
       auto native_edge =
           value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
-      v = native_edge.Interpolate(edge_pair_.closest_points.first)
+      v = native_edge.Interpolate(edge_pair_.extremal_points.first)
               .Normalize(value0.dimensions());
     }
 
@@ -586,7 +597,8 @@ struct S2DistanceExec {
   using out_t = DoubleOutputBuilder;
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
-    ClearanceLine(value0, value1, &edge_pair_, kFlagComputeDistance);
+    DistanceLine<MinDistanceTraits>(value0, value1, &edge_pair_,
+                                    kFlagComputeDistance);
     if (edge_pair_.is_empty()) {
       out->AppendNull();
     } else {
@@ -625,7 +637,8 @@ struct S2ShortestLineExec {
     // use the common dimensions as the output dimensionality
     out->SetDimensionsCommon(value0.dimensions(), value1.dimensions());
 
-    ClearanceLine(value0, value1, &edge_pair_, kFlagComputePoints);
+    DistanceLine<MinDistanceTraits>(value0, value1, &edge_pair_,
+                                    kFlagComputePoints);
     if (edge_pair_.is_empty()) {
       out->AppendEmpty(GEOARROW_GEOMETRY_TYPE_LINESTRING);
       return;
@@ -646,13 +659,13 @@ struct S2ShortestLineExec {
     auto native_edge0 =
         value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
     auto native_vertex0 =
-        native_edge0.Interpolate(edge_pair_.closest_points.first)
+        native_edge0.Interpolate(edge_pair_.extremal_points.first)
             .Normalize(value0.dimensions());
 
     auto native_edge1 =
         value1.native_edge(edge_pair_.shape_id1, edge_pair_.edge_id1);
     auto native_vertex1 =
-        native_edge1.Interpolate(edge_pair_.closest_points.second)
+        native_edge1.Interpolate(edge_pair_.extremal_points.second)
             .Normalize(value1.dimensions());
 
     out->FeatureStart();
@@ -684,13 +697,13 @@ struct S2LongestLineExec {
     auto native_edge0 =
         value0.native_edge(edge_pair_.shape_id0, edge_pair_.edge_id0);
     auto native_vertex0 =
-        native_edge0.Interpolate(edge_pair_.closest_points.first)
+        native_edge0.Interpolate(edge_pair_.extremal_points.first)
             .Normalize(value0.dimensions());
 
     auto native_edge1 =
         value1.native_edge(edge_pair_.shape_id1, edge_pair_.edge_id1);
     auto native_vertex1 =
-        native_edge1.Interpolate(edge_pair_.closest_points.second)
+        native_edge1.Interpolate(edge_pair_.extremal_points.second)
             .Normalize(value1.dimensions());
 
     out->FeatureStart();

@@ -602,7 +602,38 @@ INSTANTIATE_TEST_SUITE_P(
             // Longest line
             "LINESTRING (31 30, 0 0)",
             // Closest Point
-            "POINT (30 30)"}
+            "POINT (30 30)"},
+
+        DistanceScalarScalarParam{
+            // Polygon x polygon (north pole vs south pole) ----------
+            "polygon_distance_polygon_poles",
+            "POLYGON ((-120 80, 0 80, 120 80, -120 80))",
+            "POLYGON ((-120 -80, 0 -80, 120 -80, -120 -80))",
+            // Distance
+            17791216.188397426,
+            // Max distance
+            20015118.21194711,
+            // Shortest line
+            "LINESTRING (-120 80, -120 -80)",
+            // Longest line
+            "LINESTRING (-120 80, 120 -80)",
+            // Closest Point
+            "POINT (-120 80)"},
+        DistanceScalarScalarParam{
+            // Polygon x polygon (north pole vs south pole, reversed) ----------
+            "polygon_distance_polygon_poles_rev",
+            "POLYGON ((-120 -80, 0 -80, 120 -80, -120 -80))",
+            "POLYGON ((-120 80, 0 80, 120 80, -120 80))",
+            // Distance
+            17791216.188397426,
+            // Max distance
+            20015118.21194711,
+            // Shortest line
+            "LINESTRING (-120 -80, -120 80)",
+            // Longest line
+            "LINESTRING (-120 -80, 0 80)",
+            // Closest Point
+            "POINT (-120 -80)"}
 
         ),
     [](const ::testing::TestParamInfo<DistanceScalarScalarParam>& info) {
