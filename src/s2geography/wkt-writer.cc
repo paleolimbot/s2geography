@@ -30,6 +30,10 @@ std::string WKTWriter::write_feature(const Geography& geog) {
   const auto data = static_cast<const char*>(array.buffers[2]);
   std::string result(data, offsets[1]);
 
+  if (array.release != nullptr) {
+    array.release(&array);
+  }
+
   return result;
 }
 

@@ -8,7 +8,8 @@ permissions:
   contents: read
 
 env:
-  VCPKG_REF: 5a01de756c28279ddfdd2b061d1c75710a6255fa
+  # April 2026
+  VCPKG_REF: 0c2764ebcc4776aed35f9946c81a8c1efe149a03
 
 name: vcpkg
 
@@ -86,6 +87,77 @@ jobs:
       - name: Run example-simple
         run: |
           ./dist/examples/example-simple
+
+  sanitizers:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            triplet: x64-linux-asan-only
+            asan_options: "detect_leaks=1:detect_stack_use_after_return=1"
+            # Abseil lts_20260107 triggers a GCC constexpr bug with UBSAN
+            # (https://github.com/abseil/abseil-cpp/issues/1634).
+            # Use ASAN-only on Linux to keep leak detection working.
+            sanitizer_type: address
+          - os: macos-latest
+            triplet: arm64-osx-asan
+            asan_options: "detect_stack_use_after_return=1"
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Clone vcpkg
+        uses: actions/checkout@v6
+        with:
+          repository: microsoft/vcpkg
+          ref: ${{ env.VCPKG_REF }}
+          path: vcpkg
+
+      - name: Set up environment variables and bootstrap vcpkg
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+          CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+        run: |
+          cd vcpkg
+          ./bootstrap-vcpkg.sh
+          cd ..
+
+          echo "VCPKG_ROOT=$VCPKG_ROOT" >> $GITHUB_ENV
+          echo "PATH=$VCPKG_ROOT:$PATH" >> $GITHUB_ENV
+          echo "CMAKE_TOOLCHAIN_FILE=$CMAKE_TOOLCHAIN_FILE" >> $GITHUB_ENV
+
+      - name: Cache vcpkg binaries
+        id: cache-vcpkg
+        uses: actions/cache@v5
+        with:
+          path: vcpkg/installed
+          key: vcpkg-installed-asan-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REF }}-2
+
+      - name: Install vcpkg dependencies
+        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
+        run: |
+          ./vcpkg/vcpkg install nanoarrow s2geometry abseil openssl \
+            --overlay-triplets=ci/triplets --triplet=${{ matrix.triplet }}
+          rm -rf vcpkg/buildtrees
+          rm -rf vcpkg/downloads
+
+      - name: Build s2geography
+        run: |
+          mkdir build && cd build
+          cmake .. -DS2GEOGRAPHY_BUILD_TESTS=ON -DS2GEOGRAPHY_SANITIZERS=ON \
+            -DS2GEOGRAPHY_SANITIZER_TYPE=${{ matrix.sanitizer_type || 'address,undefined' }} \
+            -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=OFF \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/ci/triplets
+          cmake --build .
+
+      - name: Run tests
+        env:
+          ASAN_OPTIONS: ${{ matrix.asan_options }}
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          cd build
+          ctest -T test --output-on-failure .
 
   clang-tidy:
     runs-on: ubuntu-latest

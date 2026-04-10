@@ -651,6 +651,11 @@ class WriterImpl {
   }
 
   void Init(const ArrowSchema* schema, const ExportOptions& options) {
+    if (writer_.private_data != nullptr) {
+      GeoArrowArrayWriterReset(&writer_);
+      writer_.private_data = nullptr;
+    }
+
     options_ = options;
 
     int code = GeoArrowArrayWriterInitFromSchema(&writer_, schema);
@@ -665,6 +670,11 @@ class WriterImpl {
   }
 
   void Init(GeoArrowType type, const ExportOptions& options) {
+    if (writer_.private_data != nullptr) {
+      GeoArrowArrayWriterReset(&writer_);
+      writer_.private_data = nullptr;
+    }
+
     options_ = options;
     type_ = type;
 

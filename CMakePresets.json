@@ -25,6 +25,17 @@
               "CMAKE_BUILD_TYPE": "Debug",
               "S2GEOGRAPHY_BUILD_TESTS": "ON"
           }
+      },
+      {
+          "name": "sanitizers",
+          "inherits": [
+              "default-with-tests"
+          ],
+          "displayName": "ASAN + UBSAN",
+          "cacheVariables": {
+              "S2GEOGRAPHY_SANITIZERS": "ON",
+              "BUILD_SHARED_LIBS": "OFF"
+          }
       }
     ]
 }
