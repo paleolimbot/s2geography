@@ -38,6 +38,7 @@ main() {
     set -x
 
     run-clang-tidy -p "${build_dir}" -j$jobs \
+        -header-filter='src/s2geography/.*' \
         $extra_args | \
         tee "${build_dir}/clang-tidy-output.txt"
 
