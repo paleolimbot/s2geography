@@ -184,10 +184,13 @@ struct MaxDistanceTraits {
       const S2Point& a0, const S2Point& a1, const S2Point& b0,
       const S2Point& b1) {
     if (S2::CrossingSign(a0, a1, -b0, -b1) >= 0) {
-      throw Exception(
-          "Cannot compute farthest points between edges at antipodal distance "
-          "(max distance = pi)");
+      // The edges are at antipodal distance (pi). The intersection of edge
+      // (a0,a1) with the reflected edge (-b0,-b1) gives us point p on edge a;
+      // its antipode -p lies on edge b.
+      S2Point p = S2::GetIntersection(a0, a1, -b0, -b1);
+      return {p, -p};
     }
+
     std::pair<S2Point, S2Point> best{a0, b0};
     S1ChordAngle best_dist(a0, b0);
     auto check = [&](const S2Point& pa, const S2Point& pb) {
@@ -215,9 +218,8 @@ struct MaxDistanceTraits {
       S1ChordAngle max_dist = S1ChordAngle::Negative();
       S2::UpdateMaxDistance(point, a, b, &max_dist);
       if (max_dist == S1ChordAngle::Straight()) {
-        throw Exception(
-            "Cannot compute farthest point on edge at antipodal distance "
-            "(max distance = pi)");
+        // -point lies on the edge; the farthest point is its projection.
+        return S2::Project(-point, a, b);
       }
     }
     return (da > db) ? a : b;

@@ -159,9 +159,8 @@ TEST_P(DistanceScalarScalarTest, SedonaUdf) {
             out_array.get(), NANOARROW_TYPE_DOUBLE, {p.expected_max_distance}));
       }
 
-      // Test ST_LongestLine (skip when expected is nullopt with valid inputs,
-      // which indicates an antipodal case that is expected to error)
-      if (p.expected_longest_line || !p.lhs || !p.rhs) {
+      // Test ST_LongestLine
+      {
         SCOPED_TRACE("ST_LongestLine()");
 
         struct SedonaCScalarKernel kernel;
@@ -622,8 +621,8 @@ INSTANTIATE_TEST_SUITE_P(
             20015118.21194711,
             // Shortest line
             "LINESTRING (-120 80, -120 -80)",
-            // Longest line (antipodal: max distance = pi, not yet supported)
-            std::nullopt,
+            // Longest line
+            "LINESTRING (-30 84.187176, 150 -84.187176)",
             // Closest Point
             "POINT (-120 80)"},
         DistanceScalarScalarParam{
@@ -637,8 +636,8 @@ INSTANTIATE_TEST_SUITE_P(
             20015118.21194711,
             // Shortest line
             "LINESTRING (-120 -80, -120 80)",
-            // Longest line (antipodal: max distance = pi, not yet supported)
-            std::nullopt,
+            // Longest line
+            "LINESTRING (150 -84.187176, -30 84.187176)",
             // Closest Point
             "POINT (-120 -80)"},
         DistanceScalarScalarParam{
@@ -648,13 +647,55 @@ INSTANTIATE_TEST_SUITE_P(
             // Distance
             18446595.193179362,
             // Max distance
-            20015118.21194711,
+            20015118.022076216,
             // Shortest line
             "LINESTRING (-90 -80, 0 80)",
-            // Longest line (antipodal: max distance = pi, not yet supported)
-            std::nullopt,
+            // Longest line
+            "LINESTRING (-90 -90, 90 90)",
             // Closest Point
-            "POINT (-90 -80)"}
+            "POINT (-90 -80)"},
+        DistanceScalarScalarParam{
+            // Linestring x polygon (antipodal crossing) ----------
+            "linestring_distance_polygon_poles", "LINESTRING (-90 -80, 90 -80)",
+            "POLYGON ((-120 90, 0 90, 120 90, -120 90))",
+            // Distance
+            18903167.200172286,
+            // Max distance
+            20015118.21194711,
+            // Shortest line
+            "LINESTRING (-90 -80, -120 90)",
+            // Longest line
+            "LINESTRING (75.445756 -90, -104.554244 90)",
+            // Closest Point
+            "POINT (-90 -80)"},
+        DistanceScalarScalarParam{
+            // Polygon x linestring (antipodal crossing) ----------
+            "polygon_distance_linestring_poles",
+            "POLYGON ((-120 90, 0 90, 120 90, -120 90))",
+            "LINESTRING (-90 -80, 90 -80)",
+            // Distance
+            18903167.200172286,
+            // Max distance
+            20015118.21194711,
+            // Shortest line
+            "LINESTRING (-120 90, -90 -80)",
+            // Longest line
+            "LINESTRING (-104.554244 90, 75.445756 -90)",
+            // Closest Point
+            "POINT (-120 90)"},
+        DistanceScalarScalarParam{
+            // Point x point (antipodal crossing) ----------
+            "point_distance_point_poles", "POINT (0 -90)", "POINT (0 90)",
+            // Distance
+            20015118.21194711,
+            // Max distance
+            20015118.21194711,
+            // Shortest line
+            "LINESTRING (0 -90, 0 90)",
+            // Longest line
+            "LINESTRING (0 -90, 0 90)",
+            // Closest Point
+            "POINT (0 -90)"}
 
         ),
     [](const ::testing::TestParamInfo<DistanceScalarScalarParam>& info) {
