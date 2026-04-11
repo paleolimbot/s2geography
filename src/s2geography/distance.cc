@@ -6,6 +6,7 @@
 #include <s2/s2debug.h>
 #include <s2/s2earth.h>
 #include <s2/s2edge_crossings.h>
+#include <s2/s2edge_distances.h>
 #include <s2/s2furthest_edge_query.h>
 
 #include "s2geography/geography.h"
@@ -177,10 +178,16 @@ struct MaxDistanceTraits {
     return query.FindFurthestEdge(target);
   }
 
-  // Max distance between two spherical edges is always at endpoints.
+  // Max distance between two spherical edges is at endpoints unless one edge
+  // crosses the antipodal reflection of the other (distance = pi).
   static std::pair<S2Point, S2Point> edge_pair_extremal_points(
       const S2Point& a0, const S2Point& a1, const S2Point& b0,
       const S2Point& b1) {
+    if (S2::CrossingSign(a0, a1, -b0, -b1) >= 0) {
+      throw Exception(
+          "Cannot compute farthest points between edges at antipodal distance "
+          "(max distance = pi)");
+    }
     std::pair<S2Point, S2Point> best{a0, b0};
     S1ChordAngle best_dist(a0, b0);
     auto check = [&](const S2Point& pa, const S2Point& pb) {
@@ -196,10 +203,24 @@ struct MaxDistanceTraits {
     return best;
   }
 
-  // Farthest point on a geodesic edge from a point is at one of the endpoints.
+  // Farthest point on a geodesic edge from a point is at one of the endpoints
+  // unless -point lies interior to the edge (distance = pi).
   static S2Point project_to_edge(const S2Point& point, const S2Point& a,
                                  const S2Point& b) {
-    return (S1ChordAngle(point, a) > S1ChordAngle(point, b)) ? a : b;
+    S1ChordAngle da(point, a);
+    S1ChordAngle db(point, b);
+    // When the farthest endpoint is more than 90 degrees away, the true
+    // farthest point might be interior to the edge (antipodal case).
+    if (std::max(da, db) > S1ChordAngle::Right()) {
+      S1ChordAngle max_dist = S1ChordAngle::Negative();
+      S2::UpdateMaxDistance(point, a, b, &max_dist);
+      if (max_dist == S1ChordAngle::Straight()) {
+        throw Exception(
+            "Cannot compute farthest point on edge at antipodal distance "
+            "(max distance = pi)");
+      }
+    }
+    return (da > db) ? a : b;
   }
 
   static constexpr bool kHandlesInteriors = false;
@@ -419,7 +440,7 @@ void DistanceLineUsingShapeIndex(const S2ShapeIndex& value0,
       out->extremal_points =
           Traits::edge_pair_extremal_points(e0.v0, e0.v1, e1.v0, e1.v1);
     } else {
-      throw Exception("Failed to find farthest edge pair");
+      throw Exception("Failed to find extremal edge pair");
     }
   }
 }
