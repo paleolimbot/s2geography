@@ -72,6 +72,7 @@ TEST_P(DistanceScalarScalarTest, SedonaUdf) {
                    ", prepare_arg1: " + std::to_string(prepare_arg1));
       // Test ST_Distance()
       {
+        SCOPED_TRACE("ST_Distance()");
         struct SedonaCScalarKernel kernel;
         struct SedonaCScalarKernelImpl impl;
         s2geography::sedona_udf::DistanceKernel(&kernel, prepare_arg0,
@@ -94,6 +95,7 @@ TEST_P(DistanceScalarScalarTest, SedonaUdf) {
 
       // Test ST_ShortestLine
       {
+        SCOPED_TRACE("ST_ShortestLine()");
         struct SedonaCScalarKernel kernel;
         struct SedonaCScalarKernelImpl impl;
         s2geography::sedona_udf::ShortestLineKernel(&kernel, prepare_arg0,
@@ -115,6 +117,7 @@ TEST_P(DistanceScalarScalarTest, SedonaUdf) {
 
       // Test ST_ClosestPoint
       {
+        SCOPED_TRACE("ST_ClosestPoint()");
         struct SedonaCScalarKernel kernel;
         struct SedonaCScalarKernelImpl impl;
         s2geography::sedona_udf::ClosestPointKernel(&kernel);
@@ -135,6 +138,7 @@ TEST_P(DistanceScalarScalarTest, SedonaUdf) {
 
       // Test ST_MaxDistance
       {
+        SCOPED_TRACE("ST_MaxDistance()");
         struct SedonaCScalarKernel kernel;
         struct SedonaCScalarKernelImpl impl;
         s2geography::sedona_udf::MaxDistanceKernel(&kernel, prepare_arg0,
@@ -158,6 +162,8 @@ TEST_P(DistanceScalarScalarTest, SedonaUdf) {
       // Test ST_LongestLine (skip when expected is nullopt with valid inputs,
       // which indicates an antipodal case that is expected to error)
       if (p.expected_longest_line || !p.lhs || !p.rhs) {
+        SCOPED_TRACE("ST_LongestLine()");
+
         struct SedonaCScalarKernel kernel;
         struct SedonaCScalarKernelImpl impl;
         s2geography::sedona_udf::LongestLineKernel(&kernel, prepare_arg0,
@@ -634,7 +640,21 @@ INSTANTIATE_TEST_SUITE_P(
             // Longest line (antipodal: max distance = pi, not yet supported)
             std::nullopt,
             // Closest Point
-            "POINT (-120 -80)"}
+            "POINT (-120 -80)"},
+        DistanceScalarScalarParam{
+            // Linestring x linestring (antipodal crossing) ----------
+            "linestring_distance_linestring_poles",
+            "LINESTRING (-90 -80, 90 -80)", "LINESTRING (0 80, 180 80)",
+            // Distance
+            18446595.193179362,
+            // Max distance
+            20015118.21194711,
+            // Shortest line
+            "LINESTRING (-90 -80, 0 80)",
+            // Longest line (antipodal: max distance = pi, not yet supported)
+            std::nullopt,
+            // Closest Point
+            "POINT (-90 -80)"}
 
         ),
     [](const ::testing::TestParamInfo<DistanceScalarScalarParam>& info) {
