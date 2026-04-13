@@ -9,7 +9,7 @@
 ---
 Checks: >-
   clang-analyzer-*,
-  -clang-analyzer-cplusplus.Move
+  -clang-analyzer-cplusplus.Move,
   -clang-analyzer-core.CallAndMessage,
   -clang-analyzer-optin.performance.Padding,
   -clang-analyzer-security.insecureAPI.rand,
