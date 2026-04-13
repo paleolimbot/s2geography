@@ -167,37 +167,6 @@ struct MinDistanceTraits {
   static constexpr bool kHandlesInteriors = true;
 };
 
-// Identical to MinDistanceTraits but allows for a minimum distance threshold
-// (after which searching may be abandoned).
-struct DistanceWithinTraits {
-  using Query = S2ClosestEdgeQuery;
-
-  static S1ChordAngle default_distance() {
-    return MinDistanceTraits::default_distance();
-  }
-
-  static bool is_better(S1ChordAngle candidate, S1ChordAngle current) {
-    return MinDistanceTraits::is_better(candidate, current);
-  }
-
-  static Query::Result find_edge(Query& query, Query::Target* target) {
-    return MinDistanceTraits::find_edge(query, target);
-  }
-
-  static std::pair<S2Point, S2Point> edge_pair_extremal_points(
-      const S2Point& a0, const S2Point& a1, const S2Point& b0,
-      const S2Point& b1) {
-    return MinDistanceTraits::edge_pair_extremal_points(a0, a1, b0, b1);
-  }
-
-  static S2Point project_to_edge(const S2Point& point, const S2Point& a,
-                                 const S2Point& b) {
-    return MinDistanceTraits::project_to_edge(point, a, b);
-  }
-
-  static constexpr bool kHandlesInteriors = true;
-};
-
 struct MaxDistanceTraits {
   using Query = S2FurthestEdgeQuery;
 
@@ -311,7 +280,7 @@ void DistanceLineOnlyEdgesSemiBruteForce(
   typename Traits::Query query0(&value0);
   query0.mutable_options()->set_include_interiors(Traits::kHandlesInteriors);
   query0.mutable_options()->set_max_results(1);
-  if constexpr (std::is_same_v<Traits, DistanceWithinTraits>) {
+  if constexpr (std::is_same_v<Traits, MinDistanceTraits>) {
     if (min_distance != S1ChordAngle::Infinity()) {
       query0.mutable_options()->set_inclusive_max_distance(min_distance);
     }
@@ -407,7 +376,7 @@ void DistanceLineUsingShapeIndex(
   typename Traits::Query query0(&value0);
   query0.mutable_options()->set_include_interiors(Traits::kHandlesInteriors);
   query0.mutable_options()->set_max_results(1);
-  if constexpr (std::is_same_v<Traits, DistanceWithinTraits>) {
+  if constexpr (std::is_same_v<Traits, MinDistanceTraits>) {
     if (min_distance != S1ChordAngle::Infinity()) {
       query0.mutable_options()->set_inclusive_max_distance(min_distance);
     }
@@ -476,7 +445,7 @@ void DistanceLineUsingShapeIndex(
     typename Traits::Query query1(&value1);
     query1.mutable_options()->set_include_interiors(false);
     query1.mutable_options()->set_max_results(1);
-    if constexpr (std::is_same_v<Traits, DistanceWithinTraits>) {
+    if constexpr (std::is_same_v<Traits, MinDistanceTraits>) {
       if (min_distance != S1ChordAngle::Infinity()) {
         query1.mutable_options()->set_inclusive_max_distance(min_distance);
       }
@@ -508,7 +477,7 @@ void DistanceLineUsingShapeIndexAndPoint(
   typename Traits::Query query0(&value0);
   query0.mutable_options()->set_include_interiors(Traits::kHandlesInteriors);
   query0.mutable_options()->set_max_results(1);
-  if constexpr (std::is_same_v<Traits, DistanceWithinTraits>) {
+  if constexpr (std::is_same_v<Traits, MinDistanceTraits>) {
     if (min_distance != S1ChordAngle::Infinity()) {
       query0.mutable_options()->set_inclusive_max_distance(min_distance);
     }
