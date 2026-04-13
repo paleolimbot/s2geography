@@ -3,9 +3,13 @@
 # clang-diagnostic-c2y-extensions is because of nanoarrow and
 # geoarrow's __COUNTER__ use, which will be fixed in future versions
 # of both.
+# -clang-analyzer-cplusplus.Move is added because operator- triggers
+# this for an S2Point in the S2 headers, which is out of our
+# control.
 ---
 Checks: >-
   clang-analyzer-*,
+  -clang-analyzer-cplusplus.Move
   -clang-analyzer-core.CallAndMessage,
   -clang-analyzer-optin.performance.Padding,
   -clang-analyzer-security.insecureAPI.rand,
