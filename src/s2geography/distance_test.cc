@@ -37,6 +37,26 @@ TEST(Distance, SedonaUdfDistance) {
                       {111195.10117748393, 0.0, std::nullopt}));
 }
 
+TEST(Distance, SedonaUdfDistanceWithin) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::DistanceWithinKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+      NANOARROW_TYPE_BOOL));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+      {{"POINT (0 0)"}, {"POINT (0 1)", "LINESTRING (0 0, 0 1)", std::nullopt}},
+      {{50000.0}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
+                                          {false, true, std::nullopt}));
+}
+
 struct DistanceScalarScalarParam {
   std::string name;
   std::optional<std::string> lhs;

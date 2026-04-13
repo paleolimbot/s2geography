@@ -717,6 +717,28 @@ struct S2LongestLineExec {
   EdgePair edge_pair_;
 };
 
+struct S2DistanceWithinExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
+  using arg2_t = DoubleInputView;
+  using out_t = BoolOutputBuilder;
+
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, arg2_t::c_type value2,
+            out_t* out) {
+    DistanceLine<MinDistanceTraits>(value0, value1, &edge_pair_,
+                                    kFlagComputeDistance);
+    if (edge_pair_.is_empty()) {
+      out->Append(false);
+    } else {
+      double distance_meters =
+          edge_pair_.distance.radians() * S2Earth::RadiusMeters();
+      out->Append(distance_meters <= value2);
+    }
+  }
+
+  EdgePair edge_pair_;
+};
+
 void ClosestPointKernel(struct SedonaCScalarKernel* out) {
   InitBinaryKernel<S2ClosestPointExec>(out, "st_closestpoint");
 }
@@ -725,6 +747,12 @@ void DistanceKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
                     bool prepare_arg1_scalar) {
   InitBinaryKernel<S2DistanceExec>(out, "st_distance", prepare_arg0_scalar,
                                    prepare_arg1_scalar);
+}
+
+void DistanceWithinKernel(struct SedonaCScalarKernel* out,
+                          bool prepare_arg0_scalar, bool prepare_arg1_scalar) {
+  InitTernaryKernel<S2DistanceWithinExec>(
+      out, "st_distance", prepare_arg0_scalar, prepare_arg1_scalar);
 }
 
 void MaxDistanceKernel(struct SedonaCScalarKernel* out,
