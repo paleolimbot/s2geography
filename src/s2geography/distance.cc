@@ -446,11 +446,8 @@ void DistanceLineUsingShapeIndex(const S2ShapeIndex& value0,
     typename Traits::Query query1(&value1);
     query1.mutable_options()->set_include_interiors(false);
     query1.mutable_options()->set_max_results(1);
-    if constexpr (std::is_same_v<Traits, MinDistanceTraits>) {
-      if (max_distance != S1ChordAngle::Infinity()) {
-        query1.mutable_options()->set_inclusive_max_distance(max_distance);
-      }
-    }
+    // No need to set the max distance here because we don't compute nearest
+    // points when we have a max_distance filter (i.e., DWithin).
 
     S2Shape::Edge e0 = query0.GetEdge(result0);
     typename Traits::Query::EdgeTarget target2(e0.v0, e0.v1);
