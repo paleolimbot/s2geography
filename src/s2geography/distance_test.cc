@@ -37,6 +37,26 @@ TEST(Distance, SedonaUdfDistance) {
                       {111195.10117748393, 0.0, std::nullopt}));
 }
 
+TEST(Distance, SedonaUdfDistanceWithin) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::DistanceWithinKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+      NANOARROW_TYPE_BOOL));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+      {{"POINT (0 0)"}, {"POINT (0 1)", "LINESTRING (0 0, 0 1)", std::nullopt}},
+      {{50000.0}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
+                                          {false, true, std::nullopt}));
+}
+
 struct DistanceScalarScalarParam {
   std::string name;
   std::optional<std::string> lhs;
@@ -91,6 +111,83 @@ TEST_P(DistanceScalarScalarTest, SedonaUdf) {
 
         ASSERT_NO_FATAL_FAILURE(TestResultArrow(
             out_array.get(), NANOARROW_TYPE_DOUBLE, {p.expected}));
+      }
+
+      // Test ST_DWithin() against the exact distance (i.e., the greatest
+      // distance at which ST_DWithin() should return true)
+      {
+        SCOPED_TRACE("ST_DWithin(a, b, actual_distance)");
+        struct SedonaCScalarKernel kernel;
+        struct SedonaCScalarKernelImpl impl;
+        s2geography::sedona_udf::DistanceWithinKernel(&kernel, prepare_arg0,
+                                                      prepare_arg1);
+
+        ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+            &kernel, &impl,
+            {ARROW_TYPE_WKB, ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+            NANOARROW_TYPE_BOOL));
+
+        // If the inputs were null, the expected value is a null; if the inputs
+        // were non-null, the expected value is true (for a non-null return) and
+        // false otherwise (e.g., distance between empties).
+        std::optional<bool> expected =
+            (!p.lhs || !p.rhs) ? std::nullopt
+                               : std::make_optional(p.expected.has_value());
+
+        // For the distance argument, pass 0.0 if we have something that would
+        // have returned null for a distance. This checks the case where one
+        // operand was EMPTY, where this should return false
+        double distance_threshold = p.expected.value_or(0.0);
+
+        nanoarrow::UniqueArray out_array;
+        ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+            &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+            {{p.lhs}, {p.rhs}}, {{distance_threshold}}, out_array.get()));
+        impl.release(&impl);
+        kernel.release(&kernel);
+
+        ASSERT_NO_FATAL_FAILURE(
+            TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL, {expected}));
+      }
+
+      // Test ST_DWithin() against a distance slightly less than the exact
+      // distance (i.e., a threshold at which ST_DWithin() should return
+      // false, except for null propagation)
+      {
+        SCOPED_TRACE(
+            "ST_DWithin(a, b, actual_distance - eps * actual_distance)");
+        struct SedonaCScalarKernel kernel;
+        struct SedonaCScalarKernelImpl impl;
+        s2geography::sedona_udf::DistanceWithinKernel(&kernel, prepare_arg0,
+                                                      prepare_arg1);
+
+        ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+            &kernel, &impl,
+            {ARROW_TYPE_WKB, ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+            NANOARROW_TYPE_BOOL));
+
+        // For this test, everything should return false unless propagating
+        // nulls
+        std::optional<bool> expected =
+            (!p.lhs || !p.rhs) ? std::nullopt : std::make_optional(false);
+
+        // For the distance argument, subtract a small amount such that
+        // everything should return false. This is roughly 20 nanometers
+        // for the largest possible distance between two things on
+        // earth.
+        double distance_threshold = p.expected.value_or(0.0);
+        double eps = std::max(1.0e-15, distance_threshold * 1e-15);
+        distance_threshold -= eps;
+
+        nanoarrow::UniqueArray out_array;
+        ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+            &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+            {{p.lhs}, {p.rhs}}, {{distance_threshold}}, out_array.get()));
+        impl.release(&impl);
+        kernel.release(&kernel);
+
+        ASSERT_NO_FATAL_FAILURE(
+            TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL, {expected}));
       }
 
       // Test ST_ShortestLine
@@ -317,6 +414,35 @@ INSTANTIATE_TEST_SUITE_P(
             "POINT (1 0)"},
 
         DistanceScalarScalarParam{
+            // Point x linestring (point on linestring) ----------
+            "linestring_distance_point_on", "LINESTRING (0 0, 0 1)",
+            "POINT (0 0)",
+            // Distance
+            0.0,
+            // Max distance
+            111195.10117748393,
+            // Shortest line
+            "LINESTRING (0 0, 0 0)",
+            // Longest line
+            "LINESTRING (0 1, 0 0)",
+            // Closest Point
+            "POINT (0 0)"},
+        DistanceScalarScalarParam{
+            // Point x linestring (point off linestring) ----------
+            "linestring_distance_point_off", "LINESTRING (0 0, 0 1)",
+            "POINT (1 0)",
+            // Distance
+            111195.10117748393,
+            // Max distance
+            157249.62809250789,
+            // Shortest line
+            "LINESTRING (0 0, 1 0)",
+            // Longest line
+            "LINESTRING (0 1, 1 0)",
+            // Closest Point
+            "POINT (0 0)"},
+
+        DistanceScalarScalarParam{
             // Point x polygon (point inside)
             "point_distance_polygon_inside", "POINT (0.25 0.25)",
             "POLYGON ((0 0, 2 0, 0 2, 0 0))",
@@ -496,7 +622,7 @@ INSTANTIATE_TEST_SUITE_P(
             "linestring_distance_polygon_outside", "LINESTRING (3 3, 4 4)",
             "POLYGON ((0 0, 2 0, 0 2, 0 0))",
             // Distance
-            314367.35908786184,
+            314367.35908786188,
             // Max distance
             628758.78426786896,
             // Shortest line
@@ -510,7 +636,7 @@ INSTANTIATE_TEST_SUITE_P(
             "polygon_distance_linestring_outside",
             "POLYGON ((0 0, 2 0, 0 2, 0 0))", "LINESTRING (3 3, 4 4)",
             // Distance
-            314367.35908786184,
+            314367.35908786188,
             // Max distance
             628758.78426786896,
             // Shortest line
