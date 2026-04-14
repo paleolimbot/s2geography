@@ -1,6 +1,8 @@
 #include "s2geography/coverings.h"
 
 #include <gtest/gtest.h>
+#include <s2/s2cell_id.h>
+#include <s2/s2latlng.h>
 
 #include <optional>
 #include <string>
@@ -156,6 +158,31 @@ TEST(LatLngRectBounderTest, AccumulatesBounds) {
   EXPECT_DOUBLE_EQ(bounds.lat_lo().degrees(), 0.0);
   EXPECT_DOUBLE_EQ(bounds.lng_hi().degrees(), 10.0);
   EXPECT_DOUBLE_EQ(bounds.lat_hi().degrees(), 20.0);
+}
+
+TEST(Coverings, SedonaUdfCellIdFromPointArray) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::CellIdFromPointKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(
+      TestInitKernel(&kernel, &impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_INT64));
+
+  // Compute expected cell IDs
+  S2CellId id_origin(S2LatLng::FromDegrees(0, 0).ToPoint());
+  S2CellId id_point1(S2LatLng::FromDegrees(1, 0).ToPoint());
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB},
+      {{"POINT (0 0)", "POINT (0 1)", "POINT EMPTY", std::nullopt}}, {},
+      out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(
+      out_array.get(), NANOARROW_TYPE_INT64,
+      {static_cast<double>(id_origin.id()), static_cast<double>(id_point1.id()),
+       std::nullopt, std::nullopt}));
 }
 
 

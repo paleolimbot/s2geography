@@ -138,7 +138,7 @@ class ArrowOutputBuilder {
 };
 
 using BoolOutputBuilder = ArrowOutputBuilder<bool, NANOARROW_TYPE_BOOL>;
-using IntOutputBuilder = ArrowOutputBuilder<int32_t, NANOARROW_TYPE_INT64>;
+using IntOutputBuilder = ArrowOutputBuilder<int64_t, NANOARROW_TYPE_INT64>;
 using DoubleOutputBuilder = ArrowOutputBuilder<double, NANOARROW_TYPE_DOUBLE>;
 
 template <typename Child>

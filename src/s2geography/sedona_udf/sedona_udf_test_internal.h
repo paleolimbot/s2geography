@@ -418,7 +418,8 @@ inline void TestResultArrow(struct ArrowArray* result,
   for (int64_t i = 0; i < array_view->length; i++) {
     if (ArrowArrayViewIsNull(array_view.get(), i)) {
       actual.push_back(ARROW_TYPE_WKB);
-    } else if (result_type == NANOARROW_TYPE_BOOL) {
+    } else if (result_type == NANOARROW_TYPE_BOOL ||
+               result_type == NANOARROW_TYPE_INT64) {
       actual.push_back(
           static_cast<double>(ArrowArrayViewGetIntUnsafe(array_view.get(), i)));
     } else {

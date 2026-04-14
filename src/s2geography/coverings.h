@@ -5,6 +5,7 @@
 #include <s2/s2region_coverer.h>
 
 #include "s2geography/geography.h"
+#include "s2geography/sedona_udf/sedona_extension.h"
 
 namespace s2geography {
 
@@ -35,5 +36,11 @@ void s2_covering_buffered(const ShapeIndexGeography& geog,
                           double distance_radians,
                           std::vector<S2CellId>* covering,
                           S2RegionCoverer& coverer);
+
+namespace sedona_udf {
+
+void CellIdFromPointKernel(struct SedonaCScalarKernel* out);
+
+}  // namespace sedona_udf
 
 }  // namespace s2geography
