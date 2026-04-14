@@ -413,6 +413,35 @@ INSTANTIATE_TEST_SUITE_P(
             "POINT (1 0)"},
 
         DistanceScalarScalarParam{
+            // Point x linestring (point on linestring) ----------
+            "linestring_distance_point_on", "LINESTRING (0 0, 0 1)",
+            "POINT (0 0)",
+            // Distance
+            0.0,
+            // Max distance
+            111195.10117748393,
+            // Shortest line
+            "LINESTRING (0 0, 0 0)",
+            // Longest line
+            "LINESTRING (0 1, 0 0)",
+            // Closest Point
+            "POINT (0 0)"},
+        DistanceScalarScalarParam{
+            // Point x linestring (point off linestring) ----------
+            "linestring_distance_point_off", "LINESTRING (0 0, 0 1)",
+            "POINT (1 0)",
+            // Distance
+            111195.10117748393,
+            // Max distance
+            157249.62809250789,
+            // Shortest line
+            "LINESTRING (0 0, 1 0)",
+            // Longest line
+            "LINESTRING (0 1, 1 0)",
+            // Closest Point
+            "POINT (0 0)"},
+
+        DistanceScalarScalarParam{
             // Point x polygon (point inside)
             "point_distance_polygon_inside", "POINT (0.25 0.25)",
             "POLYGON ((0 0, 2 0, 0 2, 0 0))",
