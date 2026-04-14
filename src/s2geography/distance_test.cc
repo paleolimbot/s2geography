@@ -116,7 +116,7 @@ TEST_P(DistanceScalarScalarTest, SedonaUdf) {
       // Test ST_DWithin() against the exact distance (i.e., the greatest
       // distance at which ST_DWithin() should return true)
       {
-        SCOPED_TRACE("ST_DWithin(a, b, actual_distance");
+        SCOPED_TRACE("ST_DWithin(a, b, actual_distance)");
         struct SedonaCScalarKernel kernel;
         struct SedonaCScalarKernelImpl impl;
         s2geography::sedona_udf::DistanceWithinKernel(&kernel, prepare_arg0,
@@ -137,7 +137,46 @@ TEST_P(DistanceScalarScalarTest, SedonaUdf) {
         // For the distance argument, pass 0.0 if we have something that would
         // have returned null for a distance. This checks the case where one
         // operand was EMPTY, where this should return false
-        std::optional<double> distance_threshold = p.expected.value_or(0.0);
+        double distance_threshold = p.expected.value_or(0.0);
+
+        nanoarrow::UniqueArray out_array;
+        ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+            &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+            {{p.lhs}, {p.rhs}}, {{distance_threshold}}, out_array.get()));
+        impl.release(&impl);
+        kernel.release(&kernel);
+
+        ASSERT_NO_FATAL_FAILURE(
+            TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL, {expected}));
+      }
+
+      // Test ST_DWithin() against the exact distance (i.e., the greatest
+      // distance at which ST_DWithin() should return true)
+      {
+        SCOPED_TRACE(
+            "ST_DWithin(a, b, actual_distance - eps * actual_distance)");
+        struct SedonaCScalarKernel kernel;
+        struct SedonaCScalarKernelImpl impl;
+        s2geography::sedona_udf::DistanceWithinKernel(&kernel, prepare_arg0,
+                                                      prepare_arg1);
+
+        ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+            &kernel, &impl,
+            {ARROW_TYPE_WKB, ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+            NANOARROW_TYPE_BOOL));
+
+        // For this test, everything should return false unless propagating
+        // nulls
+        std::optional<bool> expected =
+            (!p.lhs || !p.rhs) ? std::nullopt : std::make_optional(false);
+
+        // For the distance argument, subtract a small amount such that
+        // everything should return false. This is roughly 20 nanometers
+        // for the largest possible distance between two things on
+        // earth.
+        double distance_threshold = p.expected.value_or(0.0);
+        double eps = std::max(1.0e-15, distance_threshold * 1e-15);
+        distance_threshold -= eps;
 
         nanoarrow::UniqueArray out_array;
         ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
