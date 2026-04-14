@@ -107,14 +107,13 @@ S2LatLngRect LatLngRectBounder::BoundPoints(const GeoArrowGeography& value) {
       [&](const internal::GeoArrowVertex& v) {
         S2LatLng ll = S2LatLng::FromDegrees(v.lat, v.lng).Normalized();
         xs.AddPoint(ll.lng().radians());
-        ys.AddPoint(ll.lat().degrees());
+        ys.AddPoint(ll.lat().radians());
         return true;
       });
 
-  S2LatLng lo(S1Angle::Radians(xs.lo()), S1Angle::Degrees(ys.lo()));
-  S2LatLng hi(S1Angle::Radians(xs.hi()), S1Angle::Degrees(ys.hi()));
-
-  return S2LatLngRect();
+  S2LatLng lo(S1Angle::Radians(ys.lo()), S1Angle::Radians(xs.lo()));
+  S2LatLng hi(S1Angle::Radians(ys.hi()), S1Angle::Radians(xs.hi()));
+  return S2LatLngRect(lo, hi);
 }
 
 S2LatLngRect LatLngRectBounder::BoundLines(const GeoArrowGeography& value) {
