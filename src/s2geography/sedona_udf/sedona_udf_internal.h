@@ -111,6 +111,8 @@ class ArrowOutputBuilder {
     }
   }
 
+  int64_t current_length() { return array_->length; }
+
   void Finish(struct ArrowArray* out) {
     NANOARROW_THROW_NOT_OK(
         ArrowArrayFinishBuildingDefault(array_.get(), nullptr));
@@ -122,8 +124,92 @@ class ArrowOutputBuilder {
 };
 
 using BoolOutputBuilder = ArrowOutputBuilder<bool, NANOARROW_TYPE_BOOL>;
-using IntOutputBuilder = ArrowOutputBuilder<int32_t, NANOARROW_TYPE_INT32>;
+using IntOutputBuilder = ArrowOutputBuilder<int32_t, NANOARROW_TYPE_INT64>;
 using DoubleOutputBuilder = ArrowOutputBuilder<double, NANOARROW_TYPE_DOUBLE>;
+
+template<typename Child>
+class ListOutputBuilder {
+ public:
+
+  ListOutputBuilder() = default;
+  ListOutputBuilder(const ListOutputBuilder&) = delete;
+  ListOutputBuilder& operator=(const ListOutputBuilder&) = delete;
+
+  Child& items() { return items_; }
+
+  void InitOutputType(struct ArrowSchema* out) {
+    NANOARROW_THROW_NOT_OK(ArrowSchemaInitFromType(out, NANOARROW_TYPE_LIST));
+    items_.InitOutputType(out->children[0]);
+  }
+
+  void InitOutputTypeWithCrs(struct ArrowSchema* out, const std::string& crs) {
+    S2GEOGRAPHY_UNUSED(crs);
+    InitOutputType(out);
+  }
+
+  void Reserve(int64_t additional_size) {
+    array_.reset();
+
+    current_length_ = 0;
+    lengths_.clear();
+    lengths_.reserve(additional_size + 1);
+    lengths_.push_back(0);
+
+    nulls_.clear();
+  }
+
+  void AppendNull() { Append(false); }
+
+  void Append(bool is_valid = true) {
+    if (items_.current_length() > std::numeric_limits<int32_t>::max()) {
+      throw Exception(
+          "Can't build nested list output with >INT32_MAX child elements");
+    }
+
+    if (nulls_.empty() && !is_valid) {
+      nulls_.reserve(lengths_.capacity());
+      nulls_.resize(current_length_);
+      std::fill_n(nulls_.begin(), current_length_, 1);
+    }
+
+    if (!nulls_.empty()) {
+      nulls_.push_back(is_valid);
+    }
+
+    lengths_.push_back(static_cast<int32_t>(items_.current_length()));
+
+    null_count_ += is_valid;
+    ++current_length_;
+  }
+
+  void Finish(struct ArrowArray* out) {
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_THROW_NOT_OK(
+        ArrowArrayInitFromType(tmp.get(), NANOARROW_TYPE_UNINITIALIZED));
+    NANOARROW_THROW_NOT_OK(ArrowArrayAllocateChildren(tmp.get(), 1));
+    items_.Finish(tmp->children[0]);
+
+    nanoarrow::UniqueBitmap nulls;
+    ArrowBitmapInit(nulls.get());
+    NANOARROW_THROW_NOT_OK(ArrowBitmapReserve(nulls.get(), current_length_));
+    ArrowBitmapAppendInt8Unsafe(nulls.get(), nulls_.data(), current_length_);
+    ArrowArraySetValidityBitmap(tmp.get(), nulls.get());
+
+    nanoarrow::UniqueBuffer offsets;
+    nanoarrow::BufferInitSequence(offsets.get(), lengths_);
+    lengths_.clear();
+    ArrowArraySetBuffer(tmp.get(), 1, offsets.get());
+
+    ArrowArrayMove(tmp.get(), out);
+  }
+
+  Child items_;
+  std::vector<int8_t> nulls_;
+  std::vector<int32_t> lengths_;
+  nanoarrow::UniqueArray array_;
+  int64_t current_length_;
+  int64_t null_count_;
+};
 
 /// \brief Low-level output builder for Geography as WKB
 ///

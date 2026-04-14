@@ -7,6 +7,7 @@
 #include "s2geography/accessors-geog.h"
 #include "s2geography/accessors.h"
 #include "s2geography/geography.h"
+#include "s2geography/sedona_udf/sedona_udf_internal.h"
 
 namespace s2geography {
 
@@ -78,5 +79,67 @@ void s2_covering_buffered(const ShapeIndexGeography& geog,
                                     S1ChordAngle::Radians(distance_radians));
   coverer.GetCovering(region, covering);
 }
+
+namespace sedona_udf {
+
+struct CellIdFromPointExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using out_t = IntOutputBuilder;
+
+  void Exec(arg0_t::c_type value, out_t* out) {
+    if (value.is_empty()) {
+      out->AppendNull();
+      return;
+    }
+
+    auto pt = value.Point();
+    if (!pt) {
+      throw Exception("Can't compute point cell ID from a non-point geography");
+    }
+
+    S2CellId id(*pt);
+    out->Append(static_cast<int64_t>(id.id()));
+  }
+};
+
+struct CoveringCellIdsExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using out_t = ListOutputBuilder<IntOutputBuilder>;
+
+  void Exec(arg0_t::c_type value, out_t* out) {
+    if (value.is_empty()) {
+      out->Append();
+      return;
+    }
+
+    coverer_.mutable_options()->set_max_cells(8);
+    covering_.clear();
+
+    for (const S2CellId id : value.Covering()) {
+      covering_.push_back(id);
+    }
+
+    coverer_.CanonicalizeCovering(&covering_);
+
+    for (const S2CellId id : covering_) {
+      out->items().Append(static_cast<int64_t>(id.id()));
+    }
+
+    out->Append();
+  }
+
+  std::vector<S2CellId> covering_;
+  S2RegionCoverer coverer_;
+};
+
+void CellIdFromPointKernel(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<CellIdFromPointExec>(out, "s2_cellidfrompoint");
+}
+
+void CoveringCellIdsKernel(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<CoveringCellIdsExec>(out, "s2_coveringcellids");
+}
+
+}  // namespace sedona_udf
 
 }  // namespace s2geography
