@@ -19,8 +19,6 @@ struct LatLngRectBounderParam {
   std::optional<double> xmax;
   std::optional<double> ymax;
 
-
-
   friend std::ostream& operator<<(std::ostream& os,
                                   const LatLngRectBounderParam& p) {
     os << p.name;
@@ -47,17 +45,16 @@ TEST_P(LatLngRectBounderTest, Bounds) {
     // Expect empty bounds
     EXPECT_TRUE(bounds.is_empty()) << "Expected empty bounds for " << p.wkt;
   } else {
-    EXPECT_FALSE(bounds.is_empty()) << "Expected non-empty bounds for " << p.wkt;
+    EXPECT_FALSE(bounds.is_empty())
+        << "Expected non-empty bounds for " << p.wkt;
 
-    // Use larger tolerance for polygons due to geodesic edge bulging
-    constexpr double kTolerance = 0.1;  // degrees
-    EXPECT_NEAR(bounds.lng_lo().degrees(), *p.xmin, kTolerance)
+    EXPECT_DOUBLE_EQ(bounds.lng_lo().degrees(), *p.xmin)
         << "xmin mismatch for " << p.wkt;
-    EXPECT_NEAR(bounds.lat_lo().degrees(), *p.ymin, kTolerance)
+    EXPECT_DOUBLE_EQ(bounds.lat_lo().degrees(), *p.ymin)
         << "ymin mismatch for " << p.wkt;
-    EXPECT_NEAR(bounds.lng_hi().degrees(), *p.xmax, kTolerance)
+    EXPECT_DOUBLE_EQ(bounds.lng_hi().degrees(), *p.xmax)
         << "xmax mismatch for " << p.wkt;
-    EXPECT_NEAR(bounds.lat_hi().degrees(), *p.ymax, kTolerance)
+    EXPECT_DOUBLE_EQ(bounds.lat_hi().degrees(), *p.ymax)
         << "ymax mismatch for " << p.wkt;
   }
 }
@@ -77,31 +74,49 @@ INSTANTIATE_TEST_SUITE_P(
         // Points
         LatLngRectBounderParam{"point_origin", "POINT (0 0)", 0.0, 0.0, 0.0,
                                0.0},
-        LatLngRectBounderParam{"point_positive", "POINT (10 20)", 10.0, 20.0,
-                               10.0, 20.0},
-        LatLngRectBounderParam{"point_negative", "POINT (-30 -40)", -30.0,
-                               -40.0, -30.0, -40.0},
-
-        // MultiPoints
-        LatLngRectBounderParam{"multipoint_two", "MULTIPOINT ((0 0), (10 20))",
-                               0.0, 0.0, 10.0, 20.0},
-        LatLngRectBounderParam{
-            "multipoint_spanning", "MULTIPOINT ((-10 -20), (30 40))", -10.0,
-            -20.0, 30.0, 40.0},
+        LatLngRectBounderParam{"multipoint_spanning",
+                               "MULTIPOINT ((-10 -20), (30 40))", -10.0, -20.0,
+                               30.0, 40.0},
+        LatLngRectBounderParam{"multipoint_antimeridian",
+                               "MULTIPOINT ((170 10), (-170 11))", 170.0, 10.0,
+                               -170.0, 11.0},
 
         // LineStrings
-        LatLngRectBounderParam{"linestring_horizontal",
-                               "LINESTRING (0 0, 10 0)", 0.0, 0.0, 10.0, 0.0},
+        LatLngRectBounderParam{
+            "linestring_horizontal_equator", "LINESTRING (0 0, 10 0)", 0.0,
+            -4.1493099444912135e-14, 10.0, 4.1493099444912135e-14},
         LatLngRectBounderParam{"linestring_vertical", "LINESTRING (0 0, 0 10)",
-                               0.0, 0.0, 0.0, 10.0},
-        LatLngRectBounderParam{"linestring_diagonal",
-                               "LINESTRING (0 0, 10 10)", 0.0, 0.0, 10.0, 10.0},
+                               0.0, -2.5444437451708134e-14, 0.0,
+                               10.000000000000025},
+        LatLngRectBounderParam{"linestring_diagonal", "LINESTRING (0 1, 10 11)",
+                               0.0, 0.99999999999997458, 10.0,
+                               11.000000000000025},
+        LatLngRectBounderParam{"linestring_north_pole",
+                               "LINESTRING (90 80, -90 80)", -180.0, 80.0,
+                               180.0, 90.0},
+        LatLngRectBounderParam{"linestring_south_pole",
+                               "LINESTRING (90 -80, -90 -80)", -180.0, -90.0,
+                               180.0, -80.0},
+        LatLngRectBounderParam{"linestring_antimeridian",
+                               "LINESTRING (170 10, -170 10)", 170.0,
+                               9.9999999999999787, -170.0, 10.151081711048198},
+        LatLngRectBounderParam{
+            "multilinestring_antimeridian",
+            "MULTILINESTRING ((160 10, 170 10), (-170 10, -160 10))", 160.0,
+            9.9999999999999787, -160.0, 10.037423045910776},
 
-        // Polygons (simple cases)
+        // Polygons
         LatLngRectBounderParam{"triangle", "POLYGON ((0 0, 10 0, 5 10, 0 0))",
-                               0.0, 0.0, 10.0, 10.0},
-        LatLngRectBounderParam{"square", "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
-                               0.0, 0.0, 10.0, 10.0}));
+                               0.0, -4.1493099444912135e-14, 10.0,
+                               10.000000000000025},
+        LatLngRectBounderParam{"triangle_north_pole",
+                               "POLYGON ((0 80, 120 80, -120 80, 0 80))",
+                               -180.0, 80.0, 180.0, 90.0},
+        LatLngRectBounderParam{"triangle_south_pole",
+                               "POLYGON ((0 -80, -120 -80, 120 -80, 0 -80))",
+                               -180.0, -90.0, 180.0, -80.0}
+
+        ));
 
 // Test that Clear() resets state properly
 TEST(LatLngRectBounderTest, ClearResetsState) {
@@ -137,9 +152,8 @@ TEST(LatLngRectBounderTest, AccumulatesBounds) {
   bounder.Update(geog2);
   S2LatLngRect bounds = bounder.Finish();
 
-  constexpr double kTolerance = 1e-6;
-  EXPECT_NEAR(bounds.lng_lo().degrees(), 0.0, kTolerance);
-  EXPECT_NEAR(bounds.lat_lo().degrees(), 0.0, kTolerance);
-  EXPECT_NEAR(bounds.lng_hi().degrees(), 10.0, kTolerance);
-  EXPECT_NEAR(bounds.lat_hi().degrees(), 20.0, kTolerance);
+  EXPECT_DOUBLE_EQ(bounds.lng_lo().degrees(), 0.0);
+  EXPECT_DOUBLE_EQ(bounds.lat_lo().degrees(), 0.0);
+  EXPECT_DOUBLE_EQ(bounds.lng_hi().degrees(), 10.0);
+  EXPECT_DOUBLE_EQ(bounds.lat_hi().degrees(), 20.0);
 }
