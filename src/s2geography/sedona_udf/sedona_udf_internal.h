@@ -211,6 +211,118 @@ class ListOutputBuilder {
   int64_t null_count_;
 };
 
+template <typename... Children>
+class StructOutputBuilder {
+ public:
+  StructOutputBuilder() = default;
+  StructOutputBuilder(const StructOutputBuilder&) = delete;
+  StructOutputBuilder& operator=(const StructOutputBuilder&) = delete;
+
+  template <size_t I>
+  auto& field() {
+    return std::get<I>(fields_);
+  }
+
+  template <size_t I>
+  const auto& field() const {
+    return std::get<I>(fields_);
+  }
+
+  static constexpr size_t kNumFields = sizeof...(Children);
+
+  void InitOutputType(struct ArrowSchema* out,
+                      const std::array<const char*, kNumFields>& names = {}) {
+    NANOARROW_THROW_NOT_OK(ArrowSchemaInitFromType(out, NANOARROW_TYPE_STRUCT));
+    NANOARROW_THROW_NOT_OK(ArrowSchemaAllocateChildren(out, kNumFields));
+    InitFieldsOutputType(out, names, std::index_sequence_for<Children...>{});
+  }
+
+  void InitOutputTypeWithCrs(struct ArrowSchema* out, const std::string& crs,
+                             const std::array<const char*, kNumFields>& names = {}) {
+    S2GEOGRAPHY_UNUSED(crs);
+    InitOutputType(out, names);
+  }
+
+  void Reserve(int64_t additional_size) {
+    current_length_ = 0;
+    null_count_ = 0;
+    nulls_.clear();
+    ReserveFields(additional_size, std::index_sequence_for<Children...>{});
+  }
+
+  void AppendNull() { Append(false); }
+
+  void Append(bool is_valid = true) {
+    if (nulls_.empty() && !is_valid) {
+      nulls_.reserve(current_length_ + 1);
+      nulls_.resize(current_length_);
+      std::fill_n(nulls_.begin(), current_length_, 1);
+    }
+
+    if (!nulls_.empty()) {
+      nulls_.push_back(is_valid);
+    }
+
+    null_count_ += !is_valid;
+    ++current_length_;
+  }
+
+  int64_t current_length() const { return current_length_; }
+
+  void Finish(struct ArrowArray* out) {
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_THROW_NOT_OK(
+        ArrowArrayInitFromType(tmp.get(), NANOARROW_TYPE_STRUCT));
+    NANOARROW_THROW_NOT_OK(
+        ArrowArrayAllocateChildren(tmp.get(), sizeof...(Children)));
+    FinishFields(tmp.get(), std::index_sequence_for<Children...>{});
+
+    tmp->length = current_length_;
+    tmp->null_count = null_count_;
+
+    if (!nulls_.empty()) {
+      nanoarrow::UniqueBitmap nulls;
+      ArrowBitmapInit(nulls.get());
+      NANOARROW_THROW_NOT_OK(ArrowBitmapReserve(nulls.get(), current_length_));
+      ArrowBitmapAppendInt8Unsafe(nulls.get(), nulls_.data(), current_length_);
+      ArrowArraySetValidityBitmap(tmp.get(), nulls.get());
+    }
+
+    ArrowArrayMove(tmp.get(), out);
+  }
+
+ private:
+  std::tuple<Children...> fields_;
+  std::vector<int8_t> nulls_;
+  int64_t current_length_{0};
+  int64_t null_count_{0};
+
+  template <size_t... Is>
+  void InitFieldsOutputType(struct ArrowSchema* out,
+                            const std::array<const char*, kNumFields>& names,
+                            std::index_sequence<Is...>) {
+    (InitField<Is>(out->children[Is], names[Is]), ...);
+  }
+
+  template <size_t I>
+  void InitField(struct ArrowSchema* child, const char* name) {
+    std::get<I>(fields_).InitOutputType(child);
+    if (name != nullptr) {
+      NANOARROW_THROW_NOT_OK(ArrowSchemaSetName(child, name));
+    }
+  }
+
+  template <size_t... Is>
+  void ReserveFields(int64_t additional_size, std::index_sequence<Is...>) {
+    (std::get<Is>(fields_).Reserve(additional_size), ...);
+  }
+
+  template <size_t... Is>
+  void FinishFields(struct ArrowArray* out, std::index_sequence<Is...>) {
+    (std::get<Is>(fields_).Finish(out->children[Is]), ...);
+  }
+};
+
 /// \brief Low-level output builder for Geography as WKB
 ///
 /// This builder handles output from functions that return geometry
