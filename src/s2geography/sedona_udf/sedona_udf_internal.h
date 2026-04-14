@@ -20,6 +20,16 @@ namespace sedona_udf {
 template <class... T>
 struct always_false : std::false_type {};
 
+/// \brief Detection trait for optional Exec::Init(arg0_t*, out_t*) method
+template <typename T, typename = void>
+struct has_exec_init : std::false_type {};
+
+template <typename T>
+struct has_exec_init<T, std::void_t<decltype(std::declval<T>().Init(
+                            std::declval<typename T::arg0_t*>(),
+                            std::declval<typename T::out_t*>()))>>
+    : std::true_type {};
+
 /// \defgroup sedona_udf-utils Arrow UDF Utilities
 ///
 /// To simplify implementations of a large number of functions, we
@@ -101,6 +111,10 @@ class ArrowOutputBuilder {
     NANOARROW_THROW_NOT_OK(ArrowArrayAppendNull(array_.get(), 1));
   }
 
+  void AppendEmpty() {
+    NANOARROW_THROW_NOT_OK(ArrowArrayAppendEmpty(array_.get(), 1));
+  }
+
   void Append(c_type value) {
     if constexpr (std::is_integral_v<c_type>) {
       NANOARROW_THROW_NOT_OK(ArrowArrayAppendInt(array_.get(), value));
@@ -127,10 +141,9 @@ using BoolOutputBuilder = ArrowOutputBuilder<bool, NANOARROW_TYPE_BOOL>;
 using IntOutputBuilder = ArrowOutputBuilder<int32_t, NANOARROW_TYPE_INT64>;
 using DoubleOutputBuilder = ArrowOutputBuilder<double, NANOARROW_TYPE_DOUBLE>;
 
-template<typename Child>
+template <typename Child>
 class ListOutputBuilder {
  public:
-
   ListOutputBuilder() = default;
   ListOutputBuilder(const ListOutputBuilder&) = delete;
   ListOutputBuilder& operator=(const ListOutputBuilder&) = delete;
@@ -230,17 +243,19 @@ class StructOutputBuilder {
 
   static constexpr size_t kNumFields = sizeof...(Children);
 
-  void InitOutputType(struct ArrowSchema* out,
-                      const std::array<const char*, kNumFields>& names = {}) {
-    NANOARROW_THROW_NOT_OK(ArrowSchemaInitFromType(out, NANOARROW_TYPE_STRUCT));
-    NANOARROW_THROW_NOT_OK(ArrowSchemaAllocateChildren(out, kNumFields));
-    InitFieldsOutputType(out, names, std::index_sequence_for<Children...>{});
+  void SetNames(const std::array<const char*, kNumFields>& names) {
+    names_ = names;
   }
 
-  void InitOutputTypeWithCrs(struct ArrowSchema* out, const std::string& crs,
-                             const std::array<const char*, kNumFields>& names = {}) {
+  void InitOutputType(struct ArrowSchema* out) {
+    NANOARROW_THROW_NOT_OK(ArrowSchemaInitFromType(out, NANOARROW_TYPE_STRUCT));
+    NANOARROW_THROW_NOT_OK(ArrowSchemaAllocateChildren(out, kNumFields));
+    InitFieldsOutputType(out, std::index_sequence_for<Children...>{});
+  }
+
+  void InitOutputTypeWithCrs(struct ArrowSchema* out, const std::string& crs) {
     S2GEOGRAPHY_UNUSED(crs);
-    InitOutputType(out, names);
+    InitOutputType(out);
   }
 
   void Reserve(int64_t additional_size) {
@@ -250,7 +265,10 @@ class StructOutputBuilder {
     ReserveFields(additional_size, std::index_sequence_for<Children...>{});
   }
 
-  void AppendNull() { Append(false); }
+  void AppendNull() {
+    AppendEmptyFields(std::index_sequence_for<Children...>{});
+    Append(false);
+  }
 
   void Append(bool is_valid = true) {
     if (nulls_.empty() && !is_valid) {
@@ -294,27 +312,32 @@ class StructOutputBuilder {
  private:
   std::tuple<Children...> fields_;
   std::vector<int8_t> nulls_;
+  std::array<const char*, kNumFields> names_{};
   int64_t current_length_{0};
   int64_t null_count_{0};
 
   template <size_t... Is>
   void InitFieldsOutputType(struct ArrowSchema* out,
-                            const std::array<const char*, kNumFields>& names,
                             std::index_sequence<Is...>) {
-    (InitField<Is>(out->children[Is], names[Is]), ...);
+    (InitField<Is>(out->children[Is]), ...);
   }
 
   template <size_t I>
-  void InitField(struct ArrowSchema* child, const char* name) {
+  void InitField(struct ArrowSchema* child) {
     std::get<I>(fields_).InitOutputType(child);
-    if (name != nullptr) {
-      NANOARROW_THROW_NOT_OK(ArrowSchemaSetName(child, name));
+    if (names_[I] != nullptr) {
+      NANOARROW_THROW_NOT_OK(ArrowSchemaSetName(child, names_[I]));
     }
   }
 
   template <size_t... Is>
   void ReserveFields(int64_t additional_size, std::index_sequence<Is...>) {
     (std::get<Is>(fields_).Reserve(additional_size), ...);
+  }
+
+  template <size_t... Is>
+  void AppendEmptyFields(std::index_sequence<Is...>) {
+    (std::get<Is>(fields_).AppendEmpty(), ...);
   }
 
   template <size_t... Is>
@@ -870,6 +893,10 @@ class SedonaUnaryKernelAdapter {
         data->out->InitOutputTypeWithCrs(out, crs_out);
       }
 
+      if constexpr (has_exec_init<Exec>::value) {
+        data->exec.Init(data->arg0.get(), data->out.get());
+      }
+
       return NANOARROW_OK;
     } catch (std::exception& e) {
       data->last_error = e.what();
@@ -976,6 +1003,10 @@ class SedonaBinaryKernelAdapter {
         data->out->InitOutputType(out);
       } else {
         data->out->InitOutputTypeWithCrs(out, crs_out);
+      }
+
+      if constexpr (has_exec_init<Exec>::value) {
+        data->exec.Init(data->arg0.get(), data->out.get());
       }
 
       return 0;
@@ -1093,6 +1124,10 @@ class SedonaTernaryKernelAdapter {
         data->out->InitOutputType(out);
       } else {
         data->out->InitOutputTypeWithCrs(out, crs_out);
+      }
+
+      if constexpr (has_exec_init<Exec>::value) {
+        data->exec.Init(data->arg0.get(), data->out.get());
       }
 
       return 0;

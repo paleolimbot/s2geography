@@ -1,6 +1,8 @@
 
 #include "s2geography/coverings.h"
 
+#include <s2/s2edge_crosser.h>
+#include <s2/s2latlng_rect_bounder.h>
 #include <s2/s2region_coverer.h>
 #include <s2/s2shape_index_buffered_region.h>
 
@@ -80,6 +82,128 @@ void s2_covering_buffered(const ShapeIndexGeography& geog,
   coverer.GetCovering(region, covering);
 }
 
+struct LatLngRectBounder {
+ public:
+  void Clear() { bounds_ = S2LatLngRect::Empty(); }
+
+  S2LatLngRect Finish() const { return bounds_; }
+
+  void Update(const GeoArrowGeography& value) {
+    if (value.is_empty()) {
+      return;
+    }
+
+    bounds_ = bounds_.Union(
+        BoundPoints(value).Union(BoundLines(value)).Union(BoundLoops(value)));
+  }
+
+ private:
+  S2LatLngRect BoundPoints(const GeoArrowGeography& value) {
+    if (value.points()->is_empty()) {
+      return S2LatLngRect::Empty();
+    }
+
+    S1Interval xs;
+    R1Interval ys;
+    value.points()->geom().VisitNativeVertices(
+        [&](const internal::GeoArrowVertex& v) {
+          S2LatLng ll = S2LatLng::FromDegrees(v.lat, v.lng).Normalized();
+          xs.AddPoint(ll.lng().radians());
+          ys.AddPoint(ll.lat().degrees());
+          return true;
+        });
+
+    S2LatLng lo(S1Angle::Radians(xs.lo()), S1Angle::Degrees(ys.lo()));
+    S2LatLng hi(S1Angle::Radians(xs.hi()), S1Angle::Degrees(ys.hi()));
+
+    return S2LatLngRect();
+  }
+
+  S2LatLngRect BoundLines(const GeoArrowGeography& value) {
+    S2LatLngRect bounds = S2LatLngRect::Empty();
+
+    value.lines()->geom().VisitChains([&](const GeoArrowChain& c) {
+      S2LatLngRectBounder bounder;
+      c.VisitNativeVertices([&](const internal::GeoArrowVertex& v) {
+        S2LatLng ll = S2LatLng::FromDegrees(v.lat, v.lng).Normalized();
+        bounder.AddLatLng(ll);
+        return true;
+      });
+      bounds = bounds.Union(bounder.GetBound());
+      return true;
+    });
+
+    return bounds;
+  }
+
+  S2LatLngRect BoundLoops(const GeoArrowGeography& value) {
+    S2LatLngRect bounds = S2LatLngRect::Empty();
+    auto reference = value.polygons()->GetReferencePoint();
+
+    // Adapted from the s2loop.cc implementation of bounding
+    value.polygons()->geom().VisitLoops(
+        &scratch_, [&](const GeoArrowLoop& loop) {
+          // Only shells contribute to the bounds of valid polygons
+          if (loop.is_hole()) {
+            return true;
+          }
+
+          // Loop through all the vertices, bounding the edges and checking
+          // for edge crossings between the reference point and the north pole.
+          // We brute force both containment checks because (1) we have to loop
+          // through all the vertices anyway and (2) in most cases we can avoid
+          // the check for south pole containment.
+          S2LatLngRectBounder bounder;
+
+          S2Point north_pole = S2Point(0, 0, 1);
+          S2Point v0 = loop.vertex(0);
+          S2CopyingEdgeCrosser crosser(reference.point, north_pole, v0);
+          bool contains_north_pole = reference.contained;
+
+          loop.VisitNativeVertices([&](const internal::GeoArrowVertex& v) {
+            S2LatLng ll = S2LatLng::FromDegrees(v.lat, v.lng).Normalized();
+            bounder.AddLatLng(ll);
+            contains_north_pole ^= crosser.EdgeOrVertexCrossing(ll.ToPoint());
+            return true;
+          });
+          S2LatLngRect b = bounder.GetBound();
+
+          // Check north pole containment
+          if (contains_north_pole) {
+            b = S2LatLngRect(R1Interval(b.lat().lo(), M_PI_2),
+                             S1Interval::Full());
+          }
+
+          // If a loop contains the south pole, then either it wraps entirely
+          // around the sphere (full longitude range), or it also contains the
+          // north pole in which case b.lng().is_full() due to the test above.
+          // Either way, we only need to do the south pole containment test if
+          // b.lng().is_full().
+          if (b.lng().is_full()) {
+            bool contains_south_pole = reference.contained;
+            S2Point south_pole(0, 0, -1);
+            S2CopyingEdgeCrosser crosser(reference.point, south_pole, v0);
+            loop.VisitVertices(1, loop.size() - 1, [&](const S2Point& vertex) {
+              contains_south_pole ^= crosser.EdgeOrVertexCrossing(vertex);
+              return true;
+            });
+
+            if (contains_south_pole) {
+              b.mutable_lat()->set_lo(-M_PI_2);
+            }
+          }
+
+          bounds = bounds.Union(b);
+          return true;
+        });
+
+    return bounds;
+  }
+
+  S2LatLngRect bounds_;
+  std::vector<S2Point> scratch_;
+};
+
 namespace sedona_udf {
 
 struct CellIdFromPointExec {
@@ -132,12 +256,43 @@ struct CoveringCellIdsExec {
   S2RegionCoverer coverer_;
 };
 
+struct BoundingBoxExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using out_t = StructOutputBuilder<DoubleOutputBuilder, DoubleOutputBuilder,
+                                    DoubleOutputBuilder, DoubleOutputBuilder>;
+
+  void Init(arg0_t* input, out_t* out) {
+    out->SetNames({"xmin", "ymin", "xmax", "ymax"});
+  }
+
+  void Exec(arg0_t::c_type value, out_t* out) {
+    if (value.is_empty()) {
+      out->AppendNull();
+    }
+
+    bounder_.Clear();
+    bounder_.Update(value);
+    S2LatLngRect bounds = bounder_.Finish();
+    out->field<0>().Append(bounds.lng_lo().degrees());
+    out->field<1>().Append(bounds.lat_lo().degrees());
+    out->field<2>().Append(bounds.lng_hi().degrees());
+    out->field<3>().Append(bounds.lat_hi().degrees());
+    out->Append();
+  }
+
+  LatLngRectBounder bounder_;
+};
+
 void CellIdFromPointKernel(struct SedonaCScalarKernel* out) {
   InitUnaryKernel<CellIdFromPointExec>(out, "s2_cellidfrompoint");
 }
 
 void CoveringCellIdsKernel(struct SedonaCScalarKernel* out) {
   InitUnaryKernel<CoveringCellIdsExec>(out, "s2_coveringcellids");
+}
+
+void BoundingBoxKernel(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<CoveringCellIdsExec>(out, "st_boundingbox");
 }
 
 }  // namespace sedona_udf
