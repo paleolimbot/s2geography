@@ -184,5 +184,3 @@ TEST(Coverings, SedonaUdfCellIdFromPointArray) {
       {static_cast<double>(id_origin.id()), static_cast<double>(id_point1.id()),
        std::nullopt, std::nullopt}));
 }
-
-
