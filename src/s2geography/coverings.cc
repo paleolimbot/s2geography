@@ -111,6 +111,10 @@ S2LatLngRect LatLngRectBounder::BoundPoints(const GeoArrowGeography& value) {
         return true;
       });
 
+  // Expand for error in rounding for xs. This is the explansion that takes
+  // place during the S2LatLngRectBounder's GetBound().
+  xs.Expanded(2 * DBL_EPSILON);
+
   S2LatLng lo(S1Angle::Radians(ys.lo()), S1Angle::Radians(xs.lo()));
   S2LatLng hi(S1Angle::Radians(ys.hi()), S1Angle::Radians(xs.hi()));
   return S2LatLngRect(lo, hi);

@@ -157,3 +157,5 @@ TEST(LatLngRectBounderTest, AccumulatesBounds) {
   EXPECT_DOUBLE_EQ(bounds.lng_hi().degrees(), 10.0);
   EXPECT_DOUBLE_EQ(bounds.lat_hi().degrees(), 20.0);
 }
+
+
