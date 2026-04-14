@@ -150,8 +150,9 @@ TEST_P(DistanceScalarScalarTest, SedonaUdf) {
             TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL, {expected}));
       }
 
-      // Test ST_DWithin() against the exact distance (i.e., the greatest
-      // distance at which ST_DWithin() should return true)
+      // Test ST_DWithin() against a distance slightly less than the exact
+      // distance (i.e., a threshold at which ST_DWithin() should return
+      // false, except for null propagation)
       {
         SCOPED_TRACE(
             "ST_DWithin(a, b, actual_distance - eps * actual_distance)");

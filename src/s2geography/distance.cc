@@ -446,8 +446,8 @@ void DistanceLineUsingShapeIndex(const S2ShapeIndex& value0,
     typename Traits::Query query1(&value1);
     query1.mutable_options()->set_include_interiors(false);
     query1.mutable_options()->set_max_results(1);
-    // No need to set the max distance here because we don't compute nearest
-    // points when we have a max_distance filter (i.e., DWithin).
+    // This secondary query is only used to identify the matching extremal
+    // edge in value1 once point computation has been requested.
 
     S2Shape::Edge e0 = query0.GetEdge(result0);
     typename Traits::Query::EdgeTarget target2(e0.v0, e0.v1);
@@ -788,7 +788,7 @@ void DistanceKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
 void DistanceWithinKernel(struct SedonaCScalarKernel* out,
                           bool prepare_arg0_scalar, bool prepare_arg1_scalar) {
   InitTernaryKernel<S2DistanceWithinExec>(
-      out, "st_distance", prepare_arg0_scalar, prepare_arg1_scalar);
+      out, "st_dwithin", prepare_arg0_scalar, prepare_arg1_scalar);
 }
 
 void MaxDistanceKernel(struct SedonaCScalarKernel* out,
