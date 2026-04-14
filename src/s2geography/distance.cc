@@ -270,9 +270,10 @@ void DistanceLineOnlyEdgesBruteForce(const GeoArrowGeography& value0,
 }
 
 template <typename Traits>
-void DistanceLineOnlyEdgesSemiBruteForce(
-    const S2ShapeIndex& value0, const GeoArrowGeography& value1, EdgePair* out,
-    int flags, S1ChordAngle min_distance = S1ChordAngle::Infinity()) {
+void DistanceLineOnlyEdgesSemiBruteForce(const S2ShapeIndex& value0,
+                                         const GeoArrowGeography& value1,
+                                         EdgePair* out, int flags,
+                                         S1ChordAngle max_distance) {
   *out = {};
   out->distance = Traits::default_distance();
   S2GEOGRAPHY_DCHECK(value1.polygons()->is_empty());
@@ -281,8 +282,8 @@ void DistanceLineOnlyEdgesSemiBruteForce(
   query0.mutable_options()->set_include_interiors(Traits::kHandlesInteriors);
   query0.mutable_options()->set_max_results(1);
   if constexpr (std::is_same_v<Traits, MinDistanceTraits>) {
-    if (min_distance != S1ChordAngle::Infinity()) {
-      query0.mutable_options()->set_inclusive_max_distance(min_distance);
+    if (max_distance != S1ChordAngle::Infinity()) {
+      query0.mutable_options()->set_inclusive_max_distance(max_distance);
     }
   }
 
@@ -367,9 +368,9 @@ void ClearanceLineFromPoints(const S2Point& value0, const S2Point& value1,
 }
 
 template <typename Traits>
-void DistanceLineUsingShapeIndex(
-    const S2ShapeIndex& value0, const S2ShapeIndex& value1, EdgePair* out,
-    int flags, S1ChordAngle min_distance = S1ChordAngle::Infinity()) {
+void DistanceLineUsingShapeIndex(const S2ShapeIndex& value0,
+                                 const S2ShapeIndex& value1, EdgePair* out,
+                                 int flags, S1ChordAngle max_distance) {
   *out = {};
   out->distance = Traits::default_distance();
 
@@ -377,8 +378,8 @@ void DistanceLineUsingShapeIndex(
   query0.mutable_options()->set_include_interiors(Traits::kHandlesInteriors);
   query0.mutable_options()->set_max_results(1);
   if constexpr (std::is_same_v<Traits, MinDistanceTraits>) {
-    if (min_distance != S1ChordAngle::Infinity()) {
-      query0.mutable_options()->set_inclusive_max_distance(min_distance);
+    if (max_distance != S1ChordAngle::Infinity()) {
+      query0.mutable_options()->set_inclusive_max_distance(max_distance);
     }
   }
 
@@ -446,8 +447,8 @@ void DistanceLineUsingShapeIndex(
     query1.mutable_options()->set_include_interiors(false);
     query1.mutable_options()->set_max_results(1);
     if constexpr (std::is_same_v<Traits, MinDistanceTraits>) {
-      if (min_distance != S1ChordAngle::Infinity()) {
-        query1.mutable_options()->set_inclusive_max_distance(min_distance);
+      if (max_distance != S1ChordAngle::Infinity()) {
+        query1.mutable_options()->set_inclusive_max_distance(max_distance);
       }
     }
 
@@ -468,9 +469,9 @@ void DistanceLineUsingShapeIndex(
 }
 
 template <typename Traits>
-void DistanceLineUsingShapeIndexAndPoint(
-    const S2ShapeIndex& value0, const S2Point& value1, EdgePair* out, int flags,
-    S1ChordAngle min_distance = S1ChordAngle::Infinity()) {
+void DistanceLineUsingShapeIndexAndPoint(const S2ShapeIndex& value0,
+                                         const S2Point& value1, EdgePair* out,
+                                         int flags, S1ChordAngle max_distance) {
   *out = {};
   out->distance = Traits::default_distance();
 
@@ -478,8 +479,8 @@ void DistanceLineUsingShapeIndexAndPoint(
   query0.mutable_options()->set_include_interiors(Traits::kHandlesInteriors);
   query0.mutable_options()->set_max_results(1);
   if constexpr (std::is_same_v<Traits, MinDistanceTraits>) {
-    if (min_distance != S1ChordAngle::Infinity()) {
-      query0.mutable_options()->set_inclusive_max_distance(min_distance);
+    if (max_distance != S1ChordAngle::Infinity()) {
+      query0.mutable_options()->set_inclusive_max_distance(max_distance);
     }
   }
 
@@ -544,7 +545,7 @@ bool BothSmallWithoutPolygons(const GeoArrowGeography& value0,
 template <typename Traits>
 void DistanceLine(GeoArrowGeography& value0, GeoArrowGeography& value1,
                   EdgePair* out, int flags,
-                  S1ChordAngle min_distance = S1ChordAngle::Infinity()) {
+                  S1ChordAngle max_distance = S1ChordAngle::Infinity()) {
   if (value0.is_empty() || value1.is_empty()) {
     *out = {};
     return;
@@ -557,29 +558,29 @@ void DistanceLine(GeoArrowGeography& value0, GeoArrowGeography& value1,
     return;
   } else if (maybe_point0 && IsAlreadyIndexedOrLargeOrHasPolygons(value1)) {
     DistanceLineUsingShapeIndexAndPoint<Traits>(
-        value1.ShapeIndex(), *maybe_point0, out, flags, min_distance);
+        value1.ShapeIndex(), *maybe_point0, out, flags, max_distance);
     std::swap(out->shape_id0, out->shape_id1);
     std::swap(out->edge_id0, out->edge_id1);
     std::swap(out->extremal_points.first, out->extremal_points.second);
   } else if (maybe_point1 && IsAlreadyIndexedOrLargeOrHasPolygons(value0)) {
     DistanceLineUsingShapeIndexAndPoint<Traits>(
-        value0.ShapeIndex(), *maybe_point1, out, flags, min_distance);
+        value0.ShapeIndex(), *maybe_point1, out, flags, max_distance);
   } else if (BothSmallWithoutPolygons(value0, value1)) {
     DistanceLineOnlyEdgesBruteForce<Traits>(value0, value1, out);
   } else if (IsAlreadyIndexedOrLargeOrHasPolygons(value0) &&
              HasNoPolygons(value1)) {
     DistanceLineOnlyEdgesSemiBruteForce<Traits>(value0.ShapeIndex(), value1,
-                                                out, flags, min_distance);
+                                                out, flags, max_distance);
   } else if (IsAlreadyIndexedOrLargeOrHasPolygons(value1) &&
              HasNoPolygons(value0)) {
     DistanceLineOnlyEdgesSemiBruteForce<Traits>(value1.ShapeIndex(), value0,
-                                                out, flags, min_distance);
+                                                out, flags, max_distance);
     std::swap(out->shape_id0, out->shape_id1);
     std::swap(out->edge_id0, out->edge_id1);
     std::swap(out->extremal_points.first, out->extremal_points.second);
   } else {
     DistanceLineUsingShapeIndex<Traits>(
-        value0.ShapeIndex(), value1.ShapeIndex(), out, flags, min_distance);
+        value0.ShapeIndex(), value1.ShapeIndex(), out, flags, max_distance);
   }
 }
 
@@ -752,8 +753,19 @@ struct S2DistanceWithinExec {
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, arg2_t::c_type value2,
             out_t* out) {
+    if (value2 < 0.0) {
+      out->Append(false);
+      return;
+    } else if (value2 >=
+               (S1ChordAngle::Straight().radians() * S2Earth::RadiusMeters())) {
+      out->Append(true);
+      return;
+    }
+
+    S1ChordAngle distance_threshold =
+        S1ChordAngle::Radians(value2 / S2Earth::RadiusMeters());
     DistanceLine<MinDistanceTraits>(value0, value1, &edge_pair_,
-                                    kFlagComputeDistance);
+                                    kFlagComputeDistance, distance_threshold);
     if (edge_pair_.is_empty()) {
       out->Append(false);
     } else {
