@@ -753,10 +753,6 @@ struct S2DistanceWithinExec {
     if (value2 < 0.0) {
       out->Append(false);
       return;
-    } else if (value2 >=
-               (S1ChordAngle::Straight().radians() * S2Earth::RadiusMeters())) {
-      out->Append(true);
-      return;
     }
 
     S1ChordAngle distance_threshold =
