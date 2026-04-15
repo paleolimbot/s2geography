@@ -169,6 +169,11 @@ class ListOutputBuilder {
     lengths_.push_back(0);
 
     nulls_.clear();
+
+    // We could do a better job exposing the expected list size. It is
+    // unlikely to have a list that is completely empty with all elements
+    // and this could be optimized at some point.
+    items_.Reserve(0);
   }
 
   void AppendNull() { Append(false); }
@@ -183,36 +188,42 @@ class ListOutputBuilder {
       nulls_.reserve(lengths_.capacity());
       nulls_.resize(current_length_);
       std::fill_n(nulls_.begin(), current_length_, 1);
-    }
-
-    if (!nulls_.empty()) {
+      nulls_.push_back(0);
+    } else if (!nulls_.empty()) {
       nulls_.push_back(is_valid);
     }
 
     lengths_.push_back(static_cast<int32_t>(items_.current_length()));
 
-    null_count_ += is_valid;
+    null_count_ += !is_valid;
     ++current_length_;
   }
 
   void Finish(struct ArrowArray* out) {
     nanoarrow::UniqueArray tmp;
     NANOARROW_THROW_NOT_OK(
-        ArrowArrayInitFromType(tmp.get(), NANOARROW_TYPE_UNINITIALIZED));
+        ArrowArrayInitFromType(tmp.get(), NANOARROW_TYPE_LIST));
     NANOARROW_THROW_NOT_OK(ArrowArrayAllocateChildren(tmp.get(), 1));
     items_.Finish(tmp->children[0]);
 
-    nanoarrow::UniqueBitmap nulls;
-    ArrowBitmapInit(nulls.get());
-    NANOARROW_THROW_NOT_OK(ArrowBitmapReserve(nulls.get(), current_length_));
-    ArrowBitmapAppendInt8Unsafe(nulls.get(), nulls_.data(), current_length_);
-    ArrowArraySetValidityBitmap(tmp.get(), nulls.get());
+    if (null_count_ > 0) {
+      nanoarrow::UniqueBitmap nulls;
+      ArrowBitmapInit(nulls.get());
+      NANOARROW_THROW_NOT_OK(ArrowBitmapReserve(nulls.get(), current_length_));
+      ArrowBitmapAppendInt8Unsafe(nulls.get(), nulls_.data(), current_length_);
+      ArrowArraySetValidityBitmap(tmp.get(), nulls.get());
+    }
 
     nanoarrow::UniqueBuffer offsets;
     nanoarrow::BufferInitSequence(offsets.get(), lengths_);
     lengths_.clear();
     NANOARROW_THROW_NOT_OK(ArrowArraySetBuffer(tmp.get(), 1, offsets.get()));
 
+    // Set the array metadata
+    tmp->length = current_length_;
+    tmp->null_count = null_count_;
+
+    NANOARROW_THROW_NOT_OK(ArrowArrayFinishBuildingDefault(tmp.get(), nullptr));
     ArrowArrayMove(tmp.get(), out);
   }
 

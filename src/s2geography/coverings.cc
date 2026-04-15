@@ -231,15 +231,24 @@ struct CoveringCellIdsExec {
       return;
     }
 
-    coverer_.mutable_options()->set_max_cells(8);
-    covering_.clear();
-
-    for (const S2CellId id : value.Covering()) {
-      covering_.push_back(id);
+    // Canonically consider the S2CellId of a Point to be
+    // its covering. Otherwise we get funny coverings for points
+    // (no need to have four cells for a single point).
+    auto pt = value.Point();
+    if (pt) {
+      S2CellId id(*pt);
+      out->items().Append(static_cast<int64_t>(id.id()));
+      out->Append();
+      return;
     }
 
-    coverer_.CanonicalizeCovering(&covering_);
-
+    // For now, don't make any attempt to optimize calculating this.
+    // This will build a shape index for each item and may be slow.
+    // We may want to consider just implementing S2Region for the
+    // GeoArrowGeography.
+    coverer_.mutable_options()->set_max_cells(8);
+    covering_.clear();
+    coverer_.GetCovering(*value.Region(), &covering_);
     for (const S2CellId id : covering_) {
       out->items().Append(static_cast<int64_t>(id.id()));
     }

@@ -187,3 +187,68 @@ TEST(Coverings, SedonaUdfCellIdFromPointArray) {
       {static_cast<double>(id_origin.id()), static_cast<double>(id_point1.id()),
        std::nullopt, std::nullopt}));
 }
+
+TEST(Coverings, SedonaUdfCoveringCellIdsArray) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::CoveringCellIdsKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(
+      TestInitKernel(&kernel, &impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_LIST));
+
+  // Linestring spanning ~100 degrees should require multiple cells
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB},
+      {{"POINT (0 0)", "POINT (0 1)", "LINESTRING (0 0, 100 50)", "POINT EMPTY",
+        std::nullopt}},
+      {}, out_array.get()));
+
+  // Check the list structure
+  ASSERT_EQ(out_array->length, 5);
+  ASSERT_EQ(out_array->n_children, 1);
+  ASSERT_NE(out_array->buffers[1], nullptr);
+
+  // Get offsets (int32 for NANOARROW_TYPE_LIST)
+  auto* offsets = reinterpret_cast<const int32_t*>(out_array->buffers[1]);
+  // Row 0: POINT (0 0) - should have 1 cell
+  EXPECT_EQ(offsets[1] - offsets[0], 1);
+  // Row 1: POINT (0 1) - should have 1 cell
+  EXPECT_EQ(offsets[2] - offsets[1], 1);
+  // Row 2: LINESTRING (0 0, 100 50) - should have multiple cells
+  int linestring_cells = offsets[3] - offsets[2];
+  EXPECT_GE(linestring_cells, 1);
+  EXPECT_LE(linestring_cells, 8);  // max_cells is 8
+  // Row 3: POINT EMPTY - should have 0 cells
+  EXPECT_EQ(offsets[4] - offsets[3], 0);
+  // Row 4: null - should have 0 cells
+  EXPECT_EQ(offsets[5] - offsets[4], 0);
+
+  // Check child array contains valid cell IDs
+  auto* child = out_array->children[0];
+  ASSERT_NE(child, nullptr);
+  int total_cells = 1 + 1 + linestring_cells;
+  EXPECT_EQ(child->length, total_cells);
+  ASSERT_NE(child->buffers[1], nullptr);
+  auto* cell_ids = reinterpret_cast<const int64_t*>(child->buffers[1]);
+
+  // Verify each cell ID is valid by reconstructing and checking
+  S2CellId id0(cell_ids[0]);
+  S2CellId id1(cell_ids[1]);
+  EXPECT_TRUE(id0.is_valid());
+  EXPECT_TRUE(id1.is_valid());
+
+  // The cell IDs should correspond to the input points
+  S2CellId expected_id0(S2LatLng::FromDegrees(0, 0).ToPoint());
+  S2CellId expected_id1(S2LatLng::FromDegrees(1, 0).ToPoint());
+  EXPECT_EQ(id0, expected_id0);
+  EXPECT_EQ(id1, expected_id1);
+
+  // Verify the linestring's covering cells are all valid
+  for (int i = 2; i < total_cells; i++) {
+    S2CellId id(cell_ids[i]);
+    EXPECT_TRUE(id.is_valid()) << "Cell ID at index " << i << " is invalid";
+  }
+
+  impl.release(&impl);
+  kernel.release(&kernel);
+}

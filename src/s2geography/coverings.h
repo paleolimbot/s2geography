@@ -40,6 +40,7 @@ void s2_covering_buffered(const ShapeIndexGeography& geog,
 namespace sedona_udf {
 
 void CellIdFromPointKernel(struct SedonaCScalarKernel* out);
+void CoveringCellIdsKernel(struct SedonaCScalarKernel* out);
 
 }  // namespace sedona_udf
 
