@@ -172,6 +172,7 @@ class ListOutputBuilder {
     lengths_.push_back(0);
 
     nulls_.clear();
+    null_count_ = 0;
 
     // We could do a better job exposing the expected list size. It is
     // unlikely to have a list that is completely empty with all elements
@@ -900,15 +901,15 @@ class SedonaUnaryKernelAdapter {
       data->arg0->SetPrepareScalar(data->prepare_arg0_scalar);
       data->out = std::make_unique<typename Exec::out_t>();
 
+      if constexpr (has_exec_init<Exec>::value) {
+        data->exec.Init(data->arg0.get(), data->out.get());
+      }
+
       std::string crs_out = data->arg0->GetCrs();
       if (crs_out.empty()) {
         data->out->InitOutputType(out);
       } else {
         data->out->InitOutputTypeWithCrs(out, crs_out);
-      }
-
-      if constexpr (has_exec_init<Exec>::value) {
-        data->exec.Init(data->arg0.get(), data->out.get());
       }
 
       return NANOARROW_OK;
@@ -1010,6 +1011,10 @@ class SedonaBinaryKernelAdapter {
       data->arg1->SetPrepareScalar(data->prepare_arg1_scalar);
       data->out = std::make_unique<typename Exec::out_t>();
 
+      if constexpr (has_exec_init<Exec>::value) {
+        data->exec.Init(data->arg0.get(), data->out.get());
+      }
+
       // We don't have a reliable way to check the equality of CRSes, so
       // here we just return the first CRS.
       std::string crs_out = data->arg0->GetCrs();
@@ -1017,10 +1022,6 @@ class SedonaBinaryKernelAdapter {
         data->out->InitOutputType(out);
       } else {
         data->out->InitOutputTypeWithCrs(out, crs_out);
-      }
-
-      if constexpr (has_exec_init<Exec>::value) {
-        data->exec.Init(data->arg0.get(), data->out.get());
       }
 
       return 0;
@@ -1131,6 +1132,10 @@ class SedonaTernaryKernelAdapter {
       data->arg2->SetPrepareScalar(data->prepare_arg2_scalar);
       data->out = std::make_unique<typename Exec::out_t>();
 
+      if constexpr (has_exec_init<Exec>::value) {
+        data->exec.Init(data->arg0.get(), data->out.get());
+      }
+
       // We don't have a reliable way to check the equality of CRSes, so
       // here we just return the first CRS.
       std::string crs_out = data->arg0->GetCrs();
@@ -1138,10 +1143,6 @@ class SedonaTernaryKernelAdapter {
         data->out->InitOutputType(out);
       } else {
         data->out->InitOutputTypeWithCrs(out, crs_out);
-      }
-
-      if constexpr (has_exec_init<Exec>::value) {
-        data->exec.Init(data->arg0.get(), data->out.get());
       }
 
       return 0;

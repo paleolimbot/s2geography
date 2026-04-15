@@ -160,12 +160,13 @@ S2LatLngRect LatLngRectBounder::BoundLoops(const GeoArrowGeography& value) {
     S2CopyingEdgeCrosser crosser(reference.point, north_pole, v0);
     bool contains_north_pole = reference.contained;
 
-    loop.VisitNativeVertices([&](const internal::GeoArrowVertex& v) {
-      S2LatLng ll = S2LatLng::FromDegrees(v.lat, v.lng).Normalized();
-      bounder.AddLatLng(ll);
-      contains_north_pole ^= crosser.EdgeOrVertexCrossing(ll.ToPoint());
-      return true;
-    });
+    loop.VisitNativeVertices(
+        1, loop.size() - 1, [&](const internal::GeoArrowVertex& v) {
+          S2LatLng ll = S2LatLng::FromDegrees(v.lat, v.lng).Normalized();
+          bounder.AddLatLng(ll);
+          contains_north_pole ^= crosser.EdgeOrVertexCrossing(ll.ToPoint());
+          return true;
+        });
     S2LatLngRect b = bounder.GetBound();
 
     // Check north pole containment
