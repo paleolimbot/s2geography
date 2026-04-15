@@ -156,10 +156,11 @@ S2LatLngRect LatLngRectBounder::BoundLoops(const GeoArrowGeography& value) {
     S2LatLngRectBounder bounder;
 
     S2Point north_pole = S2Point(0, 0, 1);
-    S2Point v0 = loop.vertex(0);
-    S2CopyingEdgeCrosser crosser(reference.point, north_pole, v0);
+    internal::GeoArrowVertex nv0 = loop.native_vertex(0);
+    S2CopyingEdgeCrosser crosser(reference.point, north_pole, nv0.ToPoint());
     bool contains_north_pole = reference.contained;
 
+    bounder.AddLatLng(S2LatLng::FromDegrees(nv0.lat, nv0.lng).Normalized());
     loop.VisitNativeVertices(
         1, loop.size() - 1, [&](const internal::GeoArrowVertex& v) {
           S2LatLng ll = S2LatLng::FromDegrees(v.lat, v.lng).Normalized();
@@ -182,7 +183,7 @@ S2LatLngRect LatLngRectBounder::BoundLoops(const GeoArrowGeography& value) {
     if (b.lng().is_full()) {
       bool contains_south_pole = reference.contained;
       S2Point south_pole(0, 0, -1);
-      S2CopyingEdgeCrosser crosser(reference.point, south_pole, v0);
+      S2CopyingEdgeCrosser crosser(reference.point, south_pole, nv0.ToPoint());
       loop.VisitVertices(1, loop.size() - 1, [&](const S2Point& vertex) {
         contains_south_pole ^= crosser.EdgeOrVertexCrossing(vertex);
         return true;

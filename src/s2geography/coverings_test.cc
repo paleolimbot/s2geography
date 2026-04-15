@@ -73,12 +73,14 @@ INSTANTIATE_TEST_SUITE_P(
         LatLngRectBounderParam{"polygon_empty", "POLYGON EMPTY", std::nullopt,
                                std::nullopt, std::nullopt, std::nullopt},
 
-        // Points
-        LatLngRectBounderParam{"point_origin", "POINT (0 0)", 0.0, 0.0, 0.0,
-                               0.0},
-        LatLngRectBounderParam{"multipoint_spanning",
-                               "MULTIPOINT ((-10 -20), (30 40))", -10.0, -20.0,
-                               30.0, 40.0},
+        // Points (note: longitude is expanded by 2*DBL_EPSILON radians for
+        // rounding error)
+        LatLngRectBounderParam{"point_origin", "POINT (0 0)",
+                               -2.5444437451708134e-14, 0.0,
+                               2.5444437451708134e-14, 0.0},
+        LatLngRectBounderParam{
+            "multipoint_spanning", "MULTIPOINT ((-10 -20), (30 40))",
+            -10.000000000000025, -20.0, 30.000000000000025, 40.0},
         LatLngRectBounderParam{"multipoint_antimeridian",
                                "MULTIPOINT ((170 10), (-170 11))", 170.0, 10.0,
                                -170.0, 11.0},
@@ -154,9 +156,9 @@ TEST(LatLngRectBounderTest, AccumulatesBounds) {
   bounder.Update(geog2);
   S2LatLngRect bounds = bounder.Finish();
 
-  EXPECT_DOUBLE_EQ(bounds.lng_lo().degrees(), 0.0);
+  EXPECT_DOUBLE_EQ(bounds.lng_lo().degrees(), -2.5444437451708134e-14);
   EXPECT_DOUBLE_EQ(bounds.lat_lo().degrees(), 0.0);
-  EXPECT_DOUBLE_EQ(bounds.lng_hi().degrees(), 10.0);
+  EXPECT_DOUBLE_EQ(bounds.lng_hi().degrees(), 10.000000000000025);
   EXPECT_DOUBLE_EQ(bounds.lat_hi().degrees(), 20.0);
 }
 
@@ -274,13 +276,15 @@ TEST(Coverings, SedonaUdfBoundingBox) {
   // so we only check the non-null rows' values
   // Child 0: xmin
   ASSERT_NO_FATAL_FAILURE(TestResultArrow(
-      out_array->children[0], NANOARROW_TYPE_DOUBLE, {0.0, -10.0, 0.0, 0.0}));
+      out_array->children[0], NANOARROW_TYPE_DOUBLE,
+      {-2.5444437451708134e-14, -10.000000000000025, 0.0, 0.0}));
   // Child 1: ymin
   ASSERT_NO_FATAL_FAILURE(TestResultArrow(
       out_array->children[1], NANOARROW_TYPE_DOUBLE, {0.0, -20.0, 0.0, 0.0}));
   // Child 2: xmax
-  ASSERT_NO_FATAL_FAILURE(TestResultArrow(
-      out_array->children[2], NANOARROW_TYPE_DOUBLE, {0.0, 30.0, 0.0, 0.0}));
+  ASSERT_NO_FATAL_FAILURE(
+      TestResultArrow(out_array->children[2], NANOARROW_TYPE_DOUBLE,
+                      {2.5444437451708134e-14, 30.000000000000025, 0.0, 0.0}));
   // Child 3: ymax
   ASSERT_NO_FATAL_FAILURE(TestResultArrow(
       out_array->children[3], NANOARROW_TYPE_DOUBLE, {0.0, 40.0, 0.0, 0.0}));
