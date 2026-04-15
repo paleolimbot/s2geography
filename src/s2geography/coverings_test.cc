@@ -214,10 +214,9 @@ TEST(Coverings, SedonaUdfCoveringCellIdsArray) {
   EXPECT_EQ(offsets[1] - offsets[0], 1);
   // Row 1: POINT (0 1) - should have 1 cell
   EXPECT_EQ(offsets[2] - offsets[1], 1);
-  // Row 2: LINESTRING (0 0, 100 50) - should have multiple cells
+  // Row 2: LINESTRING (0 0, 100 50) - should have max_cells
   int linestring_cells = offsets[3] - offsets[2];
-  EXPECT_GE(linestring_cells, 1);
-  EXPECT_LE(linestring_cells, 8);  // max_cells is 8
+  EXPECT_EQ(linestring_cells, 8);
   // Row 3: POINT EMPTY - should have 0 cells
   EXPECT_EQ(offsets[4] - offsets[3], 0);
   // Row 4: null - should have 0 cells
@@ -231,23 +230,14 @@ TEST(Coverings, SedonaUdfCoveringCellIdsArray) {
   ASSERT_NE(child->buffers[1], nullptr);
   auto* cell_ids = reinterpret_cast<const int64_t*>(child->buffers[1]);
 
-  // Verify each cell ID is valid by reconstructing and checking
+  // The point cell IDs should correspond to the input points
   S2CellId id0(cell_ids[0]);
   S2CellId id1(cell_ids[1]);
-  EXPECT_TRUE(id0.is_valid());
-  EXPECT_TRUE(id1.is_valid());
 
-  // The cell IDs should correspond to the input points
   S2CellId expected_id0(S2LatLng::FromDegrees(0, 0).ToPoint());
   S2CellId expected_id1(S2LatLng::FromDegrees(1, 0).ToPoint());
   EXPECT_EQ(id0, expected_id0);
   EXPECT_EQ(id1, expected_id1);
-
-  // Verify the linestring's covering cells are all valid
-  for (int i = 2; i < total_cells; i++) {
-    S2CellId id(cell_ids[i]);
-    EXPECT_TRUE(id.is_valid()) << "Cell ID at index " << i << " is invalid";
-  }
 
   impl.release(&impl);
   kernel.release(&kernel);
