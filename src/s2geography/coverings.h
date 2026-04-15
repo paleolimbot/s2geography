@@ -4,12 +4,11 @@
 #include <s2/s2latlng_rect.h>
 #include <s2/s2region_coverer.h>
 
+#include "s2geography/geoarrow-geography.h"
 #include "s2geography/geography.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
 
 namespace s2geography {
-
-class GeoArrowGeography;
 
 class LatLngRectBounder {
  public:

@@ -13,6 +13,7 @@
 #include <cstring>
 #include <limits>
 
+#include "geoarrow/geoarrow.h"
 #include "s2/s2point_region.h"
 #include "s2geography/geography_interface.h"
 

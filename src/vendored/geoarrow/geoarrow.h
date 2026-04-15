@@ -405,6 +405,9 @@ enum GeoArrowType {
 
 };
 
+#ifndef GEOARROW_C_ABI
+#define GEOARROW_C_ABI
+
 /// \brief Geometry type identifiers supported by GeoArrow
 /// \ingroup geoarrow-schema
 ///
@@ -584,6 +587,8 @@ struct GeoArrowGeometryView {
   /// the children are correctly set.
   int64_t size_nodes;
 };
+
+#endif
 
 /// \brief Variant of the GeoArrowGeometry that owns its GeoArrowGeometryNode and/or
 /// its coordinates

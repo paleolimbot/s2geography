@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <absl/numeric/bits.h>
 #include <s2/s2latlng.h>
 #include <s2/s2shape.h>
 
@@ -9,7 +10,7 @@
 #include <cstring>
 #include <vector>
 
-#include "geoarrow/geoarrow.h"
+#include "s2geography/arrow_abi.h"
 #include "s2geography/macros.h"
 
 namespace s2geography {
@@ -81,11 +82,11 @@ bool VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
     uint64_t tmp;
     for (int64_t i = 0; i < n; ++i) {
       memcpy(&tmp, lngs, sizeof(double));
-      tmp = GEOARROW_BSWAP64(tmp);
+      tmp = absl::byteswap(tmp);
       memcpy(&lng, &tmp, sizeof(double));
 
       memcpy(&tmp, lats, sizeof(double));
-      tmp = GEOARROW_BSWAP64(tmp);
+      tmp = absl::byteswap(tmp);
       memcpy(&lat, &tmp, sizeof(double));
       if (!visit(lng, lat)) return false;
 
@@ -220,19 +221,19 @@ bool VisitLngLatZM(const struct GeoArrowGeometryNode* node, int64_t offset,
     uint64_t tmp;
     for (int64_t i = 0; i < n; ++i) {
       memcpy(&tmp, lngs, sizeof(double));
-      tmp = GEOARROW_BSWAP64(tmp);
+      tmp = absl::byteswap(tmp);
       memcpy(&v.lng, &tmp, sizeof(double));
 
       memcpy(&tmp, lats, sizeof(double));
-      tmp = GEOARROW_BSWAP64(tmp);
+      tmp = absl::byteswap(tmp);
       memcpy(&v.lat, &tmp, sizeof(double));
 
       memcpy(&tmp, zm0s, sizeof(double));
-      tmp = GEOARROW_BSWAP64(tmp);
+      tmp = absl::byteswap(tmp);
       memcpy(&v.zm[0], &tmp, sizeof(double));
 
       memcpy(&tmp, zm1s, sizeof(double));
-      tmp = GEOARROW_BSWAP64(tmp);
+      tmp = absl::byteswap(tmp);
       memcpy(&v.zm[1], &tmp, sizeof(double));
 
       if (!visit(v)) return false;
