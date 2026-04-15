@@ -242,3 +242,49 @@ TEST(Coverings, SedonaUdfCoveringCellIdsArray) {
   impl.release(&impl);
   kernel.release(&kernel);
 }
+
+TEST(Coverings, SedonaUdfBoundingBox) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::BoundingBoxKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(
+      TestInitKernel(&kernel, &impl, {ARROW_TYPE_WKB}, NANOARROW_TYPE_STRUCT));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB},
+                        {{"POINT (0 0)", "MULTIPOINT ((-10 -20), (30 40))",
+                          "POINT EMPTY", std::nullopt}},
+                        {}, out_array.get()));
+
+  // Check the struct has 4 rows and 4 children (xmin, ymin, xmax, ymax)
+  ASSERT_EQ(out_array->length, 4);
+  ASSERT_EQ(out_array->n_children, 4);
+
+  // For struct output, nulls are at the struct level, not in children.
+  ASSERT_NE(out_array->buffers[0], nullptr);  // validity bitmap should exist
+  auto* validity = static_cast<const uint8_t*>(out_array->buffers[0]);
+  EXPECT_TRUE(ArrowBitGet(validity, 0));
+  EXPECT_TRUE(ArrowBitGet(validity, 1));
+  EXPECT_FALSE(ArrowBitGet(validity, 2));
+  EXPECT_FALSE(ArrowBitGet(validity, 3));
+
+  // Test children values for non-null rows using TestResultArrow
+  // Note: Children have placeholder values (0.0) for null struct rows,
+  // so we only check the non-null rows' values
+  // Child 0: xmin
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(
+      out_array->children[0], NANOARROW_TYPE_DOUBLE, {0.0, -10.0, 0.0, 0.0}));
+  // Child 1: ymin
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(
+      out_array->children[1], NANOARROW_TYPE_DOUBLE, {0.0, -20.0, 0.0, 0.0}));
+  // Child 2: xmax
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(
+      out_array->children[2], NANOARROW_TYPE_DOUBLE, {0.0, 30.0, 0.0, 0.0}));
+  // Child 3: ymax
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(
+      out_array->children[3], NANOARROW_TYPE_DOUBLE, {0.0, 40.0, 0.0, 0.0}));
+
+  impl.release(&impl);
+  kernel.release(&kernel);
+}

@@ -273,6 +273,7 @@ struct BoundingBoxExec {
   void Exec(arg0_t::c_type value, out_t* out) {
     if (value.is_empty()) {
       out->AppendNull();
+      return;
     }
 
     bounder_.Clear();
@@ -297,7 +298,7 @@ void CoveringCellIdsKernel(struct SedonaCScalarKernel* out) {
 }
 
 void BoundingBoxKernel(struct SedonaCScalarKernel* out) {
-  InitUnaryKernel<CoveringCellIdsExec>(out, "st_boundingbox");
+  InitUnaryKernel<BoundingBoxExec>(out, "st_boundingbox");
 }
 
 }  // namespace sedona_udf
