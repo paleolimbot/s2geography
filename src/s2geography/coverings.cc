@@ -6,6 +6,8 @@
 #include <s2/s2region_coverer.h>
 #include <s2/s2shape_index_buffered_region.h>
 
+#include <cfloat>
+
 #include "s2geography/accessors-geog.h"
 #include "s2geography/accessors.h"
 #include "s2geography/geoarrow-geography.h"
@@ -143,8 +145,8 @@ S2LatLngRect LatLngRectBounder::BoundLoops(const GeoArrowGeography& value) {
 
   // Adapted from the s2loop.cc implementation of bounding
   value.polygons()->geom().VisitLoops(&scratch_, [&](const GeoArrowLoop& loop) {
-    // Only shells contribute to the bounds of valid polygons
-    if (loop.is_hole()) {
+    // Only non-empty shells contribute to the bounds of valid polygons
+    if (loop.is_hole() || loop.size() == 0) {
       return true;
     }
 

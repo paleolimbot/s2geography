@@ -30,6 +30,31 @@ struct has_exec_init<T, std::void_t<decltype(std::declval<T>().Init(
                             std::declval<typename T::out_t*>()))>>
     : std::true_type {};
 
+/// \brief Detection trait for optional Exec::Init(arg0_t*, arg1_t*, out_t*)
+/// method
+template <typename T, typename = void>
+struct has_exec_init_binary : std::false_type {};
+
+template <typename T>
+struct has_exec_init_binary<T, std::void_t<decltype(std::declval<T>().Init(
+                                   std::declval<typename T::arg0_t*>(),
+                                   std::declval<typename T::arg1_t*>(),
+                                   std::declval<typename T::out_t*>()))>>
+    : std::true_type {};
+
+/// \brief Detection trait for optional Exec::Init(arg0_t*, arg1_t*, arg2_t*,
+/// out_t*) method
+template <typename T, typename = void>
+struct has_exec_init_ternary : std::false_type {};
+
+template <typename T>
+struct has_exec_init_ternary<T, std::void_t<decltype(std::declval<T>().Init(
+                                    std::declval<typename T::arg0_t*>(),
+                                    std::declval<typename T::arg1_t*>(),
+                                    std::declval<typename T::arg2_t*>(),
+                                    std::declval<typename T::out_t*>()))>>
+    : std::true_type {};
+
 /// \defgroup sedona_udf-utils Arrow UDF Utilities
 ///
 /// To simplify implementations of a large number of functions, we
@@ -235,8 +260,8 @@ class ListOutputBuilder {
   std::vector<int8_t> nulls_;
   std::vector<int32_t> lengths_;
   nanoarrow::UniqueArray array_;
-  int64_t current_length_;
-  int64_t null_count_;
+  int64_t current_length_{};
+  int64_t null_count_{};
 };
 
 template <typename... Children>
@@ -1011,8 +1036,8 @@ class SedonaBinaryKernelAdapter {
       data->arg1->SetPrepareScalar(data->prepare_arg1_scalar);
       data->out = std::make_unique<typename Exec::out_t>();
 
-      if constexpr (has_exec_init<Exec>::value) {
-        data->exec.Init(data->arg0.get(), data->out.get());
+      if constexpr (has_exec_init_binary<Exec>::value) {
+        data->exec.Init(data->arg0.get(), data->arg1.get(), data->out.get());
       }
 
       // We don't have a reliable way to check the equality of CRSes, so
@@ -1132,8 +1157,9 @@ class SedonaTernaryKernelAdapter {
       data->arg2->SetPrepareScalar(data->prepare_arg2_scalar);
       data->out = std::make_unique<typename Exec::out_t>();
 
-      if constexpr (has_exec_init<Exec>::value) {
-        data->exec.Init(data->arg0.get(), data->out.get());
+      if constexpr (has_exec_init_ternary<Exec>::value) {
+        data->exec.Init(data->arg0.get(), data->arg1.get(), data->arg2.get(),
+                        data->out.get());
       }
 
       // We don't have a reliable way to check the equality of CRSes, so
