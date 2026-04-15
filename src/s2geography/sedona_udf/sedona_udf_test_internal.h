@@ -58,8 +58,8 @@ class TestGeometry {
     GEOARROW_THROW_NOT_OK(nullptr, GeoArrowGeometryViewVisit(geom(), &v));
 
     nanoarrow::UniqueArray out;
-    GEOARROW_THROW_NOT_OK(nullptr, S2GeographyGeoArrowWKTWriterFinish(
-                                       &writer, out.get(), nullptr));
+    GEOARROW_THROW_NOT_OK(nullptr,
+                          GeoArrowWKTWriterFinish(&writer, out.get(), nullptr));
     GeoArrowWKTWriterReset(&writer);
 
     auto* offsets = reinterpret_cast<const int32_t*>(out->buffers[1]);

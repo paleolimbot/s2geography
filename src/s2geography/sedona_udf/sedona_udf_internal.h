@@ -152,7 +152,7 @@ class ListOutputBuilder {
 
   void InitOutputType(struct ArrowSchema* out) {
     ArrowSchemaInit(out);
-    NANOARROW_THROW_NOT_OK(S2GeographyArrowSchemaSetFormat(out, "+l"));
+    NANOARROW_THROW_NOT_OK(ArrowSchemaSetFormat(out, "+l"));
     NANOARROW_THROW_NOT_OK(ArrowSchemaAllocateChildren(out, 1));
     items_.InitOutputType(out->children[0]);
     NANOARROW_THROW_NOT_OK(ArrowSchemaSetName(out->children[0], "item"));
