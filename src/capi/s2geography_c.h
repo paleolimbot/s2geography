@@ -39,34 +39,16 @@ void S2GeogErrorDestroy(struct S2GeogError* err);
 
 /// \defgroup cell_functions Cell Functions
 /// Functions for working with S2 cell identifiers.
-/// @{
-
-/// \brief Convert longitude/latitude to an S2 cell ID
-uint64_t S2GeogLngLatToCellId(double lng, double lat);
-
-/// @}
-
-/// \defgroup sedona_udf Sedona UDF Interface
-///
-/// Interface for user-defined functions. These functions take Arrow as input
-/// and produce Arrow as output and are useful as a generic interface to avoid
-/// verbose wrappers around S2 functions. Consuming S2Geography in this way has
-/// the disadvantage that preparatory work (e.g., preparing a geography) is not
-/// effectively reused between calls.
 ///
 /// @{
 
-/// \brief Kernel format for Apache Sedona's scalar UDF extension
-#define S2GEOGRAPHY_KERNEL_FORMAT_SEDONA_UDF 1
+/// \brief Vertex used as common input/output for vertices
+struct S2GeogVertex {
+  double v[4];
+};
 
-/// \brief The number of user-defined functions to be exported
-size_t S2GeogNumKernels(void);
-
-/// \brief Export functions into an array of the appropriate type
-///
-/// The only currently supported format is S2GEOGRAPHY_KERNEL_FORMAT_SEDONA_UDF.
-S2GeogErrorCode S2GeogInitKernels(void* kernels_array,
-                                  size_t kernels_array_size_bytes, int format);
+/// \brief Convert vertex of longitude/latitude to an S2 cell ID
+uint64_t S2GeogLngLatToCellId(struct S2GeogVertex* vertex);
 
 /// @}
 
@@ -104,6 +86,66 @@ S2GeogErrorCode S2GeogFactoryInitFromWkbNonOwning(
 
 /// \brief Destroy a geography factory
 void S2GeogFactoryDestroy(struct S2GeogFactory* geog_factory);
+
+/// @}
+
+/// \defgroup bounding Rectangle bounding
+/// Functions for computing a rectangular bounding area
+///
+/// @{
+
+/// \brief Opaque rectangle bounder object
+struct S2GeogRectBounder;
+
+/// \brief Create a new rectangle bounder
+S2GeogErrorCode S2GeogRectBounderCreate(
+    struct S2GeogRectBounder** rect_bounder);
+
+/// \brief Clear accumulated bounds from the rectangle bounder
+void S2GeogRectBounderClear(struct S2GeogRectBounder* rect_bounder);
+
+/// \brief Add a geography's bounds to the rectangle bounder
+S2GeogErrorCode S2GeogRectBounderBound(struct S2GeogRectBounder* rect_bounder,
+                                       struct S2Geog* geog,
+                                       struct S2GeogError* err);
+
+/// \brief Return 1 if the rectangle that would be returned represents empty
+/// bounds or 0 otherwise
+uint8_t S2GeogRectBounderIsEmpty(struct S2GeogRectBounder* rect_bounder);
+
+/// \brief Finish bounding and retrieve the lo/hi corners of the bounding
+/// rectangle
+S2GeogErrorCode S2GeogRectBounderFinish(struct S2GeogRectBounder* rect_bounder,
+                                        struct S2GeogVertex* lo,
+                                        struct S2GeogVertex* hi,
+                                        struct S2GeogError* err);
+
+/// \brief Destroy a rectangle bounder
+void S2GeogRectBounderDestroy(struct S2GeogRectBounder* rect_bounder);
+
+/// @}
+
+/// \defgroup sedona_udf Sedona UDF Interface
+///
+/// Interface for user-defined functions. These functions take Arrow as input
+/// and produce Arrow as output and are useful as a generic interface to avoid
+/// verbose wrappers around S2 functions. Consuming S2Geography in this way has
+/// the disadvantage that preparatory work (e.g., preparing a geography) is not
+/// effectively reused between calls.
+///
+/// @{
+
+/// \brief Kernel format for Apache Sedona's scalar UDF extension
+#define S2GEOGRAPHY_KERNEL_FORMAT_SEDONA_UDF 1
+
+/// \brief The number of user-defined functions to be exported
+size_t S2GeogNumKernels(void);
+
+/// \brief Export functions into an array of the appropriate type
+///
+/// The only currently supported format is S2GEOGRAPHY_KERNEL_FORMAT_SEDONA_UDF.
+S2GeogErrorCode S2GeogInitKernels(void* kernels_array,
+                                  size_t kernels_array_size_bytes, int format);
 
 /// @}
 

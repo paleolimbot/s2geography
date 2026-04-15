@@ -77,6 +77,17 @@ struct S2GeogFactory {
   S2GeogFactory& operator=(const S2GeogFactory&) = delete;
 };
 
+struct S2GeogRectBounder {
+  s2geography::LatLngRectBounder bounder;
+
+  // Non-copyable
+  S2GeogRectBounder(const S2GeogRectBounder&) = delete;
+  S2GeogRectBounder& operator=(const S2GeogRectBounder&) = delete;
+
+  S2GeogRectBounder() = default;
+  ~S2GeogRectBounder() = default;
+};
+
 // Error handling functions
 
 S2GeogErrorCode S2GeogErrorCreate(struct S2GeogError** err) {
@@ -98,11 +109,12 @@ void S2GeogErrorDestroy(struct S2GeogError* err) { delete err; }
 
 // Cell ID function
 
-uint64_t S2GeogLngLatToCellId(double lng, double lat) {
-  if (std::isnan(lng) || std::isnan(lat)) {
+uint64_t S2GeogLngLatToCellId(struct S2GeogVertex* v) {
+  if (std::isnan(v->v[0]) || std::isnan(v->v[1])) {
     return S2CellId::Sentinel().id();
   } else {
-    return S2CellId(S2LatLng::FromDegrees(lat, lng).Normalized().ToPoint())
+    return S2CellId(
+               S2LatLng::FromDegrees(v->v[1], v->v[0]).Normalized().ToPoint())
         .id();
   }
 }
@@ -216,6 +228,71 @@ S2GeogErrorCode S2GeogFactoryInitFromWkbNonOwning(
 
 void S2GeogFactoryDestroy(struct S2GeogFactory* geog_factory) {
   delete geog_factory;
+}
+
+// Rectangle bounder functions
+
+S2GeogErrorCode S2GeogRectBounderCreate(
+    struct S2GeogRectBounder** rect_bounder) {
+  if (rect_bounder == nullptr) {
+    return EINVAL;
+  }
+  *rect_bounder = new S2GeogRectBounder();
+  return S2GEOGRAPHY_OK;
+}
+
+void S2GeogRectBounderClear(struct S2GeogRectBounder* rect_bounder) {
+  S2GEOGRAPHY_DCHECK(rect_bounder != nullptr);
+  rect_bounder->bounder.Clear();
+}
+
+S2GeogErrorCode S2GeogRectBounderBound(struct S2GeogRectBounder* rect_bounder,
+                                       struct S2Geog* geog,
+                                       struct S2GeogError* err) {
+  S2GEOGRAPHY_C_BEGIN(err);
+
+  S2GEOGRAPHY_DCHECK(rect_bounder != nullptr);
+  S2GEOGRAPHY_DCHECK(geog != nullptr);
+
+  rect_bounder->bounder.Update(geog->geog);
+
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(err);
+}
+
+uint8_t S2GeogRectBounderIsEmpty(struct S2GeogRectBounder* rect_bounder) {
+  S2GEOGRAPHY_DCHECK(rect_bounder != nullptr);
+  return rect_bounder->bounder.Finish().is_empty() ? 1 : 0;
+}
+
+S2GeogErrorCode S2GeogRectBounderFinish(struct S2GeogRectBounder* rect_bounder,
+                                        struct S2GeogVertex* lo,
+                                        struct S2GeogVertex* hi,
+                                        struct S2GeogError* err) {
+  S2GEOGRAPHY_C_BEGIN(err);
+
+  S2GEOGRAPHY_DCHECK(rect_bounder != nullptr);
+  S2GEOGRAPHY_DCHECK(lo != nullptr);
+  S2GEOGRAPHY_DCHECK(hi != nullptr);
+
+  S2LatLngRect rect = rect_bounder->bounder.Finish();
+
+  lo->v[0] = rect.lng_lo().degrees();
+  lo->v[1] = rect.lat_lo().degrees();
+  lo->v[2] = 0;
+  lo->v[3] = 0;
+
+  hi->v[0] = rect.lng_hi().degrees();
+  hi->v[1] = rect.lat_hi().degrees();
+  hi->v[2] = 0;
+  hi->v[3] = 0;
+
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(err);
+}
+
+void S2GeogRectBounderDestroy(struct S2GeogRectBounder* rect_bounder) {
+  delete rect_bounder;
 }
 
 // Version functions
