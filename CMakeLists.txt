@@ -368,8 +368,9 @@ target_include_directories(
          $<INSTALL_INTERFACE:include>
   PRIVATE ${GEOARROW_INCLUDE_DIRECTORY} ${NANOARROW_INCLUDE_DIRECTORY})
 
-target_compile_definitions(s2geography_c PRIVATE ${GEOARROW_COMPILE_DEFINITIONS}
-                                                 ${NANOARROW_COMPILE_DEFINITIONS})
+target_compile_definitions(
+  s2geography_c PRIVATE ${GEOARROW_COMPILE_DEFINITIONS}
+                        ${NANOARROW_COMPILE_DEFINITIONS})
 
 target_link_libraries(s2geography_c PUBLIC s2geography)
 
