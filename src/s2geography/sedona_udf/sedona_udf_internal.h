@@ -211,7 +211,7 @@ class ListOutputBuilder {
     nanoarrow::UniqueBuffer offsets;
     nanoarrow::BufferInitSequence(offsets.get(), lengths_);
     lengths_.clear();
-    ArrowArraySetBuffer(tmp.get(), 1, offsets.get());
+    NANOARROW_THROW_NOT_OK(ArrowArraySetBuffer(tmp.get(), 1, offsets.get()));
 
     ArrowArrayMove(tmp.get(), out);
   }
