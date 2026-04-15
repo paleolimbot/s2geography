@@ -257,6 +257,7 @@ struct BoundingBoxExec {
                                     DoubleOutputBuilder, DoubleOutputBuilder>;
 
   void Init(arg0_t* input, out_t* out) {
+    S2GEOGRAPHY_UNUSED(input);
     out->SetNames({"xmin", "ymin", "xmax", "ymax"});
   }
 

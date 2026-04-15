@@ -179,6 +179,9 @@ TEST(Coverings, SedonaUdfCellIdFromPointArray) {
   impl.release(&impl);
   kernel.release(&kernel);
 
+  // We use doubles to test as the expected value to simplify the signature of
+  // TestResultArrow (even though it is usually dubious to do this type of
+  // cast unchecked)
   ASSERT_NO_FATAL_FAILURE(TestResultArrow(
       out_array.get(), NANOARROW_TYPE_INT64,
       {static_cast<double>(id_origin.id()), static_cast<double>(id_point1.id()),
