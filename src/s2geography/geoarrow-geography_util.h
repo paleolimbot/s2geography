@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <absl/numeric/bits.h>
 #include <s2/s2latlng.h>
 #include <s2/s2shape.h>
 
@@ -9,7 +10,7 @@
 #include <cstring>
 #include <vector>
 
-#include "geoarrow/geoarrow.h"
+#include "s2geography/arrow_abi.h"
 #include "s2geography/macros.h"
 
 namespace s2geography {
@@ -81,11 +82,11 @@ bool VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
     uint64_t tmp;
     for (int64_t i = 0; i < n; ++i) {
       memcpy(&tmp, lngs, sizeof(double));
-      tmp = GEOARROW_BSWAP64(tmp);
+      tmp = absl::byteswap(tmp);
       memcpy(&lng, &tmp, sizeof(double));
 
       memcpy(&tmp, lats, sizeof(double));
-      tmp = GEOARROW_BSWAP64(tmp);
+      tmp = absl::byteswap(tmp);
       memcpy(&lat, &tmp, sizeof(double));
       if (!visit(lng, lat)) return false;
 
@@ -220,19 +221,19 @@ bool VisitLngLatZM(const struct GeoArrowGeometryNode* node, int64_t offset,
     uint64_t tmp;
     for (int64_t i = 0; i < n; ++i) {
       memcpy(&tmp, lngs, sizeof(double));
-      tmp = GEOARROW_BSWAP64(tmp);
+      tmp = absl::byteswap(tmp);
       memcpy(&v.lng, &tmp, sizeof(double));
 
       memcpy(&tmp, lats, sizeof(double));
-      tmp = GEOARROW_BSWAP64(tmp);
+      tmp = absl::byteswap(tmp);
       memcpy(&v.lat, &tmp, sizeof(double));
 
       memcpy(&tmp, zm0s, sizeof(double));
-      tmp = GEOARROW_BSWAP64(tmp);
+      tmp = absl::byteswap(tmp);
       memcpy(&v.zm[0], &tmp, sizeof(double));
 
       memcpy(&tmp, zm1s, sizeof(double));
-      tmp = GEOARROW_BSWAP64(tmp);
+      tmp = absl::byteswap(tmp);
       memcpy(&v.zm[1], &tmp, sizeof(double));
 
       if (!visit(v)) return false;
@@ -392,31 +393,31 @@ class GeoArrowChain {
 
   /// \brief Call a function for each S2Point in this sequence
   template <typename Visit>
-  bool VisitVertices(Visit&& visit) {
+  bool VisitVertices(Visit&& visit) const {
     return internal::VisitVertices(node, visit);
   }
 
   /// \brief Call a function for each S2Point in a slice of this sequence
   template <typename Visit>
-  bool VisitVertices(int64_t offset, int64_t n, Visit&& visit) {
+  bool VisitVertices(int64_t offset, int64_t n, Visit&& visit) const {
     return internal::VisitVertices(node, offset, n, visit);
   }
 
   /// \brief Call a function for each pair of S2Points in this sequence
   template <typename Visit>
-  bool VisitEdges(Visit&& visit) {
+  bool VisitEdges(Visit&& visit) const {
     return internal::VisitEdges(node, visit);
   }
 
   /// \brief Call a function for each pair of S2Points in a slice of this
   /// sequence
   template <typename Visit>
-  bool VisitEdges(int64_t offset, int64_t n, Visit&& visit) {
+  bool VisitEdges(int64_t offset, int64_t n, Visit&& visit) const {
     return internal::VisitEdges(node, offset, n, visit);
   }
 
   /// \brief Copy a single vertex out of this sequence
-  S2Point vertex(int64_t i) {
+  S2Point vertex(int64_t i) const {
     S2Point v{};
     this->VisitVertices(i, 1, [&](const S2Point& pt) {
       v = pt;
@@ -426,7 +427,7 @@ class GeoArrowChain {
   }
 
   /// \brief Copy a single pair of vertices out of this sequence
-  S2Shape::Edge edge(int64_t i) {
+  S2Shape::Edge edge(int64_t i) const {
     S2Shape::Edge e{};
     this->VisitEdges(i, 1, [&](const S2Shape::Edge& edge) {
       e = edge;

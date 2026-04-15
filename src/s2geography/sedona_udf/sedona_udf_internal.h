@@ -20,6 +20,41 @@ namespace sedona_udf {
 template <class... T>
 struct always_false : std::false_type {};
 
+/// \brief Detection trait for optional Exec::Init(arg0_t*, out_t*) method
+template <typename T, typename = void>
+struct has_exec_init : std::false_type {};
+
+template <typename T>
+struct has_exec_init<T, std::void_t<decltype(std::declval<T>().Init(
+                            std::declval<typename T::arg0_t*>(),
+                            std::declval<typename T::out_t*>()))>>
+    : std::true_type {};
+
+/// \brief Detection trait for optional Exec::Init(arg0_t*, arg1_t*, out_t*)
+/// method
+template <typename T, typename = void>
+struct has_exec_init_binary : std::false_type {};
+
+template <typename T>
+struct has_exec_init_binary<T, std::void_t<decltype(std::declval<T>().Init(
+                                   std::declval<typename T::arg0_t*>(),
+                                   std::declval<typename T::arg1_t*>(),
+                                   std::declval<typename T::out_t*>()))>>
+    : std::true_type {};
+
+/// \brief Detection trait for optional Exec::Init(arg0_t*, arg1_t*, arg2_t*,
+/// out_t*) method
+template <typename T, typename = void>
+struct has_exec_init_ternary : std::false_type {};
+
+template <typename T>
+struct has_exec_init_ternary<T, std::void_t<decltype(std::declval<T>().Init(
+                                    std::declval<typename T::arg0_t*>(),
+                                    std::declval<typename T::arg1_t*>(),
+                                    std::declval<typename T::arg2_t*>(),
+                                    std::declval<typename T::out_t*>()))>>
+    : std::true_type {};
+
 /// \defgroup sedona_udf-utils Arrow UDF Utilities
 ///
 /// To simplify implementations of a large number of functions, we
@@ -101,6 +136,10 @@ class ArrowOutputBuilder {
     NANOARROW_THROW_NOT_OK(ArrowArrayAppendNull(array_.get(), 1));
   }
 
+  void AppendEmpty() {
+    NANOARROW_THROW_NOT_OK(ArrowArrayAppendEmpty(array_.get(), 1));
+  }
+
   void Append(c_type value) {
     if constexpr (std::is_integral_v<c_type>) {
       NANOARROW_THROW_NOT_OK(ArrowArrayAppendInt(array_.get(), value));
@@ -110,6 +149,8 @@ class ArrowOutputBuilder {
       static_assert(always_false<c_type>::value, "value type not supported");
     }
   }
+
+  int64_t current_length() { return array_->length; }
 
   void Finish(struct ArrowArray* out) {
     NANOARROW_THROW_NOT_OK(
@@ -122,8 +163,228 @@ class ArrowOutputBuilder {
 };
 
 using BoolOutputBuilder = ArrowOutputBuilder<bool, NANOARROW_TYPE_BOOL>;
-using IntOutputBuilder = ArrowOutputBuilder<int32_t, NANOARROW_TYPE_INT32>;
+using IntOutputBuilder = ArrowOutputBuilder<int64_t, NANOARROW_TYPE_INT64>;
 using DoubleOutputBuilder = ArrowOutputBuilder<double, NANOARROW_TYPE_DOUBLE>;
+
+template <typename Child>
+class ListOutputBuilder {
+ public:
+  ListOutputBuilder() = default;
+  ListOutputBuilder(const ListOutputBuilder&) = delete;
+  ListOutputBuilder& operator=(const ListOutputBuilder&) = delete;
+
+  Child& items() { return items_; }
+
+  void InitOutputType(struct ArrowSchema* out) {
+    ArrowSchemaInit(out);
+    NANOARROW_THROW_NOT_OK(ArrowSchemaSetFormat(out, "+l"));
+    NANOARROW_THROW_NOT_OK(ArrowSchemaAllocateChildren(out, 1));
+    items_.InitOutputType(out->children[0]);
+    NANOARROW_THROW_NOT_OK(ArrowSchemaSetName(out->children[0], "item"));
+  }
+
+  void InitOutputTypeWithCrs(struct ArrowSchema* out, const std::string& crs) {
+    S2GEOGRAPHY_UNUSED(crs);
+    InitOutputType(out);
+  }
+
+  void Reserve(int64_t additional_size) {
+    array_.reset();
+
+    current_length_ = 0;
+    lengths_.clear();
+    lengths_.reserve(additional_size + 1);
+    lengths_.push_back(0);
+
+    nulls_.clear();
+    null_count_ = 0;
+
+    // We could do a better job exposing the expected list size. It is
+    // unlikely to have a list that is completely empty with all elements
+    // and this could be optimized at some point.
+    items_.Reserve(0);
+  }
+
+  void AppendNull() { Append(false); }
+
+  void Append(bool is_valid = true) {
+    if (items_.current_length() > std::numeric_limits<int32_t>::max()) {
+      throw Exception(
+          "Can't build nested list output with >INT32_MAX child elements");
+    }
+
+    if (nulls_.empty() && !is_valid) {
+      nulls_.reserve(lengths_.capacity());
+      nulls_.resize(current_length_);
+      std::fill_n(nulls_.begin(), current_length_, 1);
+      nulls_.push_back(0);
+    } else if (!nulls_.empty()) {
+      nulls_.push_back(is_valid);
+    }
+
+    lengths_.push_back(static_cast<int32_t>(items_.current_length()));
+
+    null_count_ += !is_valid;
+    ++current_length_;
+  }
+
+  void Finish(struct ArrowArray* out) {
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_THROW_NOT_OK(
+        ArrowArrayInitFromType(tmp.get(), NANOARROW_TYPE_LIST));
+    NANOARROW_THROW_NOT_OK(ArrowArrayAllocateChildren(tmp.get(), 1));
+    items_.Finish(tmp->children[0]);
+
+    if (null_count_ > 0) {
+      nanoarrow::UniqueBitmap nulls;
+      ArrowBitmapInit(nulls.get());
+      NANOARROW_THROW_NOT_OK(ArrowBitmapReserve(nulls.get(), current_length_));
+      ArrowBitmapAppendInt8Unsafe(nulls.get(), nulls_.data(), current_length_);
+      ArrowArraySetValidityBitmap(tmp.get(), nulls.get());
+    }
+
+    nanoarrow::UniqueBuffer offsets;
+    nanoarrow::BufferInitSequence(offsets.get(), lengths_);
+    lengths_.clear();
+    NANOARROW_THROW_NOT_OK(ArrowArraySetBuffer(tmp.get(), 1, offsets.get()));
+
+    // Set the array metadata
+    tmp->length = current_length_;
+    tmp->null_count = null_count_;
+
+    NANOARROW_THROW_NOT_OK(ArrowArrayFinishBuildingDefault(tmp.get(), nullptr));
+    ArrowArrayMove(tmp.get(), out);
+  }
+
+  Child items_;
+  std::vector<int8_t> nulls_;
+  std::vector<int32_t> lengths_;
+  nanoarrow::UniqueArray array_;
+  int64_t current_length_{};
+  int64_t null_count_{};
+};
+
+template <typename... Children>
+class StructOutputBuilder {
+ public:
+  StructOutputBuilder() = default;
+  StructOutputBuilder(const StructOutputBuilder&) = delete;
+  StructOutputBuilder& operator=(const StructOutputBuilder&) = delete;
+
+  template <size_t I>
+  auto& field() {
+    return std::get<I>(fields_);
+  }
+
+  template <size_t I>
+  const auto& field() const {
+    return std::get<I>(fields_);
+  }
+
+  static constexpr size_t kNumFields = sizeof...(Children);
+
+  void SetNames(const std::array<const char*, kNumFields>& names) {
+    names_ = names;
+  }
+
+  void InitOutputType(struct ArrowSchema* out) {
+    NANOARROW_THROW_NOT_OK(ArrowSchemaInitFromType(out, NANOARROW_TYPE_STRUCT));
+    NANOARROW_THROW_NOT_OK(ArrowSchemaAllocateChildren(out, kNumFields));
+    InitFieldsOutputType(out, std::index_sequence_for<Children...>{});
+  }
+
+  void InitOutputTypeWithCrs(struct ArrowSchema* out, const std::string& crs) {
+    S2GEOGRAPHY_UNUSED(crs);
+    InitOutputType(out);
+  }
+
+  void Reserve(int64_t additional_size) {
+    current_length_ = 0;
+    null_count_ = 0;
+    nulls_.clear();
+    ReserveFields(additional_size, std::index_sequence_for<Children...>{});
+  }
+
+  void AppendNull() {
+    AppendEmptyFields(std::index_sequence_for<Children...>{});
+    Append(false);
+  }
+
+  void Append(bool is_valid = true) {
+    if (nulls_.empty() && !is_valid) {
+      nulls_.reserve(current_length_ + 1);
+      nulls_.resize(current_length_);
+      std::fill_n(nulls_.begin(), current_length_, 1);
+    }
+
+    if (!nulls_.empty()) {
+      nulls_.push_back(is_valid);
+    }
+
+    null_count_ += !is_valid;
+    ++current_length_;
+  }
+
+  int64_t current_length() const { return current_length_; }
+
+  void Finish(struct ArrowArray* out) {
+    nanoarrow::UniqueArray tmp;
+    NANOARROW_THROW_NOT_OK(
+        ArrowArrayInitFromType(tmp.get(), NANOARROW_TYPE_STRUCT));
+    NANOARROW_THROW_NOT_OK(
+        ArrowArrayAllocateChildren(tmp.get(), sizeof...(Children)));
+    FinishFields(tmp.get(), std::index_sequence_for<Children...>{});
+
+    tmp->length = current_length_;
+    tmp->null_count = null_count_;
+
+    if (!nulls_.empty()) {
+      nanoarrow::UniqueBitmap nulls;
+      ArrowBitmapInit(nulls.get());
+      NANOARROW_THROW_NOT_OK(ArrowBitmapReserve(nulls.get(), current_length_));
+      ArrowBitmapAppendInt8Unsafe(nulls.get(), nulls_.data(), current_length_);
+      ArrowArraySetValidityBitmap(tmp.get(), nulls.get());
+    }
+
+    ArrowArrayMove(tmp.get(), out);
+  }
+
+ private:
+  std::tuple<Children...> fields_;
+  std::vector<int8_t> nulls_;
+  std::array<const char*, kNumFields> names_{};
+  int64_t current_length_{0};
+  int64_t null_count_{0};
+
+  template <size_t... Is>
+  void InitFieldsOutputType(struct ArrowSchema* out,
+                            std::index_sequence<Is...>) {
+    (InitField<Is>(out->children[Is]), ...);
+  }
+
+  template <size_t I>
+  void InitField(struct ArrowSchema* child) {
+    std::get<I>(fields_).InitOutputType(child);
+    if (names_[I] != nullptr) {
+      NANOARROW_THROW_NOT_OK(ArrowSchemaSetName(child, names_[I]));
+    }
+  }
+
+  template <size_t... Is>
+  void ReserveFields(int64_t additional_size, std::index_sequence<Is...>) {
+    (std::get<Is>(fields_).Reserve(additional_size), ...);
+  }
+
+  template <size_t... Is>
+  void AppendEmptyFields(std::index_sequence<Is...>) {
+    (std::get<Is>(fields_).AppendEmpty(), ...);
+  }
+
+  template <size_t... Is>
+  void FinishFields(struct ArrowArray* out, std::index_sequence<Is...>) {
+    (std::get<Is>(fields_).Finish(out->children[Is]), ...);
+  }
+};
 
 /// \brief Low-level output builder for Geography as WKB
 ///
@@ -665,6 +926,10 @@ class SedonaUnaryKernelAdapter {
       data->arg0->SetPrepareScalar(data->prepare_arg0_scalar);
       data->out = std::make_unique<typename Exec::out_t>();
 
+      if constexpr (has_exec_init<Exec>::value) {
+        data->exec.Init(data->arg0.get(), data->out.get());
+      }
+
       std::string crs_out = data->arg0->GetCrs();
       if (crs_out.empty()) {
         data->out->InitOutputType(out);
@@ -770,6 +1035,10 @@ class SedonaBinaryKernelAdapter {
       data->arg0->SetPrepareScalar(data->prepare_arg0_scalar);
       data->arg1->SetPrepareScalar(data->prepare_arg1_scalar);
       data->out = std::make_unique<typename Exec::out_t>();
+
+      if constexpr (has_exec_init_binary<Exec>::value) {
+        data->exec.Init(data->arg0.get(), data->arg1.get(), data->out.get());
+      }
 
       // We don't have a reliable way to check the equality of CRSes, so
       // here we just return the first CRS.
@@ -887,6 +1156,11 @@ class SedonaTernaryKernelAdapter {
       data->arg1->SetPrepareScalar(data->prepare_arg1_scalar);
       data->arg2->SetPrepareScalar(data->prepare_arg2_scalar);
       data->out = std::make_unique<typename Exec::out_t>();
+
+      if constexpr (has_exec_init_ternary<Exec>::value) {
+        data->exec.Init(data->arg0.get(), data->arg1.get(), data->arg2.get(),
+                        data->out.get());
+      }
 
       // We don't have a reliable way to check the equality of CRSes, so
       // here we just return the first CRS.
