@@ -151,8 +151,11 @@ class ListOutputBuilder {
   Child& items() { return items_; }
 
   void InitOutputType(struct ArrowSchema* out) {
-    NANOARROW_THROW_NOT_OK(ArrowSchemaInitFromType(out, NANOARROW_TYPE_LIST));
+    ArrowSchemaInit(out);
+    NANOARROW_THROW_NOT_OK(S2GeographyArrowSchemaSetFormat(out, "+l"));
+    NANOARROW_THROW_NOT_OK(ArrowSchemaAllocateChildren(out, 1));
     items_.InitOutputType(out->children[0]);
+    NANOARROW_THROW_NOT_OK(ArrowSchemaSetName(out->children[0], "item"));
   }
 
   void InitOutputTypeWithCrs(struct ArrowSchema* out, const std::string& crs) {
