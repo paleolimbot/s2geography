@@ -628,35 +628,39 @@ TEST(GeoArrowPointShape, MultiPoint) {
   ValidateShape(shape);
 }
 
-TEST(GeoArrowPointShape, BigEndianWKB) {
+TEST(GeoArrowLaxPolylineShape, BigEndianWKBWithZM) {
   // clang-format off
-  // Big-endian WKB for POINT ZM (30 10 5 15)
+  // Big-endian WKB for LINESTRING ZM (30 10 5 15, 40 20 6 16)
   std::vector<uint8_t> wkb = {
     0x00,                                      // big endian
-    0x00, 0x00, 0x0b, 0xb9,                    // type: Point ZM (3001)
+    0x00, 0x00, 0x0b, 0xba,                    // type: LineString ZM (3002)
+    0x00, 0x00, 0x00, 0x02,                    // num points: 2
     0x40, 0x3e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // x: 30.0
     0x40, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // y: 10.0
     0x40, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // z: 5.0
     0x40, 0x2e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // m: 15.0
+    0x40, 0x44, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // x: 40.0
+    0x40, 0x34, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // y: 20.0
+    0x40, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // z: 6.0
+    0x40, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // m: 16.0
   };
   // clang-format on
 
   auto geom = TestGeometry::FromWKB(wkb);
-  GeoArrowPointShape shape(geom.geom());
-  EXPECT_EQ(shape.num_vertices(), 1);
+  GeoArrowLaxPolylineShape shape(geom.geom());
   EXPECT_EQ(shape.num_edges(), 1);
   EXPECT_EQ(shape.num_chains(), 1);
 
-  // The point's degenerate edge should have correct native coordinates
+  // The edge should have correct native coordinates
   auto e = shape.native_edge(0);
   EXPECT_DOUBLE_EQ(e.v0.lng, 30);
   EXPECT_DOUBLE_EQ(e.v0.lat, 10);
   EXPECT_DOUBLE_EQ(e.v0.zm[0], 5);
   EXPECT_DOUBLE_EQ(e.v0.zm[1], 15);
-  EXPECT_DOUBLE_EQ(e.v1.lng, 30);
-  EXPECT_DOUBLE_EQ(e.v1.lat, 10);
-  EXPECT_DOUBLE_EQ(e.v1.zm[0], 5);
-  EXPECT_DOUBLE_EQ(e.v1.zm[1], 15);
+  EXPECT_DOUBLE_EQ(e.v1.lng, 40);
+  EXPECT_DOUBLE_EQ(e.v1.lat, 20);
+  EXPECT_DOUBLE_EQ(e.v1.zm[0], 6);
+  EXPECT_DOUBLE_EQ(e.v1.zm[1], 16);
 
   // Also check the chain edge
   auto chain_e = shape.native_chain_edge(0, 0);
