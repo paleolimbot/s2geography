@@ -113,9 +113,29 @@ TEST(S2GeographyC, FactoryInitFromWkbPoint) {
   struct S2GeogError* err = nullptr;
   ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
 
-  S2GeogErrorCode code = S2GeogFactoryInitFromWkbNonOwning(
-      factory, wkb_point, sizeof(wkb_point), geog, err);
-  EXPECT_EQ(code, S2GEOGRAPHY_OK);
+  EXPECT_EQ(S2GeogFactoryInitFromWkbNonOwning(factory, wkb_point,
+                                              sizeof(wkb_point), geog, err),
+            S2GEOGRAPHY_OK);
+
+  S2GeogErrorDestroy(err);
+  S2GeogDestroy(geog);
+  S2GeogFactoryDestroy(factory);
+}
+
+TEST(S2GeographyC, FactoryInitFromInvalidWkb) {
+  struct S2GeogFactory* factory = nullptr;
+  ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
+
+  struct S2Geog* geog = nullptr;
+  ASSERT_EQ(S2GeogCreate(&geog), S2GEOGRAPHY_OK);
+
+  struct S2GeogError* err = nullptr;
+  ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
+
+  ASSERT_EQ(S2GeogFactoryInitFromWkbNonOwning(factory, nullptr, 0, geog, err),
+            EINVAL);
+  EXPECT_STREQ(S2GeogErrorGetMessage(err),
+               "Expected endian byte but found end of buffer at byte 0");
 
   S2GeogErrorDestroy(err);
   S2GeogDestroy(geog);
@@ -144,8 +164,9 @@ TEST(S2GeographyC, RectBounderBound) {
   struct S2GeogError* err = nullptr;
   ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
 
-  S2GeogFactoryInitFromWkbNonOwning(factory, wkb_point, sizeof(wkb_point), geog,
-                                    err);
+  ASSERT_EQ(S2GeogFactoryInitFromWkbNonOwning(factory, wkb_point,
+                                              sizeof(wkb_point), geog, err),
+            S2GEOGRAPHY_OK);
 
   struct S2GeogRectBounder* bounder = nullptr;
   ASSERT_EQ(S2GeogRectBounderCreate(&bounder), S2GEOGRAPHY_OK);
