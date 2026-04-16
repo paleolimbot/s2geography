@@ -154,6 +154,9 @@ S2GeogErrorCode S2GeogFactoryInitFromWkbNonOwning(
 /// is not tied to the lifecycle of the input text. This is primarily
 /// useful for testing.
 ///
+/// This function may modify out in the case of error; however, is left in
+/// a valid state and may be reused in another call to a factory method.
+///
 /// \pre geog_factory != NULL
 /// \pre out != NULL
 /// \pre buf != NULL || buf_size == 0
@@ -308,7 +311,7 @@ S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* arg0,
 /// \pre op != NULL
 int64_t S2GeogOpGetInt(struct S2GeogOp* op);
 
-/// \brief Destroy a op object
+/// \brief Destroy an op object
 ///
 /// \pre op != NULL
 void S2GeogOpDestroy(struct S2GeogOp* op);

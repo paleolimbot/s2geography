@@ -341,6 +341,8 @@ S2GeogErrorCode S2GeogFactoryInitFromWkt(struct S2GeogFactory* geog_factory,
   // Reset the output geometry to receive the parsed result
   // Ideally we could rewind this to keep the internal coord buffer
   GeoArrowGeometryReset(&out->geom);
+  out->geog.Init({nullptr, 0});
+
   ec = GeoArrowGeometryInit(&out->geom);
   if (ec != GEOARROW_OK) {
     S2GEOGRAPHY_SET_ERROR(err, "error initializing GeoArrowGeometry");
