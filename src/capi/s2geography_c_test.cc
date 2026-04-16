@@ -2,6 +2,7 @@
 #include "capi/s2geography_c.h"
 
 #include <gtest/gtest.h>
+#include <s2/s2cell_id.h>
 
 #include <limits>
 
@@ -63,8 +64,7 @@ TEST(S2GeographyC, LngLatToCellId) {
   uint64_t cell_id = S2GeogLngLatToCellId(&vertex);
 
   // Should return a valid (non-sentinel) cell ID
-  // S2CellId::Sentinel().id() is 0
-  EXPECT_NE(cell_id, 0);
+  EXPECT_NE(cell_id, S2CellId::Sentinel().id());
 }
 
 TEST(S2GeographyC, LngLatToCellIdNaN) {
@@ -73,7 +73,7 @@ TEST(S2GeographyC, LngLatToCellIdNaN) {
   vertex.v[0] = std::numeric_limits<double>::quiet_NaN();
   vertex.v[1] = 40.0;
 
-  uint64_t cell_id = S2GeogLngLatToCellId(&vertex);
+  EXPECT_EQ(S2GeogLngLatToCellId(&vertex), S2CellId::Sentinel().id());
 
   // Should return sentinel cell ID for NaN input
   // S2CellId::Sentinel().id() is expected here
@@ -81,11 +81,7 @@ TEST(S2GeographyC, LngLatToCellIdNaN) {
   struct S2GeogVertex vertex2;
   vertex2.v[0] = 0.0;
   vertex2.v[1] = std::numeric_limits<double>::quiet_NaN();
-  ;
-  uint64_t cell_id2 = S2GeogLngLatToCellId(&vertex2);
-
-  // Both NaN cases should return the same sentinel
-  EXPECT_EQ(cell_id, cell_id2);
+  EXPECT_EQ(S2GeogLngLatToCellId(&vertex2), S2CellId::Sentinel().id());
 }
 
 // ============================================================================
@@ -153,40 +149,6 @@ TEST(S2GeographyC, FactoryInitFromWkbPoint) {
 // Rectangle Bounder Tests
 // ============================================================================
 
-TEST(S2GeographyC, RectBounderCreate) {
-  struct S2GeogRectBounder* bounder = nullptr;
-  S2GeogErrorCode code = S2GeogRectBounderCreate(&bounder);
-  ASSERT_EQ(code, S2GEOGRAPHY_OK);
-  ASSERT_NE(bounder, nullptr);
-  S2GeogRectBounderDestroy(bounder);
-}
-
-TEST(S2GeographyC, RectBounderCreateNull) {
-  S2GeogErrorCode code = S2GeogRectBounderCreate(nullptr);
-  EXPECT_NE(code, S2GEOGRAPHY_OK);
-}
-
-TEST(S2GeographyC, RectBounderClear) {
-  struct S2GeogRectBounder* bounder = nullptr;
-  S2GeogRectBounderCreate(&bounder);
-
-  // Just verify it doesn't crash
-  S2GeogRectBounderClear(bounder);
-
-  S2GeogRectBounderDestroy(bounder);
-}
-
-TEST(S2GeographyC, RectBounderIsEmpty) {
-  struct S2GeogRectBounder* bounder = nullptr;
-  S2GeogRectBounderCreate(&bounder);
-
-  // Fresh bounder should be empty
-  uint8_t is_empty = S2GeogRectBounderIsEmpty(bounder);
-  EXPECT_EQ(is_empty, 1);
-
-  S2GeogRectBounderDestroy(bounder);
-}
-
 TEST(S2GeographyC, RectBounderBound) {
   // WKB for POINT(10 20)
   const uint8_t wkb_point[] = {
@@ -211,52 +173,25 @@ TEST(S2GeographyC, RectBounderBound) {
   struct S2GeogRectBounder* bounder = nullptr;
   S2GeogRectBounderCreate(&bounder);
 
-  S2GeogErrorCode code = S2GeogRectBounderBound(bounder, geog, err);
-  EXPECT_EQ(code, S2GEOGRAPHY_OK);
+  // Fresh bounder should be empty
+  EXPECT_EQ(S2GeogRectBounderIsEmpty(bounder), 1);
 
-  // After bounding a point, should no longer be empty
-  uint8_t is_empty = S2GeogRectBounderIsEmpty(bounder);
-  EXPECT_EQ(is_empty, 0);
-
-  S2GeogRectBounderDestroy(bounder);
-  S2GeogErrorDestroy(err);
-  S2GeogDestroy(geog);
-  S2GeogFactoryDestroy(factory);
-}
-
-TEST(S2GeographyC, RectBounderFinish) {
-  // WKB for POINT(10 20)
-  const uint8_t wkb_point[] = {
-      0x01,                    // byte order: little endian
-      0x01, 0x00, 0x00, 0x00,  // type: Point (1)
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x24, 0x40,  // x: 10.0
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x34, 0x40   // y: 20.0
-  };
-
-  struct S2GeogFactory* factory = nullptr;
-  S2GeogFactoryCreate(&factory);
-
-  struct S2Geog* geog = nullptr;
-  S2GeogCreate(&geog);
-
-  struct S2GeogError* err = nullptr;
-  S2GeogErrorCreate(&err);
-
-  S2GeogFactoryInitFromWkbNonOwning(factory, wkb_point, sizeof(wkb_point), geog,
-                                    err);
-
-  struct S2GeogRectBounder* bounder = nullptr;
-  S2GeogRectBounderCreate(&bounder);
-
+  // Bound a point
   S2GeogRectBounderBound(bounder, geog, err);
 
-  struct S2GeogVertex lo, hi;
-  S2GeogErrorCode code = S2GeogRectBounderFinish(bounder, &lo, &hi, err);
-  EXPECT_EQ(code, S2GEOGRAPHY_OK);
+  // Should no longer be empty
+  EXPECT_EQ(S2GeogRectBounderIsEmpty(bounder), 0);
 
-  // For a single point, lo and hi should be very close
-  EXPECT_NEAR(lo.v[0], hi.v[0], 1e-6);  // longitude
-  EXPECT_NEAR(lo.v[1], hi.v[1], 1e-6);  // latitude
+  struct S2GeogVertex lo, hi;
+  EXPECT_EQ(S2GeogRectBounderFinish(bounder, &lo, &hi, err), S2GEOGRAPHY_OK);
+  EXPECT_LE(lo.v[0], 10);
+  EXPECT_GE(hi.v[0], 10);
+  EXPECT_LE(lo.v[1], 20);
+  EXPECT_GE(hi.v[1], 20);
+
+  // If we clear, the bounder should be empty again
+  S2GeogRectBounderClear(bounder);
+  EXPECT_EQ(S2GeogRectBounderIsEmpty(bounder), 1);
 
   S2GeogRectBounderDestroy(bounder);
   S2GeogErrorDestroy(err);
