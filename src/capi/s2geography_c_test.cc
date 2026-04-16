@@ -27,7 +27,7 @@ TEST(S2GeographyC, ErrorCreate) {
 
 TEST(S2GeographyC, ErrorGetMessage) {
   struct S2GeogError* err = nullptr;
-  S2GeogErrorCreate(&err);
+  ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
 
   // Fresh error should have empty message
   const char* msg = S2GeogErrorGetMessage(err);
@@ -90,8 +90,7 @@ TEST(S2GeographyC, GeogCreate) {
 
 TEST(S2GeographyC, FactoryCreate) {
   struct S2GeogFactory* factory = nullptr;
-  S2GeogErrorCode code = S2GeogFactoryCreate(&factory);
-  ASSERT_EQ(code, S2GEOGRAPHY_OK);
+  ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
   ASSERT_NE(factory, nullptr);
   S2GeogFactoryDestroy(factory);
 }
@@ -106,13 +105,13 @@ TEST(S2GeographyC, FactoryInitFromWkbPoint) {
   };
 
   struct S2GeogFactory* factory = nullptr;
-  S2GeogFactoryCreate(&factory);
+  ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
 
   struct S2Geog* geog = nullptr;
-  S2GeogCreate(&geog);
+  ASSERT_EQ(S2GeogCreate(&geog), S2GEOGRAPHY_OK);
 
   struct S2GeogError* err = nullptr;
-  S2GeogErrorCreate(&err);
+  ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
 
   S2GeogErrorCode code = S2GeogFactoryInitFromWkbNonOwning(
       factory, wkb_point, sizeof(wkb_point), geog, err);
@@ -137,19 +136,19 @@ TEST(S2GeographyC, RectBounderBound) {
   };
 
   struct S2GeogFactory* factory = nullptr;
-  S2GeogFactoryCreate(&factory);
+  ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
 
   struct S2Geog* geog = nullptr;
-  S2GeogCreate(&geog);
+  ASSERT_EQ(S2GeogCreate(&geog), S2GEOGRAPHY_OK);
 
   struct S2GeogError* err = nullptr;
-  S2GeogErrorCreate(&err);
+  ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
 
   S2GeogFactoryInitFromWkbNonOwning(factory, wkb_point, sizeof(wkb_point), geog,
                                     err);
 
   struct S2GeogRectBounder* bounder = nullptr;
-  S2GeogRectBounderCreate(&bounder);
+  ASSERT_EQ(S2GeogRectBounderCreate(&bounder), S2GEOGRAPHY_OK);
 
   // Fresh bounder should be empty
   EXPECT_EQ(S2GeogRectBounderIsEmpty(bounder), 1);
