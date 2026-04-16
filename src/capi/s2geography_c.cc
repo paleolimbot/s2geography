@@ -248,6 +248,15 @@ S2GeogErrorCode S2GeogCreate(struct S2Geog** geog) {
   S2GEOGRAPHY_C_END(nullptr)
 }
 
+S2GeogErrorCode S2GeogForcePrepare(struct S2Geog* geog,
+                                   struct S2GeogError* err) {
+  S2GEOGRAPHY_C_BEGIN(err)
+  S2GEOGRAPHY_DCHECK(geog != nullptr);
+  geog->geog.ForceBuildIndex();
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(err);
+}
+
 void S2GeogDestroy(struct S2Geog* geog) {
   S2GEOGRAPHY_DCHECK(geog != nullptr);
   delete geog;

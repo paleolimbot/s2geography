@@ -78,9 +78,12 @@ TEST(S2GeographyC, LngLatToCellIdNaN) {
 
 TEST(S2GeographyC, GeogCreate) {
   struct S2Geog* geog = nullptr;
-  S2GeogErrorCode code = S2GeogCreate(&geog);
-  ASSERT_EQ(code, S2GEOGRAPHY_OK);
+  ASSERT_EQ(S2GeogCreate(&geog), S2GEOGRAPHY_OK);
   ASSERT_NE(geog, nullptr);
+
+  // Should be able to force prepare a fresh geography
+  ASSERT_EQ(S2GeogForcePrepare(geog, nullptr), S2GEOGRAPHY_OK);
+
   S2GeogDestroy(geog);
 }
 

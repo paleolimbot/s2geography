@@ -96,6 +96,21 @@ struct S2Geog;
 /// \pre geog != NULL
 S2GeogErrorCode S2GeogCreate(struct S2Geog** geog);
 
+/// \brief Force building the internal shape index for this geography
+///
+/// Most operations attempt to avoid building the internal ShapeIndex
+/// attached to this geography because doing so can be slow; however, for
+/// repeated calls to the same function (e.g., predicates), it can be faster to
+/// force the creation of an index. For example, internal S2 logic generally
+/// avoids building an index for loops with less than 32 vertices unless there
+/// have been 20 or more point containment queries on the same loop. In
+/// S2Geography, we leave the choice of whether or not to eagerly build an index
+/// to the user.
+///
+/// \pre geog != NULL
+S2GeogErrorCode S2GeogForcePrepare(struct S2Geog* geog,
+                                   struct S2GeogError* err);
+
 /// \brief Destroy a geography object
 ///
 /// \pre geog != NULL
