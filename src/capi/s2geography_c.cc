@@ -365,7 +365,11 @@ S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* lhs,
 }
 
 /// \brief Get integer or boolean output for this operation
-int64_t S2GeogOpGetInt(struct S2GeogOp* op) { return 0; }
+int64_t S2GeogOpGetInt(struct S2GeogOp* op) {
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+  S2GEOGRAPHY_DCHECK(op->op != nullptr);
+  return op->op->GetInt();
+}
 
 /// \brief Destroy a op object
 void S2GeogOpDestroy(struct S2GeogOp* op) {
