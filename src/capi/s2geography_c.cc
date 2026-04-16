@@ -100,7 +100,7 @@ S2GeogErrorCode S2GeogErrorCreate(struct S2GeogError** err) {
   S2GEOGRAPHY_C_END(nullptr)
 }
 
-const char* S2GeogErrorGetMessage(struct S2GeogError* err) {
+const char* S2GeogErrorGetMessage(const struct S2GeogError* err) {
   if (err == nullptr) {
     return "";
   }
@@ -235,8 +235,8 @@ S2GeogErrorCode S2GeogFactoryInitFromWkbNonOwning(
   src.size_bytes = static_cast<int64_t>(buf_size);
 
   struct GeoArrowGeometryView parsed;
-  GeoArrowErrorCode ec = S2GeographyGeoArrowWKBReaderRead(
-      &geog_factory->wkb_reader, src, &parsed, &geog_factory->error);
+  GeoArrowErrorCode ec = GeoArrowWKBReaderRead(&geog_factory->wkb_reader, src,
+                                               &parsed, &geog_factory->error);
   if (ec != GEOARROW_OK) {
     S2GEOGRAPHY_SET_ERROR(err, geog_factory->error.message);
     return ec;

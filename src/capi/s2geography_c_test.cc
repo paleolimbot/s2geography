@@ -180,13 +180,7 @@ TEST(S2GeographyC, RectBounderBound) {
 // Sedona UDF Interface Tests
 // ============================================================================
 
-TEST(S2GeographyC, NumKernels) {
-  size_t num_kernels = S2GeogNumKernels();
-  // Should have at least some kernels
-  EXPECT_GT(num_kernels, 0);
-  // Current implementation has 27 kernels
-  EXPECT_EQ(num_kernels, 27);
-}
+TEST(S2GeographyC, NumKernels) { EXPECT_EQ(S2GeogNumKernels(), 27); }
 
 TEST(S2GeographyC, InitKernelsInvalidFormat) {
   // Test with invalid format

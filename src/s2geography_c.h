@@ -54,7 +54,7 @@ S2GeogErrorCode S2GeogErrorCreate(struct S2GeogError** err);
 ///
 /// This message is always guaranteed to be a null-terminated
 /// string (usually the empty string).
-const char* S2GeogErrorGetMessage(struct S2GeogError* err);
+const char* S2GeogErrorGetMessage(const struct S2GeogError* err);
 
 /// \brief Destroy an error object
 ///
@@ -117,9 +117,10 @@ S2GeogErrorCode S2GeogFactoryCreate(struct S2GeogFactory** geog_factory);
 
 /// \brief Create a geography from WKB without taking ownership of the buffer
 ///
-/// The output S2Geog must have been created before this call with S2GeogCreate().
-/// This S2Geog can and should be reused for multiple calls to this or other
-/// factory functions (geographies have internal scratch space that can be reused).
+/// The output S2Geog must have been created before this call with
+/// S2GeogCreate(). This S2Geog can and should be reused for multiple calls to
+/// this or other factory functions (geographies have internal scratch space
+/// that can be reused).
 ///
 /// \pre geog_factory != NULL
 /// \pre out != NULL

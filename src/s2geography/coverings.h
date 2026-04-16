@@ -15,7 +15,7 @@ class LatLngRectBounder {
   void Clear();
   S2LatLngRect Finish() const;
   void Update(const GeoArrowGeography& value);
-  bool is_empty() { return bounds_.is_empty(); }
+  bool is_empty() const { return bounds_.is_empty(); }
 
  private:
   S2LatLngRect BoundPoints(const GeoArrowGeography& value);
