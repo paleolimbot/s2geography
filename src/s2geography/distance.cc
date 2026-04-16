@@ -540,8 +540,8 @@ bool BothSmallWithoutPolygons(const GeoArrowGeography& value0,
 }
 
 template <typename Traits>
-void DistanceLine(GeoArrowGeography& value0, GeoArrowGeography& value1,
-                  EdgePair* out, int flags,
+void DistanceLine(const GeoArrowGeography& value0,
+                  const GeoArrowGeography& value1, EdgePair* out, int flags,
                   S1ChordAngle max_distance = S1ChordAngle::Infinity()) {
   if (value0.is_empty() || value1.is_empty()) {
     *out = {};

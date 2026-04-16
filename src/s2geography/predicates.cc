@@ -185,7 +185,8 @@ struct S2Intersects {
     out->Append(ExecUsingShapeIndex(value0, value1));
   }
 
-  bool BruteForceExec(GeoArrowGeography& geog0, GeoArrowGeography& geog1) {
+  bool BruteForceExec(const GeoArrowGeography& geog0,
+                      const GeoArrowGeography& geog1) {
     // Collect non-point edges from both geometries upfront
     edges0_.clear();
     geog0.VisitNonPointEdges([&](const S2Shape::Edge& e) {
@@ -288,10 +289,11 @@ struct S2Intersects {
   std::vector<S2Shape::Edge> edges1_;
 };
 
+template <typename Output>
 struct S2Contains {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = BoolOutputBuilder;
+  using out_t = Output;
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     // If either argument is EMPTY, the result is FALSE
@@ -347,7 +349,8 @@ struct S2Contains {
     out->Append(ExecUsingShapeIndex(value0, value1));
   }
 
-  bool BruteForceExec(GeoArrowGeography& geog0, GeoArrowGeography& geog1) {
+  bool BruteForceExec(const GeoArrowGeography& geog0,
+                      const GeoArrowGeography& geog1) {
     // All vertices of geog1 must be inside geog0's polygons
     auto ref = geog0.polygons()->GetReferencePoint();
     if (!geog1.VisitVertices([&](const S2Point& pt) {
@@ -381,7 +384,7 @@ struct S2Contains {
   // Container (value0) is indexed, value1 is small and unindexed.
   // Use index queries to check all vertices/edges of value1 against value0.
   bool SemiBruteForceIndexedContains(const S2ShapeIndex& indexed,
-                                     GeoArrowGeography& fresh_geog) {
+                                     const GeoArrowGeography& fresh_geog) {
     // All vertices of the fresh geometry must be contained by the index.
     auto contains_query = MakeS2ContainsPointQuery(
         &indexed, S2ContainsPointQueryOptions(S2VertexModel::SEMI_OPEN));
@@ -414,10 +417,11 @@ struct S2Contains {
   std::vector<s2shapeutil::ShapeEdge> crossing_edges_;
 };
 
+template <typename Output>
 struct S2Equals {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = BoolOutputBuilder;
+  using out_t = Output;
 
   S2Equals() {
     options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
@@ -445,8 +449,8 @@ struct S2Equals {
     out->Append(s2_equals(value0.ShapeIndex(), value1.ShapeIndex(), options_));
   }
 
-  bool GeographyIdentical(GeoArrowGeography& value0,
-                          GeoArrowGeography& value1) {
+  bool GeographyIdentical(const GeoArrowGeography& value0,
+                          const GeoArrowGeography& value1) {
     if (value0.num_shapes() != value1.num_shapes()) {
       return false;
     }
@@ -523,14 +527,14 @@ void IntersectsKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
 
 void ContainsKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
                     bool prepare_arg1_scalar) {
-  InitBinaryKernel<S2Contains>(out, "st_contains", prepare_arg0_scalar,
-                               prepare_arg1_scalar);
+  InitBinaryKernel<S2Contains<BoolOutputBuilder>>(
+      out, "st_contains", prepare_arg0_scalar, prepare_arg1_scalar);
 }
 
 void EqualsKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
                   bool prepare_arg1_scalar) {
-  InitBinaryKernel<S2Equals>(out, "st_equals", prepare_arg0_scalar,
-                             prepare_arg1_scalar);
+  InitBinaryKernel<S2Equals<BoolOutputBuilder>>(
+      out, "st_equals", prepare_arg0_scalar, prepare_arg1_scalar);
 }
 
 }  // namespace sedona_udf
@@ -540,70 +544,42 @@ struct StashedBoolOutput {
   bool* out_;
 };
 
-class IntersectsPredicate : public BinaryPredicate {
+template <typename Exec>
+class PredicateImpl : public BinaryPredicate {
  public:
-  IntersectsPredicate() : out_(StashedBoolOutput{&result_}) {}
+  PredicateImpl() : out_(StashedBoolOutput{&result_}) {}
 
   bool Evaluate(const GeoArrowGeography& lhs,
                 const GeoArrowGeography& rhs) override {
-    S2GEOGRAPHY_UNUSED(lhs);
-    S2GEOGRAPHY_UNUSED(rhs);
-    S2GEOGRAPHY_UNUSED(out_);
-    // exec_.Exec(lhs, rhs, &out_);
-    return false;
+    exec_.Exec(lhs, rhs, &out_);
+    return result_;
   }
 
  private:
   bool result_{};
   StashedBoolOutput out_;
-  sedona_udf::S2Intersects<StashedBoolOutput> exec_;
-};
-
-class ContainsPredicate : public BinaryPredicate {
- public:
-  bool Evaluate(const GeoArrowGeography& lhs,
-                const GeoArrowGeography& rhs) override {
-    S2GEOGRAPHY_UNUSED(lhs);
-    S2GEOGRAPHY_UNUSED(rhs);
-    // Const-correctness
-    // p_.Exec(lhs, rhs, nullptr);
-
-    return result_;
-  }
-
- private:
-  sedona_udf::S2Contains p_;
-  bool result_{};
+  Exec exec_;
 };
 
 class WithinPredicate : public BinaryPredicate {
  public:
   bool Evaluate(const GeoArrowGeography& lhs,
                 const GeoArrowGeography& rhs) override {
-    S2GEOGRAPHY_UNUSED(lhs);
-    S2GEOGRAPHY_UNUSED(rhs);
-    // TODO: implement
-    return false;
+    return contains_.Evaluate(rhs, lhs);
   }
-};
 
-class EqualsPredicate : public BinaryPredicate {
- public:
-  bool Evaluate(const GeoArrowGeography& lhs,
-                const GeoArrowGeography& rhs) override {
-    S2GEOGRAPHY_UNUSED(lhs);
-    S2GEOGRAPHY_UNUSED(rhs);
-    // TODO: implement
-    return false;
-  }
+ private:
+  PredicateImpl<sedona_udf::S2Contains<StashedBoolOutput>> contains_;
 };
 
 std::unique_ptr<BinaryPredicate> BinaryPredicate::Intersects() {
-  return std::make_unique<IntersectsPredicate>();
+  return std::make_unique<
+      PredicateImpl<sedona_udf::S2Intersects<StashedBoolOutput>>>();
 }
 
 std::unique_ptr<BinaryPredicate> BinaryPredicate::Contains() {
-  return std::make_unique<ContainsPredicate>();
+  return std::make_unique<
+      PredicateImpl<sedona_udf::S2Contains<StashedBoolOutput>>>();
 }
 
 std::unique_ptr<BinaryPredicate> BinaryPredicate::Within() {
@@ -611,7 +587,8 @@ std::unique_ptr<BinaryPredicate> BinaryPredicate::Within() {
 }
 
 std::unique_ptr<BinaryPredicate> BinaryPredicate::Equals() {
-  return std::make_unique<EqualsPredicate>();
+  return std::make_unique<
+      PredicateImpl<sedona_udf::S2Equals<StashedBoolOutput>>>();
 }
 
 }  // namespace s2geography

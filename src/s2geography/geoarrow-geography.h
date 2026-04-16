@@ -406,7 +406,7 @@ class GeoArrowGeography {
 
   /// \brief Visit all vertices in this geography
   template <typename Visit>
-  bool VisitVertices(Visit&& visit) {
+  bool VisitVertices(Visit&& visit) const {
     if (!points()->geom().VisitChains(
             [&](GeoArrowChain chain) { return chain.VisitVertices(visit); }))
       return false;
