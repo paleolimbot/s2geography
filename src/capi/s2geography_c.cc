@@ -90,6 +90,17 @@ struct S2GeogRectBounder {
   ~S2GeogRectBounder() = default;
 };
 
+struct S2GeogPredicate {
+  // TODO: Add predicate state
+
+  // Non-copyable
+  S2GeogPredicate(const S2GeogPredicate&) = delete;
+  S2GeogPredicate& operator=(const S2GeogPredicate&) = delete;
+
+  S2GeogPredicate() = default;
+  ~S2GeogPredicate() = default;
+};
+
 // Error handling functions
 
 S2GeogErrorCode S2GeogErrorCreate(struct S2GeogError** err) {
@@ -323,6 +334,26 @@ S2GeogErrorCode S2GeogRectBounderFinish(struct S2GeogRectBounder* rect_bounder,
 void S2GeogRectBounderDestroy(struct S2GeogRectBounder* rect_bounder) {
   S2GEOGRAPHY_DCHECK(rect_bounder != nullptr);
   delete rect_bounder;
+}
+
+// Predicate functions
+
+S2GeogErrorCode S2GeogPredicateCreate(struct S2GeogPredicate* predicate,
+                                      int op) {
+  // TODO: Implement
+  return ENOTSUP;
+}
+
+S2GeogErrorCode S2GeogPredicateEval(struct S2GeogPredicate* predicate,
+                                    const S2Geog* lhs, const S2Geog* rhs,
+                                    uint8_t* out, struct S2GeogError* err) {
+  // TODO: Implement
+  return ENOTSUP;
+}
+
+void S2GeogPredicateDestroy(struct S2GeogPredicate* predicate) {
+  S2GEOGRAPHY_DCHECK(predicate != nullptr);
+  delete predicate;
 }
 
 // Version functions

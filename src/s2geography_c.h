@@ -34,6 +34,9 @@ extern "C" {
 /// between calls (e.g., users may wish to allocate a thread-local error
 /// and reuse it).
 ///
+/// Functions that can't fail do not return error codes or accept error
+/// arguments and return their values directly.
+///
 /// @{
 
 /// \brief An errno-compatible error code
@@ -208,6 +211,34 @@ size_t S2GeogNumKernels(void);
 /// The only currently supported format is S2GEOGRAPHY_KERNEL_FORMAT_SEDONA_UDF.
 S2GeogErrorCode S2GeogInitKernels(void* kernels_array,
                                   size_t kernels_array_size_bytes, int format);
+
+/// @}
+
+/// \defgroup predicates Predicates
+/// Functions for evaluating spatial predicates between geographies.
+///
+/// @{
+
+/// \brief Opaque predicate object
+struct S2GeogPredicate;
+
+/// \brief
+#define S2GEOGRAPHY_PREDICATE_INTERSECTS 1
+#define S2GEOGRAPHY_PREDICATE_CONTAINS 2
+#define S2GEOGRAPHY_PREDICATE_WITHIN 3
+#define S2GEOGRAPHY_PREDICATE_EQUALS 4
+
+/// \brief Create a new predicate object
+S2GeogErrorCode S2GeogPredicateCreate(struct S2GeogPredicate* predicate,
+                                      int predicate_id);
+
+/// \brief Evaluate a predicate between two geographies
+S2GeogErrorCode S2GeogPredicateEval(struct S2GeogPredicate* predicate,
+                                    const S2Geog* lhs, const S2Geog* rhs,
+                                    uint8_t* out, struct S2GeogError* err);
+
+/// \brief Destroy a predicate object
+void S2GeogPredicateDestroy(struct S2GeogPredicate* predicate);
 
 /// @}
 
