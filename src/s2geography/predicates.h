@@ -51,10 +51,10 @@ class BinaryPredicate {
   virtual bool Evaluate(const GeoArrowGeography& lhs,
                         const GeoArrowGeography& rhs) = 0;
 
-  std::unique_ptr<BinaryPredicate> Intersects();
-  std::unique_ptr<BinaryPredicate> Contains();
-  std::unique_ptr<BinaryPredicate> Within();
-  std::unique_ptr<BinaryPredicate> Equals();
+  static std::unique_ptr<BinaryPredicate> Intersects();
+  static std::unique_ptr<BinaryPredicate> Contains();
+  static std::unique_ptr<BinaryPredicate> Within();
+  static std::unique_ptr<BinaryPredicate> Equals();
 };
 
 namespace sedona_udf {
