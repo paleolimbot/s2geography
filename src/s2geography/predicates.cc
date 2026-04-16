@@ -113,10 +113,11 @@ namespace sedona_udf {
 
 static const int kMaxBruteForceEdges = 32;
 
+template <typename Output>
 struct S2Intersects {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = BoolOutputBuilder;
+  using out_t = Output;
 
   S2Intersects() {
     options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
@@ -516,8 +517,8 @@ struct S2Equals {
 
 void IntersectsKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
                       bool prepare_arg1_scalar) {
-  InitBinaryKernel<S2Intersects>(out, "st_intersects", prepare_arg0_scalar,
-                                 prepare_arg1_scalar);
+  InitBinaryKernel<S2Intersects<BoolOutputBuilder>>(
+      out, "st_intersects", prepare_arg0_scalar, prepare_arg1_scalar);
 }
 
 void ContainsKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
@@ -533,5 +534,84 @@ void EqualsKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
 }
 
 }  // namespace sedona_udf
+
+struct StashedBoolOutput {
+  void Append(bool value) { *out_ = value; }
+  bool* out_;
+};
+
+class IntersectsPredicate : public BinaryPredicate {
+ public:
+  IntersectsPredicate() : out_(StashedBoolOutput{&result_}) {}
+
+  bool Evaluate(const GeoArrowGeography& lhs,
+                const GeoArrowGeography& rhs) override {
+    S2GEOGRAPHY_UNUSED(lhs);
+    S2GEOGRAPHY_UNUSED(rhs);
+    S2GEOGRAPHY_UNUSED(out_);
+    // exec_.Exec(lhs, rhs, &out_);
+    return false;
+  }
+
+ private:
+  bool result_{};
+  StashedBoolOutput out_;
+  sedona_udf::S2Intersects<StashedBoolOutput> exec_;
+};
+
+class ContainsPredicate : public BinaryPredicate {
+ public:
+  bool Evaluate(const GeoArrowGeography& lhs,
+                const GeoArrowGeography& rhs) override {
+    S2GEOGRAPHY_UNUSED(lhs);
+    S2GEOGRAPHY_UNUSED(rhs);
+    // Const-correctness
+    // p_.Exec(lhs, rhs, nullptr);
+
+    return result_;
+  }
+
+ private:
+  sedona_udf::S2Contains p_;
+  bool result_{};
+};
+
+class WithinPredicate : public BinaryPredicate {
+ public:
+  bool Evaluate(const GeoArrowGeography& lhs,
+                const GeoArrowGeography& rhs) override {
+    S2GEOGRAPHY_UNUSED(lhs);
+    S2GEOGRAPHY_UNUSED(rhs);
+    // TODO: implement
+    return false;
+  }
+};
+
+class EqualsPredicate : public BinaryPredicate {
+ public:
+  bool Evaluate(const GeoArrowGeography& lhs,
+                const GeoArrowGeography& rhs) override {
+    S2GEOGRAPHY_UNUSED(lhs);
+    S2GEOGRAPHY_UNUSED(rhs);
+    // TODO: implement
+    return false;
+  }
+};
+
+std::unique_ptr<BinaryPredicate> BinaryPredicate::Intersects() {
+  return std::make_unique<IntersectsPredicate>();
+}
+
+std::unique_ptr<BinaryPredicate> BinaryPredicate::Contains() {
+  return std::make_unique<ContainsPredicate>();
+}
+
+std::unique_ptr<BinaryPredicate> BinaryPredicate::Within() {
+  return std::make_unique<WithinPredicate>();
+}
+
+std::unique_ptr<BinaryPredicate> BinaryPredicate::Equals() {
+  return std::make_unique<EqualsPredicate>();
+}
 
 }  // namespace s2geography

@@ -3,6 +3,7 @@
 
 #include <s2/s2boolean_operation.h>
 
+#include "s2geography/geoarrow-geography.h"
 #include "s2geography/geography.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
 
@@ -41,6 +42,20 @@ bool s2_intersects_box(const ShapeIndexGeography& geog1,
 bool s2_intersects_box(const S2ShapeIndex& geog1, const S2LatLngRect& rect,
                        const S2BooleanOperation::Options& options,
                        double tolerance);
+
+class BinaryPredicate {
+ public:
+  BinaryPredicate() = default;
+  virtual ~BinaryPredicate() = default;
+
+  virtual bool Evaluate(const GeoArrowGeography& lhs,
+                        const GeoArrowGeography& rhs) = 0;
+
+  std::unique_ptr<BinaryPredicate> Intersects();
+  std::unique_ptr<BinaryPredicate> Contains();
+  std::unique_ptr<BinaryPredicate> Within();
+  std::unique_ptr<BinaryPredicate> Equals();
+};
 
 namespace sedona_udf {
 
