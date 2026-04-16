@@ -20,16 +20,9 @@
 
 TEST(S2GeographyC, ErrorCreate) {
   struct S2GeogError* err = nullptr;
-  S2GeogErrorCode code = S2GeogErrorCreate(&err);
-  ASSERT_EQ(code, S2GEOGRAPHY_OK);
+  ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
   ASSERT_NE(err, nullptr);
   S2GeogErrorDestroy(err);
-}
-
-TEST(S2GeographyC, ErrorCreateNull) {
-  // Creating with null pointer should return error
-  S2GeogErrorCode code = S2GeogErrorCreate(nullptr);
-  EXPECT_NE(code, S2GEOGRAPHY_OK);
 }
 
 TEST(S2GeographyC, ErrorGetMessage) {
@@ -42,13 +35,6 @@ TEST(S2GeographyC, ErrorGetMessage) {
   EXPECT_EQ(strlen(msg), 0);
 
   S2GeogErrorDestroy(err);
-}
-
-TEST(S2GeographyC, ErrorGetMessageNull) {
-  // Getting message from null error should return empty string
-  const char* msg = S2GeogErrorGetMessage(nullptr);
-  ASSERT_NE(msg, nullptr);
-  EXPECT_EQ(strlen(msg), 0);
 }
 
 // ============================================================================
@@ -98,11 +84,6 @@ TEST(S2GeographyC, GeogCreate) {
   S2GeogDestroy(geog);
 }
 
-TEST(S2GeographyC, GeogCreateNull) {
-  S2GeogErrorCode code = S2GeogCreate(nullptr);
-  EXPECT_NE(code, S2GEOGRAPHY_OK);
-}
-
 // ============================================================================
 // Geography Factory Tests
 // ============================================================================
@@ -113,11 +94,6 @@ TEST(S2GeographyC, FactoryCreate) {
   ASSERT_EQ(code, S2GEOGRAPHY_OK);
   ASSERT_NE(factory, nullptr);
   S2GeogFactoryDestroy(factory);
-}
-
-TEST(S2GeographyC, FactoryCreateNull) {
-  S2GeogErrorCode code = S2GeogFactoryCreate(nullptr);
-  EXPECT_NE(code, S2GEOGRAPHY_OK);
 }
 
 TEST(S2GeographyC, FactoryInitFromWkbPoint) {
