@@ -444,7 +444,7 @@ GeoArrowGeography::GeoArrowGeography(GeoArrowGeography&& other)
       covering_(std::move(other.covering_)) {
   // index_ needs to be rebuilt
   index_.Clear();
-  indexed_ = false;
+  indexed_.store(false, std::memory_order_relaxed);
 }
 
 GeoArrowGeography& GeoArrowGeography::operator=(GeoArrowGeography&& other) {
@@ -456,7 +456,7 @@ GeoArrowGeography& GeoArrowGeography::operator=(GeoArrowGeography&& other) {
     covering_ = std::move(other.covering_);
     // index_ needs to be rebuilt
     index_.Clear();
-    indexed_ = false;
+    indexed_.store(false, std::memory_order_relaxed);
   }
   return *this;
 }
@@ -472,7 +472,7 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
   polygons_.Clear();
   index_.Clear();
   covering_.clear();
-  indexed_ = false;
+  indexed_.store(false, std::memory_order_relaxed);
   geom_ = geom;
 
   if (geom.size_nodes == 0) {
@@ -502,7 +502,7 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
   }
 }
 
-void GeoArrowGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) {
+void GeoArrowGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
   if (geom_.size_nodes == 0 || is_empty()) {
     return;
   }
@@ -525,7 +525,7 @@ void GeoArrowGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) {
   Region()->GetCellUnionBound(cell_ids);
 }
 
-const std::vector<S2CellId>& GeoArrowGeography::Covering() {
+const std::vector<S2CellId>& GeoArrowGeography::Covering() const {
   if (covering_.empty()) {
     GetCellUnionBound(&covering_);
   }
@@ -533,7 +533,7 @@ const std::vector<S2CellId>& GeoArrowGeography::Covering() {
   return covering_;
 }
 
-const S2ShapeIndex& GeoArrowGeography::ShapeIndex() {
+const S2ShapeIndex& GeoArrowGeography::ShapeIndex() const {
   InitIndex();
   return index_;
 }
@@ -712,7 +712,7 @@ const S2Shape* GeoArrowGeography::Shape(int id) const {
   }
 }
 
-std::unique_ptr<S2Region> GeoArrowGeography::Region() {
+std::unique_ptr<S2Region> GeoArrowGeography::Region() const {
   auto maybe_point = Point();
   if (maybe_point) {
     return std::make_unique<S2PointRegion>(*maybe_point);
@@ -722,8 +722,17 @@ std::unique_ptr<S2Region> GeoArrowGeography::Region() {
   return std::make_unique<S2ShapeIndexRegion<MutableS2ShapeIndex>>(&index_);
 }
 
-void GeoArrowGeography::InitIndex() {
-  if (indexed_ || geom_.size_nodes == 0) {
+void GeoArrowGeography::InitIndex() const {
+  // Fast path: already indexed or empty geometry
+  if (indexed_.load(std::memory_order_acquire) || geom_.size_nodes == 0) {
+    return;
+  }
+
+  // Slow path: acquire lock and add shapes (double-checked locking)
+  std::lock_guard<std::mutex> lock(index_mutex_);
+
+  // Double-check after acquiring lock
+  if (indexed_.load(std::memory_order_relaxed)) {
     return;
   }
 
@@ -749,7 +758,7 @@ void GeoArrowGeography::InitIndex() {
           std::string(GeometryTypeString(geom_.root->geometry_type)));
   }
 
-  indexed_ = true;
+  indexed_.store(true, std::memory_order_release);
 }
 
 std::pair<int, int> GeoArrowGeography::ResolveGlobalEdgeId(

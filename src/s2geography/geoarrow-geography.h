@@ -5,6 +5,8 @@
 #include <s2/s2shape.h>
 #include <s2/s2shape_index.h>
 
+#include <atomic>
+#include <mutex>
 #include <vector>
 
 #include "s2geography/geoarrow-geography_util.h"
@@ -300,7 +302,7 @@ class GeoArrowGeography {
   /// containment. This is lazily computed and may incur building an index. For
   /// Small point or multipoint geographies this will not incur the cost of
   /// building an index.
-  const std::vector<S2CellId>& Covering();
+  const std::vector<S2CellId>& Covering() const;
 
   /// \brief Return a S2ShapeIndex representation of this geography
   ///
@@ -308,18 +310,18 @@ class GeoArrowGeography {
   /// and will not be built until it is queried (see MutableS2ShapeIndex). Note
   /// that building an index of a small geography is comparatively very costly
   /// to brute force iteration if that is an option for a given algorithm.
-  const S2ShapeIndex& ShapeIndex();
+  const S2ShapeIndex& ShapeIndex() const;
 
   /// \brief Return a Region representation of this geography
   ///
   /// This region is lazy: it will not be created until potentially this call.
   /// For (single) point geographies the implementation avoids creating or
   /// building an index.
-  std::unique_ptr<S2Region> Region();
+  std::unique_ptr<S2Region> Region() const;
 
   /// \brief Return true if the internal index has not yet been built
   bool is_unindexed() const {
-    if (indexed_) {
+    if (indexed_.load(std::memory_order_acquire)) {
       return !index_.is_fresh();
     } else {
       return true;
@@ -327,7 +329,7 @@ class GeoArrowGeography {
   }
 
   /// \brief Force building the internal index
-  void ForceBuildIndex() {
+  void ForceBuildIndex() const {
     InitIndex();
     index_.ForceBuild();
   }
@@ -466,12 +468,13 @@ class GeoArrowGeography {
   GeoArrowPointShape points_;
   GeoArrowLaxPolylineShape lines_;
   GeoArrowLaxPolygonShape polygons_;
-  MutableS2ShapeIndex index_;
-  std::vector<S2CellId> covering_;
-  bool indexed_{};
+  mutable MutableS2ShapeIndex index_;
+  mutable std::vector<S2CellId> covering_;
+  mutable std::mutex index_mutex_;
+  mutable std::atomic<bool> indexed_{false};
 
-  void InitIndex();
-  void GetCellUnionBound(std::vector<S2CellId>* cell_ids);
+  void InitIndex() const;
+  void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const;
 };
 
 /// @}
