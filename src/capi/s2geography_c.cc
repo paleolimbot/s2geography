@@ -1,36 +1,38 @@
 
 #include "s2geography_c.h"
 
-#include <openssl/opensslv.h>
-#include <s2geography/accessors-geog.h>
-#include <s2geography/accessors.h>
-#include <s2geography/build.h>
-#include <s2geography/coverings.h>
-#include <s2geography/distance.h>
-#include <s2geography/linear-referencing.h>
-#include <s2geography/predicates.h>
-#include <s2geography/sedona_udf/sedona_extension.h>
-
+#include <array>
 #include <cstring>
 #include <string>
 
 #include "absl/base/config.h"
 #include "geoarrow/geoarrow.h"
 #include "nanoarrow/nanoarrow.h"
+#include "openssl/opensslv.h"
+#include "s2geography/accessors-geog.h"
+#include "s2geography/accessors.h"
+#include "s2geography/build.h"
+#include "s2geography/coverings.h"
+#include "s2geography/distance.h"
 #include "s2geography/geoarrow-geography.h"
+#include "s2geography/linear-referencing.h"
+#include "s2geography/predicates.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
 
 // Helper macros
 
-#define S2GEOGRAPHY_SET_ERROR(err, value) \
-  if ((err) != nullptr) {                 \
-    err->message = (value);               \
+#define S2GEOGRAPHY_SET_ERROR(err, value)          \
+  if ((err) != nullptr) {                          \
+    ((struct S2GeogError*)err)->message = (value); \
   }
 
 #define S2GEOGRAPHY_C_BEGIN(err)  \
   S2GEOGRAPHY_SET_ERROR(err, ""); \
   try {
 #define S2GEOGRAPHY_C_END(err)                   \
+  }                                              \
+  catch (std::bad_alloc & e) {                   \
+    return ENOMEM;                               \
   }                                              \
   catch (std::exception & e) {                   \
     S2GEOGRAPHY_SET_ERROR(err, e.what());        \
@@ -91,11 +93,11 @@ struct S2GeogRectBounder {
 // Error handling functions
 
 S2GeogErrorCode S2GeogErrorCreate(struct S2GeogError** err) {
-  if (err == nullptr) {
-    return -1;
-  }
+  S2GEOGRAPHY_C_BEGIN(nullptr);
+  S2GEOGRAPHY_DCHECK(err != nullptr);
   *err = new S2GeogError();
-  return 0;
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(nullptr)
 }
 
 const char* S2GeogErrorGetMessage(struct S2GeogError* err) {
@@ -105,11 +107,16 @@ const char* S2GeogErrorGetMessage(struct S2GeogError* err) {
   return err->message.c_str();
 }
 
-void S2GeogErrorDestroy(struct S2GeogError* err) { delete err; }
+void S2GeogErrorDestroy(struct S2GeogError* err) {
+  S2GEOGRAPHY_DCHECK(err != nullptr);
+  delete err;
+}
 
 // Cell ID function
 
 uint64_t S2GeogLngLatToCellId(struct S2GeogVertex* v) {
+  S2GEOGRAPHY_DCHECK(v != nullptr);
+
   if (std::isnan(v->v[0]) || std::isnan(v->v[1])) {
     return S2CellId::Sentinel().id();
   } else {
@@ -121,7 +128,49 @@ uint64_t S2GeogLngLatToCellId(struct S2GeogVertex* v) {
 
 // Kernel functions
 
-size_t S2GeogNumKernels(void) { return 27; }
+using KernelInitFunc = void (*)(struct SedonaCScalarKernel*);
+
+static const std::array<KernelInitFunc, 27> kSedonaKernels = {{
+    s2geography::sedona_udf::AreaKernel,
+    s2geography::sedona_udf::CentroidKernel,
+    s2geography::sedona_udf::ClosestPointKernel,
+    [](SedonaCScalarKernel* k) { s2geography::sedona_udf::ContainsKernel(k); },
+    s2geography::sedona_udf::ConvexHullKernel,
+    s2geography::sedona_udf::DifferenceKernel,
+    [](SedonaCScalarKernel* k) { s2geography::sedona_udf::DistanceKernel(k); },
+    [](SedonaCScalarKernel* k) { s2geography::sedona_udf::EqualsKernel(k); },
+    s2geography::sedona_udf::IntersectionKernel,
+    [](SedonaCScalarKernel* k) {
+      s2geography::sedona_udf::IntersectsKernel(k);
+    },
+    s2geography::sedona_udf::LengthKernel,
+    s2geography::sedona_udf::LineInterpolatePointKernel,
+    s2geography::sedona_udf::LineLocatePointKernel,
+    [](SedonaCScalarKernel* k) {
+      s2geography::sedona_udf::MaxDistanceKernel(k);
+    },
+    s2geography::sedona_udf::PerimeterKernel,
+    [](SedonaCScalarKernel* k) {
+      s2geography::sedona_udf::ShortestLineKernel(k);
+    },
+    s2geography::sedona_udf::SymDifferenceKernel,
+    s2geography::sedona_udf::UnionKernel,
+    s2geography::sedona_udf::ReducePrecisionKernel,
+    s2geography::sedona_udf::SimplifyKernel,
+    s2geography::sedona_udf::BufferKernel,
+    s2geography::sedona_udf::BufferQuadSegsKernel,
+    s2geography::sedona_udf::BufferParamsKernel,
+    [](SedonaCScalarKernel* k) {
+      s2geography::sedona_udf::DistanceWithinKernel(k);
+    },
+    s2geography::sedona_udf::CellIdFromPointKernel,
+    s2geography::sedona_udf::CoveringCellIdsKernel,
+    [](SedonaCScalarKernel* k) {
+      s2geography::sedona_udf::LongestLineKernel(k);
+    },
+}};
+
+size_t S2GeogNumKernels(void) { return kSedonaKernels.size(); }
 
 int S2GeogInitKernels(void* kernels_array, size_t kernels_array_size_bytes,
                       int format) {
@@ -130,40 +179,16 @@ int S2GeogInitKernels(void* kernels_array, size_t kernels_array_size_bytes,
   }
 
   if (kernels_array_size_bytes !=
-      (sizeof(SedonaCScalarKernel) * S2GeogNumKernels())) {
+      (sizeof(SedonaCScalarKernel) * kSedonaKernels.size())) {
     return EINVAL;
   }
 
   auto* kernel_ptr =
       reinterpret_cast<struct SedonaCScalarKernel*>(kernels_array);
 
-  s2geography::sedona_udf::AreaKernel(kernel_ptr++);
-  s2geography::sedona_udf::CentroidKernel(kernel_ptr++);
-  s2geography::sedona_udf::ClosestPointKernel(kernel_ptr++);
-  s2geography::sedona_udf::ContainsKernel(kernel_ptr++);
-  s2geography::sedona_udf::ConvexHullKernel(kernel_ptr++);
-  s2geography::sedona_udf::DifferenceKernel(kernel_ptr++);
-  s2geography::sedona_udf::DistanceKernel(kernel_ptr++);
-  s2geography::sedona_udf::EqualsKernel(kernel_ptr++);
-  s2geography::sedona_udf::IntersectionKernel(kernel_ptr++);
-  s2geography::sedona_udf::IntersectsKernel(kernel_ptr++);
-  s2geography::sedona_udf::LengthKernel(kernel_ptr++);
-  s2geography::sedona_udf::LineInterpolatePointKernel(kernel_ptr++);
-  s2geography::sedona_udf::LineLocatePointKernel(kernel_ptr++);
-  s2geography::sedona_udf::MaxDistanceKernel(kernel_ptr++);
-  s2geography::sedona_udf::PerimeterKernel(kernel_ptr++);
-  s2geography::sedona_udf::ShortestLineKernel(kernel_ptr++);
-  s2geography::sedona_udf::SymDifferenceKernel(kernel_ptr++);
-  s2geography::sedona_udf::UnionKernel(kernel_ptr++);
-  s2geography::sedona_udf::ReducePrecisionKernel(kernel_ptr++);
-  s2geography::sedona_udf::SimplifyKernel(kernel_ptr++);
-  s2geography::sedona_udf::BufferKernel(kernel_ptr++);
-  s2geography::sedona_udf::BufferQuadSegsKernel(kernel_ptr++);
-  s2geography::sedona_udf::BufferParamsKernel(kernel_ptr++);
-  s2geography::sedona_udf::DistanceWithinKernel(kernel_ptr++);
-  s2geography::sedona_udf::CellIdFromPointKernel(kernel_ptr++);
-  s2geography::sedona_udf::CoveringCellIdsKernel(kernel_ptr++);
-  s2geography::sedona_udf::LongestLineKernel(kernel_ptr++);
+  for (auto init_func : kSedonaKernels) {
+    init_func(kernel_ptr++);
+  }
 
   return 0;
 }
@@ -171,24 +196,26 @@ int S2GeogInitKernels(void* kernels_array, size_t kernels_array_size_bytes,
 // Geography functions
 
 S2GeogErrorCode S2GeogCreate(struct S2Geog** geog) {
-  if (geog == nullptr) {
-    return EINVAL;
-  }
+  S2GEOGRAPHY_C_BEGIN(nullptr);
+  S2GEOGRAPHY_DCHECK(geog != nullptr);
   *geog = new S2Geog();
-  return 0;
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(nullptr)
 }
 
-void S2GeogDestroy(struct S2Geog* geog) { delete geog; }
+void S2GeogDestroy(struct S2Geog* geog) {
+  S2GEOGRAPHY_DCHECK(geog != nullptr);
+  delete geog;
+}
 
 // Factory functions
 
 S2GeogErrorCode S2GeogFactoryCreate(struct S2GeogFactory** geog_factory) {
-  if (geog_factory == nullptr) {
-    return EINVAL;
-  }
-
+  S2GEOGRAPHY_C_BEGIN(nullptr);
+  S2GEOGRAPHY_DCHECK(geog_factory != nullptr);
   *geog_factory = new S2GeogFactory();
-  return 0;
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(nullptr)
 }
 
 S2GeogErrorCode S2GeogFactoryInitFromWkbNonOwning(
@@ -218,6 +245,7 @@ S2GeogErrorCode S2GeogFactoryInitFromWkbNonOwning(
   ec = GeoArrowGeometryShallowCopy(parsed, &out->geom);
   if (ec != GEOARROW_OK) {
     S2GEOGRAPHY_SET_ERROR(err, "error copying geometry nodes");
+    return ec;
   }
 
   out->geog.Init(GeoArrowGeometryAsView(&out->geom));
@@ -227,6 +255,7 @@ S2GeogErrorCode S2GeogFactoryInitFromWkbNonOwning(
 }
 
 void S2GeogFactoryDestroy(struct S2GeogFactory* geog_factory) {
+  S2GEOGRAPHY_DCHECK(geog_factory != nullptr);
   delete geog_factory;
 }
 
@@ -234,11 +263,11 @@ void S2GeogFactoryDestroy(struct S2GeogFactory* geog_factory) {
 
 S2GeogErrorCode S2GeogRectBounderCreate(
     struct S2GeogRectBounder** rect_bounder) {
-  if (rect_bounder == nullptr) {
-    return EINVAL;
-  }
+  S2GEOGRAPHY_C_BEGIN(nullptr);
+  S2GEOGRAPHY_DCHECK(rect_bounder != nullptr);
   *rect_bounder = new S2GeogRectBounder();
   return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(nullptr)
 }
 
 void S2GeogRectBounderClear(struct S2GeogRectBounder* rect_bounder) {
@@ -262,7 +291,7 @@ S2GeogErrorCode S2GeogRectBounderBound(struct S2GeogRectBounder* rect_bounder,
 
 uint8_t S2GeogRectBounderIsEmpty(struct S2GeogRectBounder* rect_bounder) {
   S2GEOGRAPHY_DCHECK(rect_bounder != nullptr);
-  return rect_bounder->bounder.Finish().is_empty() ? 1 : 0;
+  return rect_bounder->bounder.is_empty();
 }
 
 S2GeogErrorCode S2GeogRectBounderFinish(struct S2GeogRectBounder* rect_bounder,
@@ -292,6 +321,7 @@ S2GeogErrorCode S2GeogRectBounderFinish(struct S2GeogRectBounder* rect_bounder,
 }
 
 void S2GeogRectBounderDestroy(struct S2GeogRectBounder* rect_bounder) {
+  S2GEOGRAPHY_DCHECK(rect_bounder != nullptr);
   delete rect_bounder;
 }
 

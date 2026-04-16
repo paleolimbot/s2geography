@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-/// \file geography_glue.h
+/// \file s2geography_c.h
 ///
 /// This file exposes C functions and/or data structures used to call
 /// s2geography from C or languages that provide C FFI infrastructure

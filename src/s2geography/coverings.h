@@ -15,13 +15,14 @@ class LatLngRectBounder {
   void Clear();
   S2LatLngRect Finish() const;
   void Update(const GeoArrowGeography& value);
+  bool is_empty() { return bounds_.is_empty(); }
 
  private:
   S2LatLngRect BoundPoints(const GeoArrowGeography& value);
   S2LatLngRect BoundLines(const GeoArrowGeography& value);
   S2LatLngRect BoundLoops(const GeoArrowGeography& value);
 
-  S2LatLngRect bounds_;
+  S2LatLngRect bounds_{S2LatLngRect::Empty()};
   std::vector<S2Point> scratch_;
 };
 
