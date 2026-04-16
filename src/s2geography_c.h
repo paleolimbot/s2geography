@@ -29,12 +29,16 @@ typedef int S2GeogErrorCode;
 struct S2GeogError;
 
 /// \brief Create a new error object
+///
+/// \pre err != NULL
 S2GeogErrorCode S2GeogErrorCreate(struct S2GeogError** err);
 
 /// \brief Get the error message from an error object
 const char* S2GeogErrorGetMessage(struct S2GeogError* err);
 
 /// \brief Destroy an error object
+///
+/// \pre err != NULL
 void S2GeogErrorDestroy(struct S2GeogError* err);
 
 /// @}
@@ -50,6 +54,8 @@ struct S2GeogVertex {
 };
 
 /// \brief Convert vertex of longitude/latitude to an S2 cell ID
+///
+/// \pre vertex != NULL
 uint64_t S2GeogLngLatToCellId(struct S2GeogVertex* vertex);
 
 /// @}
@@ -63,9 +69,13 @@ uint64_t S2GeogLngLatToCellId(struct S2GeogVertex* vertex);
 struct S2Geog;
 
 /// \brief Create an empty geography object
+///
+/// \pre geog != NULL
 S2GeogErrorCode S2GeogCreate(struct S2Geog** geog);
 
 /// \brief Destroy a geography object
+///
+/// \pre geog != NULL
 void S2GeogDestroy(struct S2Geog* geog);
 
 /// @}
@@ -79,14 +89,22 @@ void S2GeogDestroy(struct S2Geog* geog);
 struct S2GeogFactory;
 
 /// \brief Create a new geography factory
+///
+/// \pre geog_factory != NULL
 S2GeogErrorCode S2GeogFactoryCreate(struct S2GeogFactory** geog_factory);
 
 /// \brief Create a geography from WKB without taking ownership of the buffer
+///
+/// \pre geog_factory != NULL
+/// \pre out != NULL
+/// \pre buf != NULL || buf_size == 0
 S2GeogErrorCode S2GeogFactoryInitFromWkbNonOwning(
     struct S2GeogFactory* geog_factory, const uint8_t* buf, size_t buf_size,
     struct S2Geog* out, struct S2GeogError* err);
 
 /// \brief Destroy a geography factory
+///
+/// \pre geog_factory != NULL
 void S2GeogFactoryDestroy(struct S2GeogFactory* geog_factory);
 
 /// @}
@@ -100,29 +118,44 @@ void S2GeogFactoryDestroy(struct S2GeogFactory* geog_factory);
 struct S2GeogRectBounder;
 
 /// \brief Create a new rectangle bounder
+///
+/// \pre rect_bounder != NULL
 S2GeogErrorCode S2GeogRectBounderCreate(
     struct S2GeogRectBounder** rect_bounder);
 
 /// \brief Clear accumulated bounds from the rectangle bounder
+///
+/// \pre rect_bounder != NULL
 void S2GeogRectBounderClear(struct S2GeogRectBounder* rect_bounder);
 
 /// \brief Add a geography's bounds to the rectangle bounder
+///
+/// \pre rect_bounder != NULL
+/// \pre geog != NULL
 S2GeogErrorCode S2GeogRectBounderBound(struct S2GeogRectBounder* rect_bounder,
                                        struct S2Geog* geog,
                                        struct S2GeogError* err);
 
 /// \brief Return 1 if the rectangle that would be returned represents empty
 /// bounds or 0 otherwise
+///
+/// \pre rect_bounder != NULL
 uint8_t S2GeogRectBounderIsEmpty(struct S2GeogRectBounder* rect_bounder);
 
 /// \brief Finish bounding and retrieve the lo/hi corners of the bounding
 /// rectangle
+///
+/// \pre rect_bounder != NULL
+/// \pre lo != NULL
+/// \pre hi != NULL
 S2GeogErrorCode S2GeogRectBounderFinish(struct S2GeogRectBounder* rect_bounder,
                                         struct S2GeogVertex* lo,
                                         struct S2GeogVertex* hi,
                                         struct S2GeogError* err);
 
 /// \brief Destroy a rectangle bounder
+///
+/// \pre rect_bounder != NULL
 void S2GeogRectBounderDestroy(struct S2GeogRectBounder* rect_bounder);
 
 /// @}
