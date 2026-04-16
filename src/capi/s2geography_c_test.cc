@@ -1,5 +1,5 @@
 
-#include "capi/s2geography_c.h"
+#include "s2geography_c.h"
 
 #include <gtest/gtest.h>
 #include <s2/s2cell_id.h>

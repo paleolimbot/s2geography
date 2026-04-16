@@ -374,15 +374,6 @@ target_compile_definitions(
 
 target_link_libraries(s2geography_c PUBLIC s2geography)
 
-install(
-  TARGETS s2geography_c
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-
-install(FILES src/capi/s2geography_c.h
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/capi)
 if(S2GEOGRAPHY_BUILD_TESTS)
 
   enable_testing()
@@ -495,7 +486,7 @@ message("  -> includes: " ${CMAKE_INSTALL_INCLUDEDIR})
 message("  -> cmake config: " ${CMAKECONFIG_INSTALL_DIR})
 
 install(
-  TARGETS s2geography
+  TARGETS s2geography s2geography_c
   EXPORT ${PROJECT_NAME}-targets
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -509,6 +500,7 @@ install(
   FILES_MATCHING
   PATTERN "*.h")
 install(FILES src/s2geography.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(FILES src/s2geography_c.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 
 if(S2GEOGRAPHY_BUILD_TESTS AND S2GEOGRAPHY_CODE_COVERAGE)
   install(
