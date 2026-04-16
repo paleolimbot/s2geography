@@ -357,6 +357,23 @@ if(S2GEOGRAPHY_EXTRA_WARNINGS)
   endif()
 endif()
 
+# Build s2geography_c (C API)
+# ---------------------------
+
+add_library(s2geography_c src/capi/s2geography_c.cc)
+
+target_include_directories(
+  s2geography_c
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+         $<INSTALL_INTERFACE:include>
+  PRIVATE ${GEOARROW_INCLUDE_DIRECTORY} ${NANOARROW_INCLUDE_DIRECTORY})
+
+target_compile_definitions(
+  s2geography_c PRIVATE ${GEOARROW_COMPILE_DEFINITIONS}
+                        ${NANOARROW_COMPILE_DEFINITIONS})
+
+target_link_libraries(s2geography_c PUBLIC s2geography)
+
 if(S2GEOGRAPHY_BUILD_TESTS)
 
   enable_testing()
@@ -381,6 +398,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   add_executable(wkb_test src/s2geography/wkb_test.cc)
   add_executable(geoarrow_geography_test
                  src/s2geography/geoarrow-geography_test.cc)
+  add_executable(s2geography_c_test src/capi/s2geography_c_test.cc)
 
   if(S2GEOGRAPHY_CODE_COVERAGE)
     target_compile_options(coverage_config INTERFACE -O0 -g --coverage)
@@ -418,6 +436,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   target_link_libraries(wkt_writer_test s2geography GTest::gtest_main)
   target_link_libraries(wkb_test s2geography GTest::gtest_main)
   target_link_libraries(geoarrow_geography_test s2geography GTest::gtest_main)
+  target_link_libraries(s2geography_c_test s2geography_c GTest::gtest_main)
 
   target_include_directories(sedona_udf_internal_test PRIVATE src/vendored)
   target_include_directories(accessors_geog_test PRIVATE src/vendored)
@@ -443,6 +462,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   gtest_discover_tests(wkt_writer_test)
   gtest_discover_tests(wkb_test)
   gtest_discover_tests(geoarrow_geography_test)
+  gtest_discover_tests(s2geography_c_test)
 endif()
 
 if(S2GEOGRAPHY_BUILD_EXAMPLES)
@@ -466,7 +486,7 @@ message("  -> includes: " ${CMAKE_INSTALL_INCLUDEDIR})
 message("  -> cmake config: " ${CMAKECONFIG_INSTALL_DIR})
 
 install(
-  TARGETS s2geography
+  TARGETS s2geography s2geography_c
   EXPORT ${PROJECT_NAME}-targets
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -480,6 +500,7 @@ install(
   FILES_MATCHING
   PATTERN "*.h")
 install(FILES src/s2geography.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(FILES src/s2geography_c.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 
 if(S2GEOGRAPHY_BUILD_TESTS AND S2GEOGRAPHY_CODE_COVERAGE)
   install(
