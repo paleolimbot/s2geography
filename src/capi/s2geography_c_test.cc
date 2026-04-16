@@ -4,7 +4,9 @@
 #include <gtest/gtest.h>
 #include <s2/s2cell_id.h>
 
+#include <cstring>
 #include <limits>
+#include <vector>
 
 // This test file performs "is it plugged in" level checks for all C API
 // functions. The goal is to ensure that:

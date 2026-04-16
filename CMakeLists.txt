@@ -374,6 +374,15 @@ target_compile_definitions(
 
 target_link_libraries(s2geography_c PUBLIC s2geography)
 
+install(
+  TARGETS s2geography_c
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+install(FILES src/capi/s2geography_c.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/capi)
 if(S2GEOGRAPHY_BUILD_TESTS)
 
   enable_testing()
