@@ -28,7 +28,7 @@ namespace s2geography {
 class Operation {
  public:
   /// \brief Output type enumerator
-  enum class OutputType { kBool, kDouble, kWkb };
+  enum class OutputType { kBool, kInt, kDouble, kWkb };
 
   Operation() = default;
   virtual ~Operation() = default;
@@ -56,6 +56,7 @@ class Operation {
   bool has_result() const { return has_result_; }
 
   /// \brief Return the integer result for operations whose output type is kInt
+  /// or kBool
   ///
   /// The result before a call to an Exec or for a function with a different
   /// output type is not defined.

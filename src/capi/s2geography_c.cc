@@ -125,6 +125,9 @@ struct S2GeogRectBounder {
 };
 
 struct S2GeogOp {
+  explicit S2GeogOp(std::unique_ptr<s2geography::Operation> op_in)
+      : op(std::move(op_in)) {}
+
   std::unique_ptr<s2geography::Operation> op;
 
   // Non-copyable
@@ -439,6 +442,8 @@ void S2GeogRectBounderDestroy(struct S2GeogRectBounder* rect_bounder) {
 
 S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp** op, int op_id) {
   S2GEOGRAPHY_C_BEGIN(nullptr);
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+
   std::unique_ptr<s2geography::Operation> inner;
   switch (op_id) {
     case S2GEOGRAPHY_OP_INTERSECTS:
@@ -457,7 +462,7 @@ S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp** op, int op_id) {
       return ENOTSUP;
   }
 
-  *op = new S2GeogOp{std::move(inner)};
+  *op = new S2GeogOp(std::move(inner));
   return S2GEOGRAPHY_OK;
   S2GEOGRAPHY_C_END(nullptr);
 }

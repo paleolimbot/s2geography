@@ -15,6 +15,7 @@
 
 #include "geoarrow/geoarrow.h"
 #include "s2/s2point_region.h"
+#include "s2/s2region_coverer.h"
 #include "s2geography/geography_interface.h"
 
 namespace s2geography {
@@ -523,14 +524,12 @@ void GeoArrowGeography::GetCellUnionBound(
       break;
   }
 
-  Region()->GetCellUnionBound(cell_ids);
+  S2RegionCoverer coverer;
+  coverer.GetFastCovering(*Region(), cell_ids);
 }
 
 const std::vector<S2CellId>& GeoArrowGeography::Covering() const {
-  if (covering_.empty()) {
-    GetCellUnionBound(&covering_);
-  }
-
+  InitIndex();
   return covering_;
 }
 
@@ -757,6 +756,29 @@ void GeoArrowGeography::InitIndex() const {
       throw Exception(
           "Can't create index from geometry type " +
           std::string(GeometryTypeString(geom_.root->geometry_type)));
+  }
+
+  // Compute covering while we hold the lock (avoid calling Region() which
+  // would re-enter InitIndex())
+  if (!is_empty()) {
+    switch (geom_.root->geometry_type) {
+      case GEOARROW_GEOMETRY_TYPE_POINT:
+      case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+        if (points_.num_vertices() <= 32) {
+          points_.geom().VisitVertices([&](S2Point v) {
+            covering_.push_back(S2CellId(v));
+            return true;
+          });
+          break;
+        }
+        [[fallthrough]];
+      default: {
+        S2RegionCoverer coverer;
+        S2ShapeIndexRegion<MutableS2ShapeIndex> region(&index_);
+        coverer.GetFastCovering(region, &covering_);
+        break;
+      }
+    }
   }
 
   indexed_.store(true, std::memory_order_release);

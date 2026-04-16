@@ -294,7 +294,7 @@ const char* S2GeogOpName(const struct S2GeogOp* op);
 /// \pre op != NULL
 int S2GeogOpOutputType(const struct S2GeogOp* op);
 
-/// \brief Evaluate a operation with two geographies as input
+/// \brief Evaluate an operation with two geographies as input
 ///
 /// \pre op != NULL
 /// \pre arg0 != NULL
