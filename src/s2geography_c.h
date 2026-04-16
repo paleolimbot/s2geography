@@ -13,9 +13,26 @@ extern "C" {
 /// This file exposes C functions and/or data structures used to call
 /// s2geography from C or languages that provide C FFI infrastructure
 /// such as Rust or Julia.
+///
+/// The functions here are designed to have some common properties:
+///
+/// - Preconditions are only checked in debug mode (i.e., users are
+///   responsible for checking that C API functions are passed
+///   non-NULL inputs where required). This includes destructors.
+/// - Output arguments of functions are only modified on success
+/// - Pointers that are const (e.g., const S2Geog*) may be shared
+///   between threads, like const std::vector (which is generally the
+///   model also used for all S2 C++ objects).
 
 /// \defgroup error_handling Error Handling
 /// Functions for creating and managing error objects.
+///
+/// Most functions in this C API return an errno-compatible error code
+/// (usually EINVAL or ENOTSUP) and optionally accept an err parameter
+/// into which more detailed message is placed when given a non-NULL
+/// value by the caller. This error object can and should be reused
+/// between calls (e.g., users may wish to allocate a thread-local error
+/// and reuse it).
 ///
 /// @{
 
@@ -34,6 +51,9 @@ struct S2GeogError;
 S2GeogErrorCode S2GeogErrorCreate(struct S2GeogError** err);
 
 /// \brief Get the error message from an error object
+///
+/// This message is always guaranteed to be a null-terminated
+/// string (usually the empty string).
 const char* S2GeogErrorGetMessage(struct S2GeogError* err);
 
 /// \brief Destroy an error object
@@ -56,7 +76,7 @@ struct S2GeogVertex {
 /// \brief Convert vertex of longitude/latitude to an S2 cell ID
 ///
 /// \pre vertex != NULL
-uint64_t S2GeogLngLatToCellId(struct S2GeogVertex* vertex);
+uint64_t S2GeogLngLatToCellId(const struct S2GeogVertex* vertex);
 
 /// @}
 
@@ -83,6 +103,8 @@ void S2GeogDestroy(struct S2Geog* geog);
 /// \defgroup geography_factory Geography Factory
 /// Factory for creating geography objects from various formats.
 ///
+/// The factory is fairly lightweight but should be reused when creating
+/// many geographies in a batch.
 /// @{
 
 /// \brief Opaque factory for creating geography objects
@@ -94,6 +116,10 @@ struct S2GeogFactory;
 S2GeogErrorCode S2GeogFactoryCreate(struct S2GeogFactory** geog_factory);
 
 /// \brief Create a geography from WKB without taking ownership of the buffer
+///
+/// The output S2Geog must have been created before this call with S2GeogCreate().
+/// This S2Geog can and should be reused for multiple calls to this or other
+/// factory functions (geographies have internal scratch space that can be reused).
 ///
 /// \pre geog_factory != NULL
 /// \pre out != NULL
@@ -133,7 +159,7 @@ void S2GeogRectBounderClear(struct S2GeogRectBounder* rect_bounder);
 /// \pre rect_bounder != NULL
 /// \pre geog != NULL
 S2GeogErrorCode S2GeogRectBounderBound(struct S2GeogRectBounder* rect_bounder,
-                                       struct S2Geog* geog,
+                                       const struct S2Geog* geog,
                                        struct S2GeogError* err);
 
 /// \brief Return 1 if the rectangle that would be returned represents empty

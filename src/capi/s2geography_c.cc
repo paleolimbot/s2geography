@@ -114,7 +114,7 @@ void S2GeogErrorDestroy(struct S2GeogError* err) {
 
 // Cell ID function
 
-uint64_t S2GeogLngLatToCellId(struct S2GeogVertex* v) {
+uint64_t S2GeogLngLatToCellId(const struct S2GeogVertex* v) {
   S2GEOGRAPHY_DCHECK(v != nullptr);
 
   if (std::isnan(v->v[0]) || std::isnan(v->v[1])) {
@@ -276,7 +276,7 @@ void S2GeogRectBounderClear(struct S2GeogRectBounder* rect_bounder) {
 }
 
 S2GeogErrorCode S2GeogRectBounderBound(struct S2GeogRectBounder* rect_bounder,
-                                       struct S2Geog* geog,
+                                       const struct S2Geog* geog,
                                        struct S2GeogError* err) {
   S2GEOGRAPHY_C_BEGIN(err);
 
