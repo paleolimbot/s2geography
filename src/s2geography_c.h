@@ -251,14 +251,16 @@ struct S2GeogOp;
 #define S2GEOGRAPHY_OP_WITHIN 3
 #define S2GEOGRAPHY_OP_EQUALS 4
 
-#define S2GEOGRAPHY_OP_OUTPUT_BOOL 1
+#define S2GEOGRAPHY_OUTPUT_TYPE_BOOL 1
 
 /// \brief Create a new operator object
 S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp** op, int op_id);
 
-const char* S2GeogOpName(struct S2GeogOp* op);
+/// \brief Get the name of the operator
+const char* S2GeogOpName(const struct S2GeogOp* op);
 
-int S2GeogOutputType(struct S2GeogOp* op);
+/// \brief Get the output type of the operator
+int S2GeogOpOutputType(const struct S2GeogOp* op);
 
 /// \brief Evaluate a operation with two geographies as input
 S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* lhs,

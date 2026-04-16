@@ -327,6 +327,9 @@ TEST_P(BinaryPredicateTest, EvalGeogGeog) {
   struct S2GeogOp* op = nullptr;
   ASSERT_EQ(S2GeogOpCreate(&op, p.op_id), S2GEOGRAPHY_OK);
 
+  ASSERT_STREQ(S2GeogOpName(op), p.name);
+  ASSERT_EQ(S2GeogOpOutputType(op), S2GEOGRAPHY_OUTPUT_TYPE_BOOL);
+
   ASSERT_EQ(S2GeogOpEvalGeogGeog(op, lhs, rhs, err), S2GEOGRAPHY_OK);
   EXPECT_EQ(S2GeogOpGetInt(op), p.expected);
 

@@ -453,12 +453,29 @@ S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp** op, int op_id) {
   S2GEOGRAPHY_C_END(nullptr);
 }
 
-/// \brief Evaluate an operation with two geographies as input
+const char* S2GeogOpName(const struct S2GeogOp* op) {
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+  S2GEOGRAPHY_DCHECK(op->op != nullptr);
+  return op->op->name().c_str();
+}
+
+int S2GeogOpOutputType(const struct S2GeogOp* op) {
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+  S2GEOGRAPHY_DCHECK(op->op != nullptr);
+  switch (op->op->output_type()) {
+    case s2geography::Operation::OutputType::kBool:
+      return S2GEOGRAPHY_OUTPUT_TYPE_BOOL;
+    default:
+      return 0;
+  }
+}
+
 S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* lhs,
                                      const S2Geog* rhs,
                                      struct S2GeogError* err) {
   S2GEOGRAPHY_C_BEGIN(err);
   S2GEOGRAPHY_DCHECK(op != nullptr);
+  S2GEOGRAPHY_DCHECK(op->op != nullptr);
   S2GEOGRAPHY_DCHECK(lhs != nullptr);
   S2GEOGRAPHY_DCHECK(rhs != nullptr);
 
@@ -467,14 +484,12 @@ S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* lhs,
   S2GEOGRAPHY_C_END(err);
 }
 
-/// \brief Get integer or boolean output for this operation
 int64_t S2GeogOpGetInt(struct S2GeogOp* op) {
   S2GEOGRAPHY_DCHECK(op != nullptr);
   S2GEOGRAPHY_DCHECK(op->op != nullptr);
   return op->op->GetInt();
 }
 
-/// \brief Destroy a op object
 void S2GeogOpDestroy(struct S2GeogOp* op) {
   S2GEOGRAPHY_DCHECK(op != nullptr);
   delete op;
