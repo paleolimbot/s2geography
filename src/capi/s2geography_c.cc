@@ -470,16 +470,16 @@ int S2GeogOpOutputType(const struct S2GeogOp* op) {
   }
 }
 
-S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* lhs,
-                                     const S2Geog* rhs,
+S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* arg0,
+                                     const S2Geog* arg1,
                                      struct S2GeogError* err) {
   S2GEOGRAPHY_C_BEGIN(err);
   S2GEOGRAPHY_DCHECK(op != nullptr);
   S2GEOGRAPHY_DCHECK(op->op != nullptr);
-  S2GEOGRAPHY_DCHECK(lhs != nullptr);
-  S2GEOGRAPHY_DCHECK(rhs != nullptr);
+  S2GEOGRAPHY_DCHECK(arg0 != nullptr);
+  S2GEOGRAPHY_DCHECK(arg1 != nullptr);
 
-  op->op->ExecGeogGeog(lhs->geog, rhs->geog);
+  op->op->ExecGeogGeog(arg0->geog, arg1->geog);
   return S2GEOGRAPHY_OK;
   S2GEOGRAPHY_C_END(err);
 }

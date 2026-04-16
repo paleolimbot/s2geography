@@ -246,31 +246,56 @@ S2GeogErrorCode S2GeogInitKernels(void* kernels_array,
 /// \brief Opaque operator object
 struct S2GeogOp;
 
+/// \brief Compute the intersects predicate between two geographies, returning a
+/// boolean
 #define S2GEOGRAPHY_OP_INTERSECTS 1
+
+/// \brief Compute the contains predicate between two geographies, returning a
+/// boolean
 #define S2GEOGRAPHY_OP_CONTAINS 2
+
+/// \brief Compute the within predicate between two geographies, returning a
+/// boolean
 #define S2GEOGRAPHY_OP_WITHIN 3
+
+/// \brief Compute the equals predicate between two geographies, returning a
+/// boolean
 #define S2GEOGRAPHY_OP_EQUALS 4
 
 #define S2GEOGRAPHY_OUTPUT_TYPE_BOOL 1
 
 /// \brief Create a new operator object
+///
+/// \pre op != NULL
 S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp** op, int op_id);
 
 /// \brief Get the name of the operator
+///
+/// \pre op != NULL
 const char* S2GeogOpName(const struct S2GeogOp* op);
 
 /// \brief Get the output type of the operator
+///
+/// \pre op != NULL
 int S2GeogOpOutputType(const struct S2GeogOp* op);
 
 /// \brief Evaluate a operation with two geographies as input
-S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* lhs,
-                                     const S2Geog* rhs,
+///
+/// \pre op != NULL
+/// \pre arg0 != NULL
+/// \pre arg1 != NULL
+S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* arg0,
+                                     const S2Geog* arg1,
                                      struct S2GeogError* err);
 
 /// \brief Get integer or boolean output for this operation
+///
+/// \pre op != NULL
 int64_t S2GeogOpGetInt(struct S2GeogOp* op);
 
 /// \brief Destroy a op object
+///
+/// \pre op != NULL
 void S2GeogOpDestroy(struct S2GeogOp* op);
 
 /// @}
