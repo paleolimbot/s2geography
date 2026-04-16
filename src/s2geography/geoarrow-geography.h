@@ -329,7 +329,7 @@ class GeoArrowGeography {
   }
 
   /// \brief Force building the internal index
-  void ForceBuildIndex() const {
+  void ForceBuildIndex() {
     InitIndex();
     index_.ForceBuild();
   }
