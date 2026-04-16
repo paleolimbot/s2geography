@@ -287,22 +287,22 @@ TEST_P(PredicatesScalarScalarTest, SedonaUdf) {
   }
 }
 
-TEST_P(PredicatesScalarScalarTest, BinaryPredicate) {
+TEST_P(PredicatesScalarScalarTest, PredicateOperation) {
   const auto& p = GetParam();
 
-  // Skip null tests for BinaryPredicate (it doesn't handle nulls directly)
+  // Skip null tests for Operation (it doesn't handle nulls directly)
   if (!p.lhs.has_value() || !p.rhs.has_value()) {
     return;
   }
 
-  // Create the appropriate predicate
-  std::unique_ptr<s2geography::BinaryPredicate> predicate;
+  // Create the appropriate predicate operation
+  std::unique_ptr<s2geography::Operation> predicate;
   if (p.op == "intersects") {
-    predicate = s2geography::BinaryPredicate::Intersects();
+    predicate = s2geography::Intersects();
   } else if (p.op == "contains") {
-    predicate = s2geography::BinaryPredicate::Contains();
+    predicate = s2geography::Contains();
   } else if (p.op == "equals") {
-    predicate = s2geography::BinaryPredicate::Equals();
+    predicate = s2geography::Equals();
   } else {
     FAIL() << "Unknown predicate: " << p.op;
   }
@@ -340,7 +340,8 @@ TEST_P(PredicatesScalarScalarTest, BinaryPredicate) {
             << "rhs geography should be unindexed when not preparing";
       }
 
-      bool result = predicate->Evaluate(lhs_geog, rhs_geog);
+      predicate->ExecGeogGeog(lhs_geog, rhs_geog);
+      bool result = predicate->GetInt() != 0;
       ASSERT_TRUE(p.expected.has_value())
           << "Expected value should not be null";
       EXPECT_EQ(result, *p.expected);

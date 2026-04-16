@@ -217,19 +217,33 @@ S2GeogErrorCode S2GeogInitKernels(void* kernels_array,
 /// \defgroup operations Operators
 /// Generic interface for function operations
 ///
+/// This interface exposes functions in a generic way that (1) allows for
+/// operation-specific scratch space or expensive object construction to be
+/// amortized over many calls and (2) reduces the number of functions required
+/// in this C API. In general, only non-trivial functions are exposed in this
+/// way because there is some overhead associated with this wrapping. Trivial
+/// functions should be exposed directly in this C API or called via the Arrow
+/// interface where these overheads can be more effectively amortized over
+/// elements in a loop.
+///
 /// @{
 
 /// \brief Opaque operator object
 struct S2GeogOp;
 
-/// \brief
 #define S2GEOGRAPHY_OP_INTERSECTS 1
 #define S2GEOGRAPHY_OP_CONTAINS 2
 #define S2GEOGRAPHY_OP_WITHIN 3
 #define S2GEOGRAPHY_OP_EQUALS 4
 
+#define S2GEOGRAPHY_OP_OUTPUT_BOOL 1
+
 /// \brief Create a new operator object
 S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp* op, int op_id);
+
+const char* S2GeogOpName(struct S2GeogOp* op);
+
+int S2GeogOutputType(struct S2GeogOp* op);
 
 /// \brief Evaluate a operation with two geographies as input
 S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* lhs,

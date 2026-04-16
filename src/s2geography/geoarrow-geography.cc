@@ -502,7 +502,8 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
   }
 }
 
-void GeoArrowGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) const {
+void GeoArrowGeography::GetCellUnionBound(
+    std::vector<S2CellId>* cell_ids) const {
   if (geom_.size_nodes == 0 || is_empty()) {
     return;
   }

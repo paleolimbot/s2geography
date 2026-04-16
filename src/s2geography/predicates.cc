@@ -9,6 +9,7 @@
 #include <s2/s2edge_tessellator.h>
 #include <s2/s2lax_loop_shape.h>
 
+#include "s2geography/operation.h"
 #include "s2geography/sedona_udf/sedona_udf_internal.h"
 
 namespace s2geography {
@@ -545,50 +546,72 @@ struct StashedBoolOutput {
 };
 
 template <typename Exec>
-class PredicateImpl : public BinaryPredicate {
+class PredicateOperation : public Operation {
  public:
-  PredicateImpl() : out_(StashedBoolOutput{&result_}) {}
+  PredicateOperation(std::string name)
+      : name_(std::move(name)), out_(StashedBoolOutput{&result_}) {}
 
-  bool Evaluate(const GeoArrowGeography& lhs,
-                const GeoArrowGeography& rhs) override {
-    exec_.Exec(lhs, rhs, &out_);
-    return result_;
+  const std::string& name() const override { return name_; }
+
+  OutputType output_type() const override {
+    return Operation::OutputType::kBool;
+  }
+
+  void ExecGeogGeog(const GeoArrowGeography& arg0,
+                    const GeoArrowGeography& arg1) override {
+    exec_.Exec(arg0, arg1, &out_);
+    int_result_ = result_ ? 1 : 0;
   }
 
  private:
+  std::string name_;
   bool result_{};
   StashedBoolOutput out_;
   Exec exec_;
 };
 
-class WithinPredicate : public BinaryPredicate {
+class WithinOperation : public Operation {
  public:
-  bool Evaluate(const GeoArrowGeography& lhs,
-                const GeoArrowGeography& rhs) override {
-    return contains_.Evaluate(rhs, lhs);
+  WithinOperation() : name_("within") {}
+
+  const std::string& name() const override { return name_; }
+
+  OutputType output_type() const override {
+    return Operation::OutputType::kBool;
+  }
+
+  void ExecGeogGeog(const GeoArrowGeography& arg0,
+                    const GeoArrowGeography& arg1) override {
+    // Within(A, B) is Contains(B, A)
+    contains_.ExecGeogGeog(arg1, arg0);
+    int_result_ = contains_.GetInt();
   }
 
  private:
-  PredicateImpl<sedona_udf::S2Contains<StashedBoolOutput>> contains_;
+  std::string name_;
+  PredicateOperation<sedona_udf::S2Contains<StashedBoolOutput>> contains_{
+      "contains"};
 };
 
-std::unique_ptr<BinaryPredicate> BinaryPredicate::Intersects() {
+std::unique_ptr<Operation> Intersects() {
   return std::make_unique<
-      PredicateImpl<sedona_udf::S2Intersects<StashedBoolOutput>>>();
+      PredicateOperation<sedona_udf::S2Intersects<StashedBoolOutput>>>(
+      "intersects");
 }
 
-std::unique_ptr<BinaryPredicate> BinaryPredicate::Contains() {
+std::unique_ptr<Operation> Contains() {
   return std::make_unique<
-      PredicateImpl<sedona_udf::S2Contains<StashedBoolOutput>>>();
+      PredicateOperation<sedona_udf::S2Contains<StashedBoolOutput>>>(
+      "contains");
 }
 
-std::unique_ptr<BinaryPredicate> BinaryPredicate::Within() {
-  return std::make_unique<WithinPredicate>();
+std::unique_ptr<Operation> Within() {
+  return std::make_unique<WithinOperation>();
 }
 
-std::unique_ptr<BinaryPredicate> BinaryPredicate::Equals() {
+std::unique_ptr<Operation> Equals() {
   return std::make_unique<
-      PredicateImpl<sedona_udf::S2Equals<StashedBoolOutput>>>();
+      PredicateOperation<sedona_udf::S2Equals<StashedBoolOutput>>>("equals");
 }
 
 }  // namespace s2geography

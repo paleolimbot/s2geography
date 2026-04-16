@@ -13,16 +13,19 @@ namespace s2geography {
 
 class Operation {
  public:
+  enum class OutputType { kBool, kDouble, kWkb };
+
   Operation() = default;
   virtual ~Operation() = default;
 
   virtual const std::string& name() const = 0;
+  virtual OutputType output_type() const = 0;
 
-  void ExecGeogGeog(const GeoArrowGeography& arg0,
-                    const GeoArrowGeography& arg1) {
+  virtual void ExecGeogGeog(const GeoArrowGeography& arg0,
+                            const GeoArrowGeography& arg1) {
     S2GEOGRAPHY_UNUSED(arg0);
     S2GEOGRAPHY_UNUSED(arg1);
-    throw Exception("Can't call " + name() + "with geog + geog");
+    throw Exception("Can't call " + name() + " with geog + geog");
   }
 
   bool has_result() const { return has_result_; }
