@@ -67,13 +67,46 @@ struct S2Geog {
 
 struct S2GeogFactory {
   struct GeoArrowWKBReader wkb_reader;
+  struct GeoArrowWKTReader wkt_reader;
   struct GeoArrowError error;
+  bool wkb_reader_initialized;
+  bool wkt_reader_initialized;
 
-  S2GeogFactory() {
-    GeoArrowWKBReaderInit(&wkb_reader);
+  S2GeogFactory()
+      : wkb_reader_initialized(false), wkt_reader_initialized(false) {
     error.message[0] = '\0';
   }
-  ~S2GeogFactory() { GeoArrowWKBReaderReset(&wkb_reader); }
+
+  ~S2GeogFactory() {
+    if (wkb_reader_initialized) {
+      GeoArrowWKBReaderReset(&wkb_reader);
+    }
+    if (wkt_reader_initialized) {
+      GeoArrowWKTReaderReset(&wkt_reader);
+    }
+  }
+
+  GeoArrowErrorCode EnsureWkbReader() {
+    if (!wkb_reader_initialized) {
+      GeoArrowErrorCode ec = GeoArrowWKBReaderInit(&wkb_reader);
+      if (ec == GEOARROW_OK) {
+        wkb_reader_initialized = true;
+      }
+      return ec;
+    }
+    return GEOARROW_OK;
+  }
+
+  GeoArrowErrorCode EnsureWktReader() {
+    if (!wkt_reader_initialized) {
+      GeoArrowErrorCode ec = GeoArrowWKTReaderInit(&wkt_reader);
+      if (ec == GEOARROW_OK) {
+        wkt_reader_initialized = true;
+      }
+      return ec;
+    }
+    return GEOARROW_OK;
+  }
 
   // Non-copyable
   S2GeogFactory(const S2GeogFactory&) = delete;
@@ -242,13 +275,20 @@ S2GeogErrorCode S2GeogFactoryInitFromWkbNonOwning(
   // Reset the parse error
   geog_factory->error.message[0] = '\0';
 
+  // Lazily initialize the WKB reader
+  GeoArrowErrorCode ec = geog_factory->EnsureWkbReader();
+  if (ec != GEOARROW_OK) {
+    S2GEOGRAPHY_SET_ERROR(err, "error initializing WKB reader");
+    return ec;
+  }
+
   struct GeoArrowBufferView src;
   src.data = buf;
   src.size_bytes = static_cast<int64_t>(buf_size);
 
   struct GeoArrowGeometryView parsed;
-  GeoArrowErrorCode ec = GeoArrowWKBReaderRead(&geog_factory->wkb_reader, src,
-                                               &parsed, &geog_factory->error);
+  ec = GeoArrowWKBReaderRead(&geog_factory->wkb_reader, src, &parsed,
+                             &geog_factory->error);
   if (ec != GEOARROW_OK) {
     S2GEOGRAPHY_SET_ERROR(err, geog_factory->error.message);
     return ec;
@@ -257,6 +297,55 @@ S2GeogErrorCode S2GeogFactoryInitFromWkbNonOwning(
   ec = GeoArrowGeometryShallowCopy(parsed, &out->geom);
   if (ec != GEOARROW_OK) {
     S2GEOGRAPHY_SET_ERROR(err, "error copying geometry nodes");
+    return ec;
+  }
+
+  out->geog.Init(GeoArrowGeometryAsView(&out->geom));
+
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(err);
+}
+
+S2GeogErrorCode S2GeogFactoryInitFromWkt(struct S2GeogFactory* geog_factory,
+                                         const char* buf, size_t buf_size,
+                                         struct S2Geog* out,
+                                         struct S2GeogError* err) {
+  S2GEOGRAPHY_C_BEGIN(err);
+
+  S2GEOGRAPHY_DCHECK(geog_factory != nullptr);
+  S2GEOGRAPHY_DCHECK(out != nullptr);
+  S2GEOGRAPHY_DCHECK(buf != nullptr || buf_size == 0);
+
+  // Reset the parse error
+  geog_factory->error.message[0] = '\0';
+
+  // Lazily initialize the WKT reader
+  GeoArrowErrorCode ec = geog_factory->EnsureWktReader();
+  if (ec != GEOARROW_OK) {
+    S2GEOGRAPHY_SET_ERROR(err, "error initializing WKT reader");
+    return ec;
+  }
+
+  // Reset the output geometry to receive the parsed result
+  // Ideally we could rewind this to keep the internal coord buffer
+  GeoArrowGeometryReset(&out->geom);
+  ec = GeoArrowGeometryInit(&out->geom);
+  if (ec != GEOARROW_OK) {
+    S2GEOGRAPHY_SET_ERROR(err, "error initializing GeoArrowGeometry");
+    return ec;
+  }
+
+  struct GeoArrowStringView src;
+  src.data = buf;
+  src.size_bytes = static_cast<int64_t>(buf_size);
+
+  // Initialize a visitor that builds into the output geometry
+  struct GeoArrowVisitor v{};
+  GeoArrowGeometryInitVisitor(&out->geom, &v);
+
+  ec = GeoArrowWKTReaderVisit(&geog_factory->wkt_reader, src, &v);
+  if (ec != GEOARROW_OK) {
+    S2GEOGRAPHY_SET_ERROR(err, "error parsing WKT");
     return ec;
   }
 

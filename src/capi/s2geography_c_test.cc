@@ -142,18 +142,8 @@ TEST(S2GeographyC, FactoryInitFromInvalidWkb) {
   S2GeogFactoryDestroy(factory);
 }
 
-// ============================================================================
-// Rectangle Bounder Tests
-// ============================================================================
-
-TEST(S2GeographyC, RectBounderBound) {
-  // WKB for POINT(10 20)
-  const uint8_t wkb_point[] = {
-      0x01,                    // byte order: little endian
-      0x01, 0x00, 0x00, 0x00,  // type: Point (1)
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x24, 0x40,  // x: 10.0
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x34, 0x40   // y: 20.0
-  };
+TEST(S2GeographyC, FactoryInitFromWktPoint) {
+  const char* wkt_point = "POINT (0 0)";
 
   struct S2GeogFactory* factory = nullptr;
   ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
@@ -164,8 +154,52 @@ TEST(S2GeographyC, RectBounderBound) {
   struct S2GeogError* err = nullptr;
   ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
 
-  ASSERT_EQ(S2GeogFactoryInitFromWkbNonOwning(factory, wkb_point,
-                                              sizeof(wkb_point), geog, err),
+  EXPECT_EQ(S2GeogFactoryInitFromWkt(factory, wkt_point, strlen(wkt_point),
+                                     geog, err),
+            S2GEOGRAPHY_OK);
+
+  S2GeogErrorDestroy(err);
+  S2GeogDestroy(geog);
+  S2GeogFactoryDestroy(factory);
+}
+
+TEST(S2GeographyC, FactoryInitFromInvalidWkt) {
+  const char* invalid_wkt = "NOT VALID WKT";
+
+  struct S2GeogFactory* factory = nullptr;
+  ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
+
+  struct S2Geog* geog = nullptr;
+  ASSERT_EQ(S2GeogCreate(&geog), S2GEOGRAPHY_OK);
+
+  struct S2GeogError* err = nullptr;
+  ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
+
+  EXPECT_NE(S2GeogFactoryInitFromWkt(factory, invalid_wkt, strlen(invalid_wkt),
+                                     geog, err),
+            S2GEOGRAPHY_OK);
+
+  S2GeogErrorDestroy(err);
+  S2GeogDestroy(geog);
+  S2GeogFactoryDestroy(factory);
+}
+
+// ============================================================================
+// Rectangle Bounder Tests
+// ============================================================================
+
+TEST(S2GeographyC, RectBounderBound) {
+  struct S2GeogFactory* factory = nullptr;
+  ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
+
+  struct S2Geog* geog = nullptr;
+  ASSERT_EQ(S2GeogCreate(&geog), S2GEOGRAPHY_OK);
+
+  struct S2GeogError* err = nullptr;
+  ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
+
+  const char* wkt = "POINT (10 20)";
+  ASSERT_EQ(S2GeogFactoryInitFromWkt(factory, wkt, strlen(wkt), geog, err),
             S2GEOGRAPHY_OK);
 
   struct S2GeogRectBounder* bounder = nullptr;
