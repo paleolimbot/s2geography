@@ -287,3 +287,72 @@ TEST(S2GeographyC, AbseilVersion) {
   // Could be a version string or "<live at head>"
   EXPECT_GT(strlen(version), 0);
 }
+
+// ============================================================================
+// Binary Predicate Operations Tests (Parameterized)
+// ============================================================================
+
+struct BinaryPredicateParam {
+  const char* name;
+  int op_id;
+  const char* lhs_wkt;
+  const char* rhs_wkt;
+  int64_t expected;
+};
+
+class BinaryPredicateTest
+    : public ::testing::TestWithParam<BinaryPredicateParam> {};
+
+TEST_P(BinaryPredicateTest, EvalGeogGeog) {
+  const auto& p = GetParam();
+
+  struct S2GeogFactory* factory = nullptr;
+  ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
+
+  struct S2Geog* lhs = nullptr;
+  struct S2Geog* rhs = nullptr;
+  ASSERT_EQ(S2GeogCreate(&lhs), S2GEOGRAPHY_OK);
+  ASSERT_EQ(S2GeogCreate(&rhs), S2GEOGRAPHY_OK);
+
+  struct S2GeogError* err = nullptr;
+  ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
+
+  ASSERT_EQ(
+      S2GeogFactoryInitFromWkt(factory, p.lhs_wkt, strlen(p.lhs_wkt), lhs, err),
+      S2GEOGRAPHY_OK);
+  ASSERT_EQ(
+      S2GeogFactoryInitFromWkt(factory, p.rhs_wkt, strlen(p.rhs_wkt), rhs, err),
+      S2GEOGRAPHY_OK);
+
+  struct S2GeogOp* op = nullptr;
+  ASSERT_EQ(S2GeogOpCreate(&op, p.op_id), S2GEOGRAPHY_OK);
+
+  ASSERT_EQ(S2GeogOpEvalGeogGeog(op, lhs, rhs, err), S2GEOGRAPHY_OK);
+  EXPECT_EQ(S2GeogOpGetInt(op), p.expected);
+
+  S2GeogOpDestroy(op);
+  S2GeogErrorDestroy(err);
+  S2GeogDestroy(rhs);
+  S2GeogDestroy(lhs);
+  S2GeogFactoryDestroy(factory);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    S2GeographyC, BinaryPredicateTest,
+    ::testing::Values(BinaryPredicateParam{"intersects",
+                                           S2GEOGRAPHY_OP_INTERSECTS,
+                                           "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                           "POINT (0.25 0.25)", 1},
+                      BinaryPredicateParam{"contains", S2GEOGRAPHY_OP_CONTAINS,
+                                           "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                           "POINT (0.25 0.25)", 1},
+                      BinaryPredicateParam{"within", S2GEOGRAPHY_OP_WITHIN,
+                                           "POINT (0.25 0.25)",
+                                           "POLYGON ((0 0, 2 0, 0 2, 0 0))", 1},
+                      BinaryPredicateParam{"equals", S2GEOGRAPHY_OP_EQUALS,
+                                           "POLYGON ((0 0, 1 0, 0 1, 0 0))",
+                                           "POLYGON ((1 0, 0 1, 0 0, 1 0))",
+                                           1}),
+    [](const ::testing::TestParamInfo<BinaryPredicateParam>& info) {
+      return info.param.name;
+    });
