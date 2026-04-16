@@ -16,6 +16,7 @@
 #include "s2geography/distance.h"
 #include "s2geography/geoarrow-geography.h"
 #include "s2geography/linear-referencing.h"
+#include "s2geography/operation.h"
 #include "s2geography/predicates.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
 
@@ -90,15 +91,15 @@ struct S2GeogRectBounder {
   ~S2GeogRectBounder() = default;
 };
 
-struct S2GeogPredicate {
-  // TODO: Add predicate state
+struct S2GeogOp {
+  std::unique_ptr<s2geography::Operation> op;
 
   // Non-copyable
-  S2GeogPredicate(const S2GeogPredicate&) = delete;
-  S2GeogPredicate& operator=(const S2GeogPredicate&) = delete;
+  S2GeogOp(const S2GeogOp&) = delete;
+  S2GeogOp& operator=(const S2GeogOp&) = delete;
 
-  S2GeogPredicate() = default;
-  ~S2GeogPredicate() = default;
+  S2GeogOp() = default;
+  ~S2GeogOp() = default;
 };
 
 // Error handling functions
@@ -336,24 +337,40 @@ void S2GeogRectBounderDestroy(struct S2GeogRectBounder* rect_bounder) {
   delete rect_bounder;
 }
 
-// Predicate functions
+// Operator functions
 
-S2GeogErrorCode S2GeogPredicateCreate(struct S2GeogPredicate* predicate,
-                                      int op) {
-  // TODO: Implement
-  return ENOTSUP;
+S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp* op, int op_id) {
+  switch (op_id) {
+    case S2GEOGRAPHY_OP_INTERSECTS:
+    case S2GEOGRAPHY_OP_CONTAINS:
+    case S2GEOGRAPHY_OP_WITHIN:
+    case S2GEOGRAPHY_OP_EQUALS:
+    default:
+      return ENOTSUP;
+  }
 }
 
-S2GeogErrorCode S2GeogPredicateEval(struct S2GeogPredicate* predicate,
-                                    const S2Geog* lhs, const S2Geog* rhs,
-                                    uint8_t* out, struct S2GeogError* err) {
-  // TODO: Implement
-  return ENOTSUP;
+/// \brief Evaluate an operation with two geographies as input
+S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* lhs,
+                                     const S2Geog* rhs,
+                                     struct S2GeogError* err) {
+  S2GEOGRAPHY_C_BEGIN(err);
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+  S2GEOGRAPHY_DCHECK(lhs != nullptr);
+  S2GEOGRAPHY_DCHECK(rhs != nullptr);
+
+  op->op->ExecGeogGeog(lhs->geog, rhs->geog);
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(err);
 }
 
-void S2GeogPredicateDestroy(struct S2GeogPredicate* predicate) {
-  S2GEOGRAPHY_DCHECK(predicate != nullptr);
-  delete predicate;
+/// \brief Get integer or boolean output for this operation
+int64_t S2GeogOpGetInt(struct S2GeogOp* op) { return 0; }
+
+/// \brief Destroy a op object
+void S2GeogOpDestroy(struct S2GeogOp* op) {
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+  delete op;
 }
 
 // Version functions

@@ -214,31 +214,33 @@ S2GeogErrorCode S2GeogInitKernels(void* kernels_array,
 
 /// @}
 
-/// \defgroup predicates Predicates
-/// Functions for evaluating spatial predicates between geographies.
+/// \defgroup operations Operators
+/// Generic interface for function operations
 ///
 /// @{
 
-/// \brief Opaque predicate object
-struct S2GeogPredicate;
+/// \brief Opaque operator object
+struct S2GeogOp;
 
 /// \brief
-#define S2GEOGRAPHY_PREDICATE_INTERSECTS 1
-#define S2GEOGRAPHY_PREDICATE_CONTAINS 2
-#define S2GEOGRAPHY_PREDICATE_WITHIN 3
-#define S2GEOGRAPHY_PREDICATE_EQUALS 4
+#define S2GEOGRAPHY_OP_INTERSECTS 1
+#define S2GEOGRAPHY_OP_CONTAINS 2
+#define S2GEOGRAPHY_OP_WITHIN 3
+#define S2GEOGRAPHY_OP_EQUALS 4
 
-/// \brief Create a new predicate object
-S2GeogErrorCode S2GeogPredicateCreate(struct S2GeogPredicate* predicate,
-                                      int predicate_id);
+/// \brief Create a new operator object
+S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp* op, int op_id);
 
-/// \brief Evaluate a predicate between two geographies
-S2GeogErrorCode S2GeogPredicateEval(struct S2GeogPredicate* predicate,
-                                    const S2Geog* lhs, const S2Geog* rhs,
-                                    uint8_t* out, struct S2GeogError* err);
+/// \brief Evaluate a operation with two geographies as input
+S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* lhs,
+                                     const S2Geog* rhs,
+                                     struct S2GeogError* err);
 
-/// \brief Destroy a predicate object
-void S2GeogPredicateDestroy(struct S2GeogPredicate* predicate);
+/// \brief Get integer or boolean output for this operation
+int64_t S2GeogOpGetInt(struct S2GeogOp* op);
+
+/// \brief Destroy a op object
+void S2GeogOpDestroy(struct S2GeogOp* op);
 
 /// @}
 
