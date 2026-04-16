@@ -3,6 +3,8 @@
 
 #include <gtest/gtest.h>
 
+#include <limits>
+
 // This test file performs "is it plugged in" level checks for all C API
 // functions. The goal is to ensure that:
 // 1. All functions are exported and linkable
@@ -68,7 +70,7 @@ TEST(S2GeographyC, LngLatToCellId) {
 TEST(S2GeographyC, LngLatToCellIdNaN) {
   // Test with NaN coordinates - should return sentinel
   struct S2GeogVertex vertex;
-  vertex.v[0] = NAN;
+  vertex.v[0] = std::numeric_limits<double>::quiet_NaN();
   vertex.v[1] = 40.0;
 
   uint64_t cell_id = S2GeogLngLatToCellId(&vertex);
@@ -78,7 +80,8 @@ TEST(S2GeographyC, LngLatToCellIdNaN) {
   // The actual sentinel value - just verify it's consistent
   struct S2GeogVertex vertex2;
   vertex2.v[0] = 0.0;
-  vertex2.v[1] = NAN;
+  vertex2.v[1] = std::numeric_limits<double>::quiet_NaN();
+  ;
   uint64_t cell_id2 = S2GeogLngLatToCellId(&vertex2);
 
   // Both NaN cases should return the same sentinel
