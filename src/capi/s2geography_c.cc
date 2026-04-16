@@ -339,15 +339,29 @@ void S2GeogRectBounderDestroy(struct S2GeogRectBounder* rect_bounder) {
 
 // Operator functions
 
-S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp* op, int op_id) {
+S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp** op, int op_id) {
+  S2GEOGRAPHY_C_BEGIN(nullptr);
+  std::unique_ptr<s2geography::Operation> inner;
   switch (op_id) {
     case S2GEOGRAPHY_OP_INTERSECTS:
+      inner = s2geography::Intersects();
+      break;
     case S2GEOGRAPHY_OP_CONTAINS:
+      inner = s2geography::Contains();
+      break;
     case S2GEOGRAPHY_OP_WITHIN:
+      inner = s2geography::Within();
+      break;
     case S2GEOGRAPHY_OP_EQUALS:
+      inner = s2geography::Equals();
+      break;
     default:
       return ENOTSUP;
   }
+
+  *op = new S2GeogOp{std::move(inner)};
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(nullptr);
 }
 
 /// \brief Evaluate an operation with two geographies as input

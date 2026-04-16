@@ -239,7 +239,7 @@ struct S2GeogOp;
 #define S2GEOGRAPHY_OP_OUTPUT_BOOL 1
 
 /// \brief Create a new operator object
-S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp* op, int op_id);
+S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp** op, int op_id);
 
 const char* S2GeogOpName(struct S2GeogOp* op);
 
