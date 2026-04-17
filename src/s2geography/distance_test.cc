@@ -949,7 +949,8 @@ INSTANTIATE_TEST_SUITE_P(
             // GC (with polygon) x point outside
             // Uses index path due to polygon
             "gc_with_polygon_distance_point_outside",
-            "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 0, 0 2, 0 0)))",
+            "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 0, 0 2, 0 "
+            "0)))",
             "POINT (-1 0)",
             // Distance: same as polygon_not_contains_close_point
             111195.10117748393,
@@ -984,7 +985,8 @@ INSTANTIATE_TEST_SUITE_P(
             // GC (with polygon) x linestring inside
             // Uses index due to polygon; linestring fully inside polygon
             "gc_with_polygon_distance_linestring_inside",
-            "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 0, 0 2, 0 0)))",
+            "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 0, 0 2, 0 "
+            "0)))",
             "LINESTRING (0.25 0.25, 0.5 0.5)",
             // Distance: linestring inside polygon
             0.0,
@@ -1001,7 +1003,8 @@ INSTANTIATE_TEST_SUITE_P(
             // Reversed: linestring fully outside polygon
             "linestring_distance_gc_with_polygon_outside",
             "LINESTRING (3 3, 4 4)",
-            "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 0, 0 2, 0 0)))",
+            "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 0, 0 2, 0 "
+            "0)))",
             // Distance: same as linestring_distance_polygon_outside
             314367.35908786188,
             // Max distance: from LINESTRING(3 3) to POINT(30 30)

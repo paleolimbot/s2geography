@@ -622,11 +622,13 @@ INSTANTIATE_TEST_SUITE_P(
             "point_intersects_gc_point", "POINT (5 5)", "intersects",
             "GEOMETRYCOLLECTION (POINT (5 5), LINESTRING (10 10, 11 10))",
             true},
-        // Intersects: linestring crosses polygon in GEOMETRYCOLLECTION
+
         ScalarScalarParam{
+            // Intersects: linestring crosses polygon in GEOMETRYCOLLECTION
             "linestring_intersects_gc_polygon", "LINESTRING (0.25 0.25, 3 3)",
             "intersects",
-            "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 0, 0 2, 0 0)))",
+            "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 "
+            "0, 0 2, 0 0)))",
             true},
         // Intersects: GEOMETRYCOLLECTION vs GEOMETRYCOLLECTION (brute force
         // path, both have mixed types)
@@ -651,10 +653,10 @@ INSTANTIATE_TEST_SUITE_P(
             "POLYGON ((0 0, 2 0, 0 2, 0 0)))",
             "contains", "POINT (0.25 0.25)", true},
         // Contains: polygon in GEOMETRYCOLLECTION contains interior linestring
-        ScalarScalarParam{
-            "gc_contains_linestring",
-            "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 0, 0 2, 0 0)))",
-            "contains", "LINESTRING (0.25 0.25, 0.5 0.5)", true},
+        ScalarScalarParam{"gc_contains_linestring",
+                          "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 "
+                          "0, 0 2, 0 0)))",
+                          "contains", "LINESTRING (0.25 0.25, 0.5 0.5)", true},
         // Contains: polygon contains GEOMETRYCOLLECTION with point + linestring
         // (exercises SemiBruteForceIndexedContains with mixed containee)
         ScalarScalarParam{
@@ -670,10 +672,11 @@ INSTANTIATE_TEST_SUITE_P(
             false},
         // Contains: GEOMETRYCOLLECTION does not contain polygon that crosses
         // boundary
-        ScalarScalarParam{
-            "gc_not_contains_crossing_polygon",
-            "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 0, 0 2, 0 0)))",
-            "contains", "POLYGON ((0.1 0.1, 3 0.1, 0.1 3, 0.1 0.1))", false},
+        ScalarScalarParam{"gc_not_contains_crossing_polygon",
+                          "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 "
+                          "0, 0 2, 0 0)))",
+                          "contains",
+                          "POLYGON ((0.1 0.1, 3 0.1, 0.1 3, 0.1 0.1))", false},
 
         // Equals: GEOMETRYCOLLECTION equals itself (identity fast path)
         ScalarScalarParam{
