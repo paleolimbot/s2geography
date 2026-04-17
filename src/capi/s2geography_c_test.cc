@@ -87,6 +87,37 @@ TEST(S2GeographyC, GeogCreate) {
   S2GeogDestroy(geog);
 }
 
+TEST(S2GeographyC, MemUsed) {
+  const char* wkt_point = "POINT (0 0)";
+
+  struct S2GeogFactory* factory = nullptr;
+  ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
+
+  struct S2Geog* geog = nullptr;
+  ASSERT_EQ(S2GeogCreate(&geog), S2GEOGRAPHY_OK);
+
+  // MemUsed should return something reasonable for an empty geography
+  size_t mem_empty = S2GeogMemUsed(geog);
+  EXPECT_GT(mem_empty, 0);
+
+  // Initialize with a point
+  ASSERT_EQ(S2GeogFactoryInitFromWkt(factory, wkt_point, strlen(wkt_point),
+                                     geog, nullptr),
+            S2GEOGRAPHY_OK);
+
+  // MemUsed should return something reasonable for a point
+  size_t mem_point = S2GeogMemUsed(geog);
+  EXPECT_GT(mem_point, 0);
+
+  // After forcing the index to build, memory should increase
+  ASSERT_EQ(S2GeogForcePrepare(geog, nullptr), S2GEOGRAPHY_OK);
+  size_t mem_prepared = S2GeogMemUsed(geog);
+  EXPECT_GT(mem_prepared, mem_point);
+
+  S2GeogDestroy(geog);
+  S2GeogFactoryDestroy(factory);
+}
+
 // ============================================================================
 // Geography Factory Tests
 // ============================================================================
