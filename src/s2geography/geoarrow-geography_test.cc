@@ -1314,6 +1314,13 @@ TEST_F(GeoArrowGeographyTest, Point) {
   EXPECT_GE(geog.ShapeIndex().num_shape_ids(), 1);
 }
 
+TEST_F(GeoArrowGeographyTest, PointMemUsed) {
+  auto geog = MakeGeography("POINT (1 2)");
+  EXPECT_EQ(geog.MemUsed(), 560);
+  geog.ForceBuildIndex();
+  EXPECT_EQ(geog.MemUsed(), 640);
+}
+
 TEST_F(GeoArrowGeographyTest, MultiPoint) {
   auto geog = MakeGeography("MULTIPOINT ((0 0), (1 1), (2 2))");
   EXPECT_EQ(geog.dimension(), 0);
@@ -1375,6 +1382,13 @@ TEST_F(GeoArrowGeographyTest, Linestring) {
   EXPECT_EQ(geog.ResolveGlobalEdgeId(0), std::make_pair(0, 0));
 }
 
+TEST_F(GeoArrowGeographyTest, LinestringMemUsed) {
+  auto geog = MakeGeography("LINESTRING (0 0, 1 1, 2 2)");
+  EXPECT_EQ(geog.MemUsed(), 564);
+  geog.ForceBuildIndex();
+  EXPECT_EQ(geog.MemUsed(), 684);
+}
+
 TEST_F(GeoArrowGeographyTest, LinestringNativeEdge) {
   auto geog =
       MakeGeography("LINESTRING ZM (0 1 100 200, 2 3 101 201, 4 5 103 203)");
@@ -1424,6 +1438,13 @@ TEST_F(GeoArrowGeographyTest, Polygon) {
   EXPECT_EQ(shape->num_edges(), 3);
 
   EXPECT_EQ(geog.ResolveGlobalEdgeId(0), std::make_pair(0, 0));
+}
+
+TEST_F(GeoArrowGeographyTest, PolygonMemUsed) {
+  auto geog = MakeGeography("POLYGON ((0 0, 1 0, 0 1, 0 0))");
+  EXPECT_EQ(geog.MemUsed(), 884);
+  geog.ForceBuildIndex();
+  EXPECT_EQ(geog.MemUsed(), 1016);
 }
 
 TEST_F(GeoArrowGeographyTest, PolygonNativeEdge) {

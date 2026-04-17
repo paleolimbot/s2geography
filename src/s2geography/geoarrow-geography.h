@@ -89,6 +89,9 @@ class GeoArrowPointShape : public S2Shape {
   /// \brief Extract a native edge within a chain
   internal::GeoArrowEdge native_chain_edge(int i, int j) const;
 
+  /// \brief Return the extra memory used by this instance beyond size_of()
+  size_t MemUsed() { return 0; }
+
  private:
   GeoArrowGeom geom_;
   uint8_t dimensions_{GEOARROW_DIMENSIONS_XY};
@@ -147,6 +150,9 @@ class GeoArrowLaxPolylineShape : public S2Shape {
 
   /// \brief Extract a native edge within a chain
   internal::GeoArrowEdge native_chain_edge(int i, int j) const;
+
+  /// \brief Return the extra memory used by this instance beyond size_of()
+  size_t MemUsed() { return num_edges_.capacity() * sizeof(int); }
 
  private:
   GeoArrowGeom geom_{};
@@ -251,6 +257,13 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   /// orientation is only used to obtain the reference point).
   bool BruteForceContains(const S2Point& pt,
                           const S2Shape::ReferencePoint& reference) const;
+
+  /// \brief Return the extra memory used by this instance beyond size_of()
+  size_t MemUsed() {
+    return num_edges_.capacity() * sizeof(int) +
+           loops_.capacity() * sizeof(struct GeoArrowGeometryNode) +
+           point_scratch_.capacity() * sizeof(struct GeoArrowGeometryNode);
+  }
 
  private:
   GeoArrowGeom geom_{};
@@ -462,6 +475,14 @@ class GeoArrowGeography {
   /// This is useful to reconstruct ZM information after querying a shape index
   /// for an edge.
   internal::GeoArrowEdge native_edge(int shape_id, int edge_id) const;
+
+  /// \brief Return the memory used by this instance
+  size_t MemUsed() {
+    return sizeof(GeoArrowGeography) + points_.MemUsed() + lines_.MemUsed() +
+           polygons_.MemUsed() +
+           collection_nodes_.capacity() * sizeof(struct GeoArrowGeometryNode) +
+           covering_.capacity() * sizeof(S2CellId) + index_.SpaceUsed();
+  }
 
  private:
   struct GeoArrowGeometryView geom_{};
