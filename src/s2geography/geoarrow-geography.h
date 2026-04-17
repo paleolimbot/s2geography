@@ -6,6 +6,7 @@
 #include <s2/s2shape_index.h>
 
 #include <atomic>
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -335,7 +336,7 @@ class GeoArrowGeography {
   /// \brief Return true if the internal index has not yet been built
   bool is_unindexed() const {
     if (indexed_.load(std::memory_order_acquire)) {
-      return !index_.is_fresh();
+      return !index_ || !index_->is_fresh();
     } else {
       return true;
     }
@@ -344,7 +345,7 @@ class GeoArrowGeography {
   /// \brief Force building the internal index
   void ForceBuildIndex() {
     InitIndex();
-    index_.ForceBuild();
+    if (index_) index_->ForceBuild();
   }
 
   /// \brief If this geography represents a single point, compute and return it
@@ -478,19 +479,22 @@ class GeoArrowGeography {
 
   /// \brief Return the memory used by this instance
   size_t MemUsed() {
-    return sizeof(GeoArrowGeography) + points_.MemUsed() + lines_.MemUsed() +
-           polygons_.MemUsed() +
-           collection_nodes_.capacity() * sizeof(struct GeoArrowGeometryNode) +
-           covering_.capacity() * sizeof(S2CellId) + index_.SpaceUsed();
+    size_t mem = sizeof(GeoArrowGeography) + points_.MemUsed();
+    if (lines_) mem += sizeof(GeoArrowLaxPolylineShape) + lines_->MemUsed();
+    if (polygons_) mem += sizeof(GeoArrowLaxPolygonShape) + polygons_->MemUsed();
+    mem += collection_nodes_.capacity() * sizeof(struct GeoArrowGeometryNode);
+    mem += covering_.capacity() * sizeof(S2CellId);
+    if (index_) mem += index_->SpaceUsed();
+    return mem;
   }
 
  private:
   struct GeoArrowGeometryView geom_{};
   GeoArrowPointShape points_;
-  GeoArrowLaxPolylineShape lines_;
-  GeoArrowLaxPolygonShape polygons_;
+  std::unique_ptr<GeoArrowLaxPolylineShape> lines_;
+  std::unique_ptr<GeoArrowLaxPolygonShape> polygons_;
   std::vector<struct GeoArrowGeometryNode> collection_nodes_;
-  mutable MutableS2ShapeIndex index_;
+  mutable std::unique_ptr<MutableS2ShapeIndex> index_;
   mutable std::vector<S2CellId> covering_;
   mutable std::mutex index_mutex_;
   mutable std::atomic<bool> indexed_{false};

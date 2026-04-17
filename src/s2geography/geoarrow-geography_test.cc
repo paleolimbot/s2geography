@@ -1316,9 +1316,9 @@ TEST_F(GeoArrowGeographyTest, Point) {
 
 TEST_F(GeoArrowGeographyTest, PointMemUsed) {
   auto geog = MakeGeography("POINT (1 2)");
-  EXPECT_EQ(geog.MemUsed(), 560);
+  EXPECT_EQ(geog.MemUsed(), 192);
   geog.ForceBuildIndex();
-  EXPECT_EQ(geog.MemUsed(), 640);
+  EXPECT_EQ(geog.MemUsed(), 376);
 }
 
 TEST_F(GeoArrowGeographyTest, MultiPoint) {
@@ -1384,9 +1384,9 @@ TEST_F(GeoArrowGeographyTest, Linestring) {
 
 TEST_F(GeoArrowGeographyTest, LinestringMemUsed) {
   auto geog = MakeGeography("LINESTRING (0 0, 1 1, 2 2)");
-  EXPECT_EQ(geog.MemUsed(), 564);
+  EXPECT_EQ(geog.MemUsed(), 264);
   geog.ForceBuildIndex();
-  EXPECT_EQ(geog.MemUsed(), 684);
+  EXPECT_EQ(geog.MemUsed(), 488);
 }
 
 TEST_F(GeoArrowGeographyTest, LinestringNativeEdge) {
@@ -1442,9 +1442,9 @@ TEST_F(GeoArrowGeographyTest, Polygon) {
 
 TEST_F(GeoArrowGeographyTest, PolygonMemUsed) {
   auto geog = MakeGeography("POLYGON ((0 0, 1 0, 0 1, 0 0))");
-  EXPECT_EQ(geog.MemUsed(), 884);
+  EXPECT_EQ(geog.MemUsed(), 632);
   geog.ForceBuildIndex();
-  EXPECT_EQ(geog.MemUsed(), 1016);
+  EXPECT_EQ(geog.MemUsed(), 868);
 }
 
 TEST_F(GeoArrowGeographyTest, PolygonNativeEdge) {
