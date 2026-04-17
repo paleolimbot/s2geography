@@ -441,6 +441,7 @@ GeoArrowGeography::GeoArrowGeography(GeoArrowGeography&& other)
       points_(std::move(other.points_)),
       lines_(std::move(other.lines_)),
       polygons_(std::move(other.polygons_)),
+      collection_nodes_(std::move(other.collection_nodes_)),
       index_(),
       covering_(std::move(other.covering_)) {
   // index_ needs to be rebuilt
@@ -454,6 +455,7 @@ GeoArrowGeography& GeoArrowGeography::operator=(GeoArrowGeography&& other) {
     points_ = std::move(other.points_);
     lines_ = std::move(other.lines_);
     polygons_ = std::move(other.polygons_);
+    collection_nodes_ = std::move(other.collection_nodes_);
     covering_ = std::move(other.covering_);
     // index_ needs to be rebuilt
     index_.Clear();
@@ -485,17 +487,93 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
       points_.Init(geom);
       break;
+
     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
     case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
       lines_.Init(geom);
       break;
+
     case GEOARROW_GEOMETRY_TYPE_POLYGON:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
       polygons_.Init(geom);
       break;
-    // GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
-    // Can be supported by walking the list and separating geometry types
-    // but not yet.
+
+    case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION: {
+      // We support geometry collections by splitting them up consistently into
+      // a multipoint, followed by a multilinestring, followed by a
+      // multipolygon. This does not maintain the nesting structure of the
+      // original (however, that is available from the original geom in a
+      // pinch). In some cases this may copy nodes unnecessarily (e.g., for
+      // polygon, where they're copied already, or if there was already only a
+      // single multipoint or multilinestring with non-empty members) but we
+      // keep it this way for simplicity.
+
+      std::vector<struct GeoArrowGeometryNode> points;
+      std::vector<struct GeoArrowGeometryNode> lines;
+      std::vector<struct GeoArrowGeometryNode> polygons;
+
+      int64_t remaining_loops = 0;
+      GeoArrowGeom(geom).VisitNodes(
+          [&](const struct GeoArrowGeometryNode* node) {
+            switch (node->geometry_type) {
+              case GEOARROW_GEOMETRY_TYPE_POINT:
+                if (node->size > 0) {
+                  points.push_back(*node);
+                }
+                break;
+              case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+                if (remaining_loops > 0) {
+                  if (node->size > 0) {
+                    polygons.push_back(*node);
+                  }
+                  --remaining_loops;
+                } else {
+                  lines.push_back(*node);
+                }
+                break;
+              case GEOARROW_GEOMETRY_TYPE_POLYGON:
+                remaining_loops = node->size;
+                polygons.push_back(*node);
+                break;
+              default:
+                break;
+            }
+            return true;
+          });
+
+      struct GeoArrowGeometryNode multi{};
+      multi.dimensions = geom.root->dimensions;
+
+      collection_nodes_.resize(points.size() + lines.size() + polygons.size() +
+                               3);
+      auto it = collection_nodes_.begin();
+
+      multi.size = static_cast<uint32_t>(points.size());
+      multi.geometry_type = GEOARROW_GEOMETRY_TYPE_MULTIPOINT;
+      *it++ = multi;
+      it = std::copy(points.begin(), points.end(), it);
+
+      multi.size = static_cast<uint32_t>(lines.size());
+      multi.geometry_type = GEOARROW_GEOMETRY_TYPE_MULTILINESTRING;
+      *it++ = multi;
+      it = std::copy(lines.begin(), lines.end(), it);
+
+      multi.size = static_cast<uint32_t>(polygons.size());
+      multi.geometry_type = GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON;
+      *it++ = multi;
+      it = std::copy(polygons.begin(), polygons.end(), it);
+
+      points_.Init(
+          {collection_nodes_.data(), static_cast<int64_t>(points.size() + 1)});
+      int64_t offset = static_cast<int64_t>(points.size() + 1);
+      lines_.Init({collection_nodes_.data() + offset,
+                   static_cast<int64_t>(lines.size() + 1)});
+      offset += static_cast<int64_t>(lines.size() + 1);
+      polygons_.Init({collection_nodes_.data() + offset,
+                      static_cast<int64_t>(polygons.size() + 1)});
+      break;
+    }
+
     default:
       throw Exception(
           "Can't create GeoArrowGeography from geometry type " +
@@ -724,9 +802,11 @@ void GeoArrowGeography::InitIndex() const {
     case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
       index_.Add(std::make_unique<S2ShapeWrapper>(&polygons_));
       break;
-    // GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
-    // Can be supported by walking the list and separating geometry types
-    // but not yet.
+    case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
+      index_.Add(std::make_unique<S2ShapeWrapper>(&points_));
+      index_.Add(std::make_unique<S2ShapeWrapper>(&lines_));
+      index_.Add(std::make_unique<S2ShapeWrapper>(&polygons_));
+      break;
     default:
       throw Exception(
           "Can't create index from geometry type " +
