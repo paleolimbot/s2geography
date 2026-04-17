@@ -503,31 +503,6 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
   }
 }
 
-void GeoArrowGeography::GetCellUnionBound(
-    std::vector<S2CellId>* cell_ids) const {
-  if (geom_.size_nodes == 0 || is_empty()) {
-    return;
-  }
-
-  switch (geom_.root->geometry_type) {
-    case GEOARROW_GEOMETRY_TYPE_POINT:
-    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
-      if (points_.num_vertices() <= 32) {
-        points_.geom().VisitVertices([&](S2Point v) {
-          cell_ids->push_back(S2CellId(v));
-          return true;
-        });
-        return;
-      }
-      break;
-    default:
-      break;
-  }
-
-  S2RegionCoverer coverer;
-  coverer.GetFastCovering(*Region(), cell_ids);
-}
-
 const std::vector<S2CellId>& GeoArrowGeography::Covering() const {
   InitIndex();
   return covering_;

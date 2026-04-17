@@ -474,7 +474,6 @@ class GeoArrowGeography {
   mutable std::atomic<bool> indexed_{false};
 
   void InitIndex() const;
-  void GetCellUnionBound(std::vector<S2CellId>* cell_ids) const;
 };
 
 /// @}
