@@ -1466,11 +1466,188 @@ TEST_F(GeoArrowGeographyTest, MultiPolygon) {
   EXPECT_EQ(shape->num_edges(), 6);  // 3 + 3
 }
 
-TEST_F(GeoArrowGeographyTest, GeometryCollectionThrows) {
-  auto gc_geom = TestGeometry::FromWKT("GEOMETRYCOLLECTION (POINT (0 0))");
-  GeoArrowGeography geog;
-  // Not yet supported
-  EXPECT_THROW(geog.Init(gc_geom.geom()), Exception);
+TEST_F(GeoArrowGeographyTest, GeometryCollectionBasicProperties) {
+  auto geog = MakeGeography(
+      "GEOMETRYCOLLECTION (POINT (0 0), LINESTRING (1 1, 2 2), "
+      "POLYGON ((10 10, 11 10, 10 11, 10 10)))");
+
+  EXPECT_EQ(geog.geometry_type(), GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION);
+  EXPECT_EQ(geog.dimension(), -1);
+  EXPECT_EQ(geog.max_dimension(), 2);
+  EXPECT_EQ(geog.num_shapes(), 3);
+  EXPECT_FALSE(geog.is_empty());
+  EXPECT_EQ(geog.num_edges(), 5);
+}
+
+TEST_F(GeoArrowGeographyTest, GeometryCollectionEmpty) {
+  auto geog = MakeGeography("GEOMETRYCOLLECTION EMPTY");
+
+  EXPECT_EQ(geog.geometry_type(), GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION);
+  EXPECT_TRUE(geog.is_empty());
+  EXPECT_EQ(geog.num_shapes(), 3);
+  EXPECT_EQ(geog.num_edges(), 0);
+}
+
+TEST_F(GeoArrowGeographyTest, GeometryCollectionShape) {
+  // Shape() switch - returns points_, lines_, polygons_ based on id
+  auto geog = MakeGeography(
+      "GEOMETRYCOLLECTION (POINT (0 0), POINT (1 1), "
+      "LINESTRING (2 2, 3 3), POLYGON ((10 10, 11 10, 10 11, 10 10)))");
+
+  // Shape(0) is points
+  auto* points_shape = geog.Shape(0);
+  ASSERT_NE(points_shape, nullptr);
+  EXPECT_EQ(points_shape->dimension(), 0);
+  EXPECT_EQ(points_shape->num_edges(), 2);
+
+  // Shape(1) is lines
+  auto* lines_shape = geog.Shape(1);
+  ASSERT_NE(lines_shape, nullptr);
+  EXPECT_EQ(lines_shape->dimension(), 1);
+  EXPECT_EQ(lines_shape->num_edges(), 1);
+
+  // Shape(2) is polygons
+  auto* polygons_shape = geog.Shape(2);
+  ASSERT_NE(polygons_shape, nullptr);
+  EXPECT_EQ(polygons_shape->dimension(), 2);
+  EXPECT_EQ(polygons_shape->num_edges(), 3);
+}
+
+TEST_F(GeoArrowGeographyTest, GeometryCollectionShapeIndex) {
+  // Tests InitIndex() switch - adds all three shapes to index
+  auto geog = MakeGeography(
+      "GEOMETRYCOLLECTION (POINT (0 0), LINESTRING (1 1, 2 2), "
+      "POLYGON ((10 10, 11 10, 10 11, 10 10)))");
+
+  // ShapeIndex() triggers InitIndex()
+  const auto& index = geog.ShapeIndex();
+  EXPECT_GE(index.num_shape_ids(), 3);
+
+  // Covering() also triggers InitIndex()
+  EXPECT_GT(geog.Covering().size(), 0);
+
+  // Test intersection with a point inside the polygon
+  auto point_in_poly = MakeGeography("POINT (10.1 10.1)");
+  EXPECT_TRUE(S2BooleanOperation::Intersects(geog.ShapeIndex(),
+                                             point_in_poly.ShapeIndex()));
+
+  // Test intersection with the point geometry
+  auto point_at_origin = MakeGeography("POINT (0 0)");
+  EXPECT_TRUE(S2BooleanOperation::Intersects(geog.ShapeIndex(),
+                                             point_at_origin.ShapeIndex()));
+
+  // Test no intersection far away
+  auto far_point = MakeGeography("POINT (50 50)");
+  EXPECT_FALSE(S2BooleanOperation::Intersects(geog.ShapeIndex(),
+                                              far_point.ShapeIndex()));
+}
+
+TEST_F(GeoArrowGeographyTest, GeometryCollectionResolveGlobalEdgeId) {
+  // Tests ResolveGlobalEdgeId() switch
+  auto geog = MakeGeography(
+      "GEOMETRYCOLLECTION (POINT (0 0), POINT (1 1), "
+      "LINESTRING (2 2, 3 3, 4 4), POLYGON ((10 10, 11 10, 10 11, 10 10)))");
+
+  // 2 point edges, 2 line edges, 3 polygon edges = 7 total
+
+  // Edge 0 is in points (shape 0)
+  EXPECT_EQ(geog.ResolveGlobalEdgeId(0), std::make_pair(0, 0));
+  // Edge 1 is in points (shape 0)
+  EXPECT_EQ(geog.ResolveGlobalEdgeId(1), std::make_pair(0, 1));
+
+  // Edge 2 is in lines (shape 1), local edge 0
+  EXPECT_EQ(geog.ResolveGlobalEdgeId(2), std::make_pair(1, 0));
+  // Edge 3 is in lines (shape 1), local edge 1
+  EXPECT_EQ(geog.ResolveGlobalEdgeId(3), std::make_pair(1, 1));
+
+  // Edge 4 is in polygons (shape 2), local edge 0
+  EXPECT_EQ(geog.ResolveGlobalEdgeId(4), std::make_pair(2, 0));
+  // Edge 5 is in polygons (shape 2), local edge 1
+  EXPECT_EQ(geog.ResolveGlobalEdgeId(5), std::make_pair(2, 1));
+  // Edge 6 is in polygons (shape 2), local edge 2
+  EXPECT_EQ(geog.ResolveGlobalEdgeId(6), std::make_pair(2, 2));
+}
+
+TEST_F(GeoArrowGeographyTest, GeometryCollectionNativeEdge) {
+  // Tests native_edge() switch
+  auto geog = MakeGeography(
+      "GEOMETRYCOLLECTION (POINT ZM (0 1 100 200), "
+      "LINESTRING ZM (2 3 101 201, 4 5 102 202), "
+      "POLYGON ZM ((10 10 10 20, 11 10 11 21, 10 11 12 22, 10 10 10 20)))");
+
+  // Native edge from points (shape 0)
+  auto e_point = geog.native_edge(0, 0);
+  EXPECT_DOUBLE_EQ(e_point.v0.lng, 0);
+  EXPECT_DOUBLE_EQ(e_point.v0.lat, 1);
+  EXPECT_DOUBLE_EQ(e_point.v0.zm[0], 100);
+  EXPECT_DOUBLE_EQ(e_point.v0.zm[1], 200);
+  EXPECT_EQ(e_point.v0, e_point.v1);  // Point edge is degenerate
+
+  // Native edge from lines (shape 1)
+  auto e_line = geog.native_edge(1, 0);
+  EXPECT_DOUBLE_EQ(e_line.v0.lng, 2);
+  EXPECT_DOUBLE_EQ(e_line.v0.lat, 3);
+  EXPECT_DOUBLE_EQ(e_line.v1.lng, 4);
+  EXPECT_DOUBLE_EQ(e_line.v1.lat, 5);
+
+  // Native edge from polygons (shape 2)
+  auto e_poly = geog.native_edge(2, 0);
+  EXPECT_DOUBLE_EQ(e_poly.v0.lng, 10);
+  EXPECT_DOUBLE_EQ(e_poly.v0.lat, 10);
+}
+
+TEST_F(GeoArrowGeographyTest, GeometryCollectionOnlyPoints) {
+  auto geog = MakeGeography("GEOMETRYCOLLECTION (POINT (0 0), POINT (1 1))");
+
+  EXPECT_EQ(geog.num_shapes(), 3);
+  EXPECT_EQ(geog.max_dimension(), 0);
+  EXPECT_FALSE(geog.is_empty());
+
+  EXPECT_EQ(geog.Shape(0)->num_edges(), 2);  // points
+  EXPECT_EQ(geog.Shape(1)->num_edges(), 0);  // lines (empty)
+  EXPECT_EQ(geog.Shape(2)->num_edges(), 0);  // polygons (empty)
+}
+
+TEST_F(GeoArrowGeographyTest, GeometryCollectionOnlyLines) {
+  auto geog = MakeGeography("GEOMETRYCOLLECTION (LINESTRING (0 0, 1 1, 2 2))");
+
+  EXPECT_EQ(geog.num_shapes(), 3);
+  EXPECT_EQ(geog.max_dimension(), 1);
+  EXPECT_FALSE(geog.is_empty());
+
+  EXPECT_EQ(geog.Shape(0)->num_edges(), 0);  // points (empty)
+  EXPECT_EQ(geog.Shape(1)->num_edges(), 2);  // lines
+  EXPECT_EQ(geog.Shape(2)->num_edges(), 0);  // polygons (empty)
+}
+
+TEST_F(GeoArrowGeographyTest, GeometryCollectionOnlyPolygons) {
+  auto geog =
+      MakeGeography("GEOMETRYCOLLECTION (POLYGON ((0 0, 1 0, 0 1, 0 0)))");
+
+  EXPECT_EQ(geog.num_shapes(), 3);
+  EXPECT_EQ(geog.max_dimension(), 2);
+  EXPECT_FALSE(geog.is_empty());
+
+  EXPECT_EQ(geog.Shape(0)->num_edges(), 0);  // points (empty)
+  EXPECT_EQ(geog.Shape(1)->num_edges(), 0);  // lines (empty)
+  EXPECT_EQ(geog.Shape(2)->num_edges(), 3);  // polygons
+}
+
+TEST_F(GeoArrowGeographyTest, GeometryCollectionNestedMulti) {
+  // Test with nested multi-geometries
+  auto geog = MakeGeography(
+      "GEOMETRYCOLLECTION ("
+      "MULTIPOINT ((0 0), (1 1)), "
+      "MULTILINESTRING ((2 2, 3 3), (4 4, 5 5)), "
+      "MULTIPOLYGON (((10 10, 11 10, 10 11, 10 10)), "
+      "((20 20, 21 20, 20 21, 20 20))))");
+
+  EXPECT_EQ(geog.num_shapes(), 3);
+  EXPECT_FALSE(geog.is_empty());
+
+  EXPECT_EQ(geog.Shape(0)->num_edges(), 2);  // 2 points
+  EXPECT_EQ(geog.Shape(1)->num_edges(), 2);  // 2 lines (1 edge each)
+  EXPECT_EQ(geog.Shape(2)->num_edges(), 6);  // 2 triangles (3 edges each)
 }
 
 TEST_F(GeoArrowGeographyTest, RegionNotNull) {
