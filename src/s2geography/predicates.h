@@ -4,6 +4,7 @@
 #include <s2/s2boolean_operation.h>
 
 #include "s2geography/geography.h"
+#include "s2geography/operation.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
 
 namespace s2geography {
@@ -41,6 +42,11 @@ bool s2_intersects_box(const ShapeIndexGeography& geog1,
 bool s2_intersects_box(const S2ShapeIndex& geog1, const S2LatLngRect& rect,
                        const S2BooleanOperation::Options& options,
                        double tolerance);
+
+std::unique_ptr<Operation> Intersects();
+std::unique_ptr<Operation> Contains();
+std::unique_ptr<Operation> Within();
+std::unique_ptr<Operation> Equals();
 
 namespace sedona_udf {
 

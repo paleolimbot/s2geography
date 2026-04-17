@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "nanoarrow/nanoarrow.hpp"
+#include "s2geography/geoarrow-geography.h"
 #include "s2geography/sedona_udf/sedona_udf_test_internal.h"
 
 TEST(Predicates, SedonaUdfIntersectsScalarArray) {
@@ -282,6 +283,68 @@ TEST_P(PredicatesScalarScalarTest, SedonaUdf) {
 
       ASSERT_NO_FATAL_FAILURE(
           TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL, {p.expected}));
+    }
+  }
+}
+
+TEST_P(PredicatesScalarScalarTest, PredicateOperation) {
+  const auto& p = GetParam();
+
+  // Skip null tests for Operation (it doesn't handle nulls directly)
+  if (!p.lhs.has_value() || !p.rhs.has_value()) {
+    return;
+  }
+
+  // Create the appropriate predicate operation
+  std::unique_ptr<s2geography::Operation> predicate;
+  if (p.op == "intersects") {
+    predicate = s2geography::Intersects();
+  } else if (p.op == "contains") {
+    predicate = s2geography::Contains();
+  } else if (p.op == "equals") {
+    predicate = s2geography::Equals();
+  } else {
+    FAIL() << "Unknown predicate: " << p.op;
+  }
+
+  // Check with all combinations of forcing an index build on arguments.
+  // This ensures we test both prepared (indexed) and unprepared (fresh)
+  // geographies.
+  for (bool prepare_arg0 : {true, false}) {
+    for (bool prepare_arg1 : {true, false}) {
+      SCOPED_TRACE("prepare_arg0: " + std::to_string(prepare_arg0) +
+                   ", prepare_arg1: " + std::to_string(prepare_arg1));
+
+      // Create fresh geographies for each iteration to ensure unindexed state
+      // when not preparing
+      auto lhs_geom = TestGeometry::FromWKT(*p.lhs);
+      auto rhs_geom = TestGeometry::FromWKT(*p.rhs);
+
+      s2geography::GeoArrowGeography lhs_geog;
+      s2geography::GeoArrowGeography rhs_geog;
+      lhs_geog.Init(lhs_geom.geom());
+      rhs_geog.Init(rhs_geom.geom());
+
+      // Force index build if preparing, otherwise verify geography is unindexed
+      if (prepare_arg0) {
+        lhs_geog.ForceBuildIndex();
+      } else {
+        ASSERT_TRUE(lhs_geog.is_unindexed())
+            << "lhs geography should be unindexed when not preparing";
+      }
+
+      if (prepare_arg1) {
+        rhs_geog.ForceBuildIndex();
+      } else {
+        ASSERT_TRUE(rhs_geog.is_unindexed())
+            << "rhs geography should be unindexed when not preparing";
+      }
+
+      predicate->ExecGeogGeog(lhs_geog, rhs_geog);
+      bool result = predicate->GetInt() != 0;
+      ASSERT_TRUE(p.expected.has_value())
+          << "Expected value should not be null";
+      EXPECT_EQ(result, *p.expected);
     }
   }
 }

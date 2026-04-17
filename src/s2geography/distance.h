@@ -2,6 +2,7 @@
 #pragma once
 
 #include "s2geography/geography.h"
+#include "s2geography/operation.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
 
 namespace s2geography {
@@ -43,5 +44,7 @@ void LongestLineKernel(struct SedonaCScalarKernel* out,
 void ClosestPointKernel(struct SedonaCScalarKernel* out);
 
 }  // namespace sedona_udf
+
+std::unique_ptr<Operation> DistanceWithin();
 
 }  // namespace s2geography

@@ -16,6 +16,7 @@
 #include "s2geography/distance.h"
 #include "s2geography/geoarrow-geography.h"
 #include "s2geography/linear-referencing.h"
+#include "s2geography/operation.h"
 #include "s2geography/predicates.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
 
@@ -66,13 +67,46 @@ struct S2Geog {
 
 struct S2GeogFactory {
   struct GeoArrowWKBReader wkb_reader;
+  struct GeoArrowWKTReader wkt_reader;
   struct GeoArrowError error;
+  bool wkb_reader_initialized;
+  bool wkt_reader_initialized;
 
-  S2GeogFactory() {
-    GeoArrowWKBReaderInit(&wkb_reader);
+  S2GeogFactory()
+      : wkb_reader_initialized(false), wkt_reader_initialized(false) {
     error.message[0] = '\0';
   }
-  ~S2GeogFactory() { GeoArrowWKBReaderReset(&wkb_reader); }
+
+  ~S2GeogFactory() {
+    if (wkb_reader_initialized) {
+      GeoArrowWKBReaderReset(&wkb_reader);
+    }
+    if (wkt_reader_initialized) {
+      GeoArrowWKTReaderReset(&wkt_reader);
+    }
+  }
+
+  GeoArrowErrorCode EnsureWkbReader() {
+    if (!wkb_reader_initialized) {
+      GeoArrowErrorCode ec = GeoArrowWKBReaderInit(&wkb_reader);
+      if (ec == GEOARROW_OK) {
+        wkb_reader_initialized = true;
+      }
+      return ec;
+    }
+    return GEOARROW_OK;
+  }
+
+  GeoArrowErrorCode EnsureWktReader() {
+    if (!wkt_reader_initialized) {
+      GeoArrowErrorCode ec = GeoArrowWKTReaderInit(&wkt_reader);
+      if (ec == GEOARROW_OK) {
+        wkt_reader_initialized = true;
+      }
+      return ec;
+    }
+    return GEOARROW_OK;
+  }
 
   // Non-copyable
   S2GeogFactory(const S2GeogFactory&) = delete;
@@ -88,6 +122,20 @@ struct S2GeogRectBounder {
 
   S2GeogRectBounder() = default;
   ~S2GeogRectBounder() = default;
+};
+
+struct S2GeogOp {
+  explicit S2GeogOp(std::unique_ptr<s2geography::Operation> op_in)
+      : op(std::move(op_in)) {}
+
+  std::unique_ptr<s2geography::Operation> op;
+
+  // Non-copyable
+  S2GeogOp(const S2GeogOp&) = delete;
+  S2GeogOp& operator=(const S2GeogOp&) = delete;
+
+  S2GeogOp() = default;
+  ~S2GeogOp() = default;
 };
 
 // Error handling functions
@@ -203,6 +251,15 @@ S2GeogErrorCode S2GeogCreate(struct S2Geog** geog) {
   S2GEOGRAPHY_C_END(nullptr)
 }
 
+S2GeogErrorCode S2GeogForcePrepare(struct S2Geog* geog,
+                                   struct S2GeogError* err) {
+  S2GEOGRAPHY_C_BEGIN(err)
+  S2GEOGRAPHY_DCHECK(geog != nullptr);
+  geog->geog.ForceBuildIndex();
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(err);
+}
+
 void S2GeogDestroy(struct S2Geog* geog) {
   S2GEOGRAPHY_DCHECK(geog != nullptr);
   delete geog;
@@ -230,13 +287,20 @@ S2GeogErrorCode S2GeogFactoryInitFromWkbNonOwning(
   // Reset the parse error
   geog_factory->error.message[0] = '\0';
 
+  // Lazily initialize the WKB reader
+  GeoArrowErrorCode ec = geog_factory->EnsureWkbReader();
+  if (ec != GEOARROW_OK) {
+    S2GEOGRAPHY_SET_ERROR(err, "error initializing WKB reader");
+    return ec;
+  }
+
   struct GeoArrowBufferView src;
   src.data = buf;
   src.size_bytes = static_cast<int64_t>(buf_size);
 
   struct GeoArrowGeometryView parsed;
-  GeoArrowErrorCode ec = GeoArrowWKBReaderRead(&geog_factory->wkb_reader, src,
-                                               &parsed, &geog_factory->error);
+  ec = GeoArrowWKBReaderRead(&geog_factory->wkb_reader, src, &parsed,
+                             &geog_factory->error);
   if (ec != GEOARROW_OK) {
     S2GEOGRAPHY_SET_ERROR(err, geog_factory->error.message);
     return ec;
@@ -245,6 +309,57 @@ S2GeogErrorCode S2GeogFactoryInitFromWkbNonOwning(
   ec = GeoArrowGeometryShallowCopy(parsed, &out->geom);
   if (ec != GEOARROW_OK) {
     S2GEOGRAPHY_SET_ERROR(err, "error copying geometry nodes");
+    return ec;
+  }
+
+  out->geog.Init(GeoArrowGeometryAsView(&out->geom));
+
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(err);
+}
+
+S2GeogErrorCode S2GeogFactoryInitFromWkt(struct S2GeogFactory* geog_factory,
+                                         const char* buf, size_t buf_size,
+                                         struct S2Geog* out,
+                                         struct S2GeogError* err) {
+  S2GEOGRAPHY_C_BEGIN(err);
+
+  S2GEOGRAPHY_DCHECK(geog_factory != nullptr);
+  S2GEOGRAPHY_DCHECK(out != nullptr);
+  S2GEOGRAPHY_DCHECK(buf != nullptr || buf_size == 0);
+
+  // Reset the parse error
+  geog_factory->error.message[0] = '\0';
+
+  // Lazily initialize the WKT reader
+  GeoArrowErrorCode ec = geog_factory->EnsureWktReader();
+  if (ec != GEOARROW_OK) {
+    S2GEOGRAPHY_SET_ERROR(err, "error initializing WKT reader");
+    return ec;
+  }
+
+  // Reset the output geometry to receive the parsed result
+  // Ideally we could rewind this to keep the internal coord buffer
+  GeoArrowGeometryReset(&out->geom);
+  out->geog.Init({nullptr, 0});
+
+  ec = GeoArrowGeometryInit(&out->geom);
+  if (ec != GEOARROW_OK) {
+    S2GEOGRAPHY_SET_ERROR(err, "error initializing GeoArrowGeometry");
+    return ec;
+  }
+
+  struct GeoArrowStringView src;
+  src.data = buf;
+  src.size_bytes = static_cast<int64_t>(buf_size);
+
+  // Initialize a visitor that builds into the output geometry
+  struct GeoArrowVisitor v{};
+  GeoArrowGeometryInitVisitor(&out->geom, &v);
+
+  ec = GeoArrowWKTReaderVisit(&geog_factory->wkt_reader, src, &v);
+  if (ec != GEOARROW_OK) {
+    S2GEOGRAPHY_SET_ERROR(err, "error parsing WKT");
     return ec;
   }
 
@@ -323,6 +438,95 @@ S2GeogErrorCode S2GeogRectBounderFinish(struct S2GeogRectBounder* rect_bounder,
 void S2GeogRectBounderDestroy(struct S2GeogRectBounder* rect_bounder) {
   S2GEOGRAPHY_DCHECK(rect_bounder != nullptr);
   delete rect_bounder;
+}
+
+// Operator functions
+
+S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp** op, int op_id) {
+  S2GEOGRAPHY_C_BEGIN(nullptr);
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+
+  std::unique_ptr<s2geography::Operation> inner;
+  switch (op_id) {
+    case S2GEOGRAPHY_OP_INTERSECTS:
+      inner = s2geography::Intersects();
+      break;
+    case S2GEOGRAPHY_OP_CONTAINS:
+      inner = s2geography::Contains();
+      break;
+    case S2GEOGRAPHY_OP_WITHIN:
+      inner = s2geography::Within();
+      break;
+    case S2GEOGRAPHY_OP_EQUALS:
+      inner = s2geography::Equals();
+      break;
+    case S2GEOGRAPHY_OP_DISTANCE_WITHIN:
+      inner = s2geography::DistanceWithin();
+      break;
+    default:
+      return ENOTSUP;
+  }
+
+  *op = new S2GeogOp(std::move(inner));
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(nullptr);
+}
+
+const char* S2GeogOpName(const struct S2GeogOp* op) {
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+  S2GEOGRAPHY_DCHECK(op->op != nullptr);
+  return op->op->name().c_str();
+}
+
+int S2GeogOpOutputType(const struct S2GeogOp* op) {
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+  S2GEOGRAPHY_DCHECK(op->op != nullptr);
+  switch (op->op->output_type()) {
+    case s2geography::Operation::OutputType::kBool:
+      return S2GEOGRAPHY_OUTPUT_TYPE_BOOL;
+    default:
+      return 0;
+  }
+}
+
+S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* arg0,
+                                     const S2Geog* arg1,
+                                     struct S2GeogError* err) {
+  S2GEOGRAPHY_C_BEGIN(err);
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+  S2GEOGRAPHY_DCHECK(op->op != nullptr);
+  S2GEOGRAPHY_DCHECK(arg0 != nullptr);
+  S2GEOGRAPHY_DCHECK(arg1 != nullptr);
+
+  op->op->ExecGeogGeog(arg0->geog, arg1->geog);
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(err);
+}
+
+S2GeogErrorCode S2GeogOpEvalGeogGeogDouble(struct S2GeogOp* op,
+                                           const S2Geog* arg0,
+                                           const S2Geog* arg1, double arg2,
+                                           struct S2GeogError* err) {
+  S2GEOGRAPHY_C_BEGIN(err);
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+  S2GEOGRAPHY_DCHECK(op->op != nullptr);
+  S2GEOGRAPHY_DCHECK(arg0 != nullptr);
+  S2GEOGRAPHY_DCHECK(arg1 != nullptr);
+
+  op->op->ExecGeogGeogDouble(arg0->geog, arg1->geog, arg2);
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(err);
+}
+
+int64_t S2GeogOpGetInt(struct S2GeogOp* op) {
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+  S2GEOGRAPHY_DCHECK(op->op != nullptr);
+  return op->op->GetInt();
+}
+
+void S2GeogOpDestroy(struct S2GeogOp* op) {
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+  delete op;
 }
 
 // Version functions

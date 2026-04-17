@@ -34,6 +34,9 @@ extern "C" {
 /// between calls (e.g., users may wish to allocate a thread-local error
 /// and reuse it).
 ///
+/// Functions that can't fail do not return error codes or accept error
+/// arguments and return their values directly.
+///
 /// @{
 
 /// \brief An errno-compatible error code
@@ -93,6 +96,21 @@ struct S2Geog;
 /// \pre geog != NULL
 S2GeogErrorCode S2GeogCreate(struct S2Geog** geog);
 
+/// \brief Force building the internal shape index for this geography
+///
+/// Most operations attempt to avoid building the internal ShapeIndex
+/// attached to this geography because doing so can be slow; however, for
+/// repeated calls to the same function (e.g., predicates), it can be faster to
+/// force the creation of an index. For example, internal S2 logic generally
+/// avoids building an index for loops with less than 32 vertices unless there
+/// have been 20 or more point containment queries on the same loop. In
+/// S2Geography, we leave the choice of whether or not to eagerly build an index
+/// to the user.
+///
+/// \pre geog != NULL
+S2GeogErrorCode S2GeogForcePrepare(struct S2Geog* geog,
+                                   struct S2GeogError* err);
+
 /// \brief Destroy a geography object
 ///
 /// \pre geog != NULL
@@ -128,6 +146,24 @@ S2GeogErrorCode S2GeogFactoryCreate(struct S2GeogFactory** geog_factory);
 S2GeogErrorCode S2GeogFactoryInitFromWkbNonOwning(
     struct S2GeogFactory* geog_factory, const uint8_t* buf, size_t buf_size,
     struct S2Geog* out, struct S2GeogError* err);
+
+/// \brief Create a geography from WKT
+///
+/// The output S2Geog must have been created before this call with
+/// S2GeogCreate(). The resulting geography owns its coordinates and
+/// is not tied to the lifecycle of the input text. This is primarily
+/// useful for testing.
+///
+/// This function may modify out in the case of error; however, is left in
+/// a valid state and may be reused in another call to a factory method.
+///
+/// \pre geog_factory != NULL
+/// \pre out != NULL
+/// \pre buf != NULL || buf_size == 0
+S2GeogErrorCode S2GeogFactoryInitFromWkt(struct S2GeogFactory* geog_factory,
+                                         const char* buf, size_t buf_size,
+                                         struct S2Geog* out,
+                                         struct S2GeogError* err);
 
 /// \brief Destroy a geography factory
 ///
@@ -208,6 +244,91 @@ size_t S2GeogNumKernels(void);
 /// The only currently supported format is S2GEOGRAPHY_KERNEL_FORMAT_SEDONA_UDF.
 S2GeogErrorCode S2GeogInitKernels(void* kernels_array,
                                   size_t kernels_array_size_bytes, int format);
+
+/// @}
+
+/// \defgroup operations Operators
+/// Generic interface for function operations
+///
+/// This interface exposes functions in a generic way that (1) allows for
+/// operation-specific scratch space or expensive object construction to be
+/// amortized over many calls and (2) reduces the number of functions required
+/// in this C API. In general, only non-trivial functions are exposed in this
+/// way because there is some overhead associated with this wrapping. Trivial
+/// functions should be exposed directly in this C API or called via the Arrow
+/// interface where these overheads can be more effectively amortized over
+/// elements in a loop.
+///
+/// @{
+
+/// \brief Opaque operator object
+struct S2GeogOp;
+
+/// \brief Compute the intersects predicate between two geographies, returning a
+/// boolean
+#define S2GEOGRAPHY_OP_INTERSECTS 1
+
+/// \brief Compute the contains predicate between two geographies, returning a
+/// boolean
+#define S2GEOGRAPHY_OP_CONTAINS 2
+
+/// \brief Compute the within predicate between two geographies, returning a
+/// boolean
+#define S2GEOGRAPHY_OP_WITHIN 3
+
+/// \brief Compute the equals predicate between two geographies, returning a
+/// boolean
+#define S2GEOGRAPHY_OP_EQUALS 4
+
+/// \brief Compute the distance-within predicate between two geographies with a
+/// distance threshold, returning a boolean
+#define S2GEOGRAPHY_OP_DISTANCE_WITHIN 5
+
+#define S2GEOGRAPHY_OUTPUT_TYPE_BOOL 1
+
+/// \brief Create a new operator object
+///
+/// \pre op != NULL
+S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp** op, int op_id);
+
+/// \brief Get the name of the operator
+///
+/// \pre op != NULL
+const char* S2GeogOpName(const struct S2GeogOp* op);
+
+/// \brief Get the output type of the operator
+///
+/// \pre op != NULL
+int S2GeogOpOutputType(const struct S2GeogOp* op);
+
+/// \brief Evaluate an operation with two geographies as input
+///
+/// \pre op != NULL
+/// \pre arg0 != NULL
+/// \pre arg1 != NULL
+S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* arg0,
+                                     const S2Geog* arg1,
+                                     struct S2GeogError* err);
+
+/// \brief Evaluate an operation with two geographies and a double as input
+///
+/// \pre op != NULL
+/// \pre arg0 != NULL
+/// \pre arg1 != NULL
+S2GeogErrorCode S2GeogOpEvalGeogGeogDouble(struct S2GeogOp* op,
+                                           const S2Geog* arg0,
+                                           const S2Geog* arg1, double arg2,
+                                           struct S2GeogError* err);
+
+/// \brief Get integer or boolean output for this operation
+///
+/// \pre op != NULL
+int64_t S2GeogOpGetInt(struct S2GeogOp* op);
+
+/// \brief Destroy an op object
+///
+/// \pre op != NULL
+void S2GeogOpDestroy(struct S2GeogOp* op);
 
 /// @}
 

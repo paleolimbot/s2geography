@@ -15,6 +15,7 @@
 
 #include "geoarrow/geoarrow.h"
 #include "s2/s2point_region.h"
+#include "s2/s2region_coverer.h"
 #include "s2geography/geography_interface.h"
 
 namespace s2geography {
@@ -444,7 +445,7 @@ GeoArrowGeography::GeoArrowGeography(GeoArrowGeography&& other)
       covering_(std::move(other.covering_)) {
   // index_ needs to be rebuilt
   index_.Clear();
-  indexed_ = false;
+  indexed_.store(false, std::memory_order_relaxed);
 }
 
 GeoArrowGeography& GeoArrowGeography::operator=(GeoArrowGeography&& other) {
@@ -456,7 +457,7 @@ GeoArrowGeography& GeoArrowGeography::operator=(GeoArrowGeography&& other) {
     covering_ = std::move(other.covering_);
     // index_ needs to be rebuilt
     index_.Clear();
-    indexed_ = false;
+    indexed_.store(false, std::memory_order_relaxed);
   }
   return *this;
 }
@@ -472,7 +473,7 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
   polygons_.Clear();
   index_.Clear();
   covering_.clear();
-  indexed_ = false;
+  indexed_.store(false, std::memory_order_relaxed);
   geom_ = geom;
 
   if (geom.size_nodes == 0) {
@@ -502,38 +503,12 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
   }
 }
 
-void GeoArrowGeography::GetCellUnionBound(std::vector<S2CellId>* cell_ids) {
-  if (geom_.size_nodes == 0 || is_empty()) {
-    return;
-  }
-
-  switch (geom_.root->geometry_type) {
-    case GEOARROW_GEOMETRY_TYPE_POINT:
-    case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
-      if (points_.num_vertices() <= 32) {
-        points_.geom().VisitVertices([&](S2Point v) {
-          cell_ids->push_back(S2CellId(v));
-          return true;
-        });
-        return;
-      }
-      break;
-    default:
-      break;
-  }
-
-  Region()->GetCellUnionBound(cell_ids);
-}
-
-const std::vector<S2CellId>& GeoArrowGeography::Covering() {
-  if (covering_.empty()) {
-    GetCellUnionBound(&covering_);
-  }
-
+const std::vector<S2CellId>& GeoArrowGeography::Covering() const {
+  InitIndex();
   return covering_;
 }
 
-const S2ShapeIndex& GeoArrowGeography::ShapeIndex() {
+const S2ShapeIndex& GeoArrowGeography::ShapeIndex() const {
   InitIndex();
   return index_;
 }
@@ -712,7 +687,7 @@ const S2Shape* GeoArrowGeography::Shape(int id) const {
   }
 }
 
-std::unique_ptr<S2Region> GeoArrowGeography::Region() {
+std::unique_ptr<S2Region> GeoArrowGeography::Region() const {
   auto maybe_point = Point();
   if (maybe_point) {
     return std::make_unique<S2PointRegion>(*maybe_point);
@@ -722,8 +697,17 @@ std::unique_ptr<S2Region> GeoArrowGeography::Region() {
   return std::make_unique<S2ShapeIndexRegion<MutableS2ShapeIndex>>(&index_);
 }
 
-void GeoArrowGeography::InitIndex() {
-  if (indexed_ || geom_.size_nodes == 0) {
+void GeoArrowGeography::InitIndex() const {
+  // Fast path: already indexed or empty geometry
+  if (indexed_.load(std::memory_order_acquire) || geom_.size_nodes == 0) {
+    return;
+  }
+
+  // Slow path: acquire lock and add shapes (double-checked locking)
+  std::lock_guard<std::mutex> lock(index_mutex_);
+
+  // Double-check after acquiring lock
+  if (indexed_.load(std::memory_order_relaxed)) {
     return;
   }
 
@@ -749,7 +733,30 @@ void GeoArrowGeography::InitIndex() {
           std::string(GeometryTypeString(geom_.root->geometry_type)));
   }
 
-  indexed_ = true;
+  // Compute covering while we hold the lock (avoid calling Region() which
+  // would re-enter InitIndex())
+  if (!is_empty()) {
+    switch (geom_.root->geometry_type) {
+      case GEOARROW_GEOMETRY_TYPE_POINT:
+      case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+        if (points_.num_vertices() <= 32) {
+          points_.geom().VisitVertices([&](S2Point v) {
+            covering_.push_back(S2CellId(v));
+            return true;
+          });
+          break;
+        }
+        [[fallthrough]];
+      default: {
+        S2RegionCoverer coverer;
+        S2ShapeIndexRegion<MutableS2ShapeIndex> region(&index_);
+        coverer.GetFastCovering(region, &covering_);
+        break;
+      }
+    }
+  }
+
+  indexed_.store(true, std::memory_order_release);
 }
 
 std::pair<int, int> GeoArrowGeography::ResolveGlobalEdgeId(

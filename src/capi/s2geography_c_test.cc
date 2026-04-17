@@ -78,9 +78,12 @@ TEST(S2GeographyC, LngLatToCellIdNaN) {
 
 TEST(S2GeographyC, GeogCreate) {
   struct S2Geog* geog = nullptr;
-  S2GeogErrorCode code = S2GeogCreate(&geog);
-  ASSERT_EQ(code, S2GEOGRAPHY_OK);
+  ASSERT_EQ(S2GeogCreate(&geog), S2GEOGRAPHY_OK);
   ASSERT_NE(geog, nullptr);
+
+  // Should be able to force prepare a fresh geography
+  ASSERT_EQ(S2GeogForcePrepare(geog, nullptr), S2GEOGRAPHY_OK);
+
   S2GeogDestroy(geog);
 }
 
@@ -142,18 +145,8 @@ TEST(S2GeographyC, FactoryInitFromInvalidWkb) {
   S2GeogFactoryDestroy(factory);
 }
 
-// ============================================================================
-// Rectangle Bounder Tests
-// ============================================================================
-
-TEST(S2GeographyC, RectBounderBound) {
-  // WKB for POINT(10 20)
-  const uint8_t wkb_point[] = {
-      0x01,                    // byte order: little endian
-      0x01, 0x00, 0x00, 0x00,  // type: Point (1)
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x24, 0x40,  // x: 10.0
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x34, 0x40   // y: 20.0
-  };
+TEST(S2GeographyC, FactoryInitFromWktPoint) {
+  const char* wkt_point = "POINT (0 0)";
 
   struct S2GeogFactory* factory = nullptr;
   ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
@@ -164,8 +157,52 @@ TEST(S2GeographyC, RectBounderBound) {
   struct S2GeogError* err = nullptr;
   ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
 
-  ASSERT_EQ(S2GeogFactoryInitFromWkbNonOwning(factory, wkb_point,
-                                              sizeof(wkb_point), geog, err),
+  EXPECT_EQ(S2GeogFactoryInitFromWkt(factory, wkt_point, strlen(wkt_point),
+                                     geog, err),
+            S2GEOGRAPHY_OK);
+
+  S2GeogErrorDestroy(err);
+  S2GeogDestroy(geog);
+  S2GeogFactoryDestroy(factory);
+}
+
+TEST(S2GeographyC, FactoryInitFromInvalidWkt) {
+  const char* invalid_wkt = "NOT VALID WKT";
+
+  struct S2GeogFactory* factory = nullptr;
+  ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
+
+  struct S2Geog* geog = nullptr;
+  ASSERT_EQ(S2GeogCreate(&geog), S2GEOGRAPHY_OK);
+
+  struct S2GeogError* err = nullptr;
+  ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
+
+  EXPECT_NE(S2GeogFactoryInitFromWkt(factory, invalid_wkt, strlen(invalid_wkt),
+                                     geog, err),
+            S2GEOGRAPHY_OK);
+
+  S2GeogErrorDestroy(err);
+  S2GeogDestroy(geog);
+  S2GeogFactoryDestroy(factory);
+}
+
+// ============================================================================
+// Rectangle Bounder Tests
+// ============================================================================
+
+TEST(S2GeographyC, RectBounderBound) {
+  struct S2GeogFactory* factory = nullptr;
+  ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
+
+  struct S2Geog* geog = nullptr;
+  ASSERT_EQ(S2GeogCreate(&geog), S2GEOGRAPHY_OK);
+
+  struct S2GeogError* err = nullptr;
+  ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
+
+  const char* wkt = "POINT (10 20)";
+  ASSERT_EQ(S2GeogFactoryInitFromWkt(factory, wkt, strlen(wkt), geog, err),
             S2GEOGRAPHY_OK);
 
   struct S2GeogRectBounder* bounder = nullptr;
@@ -252,4 +289,126 @@ TEST(S2GeographyC, AbseilVersion) {
   ASSERT_NE(version, nullptr);
   // Could be a version string or "<live at head>"
   EXPECT_GT(strlen(version), 0);
+}
+
+// ============================================================================
+// Binary Predicate Operations Tests (Parameterized)
+// ============================================================================
+
+struct BinaryPredicateParam {
+  const char* name;
+  int op_id;
+  const char* lhs_wkt;
+  const char* rhs_wkt;
+  int64_t expected;
+};
+
+class BinaryPredicateTest
+    : public ::testing::TestWithParam<BinaryPredicateParam> {};
+
+TEST_P(BinaryPredicateTest, EvalGeogGeog) {
+  const auto& p = GetParam();
+
+  struct S2GeogFactory* factory = nullptr;
+  ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
+
+  struct S2Geog* lhs = nullptr;
+  struct S2Geog* rhs = nullptr;
+  ASSERT_EQ(S2GeogCreate(&lhs), S2GEOGRAPHY_OK);
+  ASSERT_EQ(S2GeogCreate(&rhs), S2GEOGRAPHY_OK);
+
+  struct S2GeogError* err = nullptr;
+  ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
+
+  ASSERT_EQ(
+      S2GeogFactoryInitFromWkt(factory, p.lhs_wkt, strlen(p.lhs_wkt), lhs, err),
+      S2GEOGRAPHY_OK);
+  ASSERT_EQ(
+      S2GeogFactoryInitFromWkt(factory, p.rhs_wkt, strlen(p.rhs_wkt), rhs, err),
+      S2GEOGRAPHY_OK);
+
+  struct S2GeogOp* op = nullptr;
+  ASSERT_EQ(S2GeogOpCreate(&op, p.op_id), S2GEOGRAPHY_OK);
+
+  ASSERT_STREQ(S2GeogOpName(op), p.name);
+  ASSERT_EQ(S2GeogOpOutputType(op), S2GEOGRAPHY_OUTPUT_TYPE_BOOL);
+
+  ASSERT_EQ(S2GeogOpEvalGeogGeog(op, lhs, rhs, err), S2GEOGRAPHY_OK);
+  EXPECT_EQ(S2GeogOpGetInt(op), p.expected);
+
+  S2GeogOpDestroy(op);
+  S2GeogErrorDestroy(err);
+  S2GeogDestroy(rhs);
+  S2GeogDestroy(lhs);
+  S2GeogFactoryDestroy(factory);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    S2GeographyC, BinaryPredicateTest,
+    ::testing::Values(BinaryPredicateParam{"intersects",
+                                           S2GEOGRAPHY_OP_INTERSECTS,
+                                           "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                           "POINT (0.25 0.25)", 1},
+                      BinaryPredicateParam{"contains", S2GEOGRAPHY_OP_CONTAINS,
+                                           "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                           "POINT (0.25 0.25)", 1},
+                      BinaryPredicateParam{"within", S2GEOGRAPHY_OP_WITHIN,
+                                           "POINT (0.25 0.25)",
+                                           "POLYGON ((0 0, 2 0, 0 2, 0 0))", 1},
+                      BinaryPredicateParam{"equals", S2GEOGRAPHY_OP_EQUALS,
+                                           "POLYGON ((0 0, 1 0, 0 1, 0 0))",
+                                           "POLYGON ((1 0, 0 1, 0 0, 1 0))",
+                                           1}),
+    [](const ::testing::TestParamInfo<BinaryPredicateParam>& info) {
+      return info.param.name;
+    });
+
+// ============================================================================
+// DistanceWithin Operation Test
+// ============================================================================
+
+TEST(S2GeographyC, DistanceWithinOperation) {
+  struct S2GeogFactory* factory = nullptr;
+  ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
+
+  struct S2Geog* lhs = nullptr;
+  struct S2Geog* rhs = nullptr;
+  ASSERT_EQ(S2GeogCreate(&lhs), S2GEOGRAPHY_OK);
+  ASSERT_EQ(S2GeogCreate(&rhs), S2GEOGRAPHY_OK);
+
+  struct S2GeogError* err = nullptr;
+  ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
+
+  // Points ~111km apart (1 degree latitude)
+  const char* lhs_wkt = "POINT (0 0)";
+  const char* rhs_wkt = "POINT (0 1)";
+  ASSERT_EQ(
+      S2GeogFactoryInitFromWkt(factory, lhs_wkt, strlen(lhs_wkt), lhs, err),
+      S2GEOGRAPHY_OK);
+  ASSERT_EQ(
+      S2GeogFactoryInitFromWkt(factory, rhs_wkt, strlen(rhs_wkt), rhs, err),
+      S2GEOGRAPHY_OK);
+
+  struct S2GeogOp* op = nullptr;
+  ASSERT_EQ(S2GeogOpCreate(&op, S2GEOGRAPHY_OP_DISTANCE_WITHIN),
+            S2GEOGRAPHY_OK);
+
+  ASSERT_STREQ(S2GeogOpName(op), "distance_within");
+  ASSERT_EQ(S2GeogOpOutputType(op), S2GEOGRAPHY_OUTPUT_TYPE_BOOL);
+
+  // Distance is ~111195 meters, so 200000 meters should return true
+  ASSERT_EQ(S2GeogOpEvalGeogGeogDouble(op, lhs, rhs, 200000.0, err),
+            S2GEOGRAPHY_OK);
+  EXPECT_EQ(S2GeogOpGetInt(op), 1);
+
+  // 50000 meters should return false
+  ASSERT_EQ(S2GeogOpEvalGeogGeogDouble(op, lhs, rhs, 50000.0, err),
+            S2GEOGRAPHY_OK);
+  EXPECT_EQ(S2GeogOpGetInt(op), 0);
+
+  S2GeogOpDestroy(op);
+  S2GeogErrorDestroy(err);
+  S2GeogDestroy(rhs);
+  S2GeogDestroy(lhs);
+  S2GeogFactoryDestroy(factory);
 }

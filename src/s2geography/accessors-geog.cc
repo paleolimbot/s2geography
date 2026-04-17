@@ -241,7 +241,7 @@ struct Centroid {
 
 namespace {
 std::optional<internal::GeoArrowVertex> CentroidVertex(
-    GeoArrowGeography& value, std::vector<S2Point>* scratch) {
+    const GeoArrowGeography& value, std::vector<S2Point>* scratch) {
   // Compute in decreasing dimensionality and return early, because
   // centroids of lower dimension do not count towards the final value
   // if the geography has mixed dimension.

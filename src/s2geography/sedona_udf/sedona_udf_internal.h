@@ -776,7 +776,7 @@ using StringInputView = ArrowInputView<std::string_view>;
 /// represent any GeoArrow type when supported by geoarrow-c.
 class GeoArrowGeographyInputView {
  public:
-  using c_type = GeoArrowGeography&;
+  using c_type = const GeoArrowGeography&;
 
   static bool Matches(const struct ArrowSchema* type) {
     struct GeoArrowSchemaView schema_view;
