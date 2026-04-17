@@ -891,7 +891,166 @@ INSTANTIATE_TEST_SUITE_P(
             // Longest line
             "LINESTRING (0 -90, 0 90)",
             // Closest Point
-            "POINT (0 -90)"}
+            "POINT (0 -90)"},
+
+        // GEOMETRYCOLLECTION tests
+        // These test cases exercise different fast paths in the distance
+        // implementation based on geometry type composition.
+
+        DistanceScalarScalarParam{
+            // GC (point + linestring, no polygon) x point
+            // Exercises brute force path for small geometries without polygons
+            "gc_no_polygon_distance_point",
+            "GEOMETRYCOLLECTION (POINT (5 5), LINESTRING (0 0, 0 1))",
+            "POINT (0 0)",
+            // Distance: point at (0,0) touches the linestring
+            0.0,
+            // Max distance: from POINT(5 5) to POINT(0 0)
+            785768.45419216133,
+            // Shortest line
+            "LINESTRING (0 0, 0 0)",
+            // Longest line
+            "LINESTRING (5 5, 0 0)",
+            // Closest Point
+            "POINT (0 0)"},
+        DistanceScalarScalarParam{
+            // Point x GC (point + linestring, no polygon)
+            // Exercises brute force path (reversed)
+            "point_distance_gc_no_polygon", "POINT (0 0)",
+            "GEOMETRYCOLLECTION (POINT (5 5), LINESTRING (0 0, 0 1))",
+            // Distance
+            0.0,
+            // Max distance
+            785768.45419216133,
+            // Shortest line
+            "LINESTRING (0 0, 0 0)",
+            // Longest line
+            "LINESTRING (0 0, 5 5)",
+            // Closest Point
+            "POINT (0 0)"},
+
+        DistanceScalarScalarParam{
+            // GC (with polygon) x point inside
+            // Exercises DistanceLineUsingShapeIndexAndPoint due to polygon
+            "gc_with_polygon_distance_point_inside",
+            "GEOMETRYCOLLECTION (POINT (5 5), POLYGON ((0 0, 2 0, 0 2, 0 0)))",
+            "POINT (0.25 0.25)",
+            // Distance: point is inside polygon
+            0.0,
+            // Max distance: from POINT(5 5) to POINT(0.25 0.25)
+            746455.18632442318,
+            // Shortest line
+            "LINESTRING (0.25 0.25, 0.25 0.25)",
+            // Longest line
+            "LINESTRING (5 5, 0.25 0.25)",
+            // Closest Point
+            "POINT (0.25 0.25)"},
+        DistanceScalarScalarParam{
+            // GC (with polygon) x point outside
+            // Uses index path due to polygon
+            "gc_with_polygon_distance_point_outside",
+            "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 0, 0 2, 0 "
+            "0)))",
+            "POINT (-1 0)",
+            // Distance: same as polygon_not_contains_close_point
+            111195.10117748393,
+            // Max distance: from POINT(30 30) to POINT(-1 0) (including polygon
+            // vertices)
+            4677959.9936393471,
+            // Shortest line
+            "LINESTRING (0 0, -1 0)",
+            // Longest line
+            "LINESTRING (30 30, -1 0)",
+            // Closest Point
+            "POINT (0 0)"},
+
+        DistanceScalarScalarParam{
+            // GC (point + linestring, no polygon) x linestring
+            // Exercises BothSmallWithoutPolygons brute force path
+            "gc_no_polygon_distance_linestring",
+            "GEOMETRYCOLLECTION (POINT (5 5), LINESTRING (0 0, 0 1))",
+            "LINESTRING (0 0.5, 1 0.5)",
+            // Distance: linestrings cross at (0, 0.5)
+            0.0,
+            // Max distance: from POINT(5 5) to linestring vertex (0 0.5)
+            747405.65220515686,
+            // Shortest line
+            "LINESTRING (0 0.5, 0 0.5)",
+            // Longest line
+            "LINESTRING (5 5, 0 0.5)",
+            // Closest Point
+            "POINT (0 0.5)"},
+
+        DistanceScalarScalarParam{
+            // GC (with polygon) x linestring inside
+            // Uses index due to polygon; linestring fully inside polygon
+            "gc_with_polygon_distance_linestring_inside",
+            "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 0, 0 2, 0 "
+            "0)))",
+            "LINESTRING (0.25 0.25, 0.5 0.5)",
+            // Distance: linestring inside polygon
+            0.0,
+            // Max distance: from POINT(30 30) to linestring vertex
+            4565335.4112626193,
+            // Shortest line
+            "LINESTRING (0.25 0.25, 0.25 0.25)",
+            // Longest line
+            "LINESTRING (30 30, 0.25 0.25)",
+            // Closest Point
+            "POINT (0.25 0.25)"},
+        DistanceScalarScalarParam{
+            // Linestring x GC (with polygon)
+            // Reversed: linestring fully outside polygon
+            "linestring_distance_gc_with_polygon_outside",
+            "LINESTRING (3 3, 4 4)",
+            "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 0, 0 2, 0 "
+            "0)))",
+            // Distance: same as linestring_distance_polygon_outside
+            314367.35908786188,
+            // Max distance: from LINESTRING(3 3) to POINT(30 30)
+            4134193.266520442,
+            // Shortest line
+            "LINESTRING (3 3, 0.998247 1.00221)",
+            // Longest line
+            "LINESTRING (3 3, 30 30)",
+            // Closest Point
+            "POINT (3 3)"},
+
+        DistanceScalarScalarParam{
+            // GC x GC (both with polygons, overlapping)
+            // Exercises full DistanceLineUsingShapeIndex path
+            "gc_distance_gc_overlapping",
+            "GEOMETRYCOLLECTION (POINT (5 5), POLYGON ((0 0, 2 0, 0 2, 0 0)))",
+            "GEOMETRYCOLLECTION (POINT (6 6), POLYGON ((0.5 0.5, 1.5 0.5, 0.5 "
+            "1.5, 0.5 0.5)))",
+            // Distance: polygons overlap
+            0.0,
+            // Max distance: from polygon vertex (0 0) to POINT(6 6)
+            942657.82524783083,
+            // Shortest line: interior touch point (reported at vertex from
+            // second GC point)
+            "LINESTRING (6 6, 6 6)",
+            // Longest line
+            "LINESTRING (0 0, 6 6)",
+            // Closest Point
+            "POINT (6 6)"},
+        DistanceScalarScalarParam{
+            // GC x GC (both with polygons, disjoint)
+            // Full index path with non-zero distance
+            "gc_distance_gc_disjoint",
+            "GEOMETRYCOLLECTION (POINT (0 0), POLYGON ((0 0, 1 0, 0 1, 0 0)))",
+            "GEOMETRYCOLLECTION (POINT (40 40), POLYGON ((30 30, 31 30, 30 31, "
+            "30 30)))",
+            // Distance: same as polygon_distance_polygon_outside
+            4520972.0955287321,
+            // Max distance: between POINT(0 0) and POINT(40 40)
+            6012101.3650370687,
+            // Shortest line
+            "LINESTRING (0 1, 30 30)",
+            // Longest line
+            "LINESTRING (0 0, 40 40)",
+            // Closest Point
+            "POINT (0 1)"}
 
         ),
     [](const ::testing::TestParamInfo<DistanceScalarScalarParam>& info) {

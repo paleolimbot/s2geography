@@ -118,7 +118,14 @@ INSTANTIATE_TEST_SUITE_P(
                                -180.0, 80.0, 180.0, 90.0},
         LatLngRectBounderParam{"triangle_south_pole",
                                "POLYGON ((0 -80, -120 -80, 120 -80, 0 -80))",
-                               -180.0, -90.0, 180.0, -80.0}
+                               -180.0, -90.0, 180.0, -80.0},
+
+        // GeometryCollection (bounds span all component geometries)
+        LatLngRectBounderParam{
+            "geometrycollection",
+            "GEOMETRYCOLLECTION (POINT (50 50), LINESTRING (0 0, 10 0), "
+            "POLYGON ((0 0, 10 0, 5 10, 0 0)))",
+            0.0, -4.1493099444912135e-14, 50.000000000000028, 50.0}
 
         ));
 

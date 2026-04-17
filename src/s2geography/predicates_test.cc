@@ -606,7 +606,92 @@ INSTANTIATE_TEST_SUITE_P(
         // Different number of edges
         ScalarScalarParam{"polygon_not_equals_edges_ne",
                           "POLYGON ((0 0, 1 0, 0 1, 0 0))", "equals",
-                          "POLYGON ((0 0, 2 0, 0 2, 0 1, 0 0))", false}
+                          "POLYGON ((0 0, 2 0, 0 2, 0 1, 0 0))", false},
+
+        // GEOMETRYCOLLECTION tests
+        // Intersects: GEOMETRYCOLLECTION with mixed types (point + linestring +
+        // polygon) vs point inside. Exercises brute force handling of all
+        // geometry types.
+        ScalarScalarParam{
+            "gc_intersects_point",
+            "GEOMETRYCOLLECTION (POINT (5 5), LINESTRING (0 0, 1 0), "
+            "POLYGON ((0 0, 2 0, 0 2, 0 0)))",
+            "intersects", "POINT (0.25 0.25)", true},
+        // Intersects: point in GEOMETRYCOLLECTION matches standalone point
+        ScalarScalarParam{
+            "point_intersects_gc_point", "POINT (5 5)", "intersects",
+            "GEOMETRYCOLLECTION (POINT (5 5), LINESTRING (10 10, 11 10))",
+            true},
+
+        ScalarScalarParam{
+            // Intersects: linestring crosses polygon in GEOMETRYCOLLECTION
+            "linestring_intersects_gc_polygon", "LINESTRING (0.25 0.25, 3 3)",
+            "intersects",
+            "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 "
+            "0, 0 2, 0 0)))",
+            true},
+        // Intersects: GEOMETRYCOLLECTION vs GEOMETRYCOLLECTION (brute force
+        // path, both have mixed types)
+        ScalarScalarParam{
+            "gc_intersects_gc",
+            "GEOMETRYCOLLECTION (POINT (0.5 0.5), LINESTRING (0 0, 1 0))",
+            "intersects",
+            "GEOMETRYCOLLECTION (POINT (30 30), LINESTRING (0 0, 0 1))", true},
+        // Intersects: disjoint GEOMETRYCOLLECTIONs
+        ScalarScalarParam{
+            "gc_not_intersects_gc",
+            "GEOMETRYCOLLECTION (POINT (0 0), LINESTRING (1 1, 2 2))",
+            "intersects",
+            "GEOMETRYCOLLECTION (POINT (30 30), LINESTRING (40 40, 41 41))",
+            false},
+
+        // Contains: polygon in GEOMETRYCOLLECTION contains point (exercises
+        // brute force with dimension() == 2 from the polygon component)
+        ScalarScalarParam{
+            "gc_contains_point",
+            "GEOMETRYCOLLECTION (POINT (30 30), LINESTRING (40 40, 41 40), "
+            "POLYGON ((0 0, 2 0, 0 2, 0 0)))",
+            "contains", "POINT (0.25 0.25)", true},
+        // Contains: polygon in GEOMETRYCOLLECTION contains interior linestring
+        ScalarScalarParam{"gc_contains_linestring",
+                          "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 "
+                          "0, 0 2, 0 0)))",
+                          "contains", "LINESTRING (0.25 0.25, 0.5 0.5)", true},
+        // Contains: polygon contains GEOMETRYCOLLECTION with point + linestring
+        // (exercises SemiBruteForceIndexedContains with mixed containee)
+        ScalarScalarParam{
+            "polygon_contains_gc", "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
+            "GEOMETRYCOLLECTION (POINT (0.25 0.25), LINESTRING (0.3 0.3, 0.4 "
+            "0.4))",
+            true},
+        // Contains: polygon does not contain GEOMETRYCOLLECTION (point outside)
+        ScalarScalarParam{
+            "polygon_not_contains_gc_point_outside",
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))", "contains",
+            "GEOMETRYCOLLECTION (POINT (30 30), LINESTRING (0.3 0.3, 0.4 0.4))",
+            false},
+        // Contains: GEOMETRYCOLLECTION does not contain polygon that crosses
+        // boundary
+        ScalarScalarParam{"gc_not_contains_crossing_polygon",
+                          "GEOMETRYCOLLECTION (POINT (30 30), POLYGON ((0 0, 2 "
+                          "0, 0 2, 0 0)))",
+                          "contains",
+                          "POLYGON ((0.1 0.1, 3 0.1, 0.1 3, 0.1 0.1))", false},
+
+        // Equals: GEOMETRYCOLLECTION equals itself (identity fast path)
+        ScalarScalarParam{
+            "gc_equals_gc_identical",
+            "GEOMETRYCOLLECTION (POINT (0 0), LINESTRING (1 1, 2 2))", "equals",
+            "GEOMETRYCOLLECTION (POINT (0 0), LINESTRING (1 1, 2 2))", true},
+        // Equals: different GEOMETRYCOLLECTIONs
+        ScalarScalarParam{
+            "gc_not_equals_gc",
+            "GEOMETRYCOLLECTION (POINT (0 0), LINESTRING (1 1, 2 2))", "equals",
+            "GEOMETRYCOLLECTION (POINT (0 0), LINESTRING (1 1, 3 3))", false},
+        // Equals: GEOMETRYCOLLECTION vs simple geometry
+        ScalarScalarParam{"gc_not_equals_point",
+                          "GEOMETRYCOLLECTION (POINT (0 0))", "equals",
+                          "POINT (0 0)", true}
 
         ),
     [](const ::testing::TestParamInfo<ScalarScalarParam>& info) {

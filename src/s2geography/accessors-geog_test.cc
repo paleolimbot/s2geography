@@ -192,7 +192,14 @@ INSTANTIATE_TEST_SUITE_P(
             "polygon_with_hole",
             "POLYGON ((0 0, 0 2, 2 0, 0 0), (0.1 0.1, 0.1 0.5, 0.5 "
             "0.1, 0.1 0.1))",
-            23744568445.094166}
+            23744568445.094166},
+
+        // GeometryCollection (area from polygon only)
+        UnaryDoubleScalarParam{
+            "geometrycollection",
+            "GEOMETRYCOLLECTION (POINT (5 5), LINESTRING (0 0, 0 1), "
+            "POLYGON ((0 0, 0 1, 1 0, 0 0)))",
+            6182489130.9071951}
 
         ),
     [](const ::testing::TestParamInfo<UnaryDoubleScalarParam>& info) {
@@ -236,7 +243,14 @@ INSTANTIATE_TEST_SUITE_P(
         UnaryDoubleScalarParam{"triangle", "POLYGON ((0 0, 0 1, 1 0, 0 0))",
                                0.0},
         UnaryDoubleScalarParam{"square", "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))",
-                               0.0}
+                               0.0},
+
+        // GeometryCollection (length from linestring only)
+        UnaryDoubleScalarParam{
+            "geometrycollection",
+            "GEOMETRYCOLLECTION (POINT (5 5), LINESTRING (0 0, 0 1), "
+            "POLYGON ((0 0, 0 1, 1 0, 0 0)))",
+            111195.10117748393}
 
         ),
     [](const ::testing::TestParamInfo<UnaryDoubleScalarParam>& info) {
@@ -286,7 +300,14 @@ INSTANTIATE_TEST_SUITE_P(
             "polygon_with_hole",
             "POLYGON ((0 0, 0 2, 2 0, 0 0), (0.1 0.1, 0.1 0.5, 0.5 0.1, 0.1 "
             "0.1))",
-            911112.66968130425}
+            911112.66968130425},
+
+        // GeometryCollection (perimeter from polygon only)
+        UnaryDoubleScalarParam{
+            "geometrycollection",
+            "GEOMETRYCOLLECTION (POINT (5 5), LINESTRING (0 0, 0 1), "
+            "POLYGON ((0 0, 0 1, 1 0, 0 0)))",
+            379639.83044747578}
 
         ),
     [](const ::testing::TestParamInfo<UnaryDoubleScalarParam>& info) {
@@ -451,7 +472,14 @@ INSTANTIATE_TEST_SUITE_P(
             "POLYGON ZM ((0 0 10 20, 0 2 10 20, 2 0 10 20, 0 0 "
             "10 20), (0.1 0.1 11 21, 0.1 0.5 11 21, 0.5 "
             "0.1 11 21, 0.1 0.1 11 21))",
-            "POINT ZM (0.684859 0.68481 10.038454 20.038454)"}
+            "POINT ZM (0.684859 0.68481 10.038454 20.038454)"},
+
+        // GeometryCollection (centroid weighted by all components)
+        UnaryGeographyScalarParam{
+            "geometrycollection",
+            "GEOMETRYCOLLECTION (POINT (5 5), LINESTRING (0 0, 0 1), "
+            "POLYGON ((0 0, 0 1, 1 0, 0 0)))",
+            "POINT (0.33335 0.333344)"}
 
         ),
     [](const ::testing::TestParamInfo<UnaryGeographyScalarParam>& info) {
@@ -511,7 +539,14 @@ INSTANTIATE_TEST_SUITE_P(
             "multipolygon_with_hole",
             "MULTIPOLYGON (((0 0, 0 2, 2 0, 0 0), (0.1 0.1, 0.1 0.5, "
             "0.5 0.1, 0.1 0.1)), ((10 10, 10 11, 11 10, 10 10)))",
-            "POLYGON ((0 0, 2 0, 11 10, 10 11, 0 2, 0 0))"}
+            "POLYGON ((0 0, 2 0, 11 10, 10 11, 0 2, 0 0))"},
+
+        // GeometryCollection (convex hull of all vertices)
+        UnaryGeographyScalarParam{
+            "geometrycollection",
+            "GEOMETRYCOLLECTION (POINT (5 5), LINESTRING (0 0, 0 1), "
+            "POLYGON ((0 0, 0 1, 1 0, 0 0)))",
+            "POLYGON ((0 0, 1 0, 5 5, 0 1, 0 0))"}
 
         ),
     [](const ::testing::TestParamInfo<UnaryGeographyScalarParam>& info) {
@@ -580,6 +615,13 @@ INSTANTIATE_TEST_SUITE_P(
             "multipolygon",
             "MULTIPOLYGON (((0 0, 0 1, 1 0, 0 0)), ((10 10, 10 11, "
             "11 10, 10 10)))",
+            "POINT (0.224466 0.224464)"},
+
+        // GeometryCollection (point on one of the surfaces)
+        UnaryGeographyScalarParam{
+            "geometrycollection",
+            "GEOMETRYCOLLECTION (POINT (5 5), LINESTRING (0 0, 0 1), "
+            "POLYGON ((0 0, 0 1, 1 0, 0 0)))",
             "POINT (0.224466 0.224464)"}
 
         ),

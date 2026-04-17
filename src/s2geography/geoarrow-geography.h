@@ -468,6 +468,7 @@ class GeoArrowGeography {
   GeoArrowPointShape points_;
   GeoArrowLaxPolylineShape lines_;
   GeoArrowLaxPolygonShape polygons_;
+  std::vector<struct GeoArrowGeometryNode> collection_nodes_;
   mutable MutableS2ShapeIndex index_;
   mutable std::vector<S2CellId> covering_;
   mutable std::mutex index_mutex_;

@@ -570,22 +570,28 @@ class GeoArrowGeom {
   /// \brief The number of nodes in this sequence
   int64_t size() const { return geom_.size_nodes; }
 
+  template <typename Visit>
+  bool VisitNodes(Visit&& visit) const {
+    return internal::VisitGeoArrowNodes(
+        geom_,
+        [&](const struct GeoArrowGeometryNode* node) { return visit(node); });
+  }
+
   /// \brief Visit sequences of coordinates
   ///
   /// Call a function of GeoArrowChain for each sequence (point or
   /// linestring) in this set of nodes. Other node types are ignored.
   template <typename Visit>
   bool VisitChains(Visit&& visit) const {
-    return internal::VisitGeoArrowNodes(
-        geom_, [&](const struct GeoArrowGeometryNode* node) {
-          switch (node->geometry_type) {
-            case GEOARROW_GEOMETRY_TYPE_POINT:
-            case GEOARROW_GEOMETRY_TYPE_LINESTRING:
-              return visit(GeoArrowChain(node));
-            default:
-              return true;
-          }
-        });
+    return VisitNodes([&](const struct GeoArrowGeometryNode* node) {
+      switch (node->geometry_type) {
+        case GEOARROW_GEOMETRY_TYPE_POINT:
+        case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+          return visit(GeoArrowChain(node));
+        default:
+          return true;
+      }
+    });
   }
 
   /// \brief Visit sequences of coordinates as GeoArrowLoop
@@ -597,17 +603,15 @@ class GeoArrowGeom {
   /// of loops).
   template <typename Visit>
   bool VisitLoops(std::vector<S2Point>* scratch, Visit&& visit) {
-    return internal::VisitGeoArrowNodes(
-        geom_, [&](const struct GeoArrowGeometryNode* node) {
-          switch (node->geometry_type) {
-            case GEOARROW_GEOMETRY_TYPE_LINESTRING:
-              return visit(
-                  GeoArrowLoop(node, scratch,
-                               node->flags & internal::kFlagS2GeographyIsHole));
-            default:
-              return true;
-          }
-        });
+    return VisitNodes([&](const struct GeoArrowGeometryNode* node) {
+      switch (node->geometry_type) {
+        case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+          return visit(GeoArrowLoop(
+              node, scratch, node->flags & internal::kFlagS2GeographyIsHole));
+        default:
+          return true;
+      }
+    });
   }
 
   /// \brief Call a function for each vertex in this node set
