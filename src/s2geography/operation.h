@@ -49,6 +49,15 @@ class Operation {
     throw Exception("Can't call " + name() + " with geog + geog");
   }
 
+  /// \brief Execute a function with two geographies and a double as input
+  virtual void ExecGeogGeogDouble(const GeoArrowGeography& arg0,
+                                  const GeoArrowGeography& arg1, double arg2) {
+    S2GEOGRAPHY_UNUSED(arg0);
+    S2GEOGRAPHY_UNUSED(arg1);
+    S2GEOGRAPHY_UNUSED(arg2);
+    throw Exception("Can't call " + name() + " with geog + geog + double");
+  }
+
   /// \brief Return true if the output of the last Exec call is non-null
   ///
   /// This is needed for functions that can return null even for non-null

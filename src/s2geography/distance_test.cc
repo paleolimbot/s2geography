@@ -282,6 +282,76 @@ TEST_P(DistanceScalarScalarTest, SedonaUdf) {
   }
 }
 
+TEST_P(DistanceScalarScalarTest, DistanceOperation) {
+  const auto& p = GetParam();
+
+  // Skip null tests for Operation (it doesn't handle nulls directly)
+  if (!p.lhs.has_value() || !p.rhs.has_value()) {
+    return;
+  }
+
+  // Create the DistanceWithin operation
+  std::unique_ptr<s2geography::Operation> distance_within =
+      s2geography::DistanceWithin();
+
+  // Check with all combinations of forcing an index build on arguments.
+  for (bool prepare_arg0 : {true, false}) {
+    for (bool prepare_arg1 : {true, false}) {
+      SCOPED_TRACE("prepare_arg0: " + std::to_string(prepare_arg0) +
+                   ", prepare_arg1: " + std::to_string(prepare_arg1));
+
+      // Create fresh geographies for each iteration
+      auto lhs_geom = TestGeometry::FromWKT(*p.lhs);
+      auto rhs_geom = TestGeometry::FromWKT(*p.rhs);
+
+      s2geography::GeoArrowGeography lhs_geog;
+      s2geography::GeoArrowGeography rhs_geog;
+      lhs_geog.Init(lhs_geom.geom());
+      rhs_geog.Init(rhs_geom.geom());
+
+      // Force index build if preparing
+      if (prepare_arg0) {
+        lhs_geog.ForceBuildIndex();
+      } else {
+        ASSERT_TRUE(lhs_geog.is_unindexed())
+            << "lhs geography should be unindexed when not preparing";
+      }
+
+      if (prepare_arg1) {
+        rhs_geog.ForceBuildIndex();
+      } else {
+        ASSERT_TRUE(rhs_geog.is_unindexed())
+            << "rhs geography should be unindexed when not preparing";
+      }
+
+      // Test with exact distance threshold (should return true for non-empty)
+      {
+        SCOPED_TRACE("DistanceWithin(exact_distance)");
+        double distance_threshold = p.expected.value_or(0.0);
+        distance_within->ExecGeogGeogDouble(lhs_geog, rhs_geog,
+                                            distance_threshold);
+        bool result = distance_within->GetInt() != 0;
+        // Expected: true if we have a non-null expected distance, false
+        // otherwise (e.g., distance between empties)
+        bool expected = p.expected.has_value();
+        EXPECT_EQ(result, expected);
+      }
+
+      // Test with distance slightly less than exact (should return false)
+      if (p.expected.has_value()) {
+        SCOPED_TRACE("DistanceWithin(exact_distance - eps)");
+        double distance_threshold = *p.expected;
+        double eps = std::max(1.0e-15, distance_threshold * 1e-15);
+        distance_threshold -= eps;
+        distance_within->ExecGeogGeogDouble(lhs_geog, rhs_geog,
+                                            distance_threshold);
+        bool result = distance_within->GetInt() != 0;
+        EXPECT_FALSE(result);
+      }
+    }
+  }
+}
+
 INSTANTIATE_TEST_SUITE_P(
     Distance, DistanceScalarScalarTest,
     ::testing::Values(

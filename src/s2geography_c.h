@@ -280,6 +280,10 @@ struct S2GeogOp;
 /// boolean
 #define S2GEOGRAPHY_OP_EQUALS 4
 
+/// \brief Compute the distance-within predicate between two geographies with a
+/// distance threshold, returning a boolean
+#define S2GEOGRAPHY_OP_DISTANCE_WITHIN 5
+
 #define S2GEOGRAPHY_OUTPUT_TYPE_BOOL 1
 
 /// \brief Create a new operator object
@@ -305,6 +309,16 @@ int S2GeogOpOutputType(const struct S2GeogOp* op);
 S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* arg0,
                                      const S2Geog* arg1,
                                      struct S2GeogError* err);
+
+/// \brief Evaluate an operation with two geographies and a double as input
+///
+/// \pre op != NULL
+/// \pre arg0 != NULL
+/// \pre arg1 != NULL
+S2GeogErrorCode S2GeogOpEvalGeogGeogDouble(struct S2GeogOp* op,
+                                           const S2Geog* arg0,
+                                           const S2Geog* arg1, double arg2,
+                                           struct S2GeogError* err);
 
 /// \brief Get integer or boolean output for this operation
 ///

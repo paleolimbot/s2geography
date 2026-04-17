@@ -362,3 +362,53 @@ INSTANTIATE_TEST_SUITE_P(
     [](const ::testing::TestParamInfo<BinaryPredicateParam>& info) {
       return info.param.name;
     });
+
+// ============================================================================
+// DistanceWithin Operation Test
+// ============================================================================
+
+TEST(S2GeographyC, DistanceWithinOperation) {
+  struct S2GeogFactory* factory = nullptr;
+  ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
+
+  struct S2Geog* lhs = nullptr;
+  struct S2Geog* rhs = nullptr;
+  ASSERT_EQ(S2GeogCreate(&lhs), S2GEOGRAPHY_OK);
+  ASSERT_EQ(S2GeogCreate(&rhs), S2GEOGRAPHY_OK);
+
+  struct S2GeogError* err = nullptr;
+  ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
+
+  // Points ~111km apart (1 degree latitude)
+  const char* lhs_wkt = "POINT (0 0)";
+  const char* rhs_wkt = "POINT (0 1)";
+  ASSERT_EQ(
+      S2GeogFactoryInitFromWkt(factory, lhs_wkt, strlen(lhs_wkt), lhs, err),
+      S2GEOGRAPHY_OK);
+  ASSERT_EQ(
+      S2GeogFactoryInitFromWkt(factory, rhs_wkt, strlen(rhs_wkt), rhs, err),
+      S2GEOGRAPHY_OK);
+
+  struct S2GeogOp* op = nullptr;
+  ASSERT_EQ(S2GeogOpCreate(&op, S2GEOGRAPHY_OP_DISTANCE_WITHIN),
+            S2GEOGRAPHY_OK);
+
+  ASSERT_STREQ(S2GeogOpName(op), "distance_within");
+  ASSERT_EQ(S2GeogOpOutputType(op), S2GEOGRAPHY_OUTPUT_TYPE_BOOL);
+
+  // Distance is ~111195 meters, so 200000 meters should return true
+  ASSERT_EQ(S2GeogOpEvalGeogGeogDouble(op, lhs, rhs, 200000.0, err),
+            S2GEOGRAPHY_OK);
+  EXPECT_EQ(S2GeogOpGetInt(op), 1);
+
+  // 50000 meters should return false
+  ASSERT_EQ(S2GeogOpEvalGeogGeogDouble(op, lhs, rhs, 50000.0, err),
+            S2GEOGRAPHY_OK);
+  EXPECT_EQ(S2GeogOpGetInt(op), 0);
+
+  S2GeogOpDestroy(op);
+  S2GeogErrorDestroy(err);
+  S2GeogDestroy(rhs);
+  S2GeogDestroy(lhs);
+  S2GeogFactoryDestroy(factory);
+}

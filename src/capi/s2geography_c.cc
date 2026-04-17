@@ -460,6 +460,9 @@ S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp** op, int op_id) {
     case S2GEOGRAPHY_OP_EQUALS:
       inner = s2geography::Equals();
       break;
+    case S2GEOGRAPHY_OP_DISTANCE_WITHIN:
+      inner = s2geography::DistanceWithin();
+      break;
     default:
       return ENOTSUP;
   }
@@ -496,6 +499,21 @@ S2GeogErrorCode S2GeogOpEvalGeogGeog(struct S2GeogOp* op, const S2Geog* arg0,
   S2GEOGRAPHY_DCHECK(arg1 != nullptr);
 
   op->op->ExecGeogGeog(arg0->geog, arg1->geog);
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(err);
+}
+
+S2GeogErrorCode S2GeogOpEvalGeogGeogDouble(struct S2GeogOp* op,
+                                           const S2Geog* arg0,
+                                           const S2Geog* arg1, double arg2,
+                                           struct S2GeogError* err) {
+  S2GEOGRAPHY_C_BEGIN(err);
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+  S2GEOGRAPHY_DCHECK(op->op != nullptr);
+  S2GEOGRAPHY_DCHECK(arg0 != nullptr);
+  S2GEOGRAPHY_DCHECK(arg1 != nullptr);
+
+  op->op->ExecGeogGeogDouble(arg0->geog, arg1->geog, arg2);
   return S2GEOGRAPHY_OK;
   S2GEOGRAPHY_C_END(err);
 }

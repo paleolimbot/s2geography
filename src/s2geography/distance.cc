@@ -12,6 +12,7 @@
 #include <type_traits>
 
 #include "s2geography/geography.h"
+#include "s2geography/operation.h"
 #include "s2geography/sedona_udf/sedona_udf_internal.h"
 
 namespace s2geography {
@@ -742,11 +743,12 @@ struct S2LongestLineExec {
   EdgePair edge_pair_;
 };
 
+template <typename Output>
 struct S2DistanceWithinExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
   using arg2_t = DoubleInputView;
-  using out_t = BoolOutputBuilder;
+  using out_t = Output;
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, arg2_t::c_type value2,
             out_t* out) {
@@ -783,7 +785,7 @@ void DistanceKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
 
 void DistanceWithinKernel(struct SedonaCScalarKernel* out,
                           bool prepare_arg0_scalar, bool prepare_arg1_scalar) {
-  InitTernaryKernel<S2DistanceWithinExec>(
+  InitTernaryKernel<S2DistanceWithinExec<BoolOutputBuilder>>(
       out, "st_dwithin", prepare_arg0_scalar, prepare_arg1_scalar);
 }
 
@@ -806,5 +808,38 @@ void ShortestLineKernel(struct SedonaCScalarKernel* out,
 }
 
 }  // namespace sedona_udf
+
+struct StashedBoolOutput {
+  void Append(bool value) { *out_ = value; }
+  bool* out_;
+};
+
+class DistanceWithinOperation : public Operation {
+ public:
+  DistanceWithinOperation() : name_("distance_within") {}
+
+  const std::string& name() const override { return name_; }
+
+  OutputType output_type() const override {
+    return Operation::OutputType::kBool;
+  }
+
+  void ExecGeogGeogDouble(const GeoArrowGeography& arg0,
+                          const GeoArrowGeography& arg1,
+                          double distance_meters) override {
+    StashedBoolOutput out{&result_};
+    exec_.Exec(arg0, arg1, distance_meters, &out);
+    int_result_ = result_ ? 1 : 0;
+  }
+
+ private:
+  std::string name_;
+  bool result_{};
+  sedona_udf::S2DistanceWithinExec<StashedBoolOutput> exec_;
+};
+
+std::unique_ptr<Operation> DistanceWithin() {
+  return std::make_unique<DistanceWithinOperation>();
+}
 
 }  // namespace s2geography
