@@ -481,7 +481,8 @@ class GeoArrowGeography {
   size_t MemUsed() {
     size_t mem = sizeof(GeoArrowGeography) + points_.MemUsed();
     if (lines_) mem += sizeof(GeoArrowLaxPolylineShape) + lines_->MemUsed();
-    if (polygons_) mem += sizeof(GeoArrowLaxPolygonShape) + polygons_->MemUsed();
+    if (polygons_)
+      mem += sizeof(GeoArrowLaxPolygonShape) + polygons_->MemUsed();
     mem += collection_nodes_.capacity() * sizeof(struct GeoArrowGeometryNode);
     mem += covering_.capacity() * sizeof(S2CellId);
     if (index_) mem += index_->SpaceUsed();

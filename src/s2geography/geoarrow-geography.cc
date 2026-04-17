@@ -795,7 +795,8 @@ std::unique_ptr<S2Region> GeoArrowGeography::Region() const {
   }
 
   InitIndex();
-  return std::make_unique<S2ShapeIndexRegion<MutableS2ShapeIndex>>(index_.get());
+  return std::make_unique<S2ShapeIndexRegion<MutableS2ShapeIndex>>(
+      index_.get());
 }
 
 void GeoArrowGeography::InitIndex() const {
