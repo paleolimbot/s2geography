@@ -671,10 +671,12 @@ uint8_t GeoArrowGeography::dimensions() const {
       return points_.dimensions();
     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
     case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
-      return lines_ ? lines_->dimensions() : GEOARROW_DIMENSIONS_XY;
+      return lines_ ? lines_->dimensions()
+                    : static_cast<uint8_t>(GEOARROW_DIMENSIONS_XY);
     case GEOARROW_GEOMETRY_TYPE_POLYGON:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
-      return polygons_ ? polygons_->dimensions() : GEOARROW_DIMENSIONS_XY;
+      return polygons_ ? polygons_->dimensions()
+                       : static_cast<uint8_t>(GEOARROW_DIMENSIONS_XY);
     default:
       return geom_.root->dimensions;
   }
