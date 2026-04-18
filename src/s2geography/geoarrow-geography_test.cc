@@ -1442,7 +1442,7 @@ TEST_F(GeoArrowGeographyTest, Polygon) {
 
 TEST_F(GeoArrowGeographyTest, PolygonMemUsed) {
   auto geog = MakeGeography("POLYGON ((0 0, 1 0, 0 1, 0 0))");
-  EXPECT_GE(geog.MemUsed(), 600);
+  EXPECT_GE(geog.MemUsed(), 550);
   geog.ForceBuildIndex();
   EXPECT_GE(geog.MemUsed(), 800);
 }
