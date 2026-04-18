@@ -111,6 +111,14 @@ S2GeogErrorCode S2GeogCreate(struct S2Geog** geog);
 S2GeogErrorCode S2GeogForcePrepare(struct S2Geog* geog,
                                    struct S2GeogError* err);
 
+/// \brief Return the memory used by a geography object
+///
+/// This returns the total memory footprint including sizeof(S2Geog), internal
+/// shape allocations, index memory, and owned coordinate buffers.
+///
+/// \pre geog != NULL
+size_t S2GeogMemUsed(struct S2Geog* geog);
+
 /// \brief Destroy a geography object
 ///
 /// \pre geog != NULL

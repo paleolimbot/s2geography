@@ -6,6 +6,7 @@
 #include <s2/s2shape_index.h>
 
 #include <atomic>
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -89,6 +90,9 @@ class GeoArrowPointShape : public S2Shape {
   /// \brief Extract a native edge within a chain
   internal::GeoArrowEdge native_chain_edge(int i, int j) const;
 
+  /// \brief Return the extra memory used by this instance beyond size_of()
+  size_t MemUsed() { return 0; }
+
  private:
   GeoArrowGeom geom_;
   uint8_t dimensions_{GEOARROW_DIMENSIONS_XY};
@@ -147,6 +151,9 @@ class GeoArrowLaxPolylineShape : public S2Shape {
 
   /// \brief Extract a native edge within a chain
   internal::GeoArrowEdge native_chain_edge(int i, int j) const;
+
+  /// \brief Return the extra memory used by this instance beyond size_of()
+  size_t MemUsed() { return num_edges_.capacity() * sizeof(int); }
 
  private:
   GeoArrowGeom geom_{};
@@ -252,6 +259,13 @@ class GeoArrowLaxPolygonShape : public S2Shape {
   bool BruteForceContains(const S2Point& pt,
                           const S2Shape::ReferencePoint& reference) const;
 
+  /// \brief Return the extra memory used by this instance beyond size_of()
+  size_t MemUsed() {
+    return num_edges_.capacity() * sizeof(int) +
+           loops_.capacity() * sizeof(struct GeoArrowGeometryNode) +
+           point_scratch_.capacity() * sizeof(struct GeoArrowGeometryNode);
+  }
+
  private:
   GeoArrowGeom geom_{};
   int num_loops_{};
@@ -322,7 +336,7 @@ class GeoArrowGeography {
   /// \brief Return true if the internal index has not yet been built
   bool is_unindexed() const {
     if (indexed_.load(std::memory_order_acquire)) {
-      return !index_.is_fresh();
+      return !index_ || !index_->is_fresh();
     } else {
       return true;
     }
@@ -331,7 +345,7 @@ class GeoArrowGeography {
   /// \brief Force building the internal index
   void ForceBuildIndex() {
     InitIndex();
-    index_.ForceBuild();
+    if (index_) index_->ForceBuild();
   }
 
   /// \brief If this geography represents a single point, compute and return it
@@ -463,13 +477,25 @@ class GeoArrowGeography {
   /// for an edge.
   internal::GeoArrowEdge native_edge(int shape_id, int edge_id) const;
 
+  /// \brief Return the memory used by this instance
+  size_t MemUsed() {
+    size_t mem = sizeof(GeoArrowGeography) + points_.MemUsed();
+    if (lines_) mem += sizeof(GeoArrowLaxPolylineShape) + lines_->MemUsed();
+    if (polygons_)
+      mem += sizeof(GeoArrowLaxPolygonShape) + polygons_->MemUsed();
+    mem += collection_nodes_.capacity() * sizeof(struct GeoArrowGeometryNode);
+    mem += covering_.capacity() * sizeof(S2CellId);
+    if (index_) mem += index_->SpaceUsed();
+    return mem;
+  }
+
  private:
   struct GeoArrowGeometryView geom_{};
   GeoArrowPointShape points_;
-  GeoArrowLaxPolylineShape lines_;
-  GeoArrowLaxPolygonShape polygons_;
+  std::unique_ptr<GeoArrowLaxPolylineShape> lines_;
+  std::unique_ptr<GeoArrowLaxPolygonShape> polygons_;
   std::vector<struct GeoArrowGeometryNode> collection_nodes_;
-  mutable MutableS2ShapeIndex index_;
+  mutable std::unique_ptr<MutableS2ShapeIndex> index_;
   mutable std::vector<S2CellId> covering_;
   mutable std::mutex index_mutex_;
   mutable std::atomic<bool> indexed_{false};

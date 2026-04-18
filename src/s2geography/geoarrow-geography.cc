@@ -442,11 +442,12 @@ GeoArrowGeography::GeoArrowGeography(GeoArrowGeography&& other)
       lines_(std::move(other.lines_)),
       polygons_(std::move(other.polygons_)),
       collection_nodes_(std::move(other.collection_nodes_)),
-      index_(),
+      index_(std::move(other.index_)),
       covering_(std::move(other.covering_)) {
-  // index_ needs to be rebuilt
-  index_.Clear();
-  indexed_.store(false, std::memory_order_relaxed);
+  // Reset other's indexed_ flag since we took ownership of its index
+  other.indexed_.store(false, std::memory_order_relaxed);
+  indexed_.store(other.indexed_.load(std::memory_order_relaxed),
+                 std::memory_order_relaxed);
 }
 
 GeoArrowGeography& GeoArrowGeography::operator=(GeoArrowGeography&& other) {
@@ -456,24 +457,27 @@ GeoArrowGeography& GeoArrowGeography::operator=(GeoArrowGeography&& other) {
     lines_ = std::move(other.lines_);
     polygons_ = std::move(other.polygons_);
     collection_nodes_ = std::move(other.collection_nodes_);
+    index_ = std::move(other.index_);
     covering_ = std::move(other.covering_);
-    // index_ needs to be rebuilt
-    index_.Clear();
-    indexed_.store(false, std::memory_order_relaxed);
+    indexed_.store(other.indexed_.load(std::memory_order_relaxed),
+                   std::memory_order_relaxed);
+    other.indexed_.store(false, std::memory_order_relaxed);
   }
   return *this;
 }
 
 void GeoArrowGeography::Init(struct GeoArrowGeometryView geom) {
   InitOriented(geom);
-  polygons_.NormalizeOrientation();
+  if (polygons_) {
+    polygons_->NormalizeOrientation();
+  }
 }
 
 void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
   points_.Clear();
-  lines_.Clear();
-  polygons_.Clear();
-  index_.Clear();
+  if (lines_) lines_->Clear();
+  if (polygons_) polygons_->Clear();
+  if (index_) index_->Clear();
   covering_.clear();
   indexed_.store(false, std::memory_order_relaxed);
   geom_ = geom;
@@ -490,12 +494,14 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
 
     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
     case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
-      lines_.Init(geom);
+      if (!lines_) lines_ = std::make_unique<GeoArrowLaxPolylineShape>();
+      lines_->Init(geom);
       break;
 
     case GEOARROW_GEOMETRY_TYPE_POLYGON:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
-      polygons_.Init(geom);
+      if (!polygons_) polygons_ = std::make_unique<GeoArrowLaxPolygonShape>();
+      polygons_->Init(geom);
       break;
 
     case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION: {
@@ -566,11 +572,13 @@ void GeoArrowGeography::InitOriented(struct GeoArrowGeometryView geom) {
       points_.Init(
           {collection_nodes_.data(), static_cast<int64_t>(points.size() + 1)});
       int64_t offset = static_cast<int64_t>(points.size() + 1);
-      lines_.Init({collection_nodes_.data() + offset,
-                   static_cast<int64_t>(lines.size() + 1)});
+      if (!lines_) lines_ = std::make_unique<GeoArrowLaxPolylineShape>();
+      lines_->Init({collection_nodes_.data() + offset,
+                    static_cast<int64_t>(lines.size() + 1)});
       offset += static_cast<int64_t>(lines.size() + 1);
-      polygons_.Init({collection_nodes_.data() + offset,
-                      static_cast<int64_t>(polygons.size() + 1)});
+      if (!polygons_) polygons_ = std::make_unique<GeoArrowLaxPolygonShape>();
+      polygons_->Init({collection_nodes_.data() + offset,
+                       static_cast<int64_t>(polygons.size() + 1)});
       break;
     }
 
@@ -588,7 +596,15 @@ const std::vector<S2CellId>& GeoArrowGeography::Covering() const {
 
 const S2ShapeIndex& GeoArrowGeography::ShapeIndex() const {
   InitIndex();
-  return index_;
+  // For empty geometries, InitIndex() may not create an index, but we still
+  // need to return a valid reference. Lazily create an empty index.
+  if (!index_) {
+    std::lock_guard<std::mutex> lock(index_mutex_);
+    if (!index_) {
+      index_ = std::make_unique<MutableS2ShapeIndex>();
+    }
+  }
+  return *index_;
 }
 
 bool GeoArrowGeography::is_empty() const {
@@ -602,10 +618,10 @@ bool GeoArrowGeography::is_empty() const {
       return points_.is_empty();
     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
     case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
-      return lines_.is_empty();
+      return !lines_ || lines_->is_empty();
     case GEOARROW_GEOMETRY_TYPE_POLYGON:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
-      return polygons_.is_empty();
+      return !polygons_ || polygons_->is_empty();
     default:
       for (int i = 0; i < num_shapes(); ++i) {
         if (!Shape(i)->is_empty()) {
@@ -655,10 +671,12 @@ uint8_t GeoArrowGeography::dimensions() const {
       return points_.dimensions();
     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
     case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
-      return lines_.dimensions();
+      return lines_ ? lines_->dimensions()
+                    : static_cast<uint8_t>(GEOARROW_DIMENSIONS_XY);
     case GEOARROW_GEOMETRY_TYPE_POLYGON:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
-      return polygons_.dimensions();
+      return polygons_ ? polygons_->dimensions()
+                       : static_cast<uint8_t>(GEOARROW_DIMENSIONS_XY);
     default:
       return geom_.root->dimensions;
   }
@@ -685,11 +703,11 @@ int GeoArrowGeography::dimension() const {
 }
 
 int GeoArrowGeography::max_dimension() const {
-  if (!polygons_.is_empty()) {
+  if (polygons_ && !polygons_->is_empty()) {
     return 2;
   }
 
-  if (!lines_.is_empty()) {
+  if (lines_ && !lines_->is_empty()) {
     return 1;
   }
 
@@ -703,15 +721,22 @@ int GeoArrowGeography::max_dimension() const {
 }
 
 int GeoArrowGeography::num_edges() const {
-  return points_.num_edges() + lines_.num_edges() + polygons_.num_edges();
+  int edges = points_.num_edges();
+  if (lines_) edges += lines_->num_edges();
+  if (polygons_) edges += polygons_->num_edges();
+  return edges;
 }
+
+// Static empty shapes for returning from accessors when shapes aren't allocated
+static const GeoArrowLaxPolylineShape kEmptyPolylineShape;
+static const GeoArrowLaxPolygonShape kEmptyPolygonShape;
 
 const GeoArrowPointShape* GeoArrowGeography::points() const { return &points_; }
 const GeoArrowLaxPolylineShape* GeoArrowGeography::lines() const {
-  return &lines_;
+  return lines_ ? lines_.get() : &kEmptyPolylineShape;
 }
 const GeoArrowLaxPolygonShape* GeoArrowGeography::polygons() const {
-  return &polygons_;
+  return polygons_ ? polygons_.get() : &kEmptyPolygonShape;
 }
 
 int GeoArrowGeography::num_shapes() const {
@@ -743,20 +768,20 @@ const S2Shape* GeoArrowGeography::Shape(int id) const {
 
     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
     case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
-      return &lines_;
+      return lines_.get();
 
     case GEOARROW_GEOMETRY_TYPE_POLYGON:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
-      return &polygons_;
+      return polygons_.get();
 
     case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
       switch (id) {
         case 0:
           return &points_;
         case 1:
-          return &lines_;
+          return lines_.get();
         case 2:
-          return &polygons_;
+          return polygons_.get();
         default:
           throw Exception("GeometryCollection shape ids must be 0, 1, or 2");
       }
@@ -772,7 +797,8 @@ std::unique_ptr<S2Region> GeoArrowGeography::Region() const {
   }
 
   InitIndex();
-  return std::make_unique<S2ShapeIndexRegion<MutableS2ShapeIndex>>(&index_);
+  return std::make_unique<S2ShapeIndexRegion<MutableS2ShapeIndex>>(
+      index_.get());
 }
 
 void GeoArrowGeography::InitIndex() const {
@@ -789,23 +815,28 @@ void GeoArrowGeography::InitIndex() const {
     return;
   }
 
+  // Lazily allocate the index
+  if (!index_) {
+    index_ = std::make_unique<MutableS2ShapeIndex>();
+  }
+
   switch (geom_.root->geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
-      index_.Add(std::make_unique<S2ShapeWrapper>(&points_));
+      index_->Add(std::make_unique<S2ShapeWrapper>(&points_));
       break;
     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
     case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
-      index_.Add(std::make_unique<S2ShapeWrapper>(&lines_));
+      index_->Add(std::make_unique<S2ShapeWrapper>(lines_.get()));
       break;
     case GEOARROW_GEOMETRY_TYPE_POLYGON:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
-      index_.Add(std::make_unique<S2ShapeWrapper>(&polygons_));
+      index_->Add(std::make_unique<S2ShapeWrapper>(polygons_.get()));
       break;
     case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
-      index_.Add(std::make_unique<S2ShapeWrapper>(&points_));
-      index_.Add(std::make_unique<S2ShapeWrapper>(&lines_));
-      index_.Add(std::make_unique<S2ShapeWrapper>(&polygons_));
+      index_->Add(std::make_unique<S2ShapeWrapper>(&points_));
+      index_->Add(std::make_unique<S2ShapeWrapper>(lines_.get()));
+      index_->Add(std::make_unique<S2ShapeWrapper>(polygons_.get()));
       break;
     default:
       throw Exception(
@@ -829,7 +860,7 @@ void GeoArrowGeography::InitIndex() const {
         [[fallthrough]];
       default: {
         S2RegionCoverer coverer;
-        S2ShapeIndexRegion<MutableS2ShapeIndex> region(&index_);
+        S2ShapeIndexRegion<MutableS2ShapeIndex> region(index_.get());
         coverer.GetFastCovering(region, &covering_);
         break;
       }
@@ -864,11 +895,12 @@ std::pair<int, int> GeoArrowGeography::ResolveGlobalEdgeId(
   }
 
   global_edge_id -= points_.num_edges();
-  if (global_edge_id < lines_.num_edges()) {
+  int lines_num_edges = lines_ ? lines_->num_edges() : 0;
+  if (global_edge_id < lines_num_edges) {
     return std::make_pair(1, global_edge_id);
   }
 
-  global_edge_id -= lines_.num_edges();
+  global_edge_id -= lines_num_edges;
   return std::make_pair(2, global_edge_id);
 }
 
@@ -881,18 +913,18 @@ internal::GeoArrowEdge GeoArrowGeography::native_edge(int shape_id,
       return points_.native_edge(edge_id);
     case GEOARROW_GEOMETRY_TYPE_LINESTRING:
     case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
-      return lines_.native_edge(edge_id);
+      return lines_->native_edge(edge_id);
     case GEOARROW_GEOMETRY_TYPE_POLYGON:
     case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
-      return polygons_.native_edge(edge_id);
+      return polygons_->native_edge(edge_id);
     case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
       switch (shape_id) {
         case 0:
           return points_.native_edge(edge_id);
         case 1:
-          return lines_.native_edge(edge_id);
+          return lines_->native_edge(edge_id);
         case 2:
-          return polygons_.native_edge(edge_id);
+          return polygons_->native_edge(edge_id);
         default:
           throw Exception("shape index out of bounds");
       }

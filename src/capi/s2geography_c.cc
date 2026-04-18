@@ -260,6 +260,15 @@ S2GeogErrorCode S2GeogForcePrepare(struct S2Geog* geog,
   S2GEOGRAPHY_C_END(err);
 }
 
+size_t S2GeogMemUsed(struct S2Geog* geog) {
+  S2GEOGRAPHY_DCHECK(geog != nullptr);
+  size_t mem = 0;
+  mem += geog->geog.MemUsed();
+  mem += sizeof(struct GeoArrowGeometry);
+  mem += geog->geom.capacity_nodes * sizeof(struct GeoArrowGeometryNode);
+  return mem;
+}
+
 void S2GeogDestroy(struct S2Geog* geog) {
   S2GEOGRAPHY_DCHECK(geog != nullptr);
   delete geog;
