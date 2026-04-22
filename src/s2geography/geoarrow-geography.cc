@@ -942,8 +942,8 @@ GeoArrowVertex GeoArrowEdge::Interpolate(double fraction) {
     return v1;
   }
 
-  S2Point pt0 = S2LatLng::FromDegrees(v0.lat, v0.lng).ToPoint();
-  S2Point pt1 = S2LatLng::FromDegrees(v1.lat, v1.lng).ToPoint();
+  S2Point pt0 = v0.ToPoint();
+  S2Point pt1 = v1.ToPoint();
   if (pt0 == pt1) {
     return v0;
   }
@@ -957,8 +957,8 @@ GeoArrowVertex GeoArrowEdge::Interpolate(double fraction) {
 }
 
 GeoArrowVertex GeoArrowEdge::Interpolate(const S2Point& point) {
-  auto pt0 = S2LatLng::FromDegrees(v0.lat, v0.lng).ToPoint();
-  auto pt1 = S2LatLng::FromDegrees(v1.lat, v1.lng).ToPoint();
+  S2Point pt0 = v0.ToPoint();
+  S2Point pt1 = v1.ToPoint();
 
   // If the start and end are the same in lon/lat space, return the first vertex
   if (pt0 == pt1) {

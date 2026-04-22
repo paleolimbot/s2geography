@@ -25,6 +25,21 @@ namespace internal {
 static constexpr uint8_t kFlagS2GeographyIsHole =
     (static_cast<uint8_t>(1) << 7);
 
+/// Convert a longitude and latitude to an S2Point
+///
+/// S2LatLng::ToPoint() has debug checks that lng and lat are within the
+/// [-180, -90, 180, 90] range; however, we don't strictly require the
+/// longitudes to be within this range and latitudes outside this range are
+/// undefined behaviour.
+///
+/// A note that this function can be a bottleneck when an operation hasn't
+/// effectively used an index or cached the resulting point sequence.
+inline S2Point LngLatToPoint(double lng, double lat) {
+  const S1Angle::SinCosPair phi = S1Angle::Degrees(lat).SinCos();
+  const S1Angle::SinCosPair theta = S1Angle::Degrees(lng).SinCos();
+  return S2Point(theta.cos * phi.cos, theta.sin * phi.cos, phi.sin);
+}
+
 /// \brief Visit "nodes" of a GeoArrowGeometryView
 ///
 /// Briefly, a GeoArrowGeometryNode is either a sequence (if geometry_type
@@ -129,7 +144,7 @@ struct GeoArrowVertex {
   }
 
   /// \brief Return the S2Point representation of this vertex
-  S2Point ToPoint() const { return S2LatLng::FromDegrees(lat, lng).ToPoint(); }
+  S2Point ToPoint() const { return LngLatToPoint(lng, lat); }
 
   /// \brief Normalize the order of zm values such that this object
   /// always represents, x, y, z, and m (in that order)
@@ -265,7 +280,7 @@ template <typename Visit>
 bool VisitVertices(const struct GeoArrowGeometryNode* node, int64_t offset,
                    int64_t n, Visit&& visit) {
   return VisitLngLat(node, offset, n, [&](double lng0, double lat0) {
-    return visit(S2LatLng::FromDegrees(lat0, lng0).ToPoint());
+    return visit(LngLatToPoint(lng0, lat0));
   });
 }
 
@@ -273,7 +288,7 @@ bool VisitVertices(const struct GeoArrowGeometryNode* node, int64_t offset,
 template <typename Visit>
 bool VisitVertices(const struct GeoArrowGeometryNode* node, Visit&& visit) {
   return VisitLngLat(node, 0, node->size, [&](double lng0, double lat0) {
-    return visit(S2LatLng::FromDegrees(lat0, lng0).ToPoint());
+    return visit(LngLatToPoint(lng0, lat0));
   });
 }
 
