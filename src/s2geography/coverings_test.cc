@@ -169,6 +169,27 @@ TEST(LatLngRectBounderTest, AccumulatesBounds) {
   EXPECT_DOUBLE_EQ(bounds.lat_hi().degrees(), 20.0);
 }
 
+// Test that ExpandByDistance expands bounds for a point
+TEST(LatLngRectBounderTest, ExpandByDistancePoint) {
+  auto test_geom = TestGeometry::FromWKT("POINT (0 0)");
+  GeoArrowGeography geog;
+  geog.Init(test_geom.geom());
+
+  LatLngRectBounder bounder;
+  bounder.Clear();
+  bounder.Update(geog);
+
+  // Expand by 1000 meters (~0.009 degrees at equator)
+  bounder.ExpandByDistance(1000.0);
+  S2LatLngRect bounds = bounder.Finish();
+
+  // After expansion, bounds should be larger than the original point bounds
+  EXPECT_LT(bounds.lat_lo().degrees(), -0.008);
+  EXPECT_GT(bounds.lat_hi().degrees(), 0.008);
+  EXPECT_LT(bounds.lng_lo().degrees(), -0.008);
+  EXPECT_GT(bounds.lng_hi().degrees(), 0.008);
+}
+
 TEST(Coverings, SedonaUdfCellIdFromPointArray) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::CellIdFromPointKernel(&kernel);
