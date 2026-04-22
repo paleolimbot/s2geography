@@ -413,6 +413,12 @@ S2GeogErrorCode S2GeogRectBounderBound(struct S2GeogRectBounder* rect_bounder,
   S2GEOGRAPHY_C_END(err);
 }
 
+void S2GeogRectBounderExpandByDistance(struct S2GeogRectBounder* rect_bounder,
+                                       double distance_meters) {
+  S2GEOGRAPHY_DCHECK(rect_bounder != nullptr);
+  rect_bounder->bounder.ExpandByDistance(distance_meters);
+}
+
 uint8_t S2GeogRectBounderIsEmpty(struct S2GeogRectBounder* rect_bounder) {
   S2GEOGRAPHY_DCHECK(rect_bounder != nullptr);
   return rect_bounder->bounder.is_empty();

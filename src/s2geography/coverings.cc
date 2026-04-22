@@ -1,6 +1,7 @@
 
 #include "s2geography/coverings.h"
 
+#include <s2/s2earth.h>
 #include <s2/s2edge_crosser.h>
 #include <s2/s2latlng_rect_bounder.h>
 #include <s2/s2region_coverer.h>
@@ -120,6 +121,12 @@ S2LatLngRect LatLngRectBounder::BoundPoints(const GeoArrowGeography& value) {
   S2LatLng lo(S1Angle::Radians(ys.lo()), S1Angle::Radians(xs.lo()));
   S2LatLng hi(S1Angle::Radians(ys.hi()), S1Angle::Radians(xs.hi()));
   return S2LatLngRect(lo, hi);
+}
+
+void LatLngRectBounder::ExpandByDistance(double distance_meters) {
+  S1Angle distance =
+      S1Angle::Radians(distance_meters / S2Earth::RadiusMeters());
+  bounds_ = bounds_.ExpandedByDistance(distance);
 }
 
 S2LatLngRect LatLngRectBounder::BoundLines(const GeoArrowGeography& value) {

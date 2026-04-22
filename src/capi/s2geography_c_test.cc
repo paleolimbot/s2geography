@@ -259,6 +259,16 @@ TEST(S2GeographyC, RectBounderBound) {
   S2GeogRectBounderClear(bounder);
   EXPECT_EQ(S2GeogRectBounderIsEmpty(bounder), 1);
 
+  // Test ExpandByDistance
+  S2GeogRectBounderBound(bounder, geog, err);
+  S2GeogRectBounderExpandByDistance(bounder, 1000.0);  // 1km
+  EXPECT_EQ(S2GeogRectBounderFinish(bounder, &lo, &hi, err), S2GEOGRAPHY_OK);
+  // After expanding by 1km (~0.009 degrees at equator), bounds should be larger
+  EXPECT_LT(lo.v[0], 10 - 0.008);
+  EXPECT_GT(hi.v[0], 10 + 0.008);
+  EXPECT_LT(lo.v[1], 20 - 0.008);
+  EXPECT_GT(hi.v[1], 20 + 0.008);
+
   S2GeogRectBounderDestroy(bounder);
   S2GeogErrorDestroy(err);
   S2GeogDestroy(geog);
