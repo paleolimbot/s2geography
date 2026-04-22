@@ -172,7 +172,7 @@ TEST_P(DistanceScalarScalarTest, SedonaUdf) {
             (!p.lhs || !p.rhs) ? std::nullopt : std::make_optional(false);
 
         // For the distance argument, subtract a small amount such that
-        // everything should return false. This is roughly 20 nanometers
+        // everything should return false. This is roughly 20 nm
         // for the largest possible distance between two things on
         // earth.
         double distance_threshold = p.expected.value_or(0.0);
@@ -408,6 +408,19 @@ INSTANTIATE_TEST_SUITE_P(
             "LINESTRING (0 0, 0 1)",
             // Longest line
             "LINESTRING (0 0, 0 1)",
+            // Closest Point
+            "POINT (0 0)"},
+        DistanceScalarScalarParam{
+            // Point x point
+            "point_distance_wraparound_lng", "POINT (0 0)", "POINT (360 361)",
+            // Distance
+            111195.10117748113,
+            // Max distance
+            111195.10117748113,
+            // Shortest line
+            "LINESTRING (0 0, 360 361)",
+            // Longest line
+            "LINESTRING (0 0, 360 361)",
             // Closest Point
             "POINT (0 0)"},
 
