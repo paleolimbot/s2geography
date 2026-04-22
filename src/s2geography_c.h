@@ -207,6 +207,12 @@ S2GeogErrorCode S2GeogRectBounderBound(struct S2GeogRectBounder* rect_bounder,
                                        const struct S2Geog* geog,
                                        struct S2GeogError* err);
 
+/// \brief Expand the accumulated bounds by a distance
+///
+/// \pre rect_bounder != NULL
+void S2GeogRectBounderExpandByDistance(struct S2GeogRectBounder* rect_bounder,
+                                       double distance_meters);
+
 /// \brief Return 1 if the rectangle that would be returned represents empty
 /// bounds or 0 otherwise
 ///
