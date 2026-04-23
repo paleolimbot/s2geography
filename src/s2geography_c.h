@@ -298,6 +298,11 @@ struct S2GeogOp;
 /// distance threshold, returning a boolean
 #define S2GEOGRAPHY_OP_DISTANCE_WITHIN 5
 
+/// \brief Compute the disjoint predicate between two geographies, returning a
+/// boolean
+#define S2GEOGRAPHY_OP_DISJOINT 6
+
+/// \brief Returned by S2GeogOpOutputType when the output type is a bool
 #define S2GEOGRAPHY_OUTPUT_TYPE_BOOL 1
 
 /// \brief Create a new operator object
