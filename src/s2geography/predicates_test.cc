@@ -220,6 +220,89 @@ TEST(Predicates, SedonaUdfContainsArrayPolygonScalarLinestring) {
                                           {true, false, false}));
 }
 
+TEST(Predicates, SedonaUdfDisjointArrayScalar) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::DisjointKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                        {{"POINT (0.25 0.25)", "POINT (-1 -1)", std::nullopt},
+                         {"POLYGON ((0 0, 1 0, 0 1, 0 0))"}},
+                        {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  // Interior point -> not disjoint (false), exterior point -> disjoint (true)
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
+                                          {false, true, std::nullopt}));
+}
+
+TEST(Predicates, SedonaUdfDisjointScalarArray) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::DisjointKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                        {{"POLYGON ((0 0, 1 0, 0 1, 0 0))"},
+                         {"POINT (0.25 0.25)", "POINT (-1 -1)", std::nullopt}},
+                        {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
+                                          {false, true, std::nullopt}));
+}
+
+TEST(Predicates, SedonaUdfWithinArrayScalar) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::WithinKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                        {{"POINT (0.25 0.25)", "POINT (-1 -1)", std::nullopt},
+                         {"POLYGON ((0 0, 2 0, 0 2, 0 0))"}},
+                        {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  // Within is the reverse of Contains: point inside polygon -> true
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
+                                          {true, false, std::nullopt}));
+}
+
+TEST(Predicates, SedonaUdfWithinScalarArray) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::WithinKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB}, NANOARROW_TYPE_BOOL));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, ARROW_TYPE_WKB},
+                        {{"POLYGON ((0 0, 2 0, 0 2, 0 0))"},
+                         {"POINT (0.25 0.25)", "POINT (-1 -1)", std::nullopt}},
+                        {}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  // Polygon is not within point
+  ASSERT_NO_FATAL_FAILURE(TestResultArrow(out_array.get(), NANOARROW_TYPE_BOOL,
+                                          {false, false, std::nullopt}));
+}
+
 struct ScalarScalarParam {
   std::string name;
   std::optional<std::string> lhs;
@@ -260,9 +343,15 @@ TEST_P(PredicatesScalarScalarTest, SedonaUdf) {
       if (p.op == "intersects") {
         s2geography::sedona_udf::IntersectsKernel(&kernel, prepare_arg0,
                                                   prepare_arg1);
+      } else if (p.op == "disjoint") {
+        s2geography::sedona_udf::DisjointKernel(&kernel, prepare_arg0,
+                                                prepare_arg1);
       } else if (p.op == "contains") {
         s2geography::sedona_udf::ContainsKernel(&kernel, prepare_arg0,
                                                 prepare_arg1);
+      } else if (p.op == "within") {
+        s2geography::sedona_udf::WithinKernel(&kernel, prepare_arg0,
+                                              prepare_arg1);
       } else if (p.op == "equals") {
         s2geography::sedona_udf::EqualsKernel(&kernel, prepare_arg0,
                                               prepare_arg1);
@@ -299,8 +388,12 @@ TEST_P(PredicatesScalarScalarTest, PredicateOperation) {
   std::unique_ptr<s2geography::Operation> predicate;
   if (p.op == "intersects") {
     predicate = s2geography::Intersects();
+  } else if (p.op == "disjoint") {
+    predicate = s2geography::Disjoint();
   } else if (p.op == "contains") {
     predicate = s2geography::Contains();
+  } else if (p.op == "within") {
+    predicate = s2geography::Within();
   } else if (p.op == "equals") {
     predicate = s2geography::Equals();
   } else {
@@ -691,7 +784,16 @@ INSTANTIATE_TEST_SUITE_P(
         // Equals: GEOMETRYCOLLECTION vs simple geometry
         ScalarScalarParam{"gc_not_equals_point",
                           "GEOMETRYCOLLECTION (POINT (0 0))", "equals",
-                          "POINT (0 0)", true}
+                          "POINT (0 0)", true},
+
+        // Disjoint (is it plugged in check)
+        // Disjoint is the negation of Intersects
+        ScalarScalarParam{"polygon_disjoint_distant_point",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "disjoint",
+                          "POINT (-30 -30)", true},
+        ScalarScalarParam{"polygon_not_disjoint_interior_point",
+                          "POLYGON ((0 0, 2 0, 0 2, 0 0))", "disjoint",
+                          "POINT (0.25 0.25)", false}
 
         ),
     [](const ::testing::TestParamInfo<ScalarScalarParam>& info) {

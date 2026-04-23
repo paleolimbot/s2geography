@@ -44,6 +44,7 @@ bool s2_intersects_box(const S2ShapeIndex& geog1, const S2LatLngRect& rect,
                        double tolerance);
 
 std::unique_ptr<Operation> Intersects();
+std::unique_ptr<Operation> Disjoint();
 std::unique_ptr<Operation> Contains();
 std::unique_ptr<Operation> Within();
 std::unique_ptr<Operation> Equals();
@@ -53,9 +54,15 @@ namespace sedona_udf {
 void IntersectsKernel(struct SedonaCScalarKernel* out,
                       bool prepare_arg0_scalar = true,
                       bool prepare_arg1_scalar = true);
+void DisjointKernel(struct SedonaCScalarKernel* out,
+                    bool prepare_arg0_scalar = true,
+                    bool prepare_arg1_scalar = true);
 void ContainsKernel(struct SedonaCScalarKernel* out,
                     bool prepare_arg0_scalar = true,
                     bool prepare_arg1_scalar = true);
+void WithinKernel(struct SedonaCScalarKernel* out,
+                  bool prepare_arg0_scalar = true,
+                  bool prepare_arg1_scalar = true);
 void EqualsKernel(struct SedonaCScalarKernel* out,
                   bool prepare_arg0_scalar = true,
                   bool prepare_arg1_scalar = true);

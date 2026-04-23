@@ -418,6 +418,37 @@ struct S2Contains {
   std::vector<s2shapeutil::ShapeEdge> crossing_edges_;
 };
 
+struct S2Within {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
+  using out_t = BoolOutputBuilder;
+
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
+    return contains_.Exec(value1, value0, out);
+  }
+
+  S2Contains<BoolOutputBuilder> contains_;
+};
+
+struct InvertedOutput {
+  void Append(bool value) { out_->Append(!value); }
+  BoolOutputBuilder* out_{};
+};
+
+struct S2Disjoint {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = GeoArrowGeographyInputView;
+  using out_t = BoolOutputBuilder;
+
+  void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
+    out_.out_ = out;
+    intersects_.Exec(value0, value1, &out_);
+  }
+
+  S2Intersects<InvertedOutput> intersects_;
+  InvertedOutput out_;
+};
+
 template <typename Output>
 struct S2Equals {
   using arg0_t = GeoArrowGeographyInputView;
@@ -526,10 +557,22 @@ void IntersectsKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
       out, "st_intersects", prepare_arg0_scalar, prepare_arg1_scalar);
 }
 
+void DisjointKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
+                    bool prepare_arg1_scalar) {
+  InitBinaryKernel<S2Disjoint>(out, "st_disjoint", prepare_arg0_scalar,
+                               prepare_arg1_scalar);
+}
+
 void ContainsKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
                     bool prepare_arg1_scalar) {
   InitBinaryKernel<S2Contains<BoolOutputBuilder>>(
       out, "st_contains", prepare_arg0_scalar, prepare_arg1_scalar);
+}
+
+void WithinKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
+                  bool prepare_arg1_scalar) {
+  InitBinaryKernel<S2Within>(out, "st_within", prepare_arg0_scalar,
+                             prepare_arg1_scalar);
 }
 
 void EqualsKernel(struct SedonaCScalarKernel* out, bool prepare_arg0_scalar,
@@ -593,10 +636,37 @@ class WithinOperation : public Operation {
       "contains"};
 };
 
+class DisjointOperation : public Operation {
+ public:
+  DisjointOperation() : name_("disjoint") {}
+
+  const std::string& name() const override { return name_; }
+
+  OutputType output_type() const override {
+    return Operation::OutputType::kBool;
+  }
+
+  void ExecGeogGeog(const GeoArrowGeography& arg0,
+                    const GeoArrowGeography& arg1) override {
+    // Disjoint(A, B) is !Intersects(A, B)
+    intersects_.ExecGeogGeog(arg0, arg1);
+    int_result_ = !intersects_.GetInt();
+  }
+
+ private:
+  std::string name_;
+  PredicateOperation<sedona_udf::S2Intersects<StashedBoolOutput>> intersects_{
+      "contains"};
+};
+
 std::unique_ptr<Operation> Intersects() {
   return std::make_unique<
       PredicateOperation<sedona_udf::S2Intersects<StashedBoolOutput>>>(
       "intersects");
+}
+
+std::unique_ptr<Operation> Disjoint() {
+  return std::make_unique<DisjointOperation>();
 }
 
 std::unique_ptr<Operation> Contains() {
