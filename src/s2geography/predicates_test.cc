@@ -785,9 +785,7 @@ INSTANTIATE_TEST_SUITE_P(
         ScalarScalarParam{"gc_not_equals_point",
                           "GEOMETRYCOLLECTION (POINT (0 0))", "equals",
                           "POINT (0 0)", true},
-
-        // Disjoint (is it plugged in check)
-        // Disjoint is the negation of Intersects
+        // Disjoint
         ScalarScalarParam{"polygon_disjoint_distant_point",
                           "POLYGON ((0 0, 2 0, 0 2, 0 0))", "disjoint",
                           "POINT (-30 -30)", true},
