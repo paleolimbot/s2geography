@@ -279,7 +279,7 @@ TEST(S2GeographyC, RectBounderBound) {
 // Sedona UDF Interface Tests
 // ============================================================================
 
-TEST(S2GeographyC, NumKernels) { EXPECT_EQ(S2GeogNumKernels(), 27); }
+TEST(S2GeographyC, NumKernels) { EXPECT_EQ(S2GeogNumKernels(), 29); }
 
 TEST(S2GeographyC, InitKernelsInvalidFormat) {
   // Test with invalid format
@@ -390,6 +390,9 @@ INSTANTIATE_TEST_SUITE_P(
                                            S2GEOGRAPHY_OP_INTERSECTS,
                                            "POLYGON ((0 0, 2 0, 0 2, 0 0))",
                                            "POINT (0.25 0.25)", 1},
+                      BinaryPredicateParam{"disjoint", S2GEOGRAPHY_OP_DISJOINT,
+                                           "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+                                           "POINT (0.25 0.25)", 0},
                       BinaryPredicateParam{"contains", S2GEOGRAPHY_OP_CONTAINS,
                                            "POLYGON ((0 0, 2 0, 0 2, 0 0))",
                                            "POINT (0.25 0.25)", 1},

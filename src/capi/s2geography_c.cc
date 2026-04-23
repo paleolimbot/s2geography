@@ -178,11 +178,12 @@ uint64_t S2GeogLngLatToCellId(const struct S2GeogVertex* v) {
 
 using KernelInitFunc = void (*)(struct SedonaCScalarKernel*);
 
-static const std::array<KernelInitFunc, 27> kSedonaKernels = {{
+static const std::array<KernelInitFunc, 29> kSedonaKernels = {{
     s2geography::sedona_udf::AreaKernel,
     s2geography::sedona_udf::CentroidKernel,
     s2geography::sedona_udf::ClosestPointKernel,
     [](SedonaCScalarKernel* k) { s2geography::sedona_udf::ContainsKernel(k); },
+    [](SedonaCScalarKernel* k) { s2geography::sedona_udf::WithinKernel(k); },
     s2geography::sedona_udf::ConvexHullKernel,
     s2geography::sedona_udf::DifferenceKernel,
     [](SedonaCScalarKernel* k) { s2geography::sedona_udf::DistanceKernel(k); },
@@ -191,6 +192,7 @@ static const std::array<KernelInitFunc, 27> kSedonaKernels = {{
     [](SedonaCScalarKernel* k) {
       s2geography::sedona_udf::IntersectsKernel(k);
     },
+    [](SedonaCScalarKernel* k) { s2geography::sedona_udf::DisjointKernel(k); },
     s2geography::sedona_udf::LengthKernel,
     s2geography::sedona_udf::LineInterpolatePointKernel,
     s2geography::sedona_udf::LineLocatePointKernel,
@@ -477,6 +479,9 @@ S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp** op, int op_id) {
       break;
     case S2GEOGRAPHY_OP_DISTANCE_WITHIN:
       inner = s2geography::DistanceWithin();
+      break;
+    case S2GEOGRAPHY_OP_DISJOINT:
+      inner = s2geography::Disjoint();
       break;
     default:
       return ENOTSUP;
