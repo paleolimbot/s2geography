@@ -8,12 +8,10 @@ namespace sedona_udf {
 
 /// \brief Exec implementation for st_to_geography for geography (no-op)
 struct ToGeographyNoOpExec {
-  using arg0_t = GeoArrowGeographyInputView;
+  using arg0_t = GeoArrowGeometryInputView;
   using out_t = GeoArrowGeographyOutputBuilder;
 
-  void Exec(arg0_t::c_type value, out_t* out) {
-    out->AppendGeometry(value.geom());
-  }
+  void Exec(arg0_t::c_type value, out_t* out) { out->AppendGeometry(value); }
 };
 
 /// \brief Exec implementation for st_to_geometry for geometry (no-op)
@@ -21,7 +19,7 @@ struct ToGeographyNoOpExec {
 /// This version still parses and rebuilds output (could be removed by an
 /// optimizer rule).
 struct ToGeometryNoOpExec {
-  using arg0_t = GeoArrowGeometryInputView;
+  using arg0_t = GeoArrowGeographyInputView;
   using out_t = GeoArrowGeometryOutputBuilder;
 
   void Exec(arg0_t::c_type value, out_t* out) {
@@ -34,18 +32,16 @@ struct ToGeometryNoOpExec {
 /// This version still parses and rebuilds output (could be removed by an
 /// optimizer rule).
 struct ToGeographyExec {
-  using arg0_t = GeoArrowGeographyInputView;
+  using arg0_t = GeoArrowGeometryInputView;
   using out_t = GeoArrowGeographyOutputBuilder;
 
-  void Exec(arg0_t::c_type value, out_t* out) {
-    out->AppendGeometry(value.geom());
-  }
+  void Exec(arg0_t::c_type value, out_t* out) { out->AppendGeometry(value); }
 };
 
 /// \brief Exec implementation for st_to_geometry for geometry (no-op)
 struct ToGeometryExec {
-  using arg0_t = GeoArrowGeometryInputView;
-  using out_t = GeoArrowGeographyOutputBuilder;
+  using arg0_t = GeoArrowGeographyInputView;
+  using out_t = GeoArrowGeometryOutputBuilder;
 
   void Exec(arg0_t::c_type value, out_t* out) {
     out->AppendGeometry(value.geom());
