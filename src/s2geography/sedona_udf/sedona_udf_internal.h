@@ -393,6 +393,7 @@ class StructOutputBuilder {
 /// this builder exposes low-level building primitives for faster output
 /// (i.e., streaming output with minimal intermediary copying) and more
 /// feature-rich (e.g., ZM output and lossless point/multipoint semantics).
+template <enum GeoArrowEdgeType edge_type>
 class GeoArrowOutputBuilder {
  public:
   GeoArrowOutputBuilder() {
@@ -424,16 +425,11 @@ class GeoArrowOutputBuilder {
   ~GeoArrowOutputBuilder() { GeoArrowWKBWriterReset(&writer_); }
 
   void InitOutputType(struct ArrowSchema* out) {
-    ::geoarrow::Wkb()
-        .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
-        .InitSchema(out);
+    ::geoarrow::Wkb().WithEdgeType(edge_type).InitSchema(out);
   }
 
   void InitOutputTypeWithCrs(struct ArrowSchema* out, const std::string& crs) {
-    ::geoarrow::Wkb()
-        .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
-        .WithCrs(crs)
-        .InitSchema(out);
+    ::geoarrow::Wkb().WithEdgeType(edge_type).WithCrs(crs).InitSchema(out);
   }
 
   void Reserve(int64_t additional_size) {
@@ -633,6 +629,11 @@ class GeoArrowOutputBuilder {
   }
 };
 
+using GeoArrowGeographyOutputBuilder =
+    GeoArrowOutputBuilder<GEOARROW_EDGE_TYPE_SPHERICAL>;
+using GeoArrowGeometryOutputBuilder =
+    GeoArrowOutputBuilder<GEOARROW_EDGE_TYPE_PLANAR>;
+
 /// \brief Generic view of Arrow input
 ///
 /// This input viewer uses nanoarrow's ArrowArrayView to provide
@@ -774,7 +775,8 @@ using StringInputView = ArrowInputView<std::string_view>;
 ///
 /// This currently handles geoarrow.wkb arrays, although in theory can
 /// represent any GeoArrow type when supported by geoarrow-c.
-class GeoArrowGeographyInputView {
+template <enum GeoArrowEdgeType edge_type>
+class GeoArrowInputView {
  public:
   using c_type = const GeoArrowGeography&;
 
@@ -798,20 +800,18 @@ class GeoArrowGeographyInputView {
     struct GeoArrowMetadataView metadata_view;
     err_code = GeoArrowMetadataViewInit(
         &metadata_view, schema_view.extension_metadata, nullptr);
-    return err_code == GEOARROW_OK &&
-           metadata_view.edge_type == GEOARROW_EDGE_TYPE_SPHERICAL;
+    return err_code == GEOARROW_OK && metadata_view.edge_type == edge_type;
   }
 
-  GeoArrowGeographyInputView(const struct ArrowSchema* type)
+  GeoArrowInputView(const struct ArrowSchema* type)
       : inner_(type), current_array_length_(1), stashed_index_(-1) {
     type_ = ::geoarrow::GeometryDataType::Make(type);
     GEOARROW_THROW_NOT_OK(nullptr, GeoArrowWKBReaderInit(&reader_));
   }
-  GeoArrowGeographyInputView(const GeoArrowGeographyInputView&) = delete;
-  GeoArrowGeographyInputView& operator=(const GeoArrowGeographyInputView&) =
-      delete;
+  GeoArrowInputView(const GeoArrowInputView&) = delete;
+  GeoArrowInputView& operator=(const GeoArrowInputView&) = delete;
 
-  ~GeoArrowGeographyInputView() { GeoArrowWKBReaderReset(&reader_); }
+  ~GeoArrowInputView() { GeoArrowWKBReaderReset(&reader_); }
 
   std::string GetCrs() { return type_.crs(); }
 
@@ -866,6 +866,10 @@ class GeoArrowGeographyInputView {
     }
   }
 };
+
+using GeoArrowGeographyInputView =
+    GeoArrowInputView<GEOARROW_EDGE_TYPE_SPHERICAL>;
+using GeoArrowGeometryInputView = GeoArrowInputView<GEOARROW_EDGE_TYPE_PLANAR>;
 
 /// @}
 

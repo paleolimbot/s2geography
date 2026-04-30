@@ -85,7 +85,7 @@ static constexpr int kMaxEdgesLinearSearch = 32;
 struct S2LineInterpolatePointExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = DoubleInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type fraction, out_t* out) {
     if (value0.is_empty()) {
