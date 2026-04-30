@@ -465,6 +465,11 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   gtest_discover_tests(s2geography_c_test)
 endif()
 
+option(S2GEOGRAPHY_BUILD_C_API "Build the C API wrapper library" OFF)
+if(S2GEOGRAPHY_BUILD_C_API)
+  add_subdirectory(capi)
+endif()
+
 if(S2GEOGRAPHY_BUILD_EXAMPLES)
   add_executable(example-simple examples/example-simple/example-simple.cc)
   target_link_libraries(example-simple PUBLIC s2geography s2::s2)
