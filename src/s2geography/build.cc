@@ -644,7 +644,7 @@ struct OutputGeometry {
   ///
   /// This is the point at which the nesting of any output polygon rings are
   /// calculated.
-  void WriteTo(GeoArrowOutputBuilder* out,
+  void WriteTo(GeoArrowGeographyOutputBuilder* out,
                uint8_t geometry_type_if_empty =
                    GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION) {
     if (num_types() == 0) {
@@ -671,7 +671,7 @@ struct OutputGeometry {
   }
 
  private:
-  void WritePointOutput(GeoArrowOutputBuilder* out) {
+  void WritePointOutput(GeoArrowGeographyOutputBuilder* out) {
     if (points_.size() == 1) {
       out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
       out->WriteCoord(points_[0]);
@@ -687,7 +687,7 @@ struct OutputGeometry {
     }
   }
 
-  void WriteLinesOutput(GeoArrowOutputBuilder* out) {
+  void WriteLinesOutput(GeoArrowGeographyOutputBuilder* out) {
     if (line_lengths_.size() == 1) {
       out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
       for (int i = 0; i < line_lengths_[0]; ++i) {
@@ -708,7 +708,7 @@ struct OutputGeometry {
     }
   }
 
-  void WritePolygonOutput(GeoArrowOutputBuilder* out) {
+  void WritePolygonOutput(GeoArrowGeographyOutputBuilder* out) {
     GroupRings();
 
     int order_id = 0;
@@ -1113,7 +1113,8 @@ struct RebuildExec {
     builder_.Init(builder_options_);
   }
 
-  void Exec(const GeoArrowGeography& value0, GeoArrowOutputBuilder* out) {
+  void Exec(const GeoArrowGeography& value0,
+            GeoArrowGeographyOutputBuilder* out) {
     builder_.Reset();
     edge_tracker_.Clear();
     output_.Clear();
@@ -1165,7 +1166,7 @@ struct RebuildExec {
 struct ReducePrecisionExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = DoubleInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type value, double grid_size, out_t* out) {
     // If the grid size changed since the last iteration, we need to recreate
@@ -1198,7 +1199,7 @@ struct ReducePrecisionExec {
 struct SimplifyExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = DoubleInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type value, double tolerance, out_t* out) {
     // If the grid size changed since the last iteration, we need to recreate
@@ -1259,7 +1260,7 @@ void BuildOverlay(S2BooleanOperation::OpType op_type,
 struct UnionOperationExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   UnionOperationExec() {
     options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
@@ -1329,7 +1330,7 @@ struct UnionOperationExec {
 struct IntersectionOperationExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   IntersectionOperationExec() {
     options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
@@ -1387,7 +1388,7 @@ struct IntersectionOperationExec {
 struct DifferenceOperationExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   DifferenceOperationExec() {
     options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
@@ -1448,7 +1449,7 @@ struct DifferenceOperationExec {
 struct SymDifferenceOperationExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   SymDifferenceOperationExec() {
     options_.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
@@ -1611,7 +1612,7 @@ struct BufferParamsExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = DoubleInputView;
   using arg2_t = StringInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type value, arg1_t::c_type distance,
             arg2_t::c_type params, out_t* out) {
@@ -1693,7 +1694,7 @@ struct BufferQuadSegsExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = DoubleInputView;
   using arg2_t = IntInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type value, arg1_t::c_type distance,
             arg2_t::c_type n_quad_segs, out_t* out) {
@@ -1708,7 +1709,7 @@ struct BufferQuadSegsExec {
 struct BufferExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = DoubleInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type value, arg1_t::c_type distance, out_t* out) {
     buffer_params_.Exec(value, distance, "", out);

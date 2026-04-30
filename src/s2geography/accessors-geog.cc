@@ -320,7 +320,7 @@ std::optional<internal::GeoArrowVertex> CentroidVertex(
 
 struct S2CentroidExec {
   using arg0_t = GeoArrowGeographyInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type value, out_t* out) {
     // Output dimensions == input dimensions
@@ -338,7 +338,7 @@ struct S2CentroidExec {
 
 struct S2ConvexHullExec {
   using arg0_t = GeoArrowGeographyInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type value, out_t* out) {
     if (value.is_empty()) {
@@ -456,7 +456,7 @@ struct S2ConvexHullExec {
 
 struct S2PointOnSurfaceExec {
   using arg0_t = GeoArrowGeographyInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type value, out_t* out) {
     // In general, we can propagate output dimensions

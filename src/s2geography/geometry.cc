@@ -6,42 +6,58 @@ namespace s2geography {
 
 namespace sedona_udf {
 
-/// \brief Exec implementation for st_to_geography
-///
-/// Converts planar geometry (WKB) to geography with spherical edges.
-/// This is a stub implementation that passes through the input.
-struct ToGeographyExec {
+/// \brief Exec implementation for st_to_geography for geography (no-op)
+struct ToGeographyNoOpExec {
   using arg0_t = GeoArrowGeographyInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type value, out_t* out) {
-    // Stub: pass through the geometry
-    // TODO: Implement actual planar to spherical conversion
     out->AppendGeometry(value.geom());
   }
 };
 
-/// \brief Exec implementation for st_to_geometry
+/// \brief Exec implementation for st_to_geometry for geometry (no-op)
 ///
-/// Converts geography (spherical edges) to planar geometry (WKB).
-/// This is a stub implementation that passes through the input.
-struct ToGeometryExec {
-  using arg0_t = GeoArrowGeographyInputView;
-  using out_t = GeoArrowOutputBuilder;
+/// This version still parses and rebuilds output (could be removed by an
+/// optimizer rule).
+struct ToGeometryNoOpExec {
+  using arg0_t = GeoArrowGeometryInputView;
+  using out_t = GeoArrowGeometryOutputBuilder;
 
   void Exec(arg0_t::c_type value, out_t* out) {
-    // Stub: pass through the geography
-    // TODO: Implement actual spherical to planar conversion
+    out->AppendGeometry(value.geom());
+  }
+};
+
+/// \brief Exec implementation for st_to_geography for geography (no-op)
+///
+/// This version still parses and rebuilds output (could be removed by an
+/// optimizer rule).
+struct ToGeographyExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using out_t = GeoArrowGeographyOutputBuilder;
+
+  void Exec(arg0_t::c_type value, out_t* out) {
+    out->AppendGeometry(value.geom());
+  }
+};
+
+/// \brief Exec implementation for st_to_geometry for geometry (no-op)
+struct ToGeometryExec {
+  using arg0_t = GeoArrowGeometryInputView;
+  using out_t = GeoArrowGeographyOutputBuilder;
+
+  void Exec(arg0_t::c_type value, out_t* out) {
     out->AppendGeometry(value.geom());
   }
 };
 
 void ToGeographyKernel(struct SedonaCScalarKernel* out) {
-  InitUnaryKernel<ToGeographyExec>(out, "st_to_geography");
+  InitUnaryKernel<ToGeographyNoOpExec>(out, "st_to_geography");
 }
 
 void ToGeometryKernel(struct SedonaCScalarKernel* out) {
-  InitUnaryKernel<ToGeometryExec>(out, "st_to_geometry");
+  InitUnaryKernel<ToGeometryNoOpExec>(out, "st_to_geometry");
 }
 
 }  // namespace sedona_udf
