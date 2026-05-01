@@ -50,8 +50,8 @@ struct ToGeographyExec {
       tessellator_ = S2EdgeTessellator(&projection_, tolerance);
     }
 
+    // TODO: we need to figure out how to call GeomEnd() at the right times
     int64_t remaining_rings = 0;
-
     internal::VisitGeoArrowNodes(
         geom, [&](const struct GeoArrowGeometryNode* node) {
           out->SetDimensions(node->dimensions);
