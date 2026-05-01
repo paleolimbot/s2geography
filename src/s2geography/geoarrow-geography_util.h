@@ -194,7 +194,7 @@ struct GeoArrowEdge {
   ///   in which case the start or end vertex is returned directly
   ///   to minimize roundtrip rounding errors)
   /// - z and m values are interpolated linearly
-  GeoArrowVertex Interpolate(const S2Point& point);
+  GeoArrowVertex Interpolate(const S2Point& point) const;
 
   /// \brief Normalize the order of zm values such that this object
   /// always represents, x, y, z, and m (in that order)

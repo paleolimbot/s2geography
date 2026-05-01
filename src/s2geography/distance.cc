@@ -585,7 +585,7 @@ void DistanceLine(const GeoArrowGeography& value0,
 struct S2ClosestPointExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     // The output usually consists of a vertex derived from the first
@@ -656,7 +656,7 @@ struct S2MaxDistanceExec {
 struct S2ShortestLineExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     // The output usually consists of one vertex from each side, so
@@ -708,7 +708,7 @@ struct S2ShortestLineExec {
 struct S2LongestLineExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = GeoArrowGeographyInputView;
-  using out_t = GeoArrowOutputBuilder;
+  using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type value0, arg1_t::c_type value1, out_t* out) {
     out->SetDimensionsCommon(value0.dimensions(), value1.dimensions());
