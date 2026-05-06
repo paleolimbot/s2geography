@@ -503,11 +503,11 @@ INSTANTIATE_TEST_SUITE_P(
 
         // Empties
         UnaryGeographyScalarParam{"point_empty", "POINT EMPTY",
-                                  "GEOMETRYCOLLECTION EMPTY"},
+                                  "POINT EMPTY"},
         UnaryGeographyScalarParam{"linestring_empty", "LINESTRING EMPTY",
-                                  "GEOMETRYCOLLECTION EMPTY"},
+                                  "LINESTRING EMPTY"},
         UnaryGeographyScalarParam{"polygon_empty", "POLYGON EMPTY",
-                                  "GEOMETRYCOLLECTION EMPTY"},
+                                  "POLYGON EMPTY"},
 
         // Points
         UnaryGeographyScalarParam{"point", "POINT (0 1)", "POINT (0 1)"},

@@ -342,7 +342,7 @@ struct S2ConvexHullExec {
 
   void Exec(arg0_t::c_type value, out_t* out) {
     if (value.is_empty()) {
-      out->AppendEmpty();
+      out->AppendEmpty(value.geometry_type());
       return;
     }
 
