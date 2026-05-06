@@ -279,7 +279,7 @@ TEST(S2GeographyC, RectBounderBound) {
 // Sedona UDF Interface Tests
 // ============================================================================
 
-TEST(S2GeographyC, NumKernels) { EXPECT_EQ(S2GeogNumKernels(), 29); }
+TEST(S2GeographyC, NumKernels) { EXPECT_EQ(S2GeogNumKernels(), 30); }
 
 TEST(S2GeographyC, InitKernelsInvalidFormat) {
   // Test with invalid format
