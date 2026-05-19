@@ -14,8 +14,10 @@ class LatLngRectBounder {
  public:
   void Clear();
   S2LatLngRect Finish() const;
+  void UpdateRect(double x_lo, double y_lo, double x_hi, double y_hi);
   void Update(const GeoArrowGeography& value);
   void ExpandByDistance(double distance_meters);
+  void ExpandByDistanceWithRadius(double distance_meters, double radius);
   bool is_empty() const { return bounds_.is_empty(); }
 
  private:

@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 #include <s2/s2cell_id.h>
+#include <s2/s2earth.h>
 #include <s2/s2latlng.h>
 
 #include <optional>
@@ -188,6 +189,45 @@ TEST(LatLngRectBounderTest, ExpandByDistancePoint) {
   EXPECT_GT(bounds.lat_hi().degrees(), 0.008);
   EXPECT_LT(bounds.lng_lo().degrees(), -0.008);
   EXPECT_GT(bounds.lng_hi().degrees(), 0.008);
+}
+
+// Test that ExpandByDistanceWithRadius expands bounds using custom radius
+TEST(LatLngRectBounderTest, ExpandByDistanceWithRadius) {
+  auto test_geom = TestGeometry::FromWKT("POINT (0 0)");
+  GeoArrowGeography geog;
+  geog.Init(test_geom.geom());
+
+  LatLngRectBounder bounder;
+  bounder.Clear();
+  bounder.Update(geog);
+
+  // Use a custom radius (half of Earth's radius)
+  // This should result in twice the angular expansion
+  double half_earth_radius = S2Earth::RadiusMeters() / 2.0;
+  bounder.ExpandByDistanceWithRadius(1000.0, half_earth_radius);
+  S2LatLngRect bounds = bounder.Finish();
+
+  // With half the radius, 1000 meters corresponds to twice the angle
+  // So bounds should expand more than ExpandByDistance with 1000m
+  EXPECT_LT(bounds.lat_lo().degrees(), -0.016);
+  EXPECT_GT(bounds.lat_hi().degrees(), 0.016);
+  EXPECT_LT(bounds.lng_lo().degrees(), -0.016);
+  EXPECT_GT(bounds.lng_hi().degrees(), 0.016);
+}
+
+// Test that UpdateRect adds rectangle bounds
+TEST(LatLngRectBounderTest, UpdateRect) {
+  LatLngRectBounder bounder;
+  bounder.Clear();
+
+  // Add a rectangle (x_lo, y_lo, x_hi, y_hi) = (lng_lo, lat_lo, lng_hi, lat_hi)
+  bounder.UpdateRect(-10.0, -20.0, 30.0, 40.0);
+  S2LatLngRect bounds = bounder.Finish();
+
+  EXPECT_DOUBLE_EQ(bounds.lng_lo().degrees(), -10.0);
+  EXPECT_DOUBLE_EQ(bounds.lat_lo().degrees(), -20.0);
+  EXPECT_DOUBLE_EQ(bounds.lng_hi().degrees(), 30.0);
+  EXPECT_DOUBLE_EQ(bounds.lat_hi().degrees(), 40.0);
 }
 
 TEST(Coverings, SedonaUdfCellIdFromPointArray) {

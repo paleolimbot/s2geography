@@ -213,6 +213,25 @@ S2GeogErrorCode S2GeogRectBounderBound(struct S2GeogRectBounder* rect_bounder,
 void S2GeogRectBounderExpandByDistance(struct S2GeogRectBounder* rect_bounder,
                                        double distance_meters);
 
+/// \brief Expand the accumulated bounds by a distance using a custom sphere
+/// radius
+///
+/// This is useful when working with non-Earth spheres or custom projections.
+///
+/// \pre rect_bounder != NULL
+void S2GeogRectBounderExpandByDistanceWithRadius(
+    struct S2GeogRectBounder* rect_bounder, double distance_meters,
+    double radius);
+
+/// \brief Update bounds with a rectangle specified by corners
+///
+/// Coordinates are in degrees: x is longitude, y is latitude.
+///
+/// \pre rect_bounder != NULL
+void S2GeogRectBounderUpdateRect(struct S2GeogRectBounder* rect_bounder,
+                                 double x_lo, double y_lo, double x_hi,
+                                 double y_hi);
+
 /// \brief Return 1 if the rectangle that would be returned represents empty
 /// bounds or 0 otherwise
 ///

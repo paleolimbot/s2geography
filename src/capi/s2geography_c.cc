@@ -422,6 +422,20 @@ void S2GeogRectBounderExpandByDistance(struct S2GeogRectBounder* rect_bounder,
   rect_bounder->bounder.ExpandByDistance(distance_meters);
 }
 
+void S2GeogRectBounderExpandByDistanceWithRadius(
+    struct S2GeogRectBounder* rect_bounder, double distance_meters,
+    double radius) {
+  S2GEOGRAPHY_DCHECK(rect_bounder != nullptr);
+  rect_bounder->bounder.ExpandByDistanceWithRadius(distance_meters, radius);
+}
+
+void S2GeogRectBounderUpdateRect(struct S2GeogRectBounder* rect_bounder,
+                                 double x_lo, double y_lo, double x_hi,
+                                 double y_hi) {
+  S2GEOGRAPHY_DCHECK(rect_bounder != nullptr);
+  rect_bounder->bounder.UpdateRect(x_lo, y_lo, x_hi, y_hi);
+}
+
 uint8_t S2GeogRectBounderIsEmpty(struct S2GeogRectBounder* rect_bounder) {
   S2GEOGRAPHY_DCHECK(rect_bounder != nullptr);
   return rect_bounder->bounder.is_empty();

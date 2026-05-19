@@ -269,6 +269,30 @@ TEST(S2GeographyC, RectBounderBound) {
   EXPECT_LT(lo.v[1], 20 - 0.008);
   EXPECT_GT(hi.v[1], 20 + 0.008);
 
+  // Test ExpandByDistanceWithRadius with half Earth's radius
+  // This should result in twice the angular expansion
+  S2GeogRectBounderClear(bounder);
+  S2GeogRectBounderBound(bounder, geog, err);
+  double half_earth_radius = 6371000.0 / 2.0;  // Half of Earth's radius in m
+  S2GeogRectBounderExpandByDistanceWithRadius(bounder, 1000.0,
+                                              half_earth_radius);
+  EXPECT_EQ(S2GeogRectBounderFinish(bounder, &lo, &hi, err), S2GEOGRAPHY_OK);
+  // With half the radius, bounds should expand more
+  EXPECT_LT(lo.v[0], 10 - 0.016);
+  EXPECT_GT(hi.v[0], 10 + 0.016);
+  EXPECT_LT(lo.v[1], 20 - 0.016);
+  EXPECT_GT(hi.v[1], 20 + 0.016);
+
+  // Test UpdateRect
+  S2GeogRectBounderClear(bounder);
+  S2GeogRectBounderUpdateRect(bounder, -10.0, -20.0, 30.0, 40.0);
+  EXPECT_EQ(S2GeogRectBounderIsEmpty(bounder), 0);
+  EXPECT_EQ(S2GeogRectBounderFinish(bounder, &lo, &hi, err), S2GEOGRAPHY_OK);
+  EXPECT_DOUBLE_EQ(lo.v[0], -10.0);
+  EXPECT_DOUBLE_EQ(lo.v[1], -20.0);
+  EXPECT_DOUBLE_EQ(hi.v[0], 30.0);
+  EXPECT_DOUBLE_EQ(hi.v[1], 40.0);
+
   S2GeogRectBounderDestroy(bounder);
   S2GeogErrorDestroy(err);
   S2GeogDestroy(geog);

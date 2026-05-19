@@ -90,6 +90,13 @@ void LatLngRectBounder::Clear() { bounds_ = S2LatLngRect::Empty(); }
 
 S2LatLngRect LatLngRectBounder::Finish() const { return bounds_; }
 
+void LatLngRectBounder::UpdateRect(double x_lo, double y_lo, double x_hi,
+                                   double y_hi) {
+  S2LatLng lo = S2LatLng::FromDegrees(y_lo, x_lo).Normalized();
+  S2LatLng hi = S2LatLng::FromDegrees(y_hi, x_hi).Normalized();
+  bounds_ = bounds_.Union(S2LatLngRect(lo, hi));
+}
+
 void LatLngRectBounder::Update(const GeoArrowGeography& value) {
   if (value.is_empty()) {
     return;
@@ -126,6 +133,12 @@ S2LatLngRect LatLngRectBounder::BoundPoints(const GeoArrowGeography& value) {
 void LatLngRectBounder::ExpandByDistance(double distance_meters) {
   S1Angle distance =
       S1Angle::Radians(distance_meters / S2Earth::RadiusMeters());
+  bounds_ = bounds_.ExpandedByDistance(distance);
+}
+
+void LatLngRectBounder::ExpandByDistanceWithRadius(double distance_meters,
+                                                   double radius) {
+  S1Angle distance = S1Angle::Radians(distance_meters / radius);
   bounds_ = bounds_.ExpandedByDistance(distance);
 }
 

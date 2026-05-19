@@ -502,8 +502,7 @@ INSTANTIATE_TEST_SUITE_P(
                                   std::nullopt},
 
         // Empties
-        UnaryGeographyScalarParam{"point_empty", "POINT EMPTY",
-                                  "POINT EMPTY"},
+        UnaryGeographyScalarParam{"point_empty", "POINT EMPTY", "POINT EMPTY"},
         UnaryGeographyScalarParam{"linestring_empty", "LINESTRING EMPTY",
                                   "LINESTRING EMPTY"},
         UnaryGeographyScalarParam{"polygon_empty", "POLYGON EMPTY",
