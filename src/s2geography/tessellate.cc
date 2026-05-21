@@ -54,11 +54,20 @@ template <typename VisitPoint, typename VisitLinestring, typename Out>
 void TransformSegments(struct GeoArrowGeometryView geom, Out* out,
                        VisitPoint&& visit_point,
                        VisitLinestring&& visit_linestring) {
-  int64_t remaining_rings = 0;
+  static constexpr int kMaxRecursion = 32;
+  int64_t remaining[kMaxRecursion] = {0};
+  uint8_t parent_type[kMaxRecursion] = {0};
+  int depth = 0;
 
   internal::VisitGeoArrowNodes(
       geom, [&](const struct GeoArrowGeometryNode* node) {
         out->SetDimensions(node->dimensions);
+
+        // If parent expects children, decrement the remaining count
+        if (depth > 0 && remaining[depth] > 0) {
+          --remaining[depth];
+        }
+
         switch (node->geometry_type) {
           case GEOARROW_GEOMETRY_TYPE_POINT:
             out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
@@ -67,24 +76,33 @@ void TransformSegments(struct GeoArrowGeometryView geom, Out* out,
             break;
 
           case GEOARROW_GEOMETRY_TYPE_LINESTRING:
-            if (remaining_rings > 0) {
-              // Inside a polygon - this is a ring
+            // Check if we're inside a polygon (linestring is a ring)
+            if (depth > 0 &&
+                parent_type[depth] == GEOARROW_GEOMETRY_TYPE_POLYGON) {
               out->RingStart();
               visit_linestring(node, out);
               out->RingEnd();
-              --remaining_rings;
             } else {
-              // Standalone linestring
               out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
               visit_linestring(node, out);
               out->GeomEnd();
             }
             break;
+
           case GEOARROW_GEOMETRY_TYPE_POLYGON:
             out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
-            remaining_rings = node->size;
+            ++depth;
+            remaining[depth] = node->size;
+            parent_type[depth] = GEOARROW_GEOMETRY_TYPE_POLYGON;
             break;
         }
+
+        // Close any geometries that have no remaining children
+        while (depth > 0 && remaining[depth] == 0) {
+          out->GeomEnd();
+          --depth;
+        }
+
         return true;
       });
 }
