@@ -956,7 +956,7 @@ GeoArrowVertex GeoArrowEdge::Interpolate(double fraction) {
           {v0.zm[0] + dzm0, v0.zm[1] + dzm1}};
 }
 
-GeoArrowVertex GeoArrowEdge::Interpolate(const S2Point& point) {
+GeoArrowVertex GeoArrowEdge::Interpolate(const S2Point& point) const {
   S2Point pt0 = v0.ToPoint();
   S2Point pt1 = v1.ToPoint();
 
