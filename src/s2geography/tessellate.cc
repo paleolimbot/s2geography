@@ -1,5 +1,7 @@
 #include "s2geography/tessellate.h"
 
+#include <optional>
+
 #include <s2/s2earth.h>
 #include <s2/s2edge_tessellator.h>
 
@@ -63,7 +65,8 @@ struct TessellateGeogExec {
         tolerance = S2EdgeTessellator::kMinTolerance();
       }
 
-      tessellator_ = S2EdgeTessellator(&projection_, tolerance);
+      tessellator_.emplace(&projection_, tolerance);
+      last_distance_ = distance;
     }
 
     // TODO: we need to figure out how to call GeomEnd() at the right times
@@ -80,18 +83,20 @@ struct TessellateGeogExec {
 
             case GEOARROW_GEOMETRY_TYPE_LINESTRING:
               if (remaining_rings > 0) {
-                out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
-                TessellateLinestring(node, out);
-                out->GeomEnd();
-              } else {
+                // Inside a polygon - this is a ring
                 out->RingStart();
                 TessellateLinestring(node, out);
                 out->RingEnd();
+                --remaining_rings;
+              } else {
+                // Standalone linestring
+                out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+                TessellateLinestring(node, out);
+                out->GeomEnd();
               }
-
-              --remaining_rings;
               break;
             case GEOARROW_GEOMETRY_TYPE_POLYGON:
+              out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
               remaining_rings = node->size;
               break;
           }
@@ -126,8 +131,8 @@ struct TessellateGeogExec {
     internal::VisitNativeEdges(
         node, 0, node->size, [&](const internal::GeoArrowEdge& e) {
           points_.clear();
-          tessellator_.AppendUnprojected(R2Point(e.v0.lng, e.v0.lat),
-                                         R2Point(e.v1.lng, e.v1.lat), &points_);
+          tessellator_->AppendUnprojected(R2Point(e.v0.lng, e.v0.lat),
+                                          R2Point(e.v1.lng, e.v1.lat), &points_);
           S2GEOGRAPHY_DCHECK(points_.size() >= 2);
           for (size_t i = 1; i < points_.size(); ++i) {
             out->AppendPoint(e.Interpolate(points_[i]));
@@ -137,7 +142,7 @@ struct TessellateGeogExec {
   }
 
   double last_distance_{-1};
-  S2EdgeTessellator tessellator_;
+  std::optional<S2EdgeTessellator> tessellator_;
   S2::PlateCarreeProjection projection_{S2::PlateCarreeProjection(180.0)};
   std::vector<S2Point> points_;
 };
@@ -155,7 +160,8 @@ struct TessellateGeomExec {
         tolerance = S2EdgeTessellator::kMinTolerance();
       }
 
-      tessellator_ = S2EdgeTessellator(&projection_, tolerance);
+      tessellator_.emplace(&projection_, tolerance);
+      last_distance_ = distance;
     }
 
     // TODO: we need to figure out how to call GeomEnd() at the right times
@@ -172,18 +178,20 @@ struct TessellateGeomExec {
 
             case GEOARROW_GEOMETRY_TYPE_LINESTRING:
               if (remaining_rings > 0) {
-                out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
-                TessellateLinestring(node, out);
-                out->GeomEnd();
-              } else {
+                // Inside a polygon - this is a ring
                 out->RingStart();
                 TessellateLinestring(node, out);
                 out->RingEnd();
+                --remaining_rings;
+              } else {
+                // Standalone linestring
+                out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+                TessellateLinestring(node, out);
+                out->GeomEnd();
               }
-
-              --remaining_rings;
               break;
             case GEOARROW_GEOMETRY_TYPE_POLYGON:
+              out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
               remaining_rings = node->size;
               break;
           }
@@ -220,8 +228,8 @@ struct TessellateGeomExec {
     internal::VisitNativeEdges(
         node, 0, node->size, [&](const internal::GeoArrowEdge& e) {
           points_.clear();
-          tessellator_.AppendProjected(e.v0.ToPoint(), e.v1.ToPoint(),
-                                       &points_);
+          tessellator_->AppendProjected(e.v0.ToPoint(), e.v1.ToPoint(),
+                                        &points_);
           S2GEOGRAPHY_DCHECK(points_.size() >= 2);
           for (size_t i = 1; i < points_.size(); ++i) {
             out->AppendPoint(EdgeInterpolateGeom(e, points_[i]));
@@ -231,12 +239,12 @@ struct TessellateGeomExec {
   }
 
   double last_distance_{-1};
-  S2EdgeTessellator tessellator_;
+  std::optional<S2EdgeTessellator> tessellator_;
   S2::PlateCarreeProjection projection_{S2::PlateCarreeProjection(180.0)};
   std::vector<R2Point> points_;
 };
 
-/// \brief Exec implementation for st_tessellategeom for geography
+/// \brief Exec implementation for st_segmentize for geography
 struct SegmentizeExec {
   using arg0_t = GeoArrowGeographyInputView;
   using arg1_t = DoubleInputView;
@@ -260,18 +268,20 @@ struct SegmentizeExec {
 
             case GEOARROW_GEOMETRY_TYPE_LINESTRING:
               if (remaining_rings > 0) {
-                out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
-                SegmentizeLinestring(node, out, max_segment_length);
-                out->GeomEnd();
-              } else {
+                // Inside a polygon - this is a ring
                 out->RingStart();
                 SegmentizeLinestring(node, out, max_segment_length);
                 out->RingEnd();
+                --remaining_rings;
+              } else {
+                // Standalone linestring
+                out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+                SegmentizeLinestring(node, out, max_segment_length);
+                out->GeomEnd();
               }
-
-              --remaining_rings;
               break;
             case GEOARROW_GEOMETRY_TYPE_POLYGON:
+              out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
               remaining_rings = node->size;
               break;
           }
@@ -339,15 +349,15 @@ struct SegmentizeExec {
 };
 
 void TessellateToGeog(struct SedonaCScalarKernel* out) {
-  InitUnaryKernel<TessellateGeogExec>(out, "st_tessellategeog");
+  InitBinaryKernel<TessellateGeogExec>(out, "st_tessellategeog");
 }
 
 void TessellateToGeom(struct SedonaCScalarKernel* out) {
-  InitUnaryKernel<TessellateGeomExec>(out, "st_tessellategeom");
+  InitBinaryKernel<TessellateGeomExec>(out, "st_tessellategeom");
 }
 
 void Segmentize(struct SedonaCScalarKernel* out) {
-  InitUnaryKernel<TessellateGeomExec>(out, "st_segmentize");
+  InitBinaryKernel<SegmentizeExec>(out, "st_segmentize");
 }
 
 }  // namespace sedona_udf

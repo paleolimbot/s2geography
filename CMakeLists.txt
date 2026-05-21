@@ -428,7 +428,9 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   target_link_libraries(
     geography_test s2geography ${S2GEOGRAPHY_NANOARROW_TARGET}
     GTest::gtest_main GTest::gmock)
-  target_link_libraries(tessellate_test s2geography GTest::gtest_main)
+  target_link_libraries(
+    tessellate_test s2geography ${S2GEOGRAPHY_NANOARROW_TARGET}
+    GTest::gtest_main GTest::gmock)
   target_link_libraries(
     linear_referencing_test s2geography ${S2GEOGRAPHY_NANOARROW_TARGET}
     GTest::gtest_main GTest::gmock)
@@ -449,6 +451,7 @@ if(S2GEOGRAPHY_BUILD_TESTS)
   target_include_directories(geoarrow_test PRIVATE src/vendored)
   target_include_directories(linear_referencing_test PRIVATE src/vendored)
   target_include_directories(predicates_test PRIVATE src/vendored)
+  target_include_directories(tessellate_test PRIVATE src/vendored)
   target_include_directories(geoarrow_geography_test PRIVATE src/vendored)
 
   include(GoogleTest)
