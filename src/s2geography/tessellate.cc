@@ -310,14 +310,23 @@ struct SegmentizeExec {
           S1Angle edge_length(p0, p1);
 
           // Calculate the number of segments needed
-          int num_segments =
-              static_cast<int>(std::ceil(edge_length / max_segment_length));
+          int64_t num_segments =
+              static_cast<int64_t>(std::ceil(edge_length / max_segment_length));
+
+          // Sanity check the number of segments to avoid mayhem
+          if (num_segments > 65536) {
+            throw Exception(
+                "Can't add more than 65536 segments to a single edge in "
+                "ST_Segmentize(). Use a larger max_segment_length or nested "
+                "calls to ST_Segmentize().");
+          }
+
           if (num_segments <= 1) {
             // No subdivision needed, just add endpoint
             out->AppendPoint(e.v1);
           } else {
             // Add intermediate points at equal fractions
-            for (int i = 1; i < num_segments; ++i) {
+            for (int64_t i = 1; i < num_segments; ++i) {
               double fraction = static_cast<double>(i) / num_segments;
               out->AppendPoint(e.Interpolate(fraction));
             }
