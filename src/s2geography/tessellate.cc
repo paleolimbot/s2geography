@@ -1,9 +1,9 @@
 #include "s2geography/tessellate.h"
 
-#include <optional>
-
 #include <s2/s2earth.h>
 #include <s2/s2edge_tessellator.h>
+
+#include <optional>
 
 #include "s2geography/geoarrow-geography_util.h"
 #include "s2geography/sedona_udf/sedona_udf_internal.h"
@@ -50,6 +50,45 @@ internal::GeoArrowVertex EdgeInterpolateGeom(const internal::GeoArrowEdge& e,
   return {p.x(), p.y(), {e.v0.zm[0] + dzm0, e.v0.zm[1] + dzm1}};
 }
 
+template <typename VisitPoint, typename VisitLinestring, typename Out>
+void TransformSegments(struct GeoArrowGeometryView geom, Out* out,
+                       VisitPoint&& visit_point,
+                       VisitLinestring&& visit_linestring) {
+  int64_t remaining_rings = 0;
+
+  internal::VisitGeoArrowNodes(
+      geom, [&](const struct GeoArrowGeometryNode* node) {
+        out->SetDimensions(node->dimensions);
+        switch (node->geometry_type) {
+          case GEOARROW_GEOMETRY_TYPE_POINT:
+            out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
+            visit_point(node, out);
+            out->GeomEnd();
+            break;
+
+          case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+            if (remaining_rings > 0) {
+              // Inside a polygon - this is a ring
+              out->RingStart();
+              visit_linestring(node, out);
+              out->RingEnd();
+              --remaining_rings;
+            } else {
+              // Standalone linestring
+              out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+              visit_linestring(node, out);
+              out->GeomEnd();
+            }
+            break;
+          case GEOARROW_GEOMETRY_TYPE_POLYGON:
+            out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
+            remaining_rings = node->size;
+            break;
+        }
+        return true;
+      });
+}
+
 }  // namespace
 
 /// \brief Exec implementation for st_tessellategeog for geography
@@ -69,38 +108,13 @@ struct TessellateGeogExec {
       last_distance_ = distance;
     }
 
-    // TODO: we need to figure out how to call GeomEnd() at the right times
-    int64_t remaining_rings = 0;
-    internal::VisitGeoArrowNodes(
-        geom, [&](const struct GeoArrowGeometryNode* node) {
-          out->SetDimensions(node->dimensions);
-          switch (node->geometry_type) {
-            case GEOARROW_GEOMETRY_TYPE_POINT:
-              out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
-              UnprojectPoint(node, out);
-              out->GeomEnd();
-              break;
-
-            case GEOARROW_GEOMETRY_TYPE_LINESTRING:
-              if (remaining_rings > 0) {
-                // Inside a polygon - this is a ring
-                out->RingStart();
-                TessellateLinestring(node, out);
-                out->RingEnd();
-                --remaining_rings;
-              } else {
-                // Standalone linestring
-                out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
-                TessellateLinestring(node, out);
-                out->GeomEnd();
-              }
-              break;
-            case GEOARROW_GEOMETRY_TYPE_POLYGON:
-              out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
-              remaining_rings = node->size;
-              break;
-          }
-          return true;
+    TransformSegments(
+        geom, out,
+        [&](const struct GeoArrowGeometryNode* node, out_t* out) {
+          UnprojectPoint(node, out);
+        },
+        [&](const struct GeoArrowGeometryNode* node, out_t* out) {
+          TessellateLinestring(node, out);
         });
   }
 
@@ -132,7 +146,8 @@ struct TessellateGeogExec {
         node, 0, node->size, [&](const internal::GeoArrowEdge& e) {
           points_.clear();
           tessellator_->AppendUnprojected(R2Point(e.v0.lng, e.v0.lat),
-                                          R2Point(e.v1.lng, e.v1.lat), &points_);
+                                          R2Point(e.v1.lng, e.v1.lat),
+                                          &points_);
           S2GEOGRAPHY_DCHECK(points_.size() >= 2);
           for (size_t i = 1; i < points_.size(); ++i) {
             out->AppendPoint(e.Interpolate(points_[i]));
@@ -164,38 +179,13 @@ struct TessellateGeomExec {
       last_distance_ = distance;
     }
 
-    // TODO: we need to figure out how to call GeomEnd() at the right times
-    int64_t remaining_rings = 0;
-    internal::VisitGeoArrowNodes(
-        geom.geom(), [&](const struct GeoArrowGeometryNode* node) {
-          out->SetDimensions(node->dimensions);
-          switch (node->geometry_type) {
-            case GEOARROW_GEOMETRY_TYPE_POINT:
-              out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
-              UnprojectPoint(node, out);
-              out->GeomEnd();
-              break;
-
-            case GEOARROW_GEOMETRY_TYPE_LINESTRING:
-              if (remaining_rings > 0) {
-                // Inside a polygon - this is a ring
-                out->RingStart();
-                TessellateLinestring(node, out);
-                out->RingEnd();
-                --remaining_rings;
-              } else {
-                // Standalone linestring
-                out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
-                TessellateLinestring(node, out);
-                out->GeomEnd();
-              }
-              break;
-            case GEOARROW_GEOMETRY_TYPE_POLYGON:
-              out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
-              remaining_rings = node->size;
-              break;
-          }
-          return true;
+    TransformSegments(
+        geom.geom(), out,
+        [&](const struct GeoArrowGeometryNode* node, out_t* out) {
+          UnprojectPoint(node, out);
+        },
+        [&](const struct GeoArrowGeometryNode* node, out_t* out) {
+          TessellateLinestring(node, out);
         });
   }
 
@@ -254,38 +244,13 @@ struct SegmentizeExec {
     S1Angle max_segment_length =
         S1Angle::Radians(distance / S2Earth::RadiusMeters());
 
-    // TODO: we need to figure out how to call GeomEnd() at the right times
-    int64_t remaining_rings = 0;
-    internal::VisitGeoArrowNodes(
-        geom.geom(), [&](const struct GeoArrowGeometryNode* node) {
-          out->SetDimensions(node->dimensions);
-          switch (node->geometry_type) {
-            case GEOARROW_GEOMETRY_TYPE_POINT:
-              out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
-              SegmentizePoint(node, out);
-              out->GeomEnd();
-              break;
-
-            case GEOARROW_GEOMETRY_TYPE_LINESTRING:
-              if (remaining_rings > 0) {
-                // Inside a polygon - this is a ring
-                out->RingStart();
-                SegmentizeLinestring(node, out, max_segment_length);
-                out->RingEnd();
-                --remaining_rings;
-              } else {
-                // Standalone linestring
-                out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
-                SegmentizeLinestring(node, out, max_segment_length);
-                out->GeomEnd();
-              }
-              break;
-            case GEOARROW_GEOMETRY_TYPE_POLYGON:
-              out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
-              remaining_rings = node->size;
-              break;
-          }
-          return true;
+    TransformSegments(
+        geom.geom(), out,
+        [&](const struct GeoArrowGeometryNode* node, out_t* out) {
+          SegmentizePoint(node, out);
+        },
+        [&](const struct GeoArrowGeometryNode* node, out_t* out) {
+          SegmentizeLinestring(node, out, max_segment_length);
         });
   }
 
