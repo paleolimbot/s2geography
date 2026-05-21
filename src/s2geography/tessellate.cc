@@ -10,32 +10,8 @@ namespace s2geography {
 
 namespace sedona_udf {
 
-/// \brief Exec implementation for st_to_geography for geography (no-op)
-///
-/// This version still parses and rebuilds output (could be removed by an
-/// optimizer rule).
-struct ToGeographyNoOpExec {
-  using arg0_t = GeoArrowGeometryInputView;
-  using out_t = GeoArrowGeographyOutputBuilder;
-
-  void Exec(arg0_t::c_type value, out_t* out) { out->AppendGeometry(value); }
-};
-
-/// \brief Exec implementation for st_to_geometry for geometry (no-op)
-///
-/// This version still parses and rebuilds output (could be removed by an
-/// optimizer rule).
-struct ToGeometryNoOpExec {
-  using arg0_t = GeoArrowGeographyInputView;
-  using out_t = GeoArrowGeometryOutputBuilder;
-
-  void Exec(arg0_t::c_type value, out_t* out) {
-    out->AppendGeometry(value.geom());
-  }
-};
-
-/// \brief Exec implementation for st_to_geography for geography
-struct ToGeographyExec {
+/// \brief Exec implementation for st_tessellategeog for geography
+struct TessellateGeogExec {
   using arg0_t = GeoArrowGeometryInputView;
   using arg1_t = DoubleInputView;
   using out_t = GeoArrowGeographyOutputBuilder;
@@ -126,8 +102,8 @@ struct ToGeographyExec {
   std::vector<S2Point> points_;
 };
 
-/// \brief Exec implementation for st_to_geometry for geography
-struct ToGeometryExec {
+/// \brief Exec implementation for st_tessellategeom for geography
+struct TessellateGeomExec {
   using arg0_t = GeoArrowGeographyInputView;
   using out_t = GeoArrowGeometryOutputBuilder;
 
@@ -136,12 +112,12 @@ struct ToGeometryExec {
   }
 };
 
-void ToGeographyKernel(struct SedonaCScalarKernel* out) {
-  InitUnaryKernel<ToGeographyNoOpExec>(out, "st_to_geography");
+void TessellateToGeog(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<TessellateGeogExec>(out, "st_tessellategeog");
 }
 
-void ToGeometryKernel(struct SedonaCScalarKernel* out) {
-  InitUnaryKernel<ToGeometryNoOpExec>(out, "st_to_geometry");
+void TessellateToGeom(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<TessellateGeomExec>(out, "st_tessellategeom");
 }
 
 }  // namespace sedona_udf

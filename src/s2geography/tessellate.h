@@ -8,10 +8,10 @@ namespace s2geography {
 namespace sedona_udf {
 
 /// \brief Kernel to convert planar geometry to geography (spherical)
-void ToGeographyKernel(struct SedonaCScalarKernel* out);
+void TessellateToGeog(struct SedonaCScalarKernel* out);
 
 /// \brief Kernel to convert geography (spherical) to planar geometry
-void ToGeometryKernel(struct SedonaCScalarKernel* out);
+void TessellateToGeom(struct SedonaCScalarKernel* out);
 
 }  // namespace sedona_udf
 
