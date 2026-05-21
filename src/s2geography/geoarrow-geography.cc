@@ -935,7 +935,7 @@ internal::GeoArrowEdge GeoArrowGeography::native_edge(int shape_id,
 
 namespace internal {
 
-GeoArrowVertex GeoArrowEdge::Interpolate(double fraction) {
+GeoArrowVertex GeoArrowEdge::Interpolate(double fraction) const {
   if (fraction <= 0) {
     return v0;
   } else if (fraction >= 1) {

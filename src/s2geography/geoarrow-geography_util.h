@@ -185,7 +185,7 @@ struct GeoArrowEdge {
   ///
   /// - lng and lat values are interpolated along a spherical path
   /// - z and m values are interpolated linearly
-  GeoArrowVertex Interpolate(double fraction);
+  GeoArrowVertex Interpolate(double fraction) const;
 
   /// \brief Given an S2Point along this edge, interpolate
   ///

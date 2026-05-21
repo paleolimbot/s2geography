@@ -291,7 +291,6 @@ struct SegmentizeExec {
   void SegmentizeLinestring(const struct GeoArrowGeometryNode* node,
                             GeoArrowGeographyOutputBuilder* out,
                             S1Angle max_segment_length) {
-    S2GEOGRAPHY_UNUSED(max_segment_length);  // TODO
     if (node->size == 0) {
       return;
     }
@@ -304,12 +303,29 @@ struct SegmentizeExec {
                                   });
 
     // Add subsequent points resulting from the segmentize
-    internal::VisitNativeEdges(node, 0, node->size,
-                               [&](const internal::GeoArrowEdge& e) {
-                                 S2GEOGRAPHY_UNUSED(e);  // TODO
-                                 // segmentize
-                                 return true;
-                               });
+    internal::VisitNativeEdges(
+        node, 0, node->size, [&](const internal::GeoArrowEdge& e) {
+          S2Point p0 = e.v0.ToPoint();
+          S2Point p1 = e.v1.ToPoint();
+          S1Angle edge_length(p0, p1);
+
+          // Calculate the number of segments needed
+          int num_segments =
+              static_cast<int>(std::ceil(edge_length / max_segment_length));
+          if (num_segments <= 1) {
+            // No subdivision needed, just add endpoint
+            out->AppendPoint(e.v1);
+          } else {
+            // Add intermediate points at equal fractions
+            for (int i = 1; i < num_segments; ++i) {
+              double fraction = static_cast<double>(i) / num_segments;
+              out->AppendPoint(e.Interpolate(fraction));
+            }
+            // Add the final endpoint
+            out->AppendPoint(e.v1);
+          }
+          return true;
+        });
   }
 };
 
