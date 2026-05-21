@@ -1,4 +1,4 @@
-#include "s2geography/geometry.h"
+#include "s2geography/tessellate.h"
 
 #include <gtest/gtest.h>
 

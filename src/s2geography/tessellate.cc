@@ -1,4 +1,4 @@
-#include "s2geography/geometry.h"
+#include "s2geography/tessellate.h"
 
 #include <s2/s2earth.h>
 #include <s2/s2edge_tessellator.h>
