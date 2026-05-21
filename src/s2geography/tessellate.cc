@@ -236,12 +236,93 @@ struct TessellateGeomExec {
   std::vector<R2Point> points_;
 };
 
+/// \brief Exec implementation for st_tessellategeom for geography
+struct SegmentizeExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = DoubleInputView;
+  using out_t = GeoArrowGeographyOutputBuilder;
+
+  void Exec(arg0_t::c_type geom, arg1_t::c_type distance, out_t* out) {
+    S1Angle max_segment_length =
+        S1Angle::Radians(distance / S2Earth::RadiusMeters());
+
+    // TODO: we need to figure out how to call GeomEnd() at the right times
+    int64_t remaining_rings = 0;
+    internal::VisitGeoArrowNodes(
+        geom.geom(), [&](const struct GeoArrowGeometryNode* node) {
+          out->SetDimensions(node->dimensions);
+          switch (node->geometry_type) {
+            case GEOARROW_GEOMETRY_TYPE_POINT:
+              out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
+              SegmentizePoint(node, out);
+              out->GeomEnd();
+              break;
+
+            case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+              if (remaining_rings > 0) {
+                out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+                SegmentizeLinestring(node, out, max_segment_length);
+                out->GeomEnd();
+              } else {
+                out->RingStart();
+                SegmentizeLinestring(node, out, max_segment_length);
+                out->RingEnd();
+              }
+
+              --remaining_rings;
+              break;
+            case GEOARROW_GEOMETRY_TYPE_POLYGON:
+              remaining_rings = node->size;
+              break;
+          }
+          return true;
+        });
+  }
+
+  void SegmentizePoint(const struct GeoArrowGeometryNode* node,
+                       GeoArrowGeographyOutputBuilder* out) {
+    internal::VisitNativeVertices(node, 0, node->size,
+                                  [&](const internal::GeoArrowVertex& v) {
+                                    out->AppendPoint(v);
+                                    return true;
+                                  });
+  }
+
+  void SegmentizeLinestring(const struct GeoArrowGeometryNode* node,
+                            GeoArrowGeographyOutputBuilder* out,
+                            S1Angle max_segment_length) {
+    S2GEOGRAPHY_UNUSED(max_segment_length);  // TODO
+    if (node->size == 0) {
+      return;
+    }
+
+    // Add the first point
+    internal::VisitNativeVertices(node, 0, 1,
+                                  [&](const internal::GeoArrowVertex& v) {
+                                    out->AppendPoint(v);
+                                    return true;
+                                  });
+
+    // Add subsequent points resulting from the segmentize
+    internal::VisitNativeEdges(node, 0, node->size,
+                               [&](const internal::GeoArrowEdge& e) {
+                                 S2GEOGRAPHY_UNUSED(e);  // TODO
+                                 // segmentize
+                                 return true;
+                               });
+  }
+};
+
 void TessellateToGeog(struct SedonaCScalarKernel* out) {
   InitUnaryKernel<TessellateGeogExec>(out, "st_tessellategeog");
 }
 
 void TessellateToGeom(struct SedonaCScalarKernel* out) {
   InitUnaryKernel<TessellateGeomExec>(out, "st_tessellategeom");
+}
+
+void Segmentize(struct SedonaCScalarKernel* out) {
+  InitUnaryKernel<TessellateGeomExec>(out, "st_segmentize");
 }
 
 }  // namespace sedona_udf

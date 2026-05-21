@@ -13,6 +13,9 @@ void TessellateToGeog(struct SedonaCScalarKernel* out);
 /// \brief Kernel to convert geography (spherical) to planar geometry
 void TessellateToGeom(struct SedonaCScalarKernel* out);
 
+/// \brief Kernel to segmentize geography along spherical edges
+void Segmentize(struct SedonaCScalarKernel* out);
+
 }  // namespace sedona_udf
 
 }  // namespace s2geography
