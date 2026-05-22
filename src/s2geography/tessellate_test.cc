@@ -238,7 +238,28 @@ INSTANTIATE_TEST_SUITE_P(
         TessellateToGeogParam{"linestring_tessellate_multiseg",
                               "LINESTRING (-10 45, 10 45, 30 45)", 10000.0,
                               "LINESTRING (-10 45, -5 45, 0 45, 5 45, 10 45, "
-                              "15 45, 20 45, 25 45, 30 45)"}),
+                              "15 45, 20 45, 25 45, 30 45)"},
+
+        // Z dimension - Z values should be linearly interpolated
+        TessellateToGeogParam{
+            "linestring_tessellate_highlat_z",
+            "LINESTRING Z (-10 45 100, 10 45 200)", 10000.0,
+            "LINESTRING Z (-10 45 100, -5 45 125.023904, 0 45 150, "
+            "5 45 174.976096, 10 45 200)"},
+
+        // M dimension - M values should be linearly interpolated
+        TessellateToGeogParam{
+            "linestring_tessellate_highlat_m",
+            "LINESTRING M (-10 45 0, 10 45 100)", 10000.0,
+            "LINESTRING M (-10 45 0, -5 45 25.023904, 0 45 50, "
+            "5 45 74.976096, 10 45 100)"},
+
+        // ZM dimension - both Z and M should be linearly interpolated
+        TessellateToGeogParam{
+            "linestring_tessellate_highlat_zm",
+            "LINESTRING ZM (-10 45 100 0, 10 45 200 100)", 10000.0,
+            "LINESTRING ZM (-10 45 100 0, -5 45 125.023904 25.023904, "
+            "0 45 150 50, 5 45 174.976096 74.976096, 10 45 200 100)"}),
     [](const ::testing::TestParamInfo<TessellateToGeogParam>& info) {
       return info.param.name;
     });
@@ -385,7 +406,29 @@ INSTANTIATE_TEST_SUITE_P(
             "LINESTRING (-10 45, 10 45, 30 45)", 10000.0,
             "LINESTRING (-10 45, -5.019332 45.328489, 0 45.438549, "
             "5.019332 45.328489, 10 45, 14.980668 45.328489, 20 45.438549, "
-            "25.019332 45.328489, 30 45)"}
+            "25.019332 45.328489, 30 45)"},
+
+        // Z dimension - Z values should be linearly interpolated
+        TessellateToGeomParam{
+            "linestring_tessellate_highlat_z",
+            "LINESTRING Z (-10 45 100, 10 45 200)", 10000.0,
+            "LINESTRING Z (-10 45 100, -5.019332 45.328489 124.903342, "
+            "0 45.438549 150, 5.019332 45.328489 175.096658, 10 45 200)"},
+
+        // M dimension - M values should be linearly interpolated
+        TessellateToGeomParam{
+            "linestring_tessellate_highlat_m",
+            "LINESTRING M (-10 45 0, 10 45 100)", 10000.0,
+            "LINESTRING M (-10 45 0, -5.019332 45.328489 24.903342, "
+            "0 45.438549 50, 5.019332 45.328489 75.096658, 10 45 100)"},
+
+        // ZM dimension - both Z and M should be linearly interpolated
+        TessellateToGeomParam{
+            "linestring_tessellate_highlat_zm",
+            "LINESTRING ZM (-10 45 100 0, 10 45 200 100)", 10000.0,
+            "LINESTRING ZM (-10 45 100 0, -5.019332 45.328489 124.903342 "
+            "24.903342, 0 45.438549 150 50, 5.019332 45.328489 175.096658 "
+            "75.096658, 10 45 200 100)"}
 
         ),
     [](const ::testing::TestParamInfo<TessellateToGeomParam>& info) {
