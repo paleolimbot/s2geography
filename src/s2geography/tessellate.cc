@@ -72,62 +72,66 @@ void TransformSegments(struct GeoArrowGeometryView geom, Out* out,
   uint8_t parent_type[kMaxRecursion] = {0};
   int depth = 0;
 
-  internal::VisitGeoArrowNodes(
-      geom, [&](const struct GeoArrowGeometryNode* node) {
-        out->SetDimensions(node->dimensions);
+  internal::VisitGeoArrowNodes(geom, [&](const struct GeoArrowGeometryNode*
+                                             node) {
+    out->SetDimensions(node->dimensions);
 
-        // If parent expects children, decrement the remaining count
-        if (depth > 0 && remaining[depth] > 0) {
-          --remaining[depth];
+    // If parent expects children, decrement the remaining count
+    if (depth > 0 && remaining[depth] > 0) {
+      --remaining[depth];
+    }
+
+    switch (node->geometry_type) {
+      case GEOARROW_GEOMETRY_TYPE_POINT:
+        out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
+        // Check for POINT EMPTY (geoarrow-c represents as POINT (nan nan))
+        if (!IsEmptyPoint(node)) {
+          visit_point(node, out);
         }
+        out->GeomEnd();
+        break;
 
-        switch (node->geometry_type) {
-          case GEOARROW_GEOMETRY_TYPE_POINT:
-            out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
-            // Check for POINT EMPTY (geoarrow-c represents as POINT (nan nan))
-            if (!IsEmptyPoint(node)) {
-              visit_point(node, out);
-            }
-            out->GeomEnd();
-            break;
-
-          case GEOARROW_GEOMETRY_TYPE_LINESTRING:
-            // Check if we're inside a polygon (linestring is a ring)
-            if (depth > 0 &&
-                parent_type[depth] == GEOARROW_GEOMETRY_TYPE_POLYGON) {
-              out->RingStart();
-              visit_linestring(node, out);
-              out->RingEnd();
-            } else {
-              out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
-              visit_linestring(node, out);
-              out->GeomEnd();
-            }
-            break;
-
-          case GEOARROW_GEOMETRY_TYPE_POLYGON:
-          case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
-          case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
-          case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
-          case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
-            out->GeomStart(
-                static_cast<enum GeoArrowGeometryType>(node->geometry_type));
-            ++depth;
-            remaining[depth] = node->size;
-            parent_type[depth] = node->geometry_type;
-            break;
-          default:
-            throw Exception("Unsupported geometry type constant");
-        }
-
-        // Close any geometries that have no remaining children
-        while (depth > 0 && remaining[depth] == 0) {
+      case GEOARROW_GEOMETRY_TYPE_LINESTRING:
+        // Check if we're inside a polygon (linestring is a ring)
+        if (depth > 0 && parent_type[depth] == GEOARROW_GEOMETRY_TYPE_POLYGON) {
+          out->RingStart();
+          visit_linestring(node, out);
+          out->RingEnd();
+        } else {
+          out->GeomStart(GEOARROW_GEOMETRY_TYPE_LINESTRING);
+          visit_linestring(node, out);
           out->GeomEnd();
-          --depth;
+        }
+        break;
+
+      case GEOARROW_GEOMETRY_TYPE_POLYGON:
+      case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+      case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
+      case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
+      case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
+        out->GeomStart(
+            static_cast<enum GeoArrowGeometryType>(node->geometry_type));
+        if ((depth + 1) >= kMaxRecursion) {
+          throw Exception(
+              "Can't transform edges of geometry with >32 levels of nesting");
         }
 
-        return true;
-      });
+        ++depth;
+        remaining[depth] = node->size;
+        parent_type[depth] = node->geometry_type;
+        break;
+      default:
+        throw Exception("Unsupported geometry type constant");
+    }
+
+    // Close any geometries that have no remaining children
+    while (depth > 0 && remaining[depth] == 0) {
+      out->GeomEnd();
+      --depth;
+    }
+
+    return true;
+  });
 }
 
 }  // namespace
@@ -238,7 +242,9 @@ struct TessellateGeomExec {
                       GeoArrowGeometryOutputBuilder* out) {
     internal::VisitNativeVertices(
         node, 0, node->size, [&](internal::GeoArrowVertex v) {
-          v.SetPoint(projection_.Unproject(R2Point(v.lng, v.lat)));
+          R2Point projected = projection_.Project(v.ToPoint());
+          v.lng = projected.x();
+          v.lat = projected.y();
           out->WriteCoord(v, node->dimensions);
           return true;
         });
@@ -287,6 +293,10 @@ struct SegmentizeExec {
   using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type geom, arg1_t::c_type distance, out_t* out) {
+    if (!std::isfinite(distance) || distance <= 0) {
+      throw Exception("ST_Segmentize distance must be finite and >0");
+    }
+
     S1Angle max_segment_length =
         S1Angle::Radians(distance / S2Earth::RadiusMeters());
 

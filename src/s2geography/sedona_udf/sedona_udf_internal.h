@@ -854,6 +854,7 @@ class GeoArrowInputView {
 
       GEOARROW_THROW_NOT_OK(
           nullptr, GeoArrowWKBReaderRead(&reader_, src, &stashed_, nullptr));
+      stashed_index_ = i;
     }
   }
 };
