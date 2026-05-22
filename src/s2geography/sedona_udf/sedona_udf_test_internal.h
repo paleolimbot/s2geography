@@ -150,8 +150,37 @@ class TestGeometry {
 // or an Arrow type (the only ones used here are bool, int32, and double).
 // We define some aliases here to ensure we can expand this if we need to and
 // make it more clean in the tests what the input/output types actually are.
-using ArrowTypeOrWKB = std::optional<enum ArrowType>;
-#define ARROW_TYPE_WKB std::nullopt
+
+/// A type that represents either an Arrow type or a GeoArrow WKB type with
+/// edge type information.
+struct ArrowTypeOrWKB {
+  bool is_wkb{false};
+  enum ArrowType arrow_type{NANOARROW_TYPE_UNINITIALIZED};
+  enum GeoArrowEdgeType edge_type{GEOARROW_EDGE_TYPE_SPHERICAL};
+
+  // Default constructor (WKB with spherical edges)
+  ArrowTypeOrWKB() : is_wkb(true), edge_type(GEOARROW_EDGE_TYPE_SPHERICAL) {}
+
+  // Implicit constructor from ArrowType (non-WKB types)
+  ArrowTypeOrWKB(enum ArrowType type) : is_wkb(false), arrow_type(type) {}
+
+  // Explicit WKB constructor with edge type
+  static ArrowTypeOrWKB Wkb(enum GeoArrowEdgeType edge = GEOARROW_EDGE_TYPE_SPHERICAL) {
+    ArrowTypeOrWKB result;
+    result.is_wkb = true;
+    result.edge_type = edge;
+    return result;
+  }
+
+  // For backwards compatibility with code expecting has_value()
+  bool has_value() const { return !is_wkb; }
+  enum ArrowType operator*() const { return arrow_type; }
+};
+
+// For backwards compatibility - ARROW_TYPE_WKB defaults to SPHERICAL edges
+#define ARROW_TYPE_WKB ArrowTypeOrWKB::Wkb(GEOARROW_EDGE_TYPE_SPHERICAL)
+// Helper for PLANAR edges (geometry input)
+#define ARROW_TYPE_WKB_PLANAR ArrowTypeOrWKB::Wkb(GEOARROW_EDGE_TYPE_PLANAR)
 
 // Create individual ArrowSchema values for each argument type
 inline std::vector<nanoarrow::UniqueSchema> ArgSchemas(
@@ -159,12 +188,12 @@ inline std::vector<nanoarrow::UniqueSchema> ArgSchemas(
   std::vector<nanoarrow::UniqueSchema> schemas;
   for (const auto& col : cols) {
     schemas.emplace_back();
-    if (col) {
+    if (!col.is_wkb) {
       NANOARROW_THROW_NOT_OK(
-          ArrowSchemaInitFromType(schemas.back().get(), *col));
+          ArrowSchemaInitFromType(schemas.back().get(), col.arrow_type));
     } else {
       geoarrow::Wkb()
-          .WithEdgeType(GEOARROW_EDGE_TYPE_SPHERICAL)
+          .WithEdgeType(col.edge_type)
           .InitSchema(schemas.back().get());
     }
   }
@@ -284,14 +313,15 @@ inline void TestInitKernel(struct SedonaCScalarKernel* kernel,
       0)
       << impl->get_last_error(impl);
 
-  if (result_type) {
+  if (result_type.has_value()) {
     struct ArrowSchemaView out_type_view;
     ASSERT_EQ(ArrowSchemaViewInit(&out_type_view, result_schema.get(), nullptr),
               NANOARROW_OK);
-    ASSERT_EQ(out_type_view.type, result_type);
+    ASSERT_EQ(out_type_view.type, *result_type);
   } else {
     auto type = ::geoarrow::GeometryDataType::Make(result_schema.get());
     ASSERT_EQ(type.id(), GEOARROW_TYPE_WKB);
+    ASSERT_EQ(type.edge_type(), result_type.edge_type);
   }
 }
 
@@ -417,7 +447,7 @@ inline void TestResultArrow(struct ArrowArray* result,
 
   for (int64_t i = 0; i < array_view->length; i++) {
     if (ArrowArrayViewIsNull(array_view.get(), i)) {
-      actual.push_back(ARROW_TYPE_WKB);
+      actual.push_back(std::nullopt);
     } else if (result_type == NANOARROW_TYPE_BOOL ||
                result_type == NANOARROW_TYPE_INT64) {
       actual.push_back(

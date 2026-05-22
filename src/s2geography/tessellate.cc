@@ -126,6 +126,7 @@ struct TessellateGeogExec {
       last_distance_ = distance;
     }
 
+    out->FeatureStart();
     TransformSegments(
         geom, out,
         [&](const struct GeoArrowGeometryNode* node, out_t* out) {
@@ -134,6 +135,7 @@ struct TessellateGeogExec {
         [&](const struct GeoArrowGeometryNode* node, out_t* out) {
           TessellateLinestring(node, out);
         });
+    out->FeatureEnd();
   }
 
   void UnprojectPoint(const struct GeoArrowGeometryNode* node,
@@ -141,7 +143,7 @@ struct TessellateGeogExec {
     internal::VisitNativeVertices(
         node, 0, node->size, [&](internal::GeoArrowVertex v) {
           v.SetPoint(projection_.Unproject(R2Point(v.lng, v.lat)));
-          out->AppendPoint(v);
+          out->WriteCoord(v);
           return true;
         });
   }
@@ -155,20 +157,20 @@ struct TessellateGeogExec {
     // Add the first point
     internal::VisitNativeVertices(node, 0, 1, [&](internal::GeoArrowVertex v) {
       v.SetPoint(projection_.Unproject(R2Point(v.lng, v.lat)));
-      out->AppendPoint(v);
+      out->WriteCoord(v);
       return true;
     });
 
     // Add subsequent points resulting from the edge tessellation
     internal::VisitNativeEdges(
-        node, 0, node->size, [&](const internal::GeoArrowEdge& e) {
+        node, 0, node->size - 1, [&](const internal::GeoArrowEdge& e) {
           points_.clear();
           tessellator_->AppendUnprojected(R2Point(e.v0.lng, e.v0.lat),
                                           R2Point(e.v1.lng, e.v1.lat),
                                           &points_);
           S2GEOGRAPHY_DCHECK(points_.size() >= 2);
           for (size_t i = 1; i < points_.size(); ++i) {
-            out->AppendPoint(e.Interpolate(points_[i]));
+            out->WriteCoord(e.Interpolate(points_[i]));
           }
           return true;
         });
@@ -197,6 +199,7 @@ struct TessellateGeomExec {
       last_distance_ = distance;
     }
 
+    out->FeatureStart();
     TransformSegments(
         geom.geom(), out,
         [&](const struct GeoArrowGeometryNode* node, out_t* out) {
@@ -205,6 +208,7 @@ struct TessellateGeomExec {
         [&](const struct GeoArrowGeometryNode* node, out_t* out) {
           TessellateLinestring(node, out);
         });
+    out->FeatureEnd();
   }
 
   void UnprojectPoint(const struct GeoArrowGeometryNode* node,
@@ -212,7 +216,7 @@ struct TessellateGeomExec {
     internal::VisitNativeVertices(
         node, 0, node->size, [&](internal::GeoArrowVertex v) {
           v.SetPoint(projection_.Unproject(R2Point(v.lng, v.lat)));
-          out->AppendPoint(v);
+          out->WriteCoord(v);
           return true;
         });
   }
@@ -228,19 +232,19 @@ struct TessellateGeomExec {
       R2Point projected = projection_.Project(v.ToPoint());
       v.lng = projected.x();
       v.lat = projected.y();
-      out->AppendPoint(v);
+      out->WriteCoord(v);
       return true;
     });
 
     // Add subsequent points resulting from the edge tessellation
     internal::VisitNativeEdges(
-        node, 0, node->size, [&](const internal::GeoArrowEdge& e) {
+        node, 0, node->size - 1, [&](const internal::GeoArrowEdge& e) {
           points_.clear();
           tessellator_->AppendProjected(e.v0.ToPoint(), e.v1.ToPoint(),
                                         &points_);
           S2GEOGRAPHY_DCHECK(points_.size() >= 2);
           for (size_t i = 1; i < points_.size(); ++i) {
-            out->AppendPoint(EdgeInterpolateGeom(e, points_[i]));
+            out->WriteCoord(EdgeInterpolateGeom(e, points_[i]));
           }
           return true;
         });
@@ -262,6 +266,7 @@ struct SegmentizeExec {
     S1Angle max_segment_length =
         S1Angle::Radians(distance / S2Earth::RadiusMeters());
 
+    out->FeatureStart();
     TransformSegments(
         geom.geom(), out,
         [&](const struct GeoArrowGeometryNode* node, out_t* out) {
@@ -270,13 +275,14 @@ struct SegmentizeExec {
         [&](const struct GeoArrowGeometryNode* node, out_t* out) {
           SegmentizeLinestring(node, out, max_segment_length);
         });
+    out->FeatureEnd();
   }
 
   void SegmentizePoint(const struct GeoArrowGeometryNode* node,
                        GeoArrowGeographyOutputBuilder* out) {
     internal::VisitNativeVertices(node, 0, node->size,
                                   [&](const internal::GeoArrowVertex& v) {
-                                    out->AppendPoint(v);
+                                    out->WriteCoord(v);
                                     return true;
                                   });
   }
@@ -291,13 +297,13 @@ struct SegmentizeExec {
     // Add the first point
     internal::VisitNativeVertices(node, 0, 1,
                                   [&](const internal::GeoArrowVertex& v) {
-                                    out->AppendPoint(v);
+                                    out->WriteCoord(v);
                                     return true;
                                   });
 
     // Add subsequent points resulting from the segmentize
     internal::VisitNativeEdges(
-        node, 0, node->size, [&](const internal::GeoArrowEdge& e) {
+        node, 0, node->size - 1, [&](const internal::GeoArrowEdge& e) {
           S2Point p0 = e.v0.ToPoint();
           S2Point p1 = e.v1.ToPoint();
           S1Angle edge_length(p0, p1);
@@ -316,15 +322,15 @@ struct SegmentizeExec {
 
           if (num_segments <= 1) {
             // No subdivision needed, just add endpoint
-            out->AppendPoint(e.v1);
+            out->WriteCoord(e.v1);
           } else {
             // Add intermediate points at equal fractions
             for (int64_t i = 1; i < num_segments; ++i) {
               double fraction = static_cast<double>(i) / num_segments;
-              out->AppendPoint(e.Interpolate(fraction));
+              out->WriteCoord(e.Interpolate(fraction));
             }
             // Add the final endpoint
-            out->AppendPoint(e.v1);
+            out->WriteCoord(e.v1);
           }
           return true;
         });
