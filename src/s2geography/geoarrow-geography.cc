@@ -32,8 +32,6 @@ void ReverseNodeInPlace(struct GeoArrowGeometryNode* node) {
   }
 }
 
-
-
 const char* GeometryTypeString(uint8_t geometry_type) {
   switch (geometry_type) {
     case GEOARROW_GEOMETRY_TYPE_POINT:

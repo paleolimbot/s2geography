@@ -1,6 +1,5 @@
 #pragma once
 
-#include "s2geography/geography.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
 
 namespace s2geography {
