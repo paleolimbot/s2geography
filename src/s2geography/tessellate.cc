@@ -326,7 +326,8 @@ struct SegmentizeExec {
           } else {
             // Add intermediate points at equal fractions
             for (int64_t i = 1; i < num_segments; ++i) {
-              double fraction = static_cast<double>(i) / num_segments;
+              double fraction =
+                  static_cast<double>(i) / static_cast<double>(num_segments);
               out->WriteCoord(e.Interpolate(fraction));
             }
             // Add the final endpoint
