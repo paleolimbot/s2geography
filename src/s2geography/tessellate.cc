@@ -90,11 +90,18 @@ void TransformSegments(struct GeoArrowGeometryView geom, Out* out,
             break;
 
           case GEOARROW_GEOMETRY_TYPE_POLYGON:
-            out->GeomStart(GEOARROW_GEOMETRY_TYPE_POLYGON);
+          case GEOARROW_GEOMETRY_TYPE_MULTIPOINT:
+          case GEOARROW_GEOMETRY_TYPE_MULTILINESTRING:
+          case GEOARROW_GEOMETRY_TYPE_MULTIPOLYGON:
+          case GEOARROW_GEOMETRY_TYPE_GEOMETRYCOLLECTION:
+            out->GeomStart(
+                static_cast<enum GeoArrowGeometryType>(node->geometry_type));
             ++depth;
             remaining[depth] = node->size;
-            parent_type[depth] = GEOARROW_GEOMETRY_TYPE_POLYGON;
+            parent_type[depth] = node->geometry_type;
             break;
+          default:
+            throw Exception("Unsupported geometry type constant");
         }
 
         // Close any geometries that have no remaining children
