@@ -19,6 +19,7 @@
 #include "s2geography/operation.h"
 #include "s2geography/predicates.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
+#include "s2geography/tessellate.h"
 
 // Helper macros
 
@@ -178,7 +179,7 @@ uint64_t S2GeogLngLatToCellId(const struct S2GeogVertex* v) {
 
 using KernelInitFunc = void (*)(struct SedonaCScalarKernel*);
 
-static const std::array<KernelInitFunc, 30> kSedonaKernels = {{
+static const std::array<KernelInitFunc, 33> kSedonaKernels = {{
     s2geography::sedona_udf::AreaKernel,
     s2geography::sedona_udf::CentroidKernel,
     s2geography::sedona_udf::ClosestPointKernel,
@@ -219,6 +220,9 @@ static const std::array<KernelInitFunc, 30> kSedonaKernels = {{
     [](SedonaCScalarKernel* k) {
       s2geography::sedona_udf::LongestLineKernel(k);
     },
+    s2geography::sedona_udf::TessellateToGeog,
+    s2geography::sedona_udf::TessellateToGeom,
+    s2geography::sedona_udf::Segmentize,
 }};
 
 size_t S2GeogNumKernels(void) { return kSedonaKernels.size(); }
