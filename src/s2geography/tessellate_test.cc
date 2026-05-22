@@ -21,7 +21,7 @@ TEST(Tessellate, SedonaUdfTessellateToGeogArray) {
   // Use a very large tolerance (1e9 meters) so no tessellation occurs
   ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
       &impl, {ARROW_TYPE_WKB_PLANAR, NANOARROW_TYPE_DOUBLE},
-      {{"POINT (0 0)", "LINESTRING (0 0, 1 1)", std::nullopt}},
+      {{"POINT (0 1)", "LINESTRING (0 1, 1 2)", std::nullopt}},
       {{1e9, 1e9, 1e9}}, out_array.get()));
   impl.release(&impl);
   kernel.release(&kernel);
@@ -29,7 +29,7 @@ TEST(Tessellate, SedonaUdfTessellateToGeogArray) {
   // With large tolerance, output should match input (just converted to
   // geography)
   ASSERT_NO_FATAL_FAILURE(TestResultGeography(
-      out_array.get(), {"POINT (0 0)", "LINESTRING (0 0, 1 1)", std::nullopt}));
+      out_array.get(), {"POINT (0 1)", "LINESTRING (0 1, 1 2)", std::nullopt}));
 }
 
 TEST(Tessellate, SedonaUdfTessellateToGeomArray) {
@@ -46,7 +46,7 @@ TEST(Tessellate, SedonaUdfTessellateToGeomArray) {
   // Use a very large tolerance (1e9 meters) so no tessellation occurs
   ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
       &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
-      {{"POINT (0 0)", "LINESTRING (0 0, 1 1)", std::nullopt}},
+      {{"POINT (0 1)", "LINESTRING (0 1, 1 2)", std::nullopt}},
       {{1e9, 1e9, 1e9}}, out_array.get()));
   impl.release(&impl);
   kernel.release(&kernel);
@@ -54,7 +54,7 @@ TEST(Tessellate, SedonaUdfTessellateToGeomArray) {
   // With large tolerance, output should match input (just converted to
   // geometry)
   ASSERT_NO_FATAL_FAILURE(TestResultGeography(
-      out_array.get(), {"POINT (0 0)", "LINESTRING (0 0, 1 1)", std::nullopt}));
+      out_array.get(), {"POINT (0 1)", "LINESTRING (0 1, 1 2)", std::nullopt}));
 }
 
 TEST(Tessellate, SedonaUdfSegmentizeArray) {
@@ -68,14 +68,14 @@ TEST(Tessellate, SedonaUdfSegmentizeArray) {
   // Use a very large segment length (1e9 meters) so no segmentization occurs
   ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
       &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
-      {{"POINT (0 0)", "LINESTRING (0 0, 1 1)", std::nullopt}},
+      {{"POINT (0 1)", "LINESTRING (0 1, 1 2)", std::nullopt}},
       {{1e9, 1e9, 1e9}}, out_array.get()));
   impl.release(&impl);
   kernel.release(&kernel);
 
   // With large segment length, output should match input
   ASSERT_NO_FATAL_FAILURE(TestResultGeography(
-      out_array.get(), {"POINT (0 0)", "LINESTRING (0 0, 1 1)", std::nullopt}));
+      out_array.get(), {"POINT (0 1)", "LINESTRING (0 1, 1 2)", std::nullopt}));
 }
 
 TEST(Tessellate, SedonaUdfSegmentizeWithSubdivision) {
@@ -100,3 +100,401 @@ TEST(Tessellate, SedonaUdfSegmentizeWithSubdivision) {
   ASSERT_NO_FATAL_FAILURE(
       TestResultGeography(out_array.get(), {"LINESTRING (0 0, 0 1, 0 2)"}));
 }
+
+// ============================================================================
+// Parameterized Tests for TessellateToGeog
+// ============================================================================
+
+struct TessellateToGeogParam {
+  std::string name;
+  std::optional<std::string> input;
+  std::optional<double> tolerance;
+  std::optional<std::string> expected;
+
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const TessellateToGeogParam& p) {
+    os << (p.input ? *p.input : "null") << " with tolerance ";
+    if (p.tolerance) {
+      os << *p.tolerance;
+    } else {
+      os << "null";
+    }
+    os << " -> " << (p.expected ? *p.expected : "null");
+    return os;
+  }
+};
+
+class TessellateToGeogTest
+    : public ::testing::TestWithParam<TessellateToGeogParam> {};
+
+TEST_P(TessellateToGeogTest, SedonaUdf) {
+  const auto& p = GetParam();
+
+  struct SedonaCScalarKernel kernel;
+  struct SedonaCScalarKernelImpl impl;
+  s2geography::sedona_udf::TessellateToGeog(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB_PLANAR, NANOARROW_TYPE_DOUBLE},
+      ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB_PLANAR, NANOARROW_TYPE_DOUBLE},
+                        {{p.input}}, {{p.tolerance}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(out_array.get(), {p.expected}));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Tessellate, TessellateToGeogTest,
+    ::testing::Values(
+        // Nulls
+        TessellateToGeogParam{"null_input", std::nullopt, 1e9, std::nullopt},
+        TessellateToGeogParam{"null_tolerance", "POINT (0 0)", std::nullopt,
+                              std::nullopt},
+        TessellateToGeogParam{"null_both", std::nullopt, std::nullopt,
+                              std::nullopt},
+
+        // Empties
+        TessellateToGeogParam{"empty_point", "POINT EMPTY", 1e9, "POINT EMPTY"},
+        TessellateToGeogParam{"empty_linestring", "LINESTRING EMPTY", 1e9,
+                              "LINESTRING EMPTY"},
+        TessellateToGeogParam{"empty_polygon", "POLYGON EMPTY", 1e9,
+                              "POLYGON EMPTY"},
+        TessellateToGeogParam{"empty_multipoint", "MULTIPOINT EMPTY", 1e9,
+                              "MULTIPOINT EMPTY"},
+        TessellateToGeogParam{"empty_multilinestring", "MULTILINESTRING EMPTY",
+                              1e9, "MULTILINESTRING EMPTY"},
+        TessellateToGeogParam{"empty_multipolygon", "MULTIPOLYGON EMPTY", 1e9,
+                              "MULTIPOLYGON EMPTY"},
+        TessellateToGeogParam{"empty_geometrycollection",
+                              "GEOMETRYCOLLECTION EMPTY", 1e9,
+                              "GEOMETRYCOLLECTION EMPTY"},
+
+        // Points (no tessellation needed regardless of tolerance)
+        TessellateToGeogParam{"point_large_tol", "POINT (0 1)", 1e9,
+                              "POINT (0 1)"},
+        TessellateToGeogParam{"point_small_tol", "POINT (30 45)", 1.0,
+                              "POINT (30 45)"},
+
+        // Linestrings without tessellation (large tolerance)
+        TessellateToGeogParam{"linestring_large_tol", "LINESTRING (0 1, 1 2)",
+                              1e9, "LINESTRING (0 1, 1 2)"},
+        TessellateToGeogParam{"linestring_multi_seg",
+                              "LINESTRING (0 1, 1 2, 2 1)", 1e9,
+                              "LINESTRING (0 1, 1 2, 2 1)"},
+
+        // Polygons without tessellation (large tolerance)
+        TessellateToGeogParam{"polygon_large_tol",
+                              "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", 1e9,
+                              "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))"},
+
+        // MultiPoints (no tessellation needed)
+        TessellateToGeogParam{"multipoint_large_tol",
+                              "MULTIPOINT ((0 1), (1 2), (2 3))", 1e9,
+                              "MULTIPOINT ((0 1), (1 2), (2 3))"},
+        TessellateToGeogParam{"multipoint_small_tol",
+                              "MULTIPOINT ((0 1), (30 45))", 1.0,
+                              "MULTIPOINT ((0 1), (30 45))"},
+
+        // MultiLinestrings without tessellation (large tolerance)
+        TessellateToGeogParam{"multilinestring_large_tol",
+                              "MULTILINESTRING ((0 1, 1 2), (2 3, 3 4))", 1e9,
+                              "MULTILINESTRING ((0 1, 1 2), (2 3, 3 4))"},
+
+        // MultiPolygons without tessellation (large tolerance)
+        TessellateToGeogParam{"multipolygon_large_tol",
+                              "MULTIPOLYGON (((0 0, 1 0, 1 1, 0 1, 0 0)), "
+                              "((2 3, 3 3, 3 4, 2 4, 2 3)))",
+                              1e9,
+                              "MULTIPOLYGON (((0 0, 1 0, 1 1, 0 1, 0 0)), "
+                              "((2 3, 3 3, 3 4, 2 4, 2 3)))"},
+
+        // GeometryCollections without tessellation (large tolerance)
+        TessellateToGeogParam{
+            "geometrycollection_large_tol",
+            "GEOMETRYCOLLECTION (POINT (0 1), LINESTRING (0 1, 1 2))", 1e9,
+            "GEOMETRYCOLLECTION (POINT (0 1), LINESTRING (0 1, 1 2))"},
+
+        // Tessellation with high-latitude horizontal line
+        // At lat 45, a planar line stays at constant latitude but the geodesic
+        // curves poleward, maximizing deviation and triggering tessellation
+        TessellateToGeogParam{"linestring_tessellate_highlat",
+                              "LINESTRING (-10 45, 10 45)", 10000.0,
+                              "LINESTRING (-10 45, -5 45, 0 45, 5 45, 10 45)"},
+
+        // Much smaller tolerance adds more intermediate points
+        TessellateToGeogParam{
+            "linestring_tessellate_highlat_small", "LINESTRING (-10 45, 10 45)",
+            1000.0,
+            "LINESTRING (-10 45, -7.5 45, -5 45, -2.5 45, 0 45, "
+            "2.5 45, 5 45, 7.5 45, 10 45)"},
+
+        // Multi-segment linestring - both segments at high latitude need
+        // tessellation
+        TessellateToGeogParam{"linestring_tessellate_multiseg",
+                              "LINESTRING (-10 45, 10 45, 30 45)", 10000.0,
+                              "LINESTRING (-10 45, -5 45, 0 45, 5 45, 10 45, "
+                              "15 45, 20 45, 25 45, 30 45)"}),
+    [](const ::testing::TestParamInfo<TessellateToGeogParam>& info) {
+      return info.param.name;
+    });
+
+// ============================================================================
+// Parameterized Tests for TessellateToGeom
+// ============================================================================
+
+struct TessellateToGeomParam {
+  std::string name;
+  std::optional<std::string> input;
+  std::optional<double> tolerance;
+  std::optional<std::string> expected;
+
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const TessellateToGeomParam& p) {
+    os << (p.input ? *p.input : "null") << " with tolerance ";
+    if (p.tolerance) {
+      os << *p.tolerance;
+    } else {
+      os << "null";
+    }
+    os << " -> " << (p.expected ? *p.expected : "null");
+    return os;
+  }
+};
+
+class TessellateToGeomTest
+    : public ::testing::TestWithParam<TessellateToGeomParam> {};
+
+TEST_P(TessellateToGeomTest, SedonaUdf) {
+  const auto& p = GetParam();
+
+  struct SedonaCScalarKernel kernel;
+  struct SedonaCScalarKernelImpl impl;
+  s2geography::sedona_udf::TessellateToGeom(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(
+      TestInitKernel(&kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+                     ARROW_TYPE_WKB_PLANAR));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+                        {{p.input}}, {{p.tolerance}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(out_array.get(), {p.expected}));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Tessellate, TessellateToGeomTest,
+    ::testing::Values(
+        // Nulls
+        TessellateToGeomParam{"null_input", std::nullopt, 1e9, std::nullopt},
+        TessellateToGeomParam{"null_tolerance", "POINT (0 0)", std::nullopt,
+                              std::nullopt},
+        TessellateToGeomParam{"null_both", std::nullopt, std::nullopt,
+                              std::nullopt},
+
+        // Empties
+        TessellateToGeomParam{"empty_point", "POINT EMPTY", 1e9, "POINT EMPTY"},
+        TessellateToGeomParam{"empty_linestring", "LINESTRING EMPTY", 1e9,
+                              "LINESTRING EMPTY"},
+        TessellateToGeomParam{"empty_polygon", "POLYGON EMPTY", 1e9,
+                              "POLYGON EMPTY"},
+        TessellateToGeomParam{"empty_multipoint", "MULTIPOINT EMPTY", 1e9,
+                              "MULTIPOINT EMPTY"},
+        TessellateToGeomParam{"empty_multilinestring", "MULTILINESTRING EMPTY",
+                              1e9, "MULTILINESTRING EMPTY"},
+        TessellateToGeomParam{"empty_multipolygon", "MULTIPOLYGON EMPTY", 1e9,
+                              "MULTIPOLYGON EMPTY"},
+        TessellateToGeomParam{"empty_geometrycollection",
+                              "GEOMETRYCOLLECTION EMPTY", 1e9,
+                              "GEOMETRYCOLLECTION EMPTY"},
+
+        // Points (no tessellation needed)
+        TessellateToGeomParam{"point_large_tol", "POINT (0 1)", 1e9,
+                              "POINT (0 1)"},
+        TessellateToGeomParam{"point_small_tol", "POINT (30 45)", 1.0,
+                              "POINT (30 45)"},
+
+        // Linestrings without tessellation (large tolerance)
+        TessellateToGeomParam{"linestring_large_tol", "LINESTRING (0 1, 1 2)",
+                              1e9, "LINESTRING (0 1, 1 2)"},
+        TessellateToGeomParam{"linestring_multi_seg",
+                              "LINESTRING (0 1, 1 2, 2 1)", 1e9,
+                              "LINESTRING (0 1, 1 2, 2 1)"},
+
+        // Polygons without tessellation (large tolerance)
+        TessellateToGeomParam{"polygon_large_tol",
+                              "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", 1e9,
+                              "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))"},
+
+        // MultiPoints (no tessellation needed)
+        TessellateToGeomParam{"multipoint_large_tol",
+                              "MULTIPOINT ((0 1), (1 2), (2 3))", 1e9,
+                              "MULTIPOINT ((0 1), (1 2), (2 3))"},
+        TessellateToGeomParam{"multipoint_small_tol",
+                              "MULTIPOINT ((0 1), (30 45))", 1.0,
+                              "MULTIPOINT ((0 1), (30 45))"},
+
+        // MultiLinestrings without tessellation (large tolerance)
+        TessellateToGeomParam{"multilinestring_large_tol",
+                              "MULTILINESTRING ((0 1, 1 2), (2 3, 3 4))", 1e9,
+                              "MULTILINESTRING ((0 1, 1 2), (2 3, 3 4))"},
+
+        // MultiPolygons without tessellation (large tolerance)
+        TessellateToGeomParam{"multipolygon_large_tol",
+                              "MULTIPOLYGON (((0 0, 1 0, 1 1, 0 1, 0 0)), "
+                              "((2 3, 3 3, 3 4, 2 4, 2 3)))",
+                              1e9,
+                              "MULTIPOLYGON (((0 0, 1 0, 1 1, 0 1, 0 0)), "
+                              "((2 3, 3 3, 3 4, 2 4, 2 3)))"},
+
+        // GeometryCollections without tessellation (large tolerance)
+        TessellateToGeomParam{
+            "geometrycollection_large_tol",
+            "GEOMETRYCOLLECTION (POINT (0 1), LINESTRING (0 1, 1 2))", 1e9,
+            "GEOMETRYCOLLECTION (POINT (0 1), LINESTRING (0 1, 1 2))"},
+
+        // Tessellation with high-latitude horizontal line
+        // At lat 45, the geodesic curves poleward from the constant-latitude
+        // planar line, maximizing deviation and triggering tessellation
+        TessellateToGeomParam{
+            "linestring_tessellate_highlat", "LINESTRING (-10 45, 10 45)",
+            10000.0,
+            "LINESTRING (-10 45, -5.019332 45.328489, 0 45.438549, "
+            "5.019332 45.328489, 10 45)"},
+
+        // Much smaller tolerance adds more intermediate points
+        TessellateToGeomParam{
+            "linestring_tessellate_highlat_small", "LINESTRING (-10 45, 10 45)",
+            1000.0,
+            "LINESTRING (-10 45, -7.51685 45.191313, -5.019332 45.328489, "
+            "-2.51211 45.411007, 0 45.438549, 2.51211 45.411007, "
+            "5.019332 45.328489, 7.51685 45.191313, 10 45)"},
+
+        // Multi-segment linestring - both segments at high latitude need
+        // tessellation
+        TessellateToGeomParam{
+            "linestring_tessellate_multiseg",
+            "LINESTRING (-10 45, 10 45, 30 45)", 10000.0,
+            "LINESTRING (-10 45, -5.019332 45.328489, 0 45.438549, "
+            "5.019332 45.328489, 10 45, 14.980668 45.328489, 20 45.438549, "
+            "25.019332 45.328489, 30 45)"}
+
+        ),
+    [](const ::testing::TestParamInfo<TessellateToGeomParam>& info) {
+      return info.param.name;
+    });
+
+// ============================================================================
+// Parameterized Tests for Segmentize
+// ============================================================================
+
+struct SegmentizeParam {
+  std::string name;
+  std::optional<std::string> input;
+  std::optional<double> max_segment_length;
+  std::optional<std::string> expected;
+
+  friend std::ostream& operator<<(std::ostream& os, const SegmentizeParam& p) {
+    os << (p.input ? *p.input : "null") << " with max_segment_length ";
+    if (p.max_segment_length) {
+      os << *p.max_segment_length;
+    } else {
+      os << "null";
+    }
+    os << " -> " << (p.expected ? *p.expected : "null");
+    return os;
+  }
+};
+
+class SegmentizeTest : public ::testing::TestWithParam<SegmentizeParam> {};
+
+TEST_P(SegmentizeTest, SedonaUdf) {
+  const auto& p = GetParam();
+
+  struct SedonaCScalarKernel kernel;
+  struct SedonaCScalarKernelImpl impl;
+  s2geography::sedona_udf::Segmentize(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, {{p.input}},
+      {{p.max_segment_length}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_NO_FATAL_FAILURE(TestResultGeography(out_array.get(), {p.expected}));
+}
+
+// Earth radius in meters
+constexpr double kEarthRadiusMeters = 6371000.0;
+// 1 degree in meters at the equator
+constexpr double kOneDegreeMeters = kEarthRadiusMeters * M_PI / 180.0;
+
+INSTANTIATE_TEST_SUITE_P(
+    Tessellate, SegmentizeTest,
+    ::testing::Values(
+        // Nulls
+        SegmentizeParam{"null_input", std::nullopt, 1e9, std::nullopt},
+        SegmentizeParam{"null_length", "POINT (0 0)", std::nullopt,
+                        std::nullopt},
+        SegmentizeParam{"null_both", std::nullopt, std::nullopt, std::nullopt},
+
+        // Empties
+        SegmentizeParam{"empty_point", "POINT EMPTY", 1e9, "POINT EMPTY"},
+        SegmentizeParam{"empty_linestring", "LINESTRING EMPTY", 1e9,
+                        "LINESTRING EMPTY"},
+        SegmentizeParam{"empty_polygon", "POLYGON EMPTY", 1e9, "POLYGON EMPTY"},
+
+        // Points (no segmentation needed)
+        SegmentizeParam{"point_large_seg", "POINT (0 1)", 1e9, "POINT (0 1)"},
+        SegmentizeParam{"point_small_seg", "POINT (30 45)", 1.0,
+                        "POINT (30 45)"},
+
+        // Linestrings without segmentation (large max segment)
+        SegmentizeParam{"linestring_large_seg", "LINESTRING (0 1, 1 2)", 1e9,
+                        "LINESTRING (0 1, 1 2)"},
+        SegmentizeParam{"linestring_multi_seg", "LINESTRING (0 1, 1 2, 2 1)",
+                        1e9, "LINESTRING (0 1, 1 2, 2 1)"},
+
+        // Polygons without segmentation (large max segment)
+        SegmentizeParam{"polygon_large_seg",
+                        "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", 1e9,
+                        "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))"},
+
+        // Segmentation - 2 degree line with ~1 degree max -> 2 segments
+        SegmentizeParam{"linestring_2deg_split2", "LINESTRING (0 0, 0 2)",
+                        kOneDegreeMeters * 1.1, "LINESTRING (0 0, 0 1, 0 2)"},
+
+        // Segmentation - 3 degree line with ~1 degree max -> 3 segments
+        SegmentizeParam{"linestring_3deg_split3", "LINESTRING (0 0, 0 3)",
+                        kOneDegreeMeters * 1.1,
+                        "LINESTRING (0 0, 0 1, 0 2, 0 3)"},
+
+        // Segmentation - 4 degree line with ~1 degree max -> 4 segments
+        SegmentizeParam{"linestring_4deg_split4", "LINESTRING (0 0, 0 4)",
+                        kOneDegreeMeters * 1.1,
+                        "LINESTRING (0 0, 0 1, 0 2, 0 3, 0 4)"},
+
+        // Polygon segmentation
+        // Note: The midpoint of the edge from (0,2) to (2,2) is at latitude
+        // 2.000304 due to the great circle path curving slightly poleward
+        SegmentizeParam{
+            "polygon_2deg_split", "POLYGON ((0 0, 0 2, 2 2, 2 0, 0 0))",
+            kOneDegreeMeters * 1.1,
+            "POLYGON ((0 0, 0 1, 0 2, 1 2.000304, 2 2, 2 1, 2 0, 1 0, 0 0))"}
+
+        ),
+    [](const ::testing::TestParamInfo<SegmentizeParam>& info) {
+      return info.param.name;
+    });
