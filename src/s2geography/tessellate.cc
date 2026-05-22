@@ -363,15 +363,15 @@ struct SegmentizeExec {
 };
 
 void TessellateToGeog(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<TessellateGeogExec>(out, "st_tessellategeog");
+  InitBinaryKernel<TessellateGeogExec>(out, "st_tessellategeog", false, false);
 }
 
 void TessellateToGeom(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<TessellateGeomExec>(out, "st_tessellategeom");
+  InitBinaryKernel<TessellateGeomExec>(out, "st_tessellategeom", false, false);
 }
 
 void Segmentize(struct SedonaCScalarKernel* out) {
-  InitBinaryKernel<SegmentizeExec>(out, "st_segmentize");
+  InitBinaryKernel<SegmentizeExec>(out, "st_segmentize", false, false);
 }
 
 }  // namespace sedona_udf
