@@ -32,15 +32,7 @@ void ReverseNodeInPlace(struct GeoArrowGeometryNode* node) {
   }
 }
 
-bool AllLngLatNaN(struct GeoArrowGeometryView geom) {
-  return internal::VisitGeoArrowNodes(
-      geom, [&](const struct GeoArrowGeometryNode* node) {
-        return internal::VisitLngLat(
-            node, 0, node->size, [&](double lng, double lat) {
-              return std::isnan(lng) && std::isnan(lat);
-            });
-      });
-}
+
 
 const char* GeometryTypeString(uint8_t geometry_type) {
   switch (geometry_type) {
@@ -75,7 +67,7 @@ void GeoArrowPointShape::Init(struct GeoArrowGeometryView geom) {
       // Treat an empty point as MULTIPOINT EMPTY
       // geoarrow-c currently reads POINT EMPTY as nan nan instead of a
       // proper EMPTY
-      if (geom.root->size == 0 || AllLngLatNaN(geom)) {
+      if (geom.root->size == 0 || internal::AllLngLatNaN(geom)) {
         geom_ = {nullptr, 0};
       } else {
         geom_ = geom;

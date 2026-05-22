@@ -121,6 +121,18 @@ bool VisitLngLat(const struct GeoArrowGeometryNode* node, int64_t offset,
   return true;
 }
 
+/// \brief Check if all coordinates in a geometry view are NaN
+///
+/// This is used to detect POINT EMPTY, which geoarrow-c currently reads
+/// as POINT (nan nan) with size 1 instead of a proper empty geometry.
+inline bool AllLngLatNaN(struct GeoArrowGeometryView geom) {
+  return VisitGeoArrowNodes(geom, [&](const struct GeoArrowGeometryNode* node) {
+    return VisitLngLat(node, 0, node->size, [&](double lng, double lat) {
+      return std::isnan(lng) && std::isnan(lat);
+    });
+  });
+}
+
 /// \brief A lossless vertex in lon/lat/z/m coordinates
 ///
 /// Unlike an S2Point, this version of a vertex (1) does not incur rounding

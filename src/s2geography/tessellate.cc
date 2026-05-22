@@ -50,6 +50,19 @@ internal::GeoArrowVertex EdgeInterpolateGeom(const internal::GeoArrowEdge& e,
   return {p.x(), p.y(), {e.v0.zm[0] + dzm0, e.v0.zm[1] + dzm1}};
 }
 
+/// \brief Check if a point node represents POINT EMPTY
+///
+/// geoarrow-c currently reads POINT EMPTY as POINT (nan nan) with size 1,
+/// so we need to check for NaN coordinates to identify empty points.
+bool IsEmptyPoint(const struct GeoArrowGeometryNode* node) {
+  if (node->size == 0) {
+    return true;
+  }
+  // Check if all coordinates are NaN (geoarrow-c representation of POINT EMPTY)
+  struct GeoArrowGeometryView view = {node, 1};
+  return internal::AllLngLatNaN(view);
+}
+
 template <typename VisitPoint, typename VisitLinestring, typename Out>
 void TransformSegments(struct GeoArrowGeometryView geom, Out* out,
                        VisitPoint&& visit_point,
@@ -71,7 +84,8 @@ void TransformSegments(struct GeoArrowGeometryView geom, Out* out,
         switch (node->geometry_type) {
           case GEOARROW_GEOMETRY_TYPE_POINT:
             out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
-            if (node->size > 0) {
+            // Check for POINT EMPTY (geoarrow-c represents as POINT (nan nan))
+            if (!IsEmptyPoint(node)) {
               visit_point(node, out);
             }
             out->GeomEnd();
