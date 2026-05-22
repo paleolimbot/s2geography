@@ -155,8 +155,8 @@ class TestGeometry {
 /// edge type information.
 struct ArrowTypeOrWKB {
   bool is_wkb{false};
-  enum ArrowType arrow_type{NANOARROW_TYPE_UNINITIALIZED};
-  enum GeoArrowEdgeType edge_type{GEOARROW_EDGE_TYPE_SPHERICAL};
+  enum ArrowType arrow_type { NANOARROW_TYPE_UNINITIALIZED };
+  enum GeoArrowEdgeType edge_type { GEOARROW_EDGE_TYPE_SPHERICAL };
 
   // Default constructor (WKB with spherical edges)
   ArrowTypeOrWKB() : is_wkb(true), edge_type(GEOARROW_EDGE_TYPE_SPHERICAL) {}
@@ -165,7 +165,8 @@ struct ArrowTypeOrWKB {
   ArrowTypeOrWKB(enum ArrowType type) : is_wkb(false), arrow_type(type) {}
 
   // Explicit WKB constructor with edge type
-  static ArrowTypeOrWKB Wkb(enum GeoArrowEdgeType edge = GEOARROW_EDGE_TYPE_SPHERICAL) {
+  static ArrowTypeOrWKB Wkb(
+      enum GeoArrowEdgeType edge = GEOARROW_EDGE_TYPE_SPHERICAL) {
     ArrowTypeOrWKB result;
     result.is_wkb = true;
     result.edge_type = edge;

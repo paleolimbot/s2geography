@@ -11,9 +11,11 @@ TEST(Tessellate, SedonaUdfTessellateToGeogArray) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::TessellateToGeog(&kernel);
   struct SedonaCScalarKernelImpl impl;
-  // TessellateToGeog takes geometry (PLANAR) input, outputs geography (SPHERICAL)
+  // TessellateToGeog takes geometry (PLANAR) input, outputs geography
+  // (SPHERICAL)
   ASSERT_NO_FATAL_FAILURE(TestInitKernel(
-      &kernel, &impl, {ARROW_TYPE_WKB_PLANAR, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB));
+      &kernel, &impl, {ARROW_TYPE_WKB_PLANAR, NANOARROW_TYPE_DOUBLE},
+      ARROW_TYPE_WKB));
 
   nanoarrow::UniqueArray out_array;
   // Use a very large tolerance (1e9 meters) so no tessellation occurs
@@ -34,9 +36,11 @@ TEST(Tessellate, SedonaUdfTessellateToGeomArray) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::TessellateToGeom(&kernel);
   struct SedonaCScalarKernelImpl impl;
-  // TessellateToGeom takes geography (SPHERICAL) input, outputs geometry (PLANAR)
-  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
-      &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE}, ARROW_TYPE_WKB_PLANAR));
+  // TessellateToGeom takes geography (SPHERICAL) input, outputs geometry
+  // (PLANAR)
+  ASSERT_NO_FATAL_FAILURE(
+      TestInitKernel(&kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_DOUBLE},
+                     ARROW_TYPE_WKB_PLANAR));
 
   nanoarrow::UniqueArray out_array;
   // Use a very large tolerance (1e9 meters) so no tessellation occurs
