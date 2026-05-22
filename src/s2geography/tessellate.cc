@@ -71,7 +71,9 @@ void TransformSegments(struct GeoArrowGeometryView geom, Out* out,
         switch (node->geometry_type) {
           case GEOARROW_GEOMETRY_TYPE_POINT:
             out->GeomStart(GEOARROW_GEOMETRY_TYPE_POINT);
-            visit_point(node, out);
+            if (node->size > 0) {
+              visit_point(node, out);
+            }
             out->GeomEnd();
             break;
 
