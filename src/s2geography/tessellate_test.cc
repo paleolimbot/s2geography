@@ -510,18 +510,62 @@ INSTANTIATE_TEST_SUITE_P(
         SegmentizeParam{"empty_linestring", "LINESTRING EMPTY", 1e9,
                         "LINESTRING EMPTY"},
         SegmentizeParam{"empty_polygon", "POLYGON EMPTY", 1e9, "POLYGON EMPTY"},
+        SegmentizeParam{"empty_multipoint", "MULTIPOINT EMPTY", 1e9,
+                        "MULTIPOINT EMPTY"},
+        SegmentizeParam{"empty_multilinestring", "MULTILINESTRING EMPTY", 1e9,
+                        "MULTILINESTRING EMPTY"},
+        SegmentizeParam{"empty_multipolygon", "MULTIPOLYGON EMPTY", 1e9,
+                        "MULTIPOLYGON EMPTY"},
+        SegmentizeParam{"empty_geometrycollection", "GEOMETRYCOLLECTION EMPTY",
+                        1e9, "GEOMETRYCOLLECTION EMPTY"},
 
         // Points (no segmentation needed)
         SegmentizeParam{"point_large_seg", "POINT (0 1)", 1e9, "POINT (0 1)"},
+        SegmentizeParam{"point_zm_large_seg", "POINT ZM (0 1 100 200)", 1e9,
+                        "POINT ZM (0 1 100 200)"},
 
         // Linestrings without segmentation (large max segment)
         SegmentizeParam{"linestring_large_seg", "LINESTRING (0 1, 1 2, 2 1)",
                         1e9, "LINESTRING (0 1, 1 2, 2 1)"},
+        SegmentizeParam{"linestring_zm_large_seg",
+                        "LINESTRING ZM (0 1 10 20, 1 2 30 40, 2 1 50 60)", 1e9,
+                        "LINESTRING ZM (0 1 10 20, 1 2 30 40, 2 1 50 60)"},
 
         // Polygons without segmentation (large max segment)
         SegmentizeParam{"polygon_large_seg",
                         "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", 1e9,
                         "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))"},
+        SegmentizeParam{
+            "polygon_zm_large_seg",
+            "POLYGON ZM ((0 0 10 20, 1 0 30 40, 1 1 50 60, 0 1 70 80, "
+            "0 0 10 20))",
+            1e9,
+            "POLYGON ZM ((0 0 10 20, 1 0 30 40, 1 1 50 60, 0 1 70 80, "
+            "0 0 10 20))"},
+
+        // MultiPoints (no segmentation needed)
+        SegmentizeParam{"multipoint_large_seg",
+                        "MULTIPOINT ((0 1), (1 2), (2 3))", 1e9,
+                        "MULTIPOINT ((0 1), (1 2), (2 3))"},
+
+        // MultiLinestrings without segmentation (large max segment)
+        SegmentizeParam{"multilinestring_large_seg",
+                        "MULTILINESTRING ((0 1, 1 2), (2 3, 3 4))", 1e9,
+                        "MULTILINESTRING ((0 1, 1 2), (2 3, 3 4))"},
+
+        // MultiPolygons without segmentation (large max segment)
+        SegmentizeParam{"multipolygon_large_seg",
+                        "MULTIPOLYGON (((0 0, 1 0, 1 1, 0 1, 0 0)), "
+                        "((2 3, 3 3, 3 4, 2 4, 2 3)))",
+                        1e9,
+                        "MULTIPOLYGON (((0 0, 1 0, 1 1, 0 1, 0 0)), "
+                        "((2 3, 3 3, 3 4, 2 4, 2 3)))"},
+
+        // GeometryCollections without segmentation (large max segment)
+        SegmentizeParam{
+            "geometrycollection_large_seg",
+            "GEOMETRYCOLLECTION (POINT (0 1), LINESTRING (0 1, 1 2))", 1e9,
+            "GEOMETRYCOLLECTION (POINT (0 1), LINESTRING (0 1, 1 2))"},
 
         // Segmentation - 2 degree line with ~1 degree max -> 2 segments
         SegmentizeParam{"linestring_2deg_split2", "LINESTRING (0 0, 0 2)",
@@ -536,6 +580,22 @@ INSTANTIATE_TEST_SUITE_P(
         SegmentizeParam{"linestring_4deg_split4", "LINESTRING (0 0, 0 4)",
                         kOneDegreeMeters * 1.1,
                         "LINESTRING (0 0, 0 1, 0 2, 0 3, 0 4)"},
+
+        // Z dimension - Z values should be linearly interpolated
+        SegmentizeParam{
+            "linestring_2deg_split_z", "LINESTRING Z (0 0 100, 0 2 200)",
+            kOneDegreeMeters * 1.1, "LINESTRING Z (0 0 100, 0 1 150, 0 2 200)"},
+
+        // M dimension - M values should be linearly interpolated
+        SegmentizeParam{"linestring_2deg_split_m",
+                        "LINESTRING M (0 0 0, 0 2 100)", kOneDegreeMeters * 1.1,
+                        "LINESTRING M (0 0 0, 0 1 50, 0 2 100)"},
+
+        // ZM dimension - both Z and M should be linearly interpolated
+        SegmentizeParam{"linestring_2deg_split_zm",
+                        "LINESTRING ZM (0 0 100 0, 0 2 200 100)",
+                        kOneDegreeMeters * 1.1,
+                        "LINESTRING ZM (0 0 100 0, 0 1 150 50, 0 2 200 100)"},
 
         // Polygon segmentation
         // Note: The midpoint of the edge from (0,2) to (2,2) is at latitude
