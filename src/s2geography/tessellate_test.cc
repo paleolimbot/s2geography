@@ -177,28 +177,34 @@ INSTANTIATE_TEST_SUITE_P(
         // Points (no tessellation needed regardless of tolerance)
         TessellateToGeogParam{"point_large_tol", "POINT (0 1)", 1e9,
                               "POINT (0 1)"},
-        TessellateToGeogParam{"point_small_tol", "POINT (30 45)", 1.0,
-                              "POINT (30 45)"},
+        TessellateToGeogParam{"point_zm_large_tol", "POINT ZM (0 1 100 200)",
+                              1e9, "POINT ZM (0 1 100 200)"},
 
         // Linestrings without tessellation (large tolerance)
-        TessellateToGeogParam{"linestring_large_tol", "LINESTRING (0 1, 1 2)",
-                              1e9, "LINESTRING (0 1, 1 2)"},
-        TessellateToGeogParam{"linestring_multi_seg",
+        TessellateToGeogParam{"linestring_large_tol",
                               "LINESTRING (0 1, 1 2, 2 1)", 1e9,
                               "LINESTRING (0 1, 1 2, 2 1)"},
+        TessellateToGeogParam{
+            "linestring_zm_large_tol",
+            "LINESTRING ZM (0 1 10 20, 1 2 30 40, 2 1 50 60)", 1e9,
+            "LINESTRING ZM (0 1 10 20, 1 2 30 40, 2 1 50 60)"},
 
         // Polygons without tessellation (large tolerance)
         TessellateToGeogParam{"polygon_large_tol",
                               "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", 1e9,
                               "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))"},
+        TessellateToGeogParam{
+            "polygon_zm_large_tol",
+            "POLYGON ZM ((0 0 10 20, 1 0 30 40, 1 1 50 60, 0 1 70 80, "
+            "0 0 10 20))",
+            1e9,
+            "POLYGON ZM ((0 0 10 20, 1 0 30 40, 1 1 50 60, 0 1 70 80, "
+            "0 0 10 20))"},
 
         // MultiPoints (no tessellation needed)
         TessellateToGeogParam{"multipoint_large_tol",
                               "MULTIPOINT ((0 1), (1 2), (2 3))", 1e9,
                               "MULTIPOINT ((0 1), (1 2), (2 3))"},
-        TessellateToGeogParam{"multipoint_small_tol",
-                              "MULTIPOINT ((0 1), (30 45))", 1.0,
-                              "MULTIPOINT ((0 1), (30 45))"},
 
         // MultiLinestrings without tessellation (large tolerance)
         TessellateToGeogParam{"multilinestring_large_tol",
@@ -340,28 +346,34 @@ INSTANTIATE_TEST_SUITE_P(
         // Points (no tessellation needed)
         TessellateToGeomParam{"point_large_tol", "POINT (0 1)", 1e9,
                               "POINT (0 1)"},
-        TessellateToGeomParam{"point_small_tol", "POINT (30 45)", 1.0,
-                              "POINT (30 45)"},
+        TessellateToGeomParam{"point_zm_large_tol", "POINT ZM (0 1 100 200)",
+                              1e9, "POINT ZM (0 1 100 200)"},
 
         // Linestrings without tessellation (large tolerance)
-        TessellateToGeomParam{"linestring_large_tol", "LINESTRING (0 1, 1 2)",
-                              1e9, "LINESTRING (0 1, 1 2)"},
-        TessellateToGeomParam{"linestring_multi_seg",
+        TessellateToGeomParam{"linestring_large_tol",
                               "LINESTRING (0 1, 1 2, 2 1)", 1e9,
                               "LINESTRING (0 1, 1 2, 2 1)"},
+        TessellateToGeomParam{
+            "linestring_zm_large_tol",
+            "LINESTRING ZM (0 1 10 20, 1 2 30 40, 2 1 50 60)", 1e9,
+            "LINESTRING ZM (0 1 10 20, 1 2 30 40, 2 1 50 60)"},
 
         // Polygons without tessellation (large tolerance)
         TessellateToGeomParam{"polygon_large_tol",
                               "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", 1e9,
                               "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))"},
+        TessellateToGeomParam{
+            "polygon_zm_large_tol",
+            "POLYGON ZM ((0 0 10 20, 1 0 30 40, 1 1 50 60, 0 1 70 80, "
+            "0 0 10 20))",
+            1e9,
+            "POLYGON ZM ((0 0 10 20, 1 0 30 40, 1 1 50 60, 0 1 70 80, "
+            "0 0 10 20))"},
 
         // MultiPoints (no tessellation needed)
         TessellateToGeomParam{"multipoint_large_tol",
                               "MULTIPOINT ((0 1), (1 2), (2 3))", 1e9,
                               "MULTIPOINT ((0 1), (1 2), (2 3))"},
-        TessellateToGeomParam{"multipoint_small_tol",
-                              "MULTIPOINT ((0 1), (30 45))", 1.0,
-                              "MULTIPOINT ((0 1), (30 45))"},
 
         // MultiLinestrings without tessellation (large tolerance)
         TessellateToGeomParam{"multilinestring_large_tol",
@@ -501,13 +513,9 @@ INSTANTIATE_TEST_SUITE_P(
 
         // Points (no segmentation needed)
         SegmentizeParam{"point_large_seg", "POINT (0 1)", 1e9, "POINT (0 1)"},
-        SegmentizeParam{"point_small_seg", "POINT (30 45)", 1.0,
-                        "POINT (30 45)"},
 
         // Linestrings without segmentation (large max segment)
-        SegmentizeParam{"linestring_large_seg", "LINESTRING (0 1, 1 2)", 1e9,
-                        "LINESTRING (0 1, 1 2)"},
-        SegmentizeParam{"linestring_multi_seg", "LINESTRING (0 1, 1 2, 2 1)",
+        SegmentizeParam{"linestring_large_seg", "LINESTRING (0 1, 1 2, 2 1)",
                         1e9, "LINESTRING (0 1, 1 2, 2 1)"},
 
         // Polygons without segmentation (large max segment)

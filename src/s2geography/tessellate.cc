@@ -150,7 +150,7 @@ struct TessellateGeogExec {
     internal::VisitNativeVertices(
         node, 0, node->size, [&](internal::GeoArrowVertex v) {
           v.SetPoint(projection_.Unproject(R2Point(v.lng, v.lat)));
-          out->WriteCoord(v);
+          out->WriteCoord(v, node->dimensions);
           return true;
         });
   }
@@ -164,7 +164,7 @@ struct TessellateGeogExec {
     // Add the first point
     internal::VisitNativeVertices(node, 0, 1, [&](internal::GeoArrowVertex v) {
       v.SetPoint(projection_.Unproject(R2Point(v.lng, v.lat)));
-      out->WriteCoord(v);
+      out->WriteCoord(v, node->dimensions);
       return true;
     });
 
@@ -177,7 +177,7 @@ struct TessellateGeogExec {
                                           &points_);
           S2GEOGRAPHY_DCHECK(points_.size() >= 2);
           for (size_t i = 1; i < points_.size(); ++i) {
-            out->WriteCoord(e.Interpolate(points_[i]));
+            out->WriteCoord(e.Interpolate(points_[i]), node->dimensions);
           }
           return true;
         });
@@ -223,7 +223,7 @@ struct TessellateGeomExec {
     internal::VisitNativeVertices(
         node, 0, node->size, [&](internal::GeoArrowVertex v) {
           v.SetPoint(projection_.Unproject(R2Point(v.lng, v.lat)));
-          out->WriteCoord(v);
+          out->WriteCoord(v, node->dimensions);
           return true;
         });
   }
@@ -239,7 +239,7 @@ struct TessellateGeomExec {
       R2Point projected = projection_.Project(v.ToPoint());
       v.lng = projected.x();
       v.lat = projected.y();
-      out->WriteCoord(v);
+      out->WriteCoord(v, node->dimensions);
       return true;
     });
 
@@ -251,7 +251,8 @@ struct TessellateGeomExec {
                                         &points_);
           S2GEOGRAPHY_DCHECK(points_.size() >= 2);
           for (size_t i = 1; i < points_.size(); ++i) {
-            out->WriteCoord(EdgeInterpolateGeom(e, points_[i]));
+            out->WriteCoord(EdgeInterpolateGeom(e, points_[i]),
+                            node->dimensions);
           }
           return true;
         });
@@ -289,7 +290,7 @@ struct SegmentizeExec {
                        GeoArrowGeographyOutputBuilder* out) {
     internal::VisitNativeVertices(node, 0, node->size,
                                   [&](const internal::GeoArrowVertex& v) {
-                                    out->WriteCoord(v);
+                                    out->WriteCoord(v, node->dimensions);
                                     return true;
                                   });
   }
@@ -304,7 +305,7 @@ struct SegmentizeExec {
     // Add the first point
     internal::VisitNativeVertices(node, 0, 1,
                                   [&](const internal::GeoArrowVertex& v) {
-                                    out->WriteCoord(v);
+                                    out->WriteCoord(v, node->dimensions);
                                     return true;
                                   });
 
@@ -329,16 +330,16 @@ struct SegmentizeExec {
 
           if (num_segments <= 1) {
             // No subdivision needed, just add endpoint
-            out->WriteCoord(e.v1);
+            out->WriteCoord(e.v1, node->dimensions);
           } else {
             // Add intermediate points at equal fractions
             for (int64_t i = 1; i < num_segments; ++i) {
               double fraction =
                   static_cast<double>(i) / static_cast<double>(num_segments);
-              out->WriteCoord(e.Interpolate(fraction));
+              out->WriteCoord(e.Interpolate(fraction), node->dimensions);
             }
             // Add the final endpoint
-            out->WriteCoord(e.v1);
+            out->WriteCoord(e.v1, node->dimensions);
           }
           return true;
         });
