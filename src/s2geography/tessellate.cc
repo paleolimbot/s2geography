@@ -143,6 +143,10 @@ struct TessellateGeogExec {
   using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type geom, arg1_t::c_type distance, out_t* out) {
+    if (!std::isfinite(distance) || distance < 0) {
+      throw Exception("tolerance must be finite and greater than 0");
+    }
+
     if (distance != last_distance_) {
       S1Angle tolerance = S1Angle::Radians(distance / S2Earth::RadiusMeters());
       if (tolerance < S2EdgeTessellator::kMinTolerance()) {
@@ -216,6 +220,10 @@ struct TessellateGeomExec {
   using out_t = GeoArrowGeometryOutputBuilder;
 
   void Exec(arg0_t::c_type geom, arg1_t::c_type distance, out_t* out) {
+    if (!std::isfinite(distance) || distance < 0) {
+      throw Exception("tolerance must be finite and greater than 0");
+    }
+
     if (distance != last_distance_) {
       S1Angle tolerance = S1Angle::Radians(distance / S2Earth::RadiusMeters());
       if (tolerance < S2EdgeTessellator::kMinTolerance()) {
