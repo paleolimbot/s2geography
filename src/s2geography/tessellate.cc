@@ -3,6 +3,7 @@
 #include <s2/s2earth.h>
 #include <s2/s2edge_tessellator.h>
 
+#include <cmath>
 #include <optional>
 
 #include "s2geography/geoarrow-geography_util.h"
@@ -143,7 +144,7 @@ struct TessellateGeogExec {
   using out_t = GeoArrowGeographyOutputBuilder;
 
   void Exec(arg0_t::c_type geom, arg1_t::c_type distance, out_t* out) {
-    if (!std::isfinite(distance) || distance < 0) {
+    if (!std::isfinite(distance) || distance <= 0) {
       throw Exception("tolerance must be finite and greater than 0");
     }
 
@@ -220,7 +221,7 @@ struct TessellateGeomExec {
   using out_t = GeoArrowGeometryOutputBuilder;
 
   void Exec(arg0_t::c_type geom, arg1_t::c_type distance, out_t* out) {
-    if (!std::isfinite(distance) || distance < 0) {
+    if (!std::isfinite(distance) || distance <= 0) {
       throw Exception("tolerance must be finite and greater than 0");
     }
 
