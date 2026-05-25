@@ -358,6 +358,22 @@ INSTANTIATE_TEST_SUITE_P(
             "LINESTRING ZM (0 1 10 20, 1 2 30 40, 2 1 50 60)", 1e9,
             "LINESTRING ZM (0 1 10 20, 1 2 30 40, 2 1 50 60)"},
 
+        // Linestring across the antimeridian and back: returned longitudes
+        // should return valid geometry with longitudes >180.
+        TessellateToGeomParam{
+            "linestring_large_tol_antimeridian",
+            "LINESTRING (170 70, 175 70, -175 70, -175 -70, 175 -70, 170 -70)",
+            1e9,
+            "LINESTRING (170 70, 175 70, 185 70, 185 0, 185 -70, 175 -70, "
+            "170 -70)"},
+        TessellateToGeomParam{
+            "linestring_large_tol_antimeridian_zm",
+            "LINESTRING ZM (170 70 10 20, 175 70 30 40, -175 70 50 60, -175 "
+            "-70 70 80, 175 -70 90 100, 170 -70 110 120)",
+            1e9,
+            "LINESTRING ZM (170 70 10 20, 175 70 30 40, 185 70 50 60, 185 0 "
+            "60 70, 185 -70 70 80, 175 -70 90 100, 170 -70 110 120)"},
+
         // Polygons without tessellation (large tolerance)
         TessellateToGeomParam{"polygon_large_tol",
                               "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", 1e9,
@@ -419,6 +435,29 @@ INSTANTIATE_TEST_SUITE_P(
             "LINESTRING (-10 45, -5.019332 45.328489, 0 45.438549, "
             "5.019332 45.328489, 10 45, 14.980668 45.328489, 20 45.438549, "
             "25.019332 45.328489, 30 45)"},
+
+        // Tessellation across the antimeridian and back: returned longitudes
+        // should return valid geometry with longitudes >180.
+        TessellateToGeomParam{
+            "linestring_tessellate_antimeridian",
+            "LINESTRING (170 70, 175 70, -175 70, -175 -70, 175 -70, 170 -70)",
+            1000.0,
+            "LINESTRING (170 70, 172.5 70.017528, 175 70, 177.495787 "
+            "70.052555, "
+            "180 70.070104, 182.504213 70.052555, 185 70, 185 0, 185 -70, "
+            "182.504213 -70.052555, 180 -70.070104, 177.495787 -70.052555, "
+            "175 -70, 172.5 -70.017528, 170 -70)"},
+        TessellateToGeomParam{
+            "linestring_tessellate_antimeridian_zm",
+            "LINESTRING ZM (170 70 10 20, 175 70 30 40, -175 70 50 60, -175 "
+            "-70 70 80, 175 -70 90 100, 170 -70 110 120)",
+            1000.0,
+            "LINESTRING ZM (170 70 10 20, 172.5 70.017528 20 30, 175 70 30 40, "
+            "177.495787 70.052555 34.991574 44.991574, 180 70.070104 40 50, "
+            "182.504213 70.052555 45.008426 55.008426, 185 70 50 60, 185 0 60 "
+            "70, 185 -70 70 80, 182.504213 -70.052555 74.991574 84.991574, "
+            "180 -70.070104 80 90, 177.495787 -70.052555 85.008426 95.008426, "
+            "175 -70 90 100, 172.5 -70.017528 100 110, 170 -70 110 120)"},
 
         // Z dimension - Z values should be linearly interpolated
         TessellateToGeomParam{

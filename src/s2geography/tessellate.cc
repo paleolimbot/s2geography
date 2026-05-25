@@ -264,11 +264,16 @@ struct TessellateGeomExec {
       return;
     }
 
+    // Track the wrapped version of the last output vertex for continuity
+    // across antimeridian crossings
+    internal::GeoArrowVertex last_wrapped_v;
+
     // Add the first point
     internal::VisitNativeVertices(node, 0, 1, [&](internal::GeoArrowVertex v) {
       R2Point projected = projection_.Project(v.ToPoint());
       v.lng = projected.x();
       v.lat = projected.y();
+      last_wrapped_v = v;
       out->WriteCoord(v, node->dimensions);
       return true;
     });
@@ -280,10 +285,28 @@ struct TessellateGeomExec {
           tessellator_->AppendProjected(e.v0.ToPoint(), e.v1.ToPoint(),
                                         &points_);
           S2GEOGRAPHY_DCHECK(points_.size() >= 2);
+
+          // Create edge copy using wrapped v0 for correct interpolation
+          internal::GeoArrowEdge wrapped_e = e;
+          wrapped_e.v0 = last_wrapped_v;
+
+          // Project and wrap v1 relative to wrapped v0
+          R2Point projected_v1 = projection_.Project(e.v1.ToPoint());
+          R2Point wrapped_v1 = projection_.WrapDestination(
+              R2Point(wrapped_e.v0.lng, wrapped_e.v0.lat), projected_v1);
+          wrapped_e.v1.lng = wrapped_v1.x();
+          wrapped_e.v1.lat = wrapped_v1.y();
+
+          // Wrap and output intermediate points
           for (size_t i = 1; i < points_.size(); ++i) {
-            out->WriteCoord(EdgeInterpolateGeom(e, points_[i]),
-                            node->dimensions);
+            R2Point wrapped_pt = projection_.WrapDestination(
+                R2Point(last_wrapped_v.lng, last_wrapped_v.lat), points_[i]);
+            internal::GeoArrowVertex out_v =
+                EdgeInterpolateGeom(wrapped_e, wrapped_pt);
+            out->WriteCoord(out_v, node->dimensions);
+            last_wrapped_v = out_v;
           }
+
           return true;
         });
   }
