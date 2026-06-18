@@ -3,6 +3,8 @@ channels:
   - conda-forge
 dependencies:
   - cxx-compiler
-  - s2geometry >=0.11
+  # Pin to <0.14.0 due to broken header installation in 0.14.0 conda package
+  # (s2/base/port.h missing). See https://github.com/conda-forge/s2geometry-feedstock/issues
+  - s2geometry >=0.11,<0.14
   - libabseil
   - cmake
