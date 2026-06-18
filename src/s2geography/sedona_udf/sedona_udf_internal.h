@@ -778,7 +778,7 @@ using StringInputView = ArrowInputView<std::string_view>;
 template <enum GeoArrowEdgeType edge_type>
 class GeoArrowInputView {
  public:
-  using c_type = struct GeoArrowGeometryView;
+  using c_type = ::GeoArrowGeometryView;
 
   static bool Matches(const struct ArrowSchema* type) {
     struct GeoArrowSchemaView schema_view;
@@ -827,7 +827,7 @@ class GeoArrowInputView {
 
   bool IsNull(int64_t i) { return inner_.IsNull(i); }
 
-  struct GeoArrowGeometryView Get(int64_t i) {
+  GeoArrowGeometryView Get(int64_t i) {
     if (current_array_length_ == 1) {
       StashIfNeeded(0);
     } else {
@@ -843,7 +843,7 @@ class GeoArrowInputView {
   ArrowInputView<std::string_view> inner_;
   int64_t current_array_length_;
   int64_t stashed_index_;
-  struct GeoArrowGeometryView stashed_;
+  GeoArrowGeometryView stashed_;
 
   void StashIfNeeded(int64_t i) {
     if (i != stashed_index_) {
@@ -910,7 +910,7 @@ class GeoArrowGeographyInputView {
 
   void StashIfNeeded(int64_t i, bool prepare = false) {
     if (i != stashed_index_) {
-      struct GeoArrowGeometryView geom = inner_.Get(i);
+      GeoArrowGeometryView geom = inner_.Get(i);
       stashed_.Init(geom);
       stashed_index_ = i;
 
