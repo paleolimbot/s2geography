@@ -179,7 +179,7 @@ uint64_t S2GeogLngLatToCellId(const struct S2GeogVertex* v) {
 
 using KernelInitFunc = void (*)(struct SedonaCScalarKernel*);
 
-static const std::array<KernelInitFunc, 33> kSedonaKernels = {{
+static const std::array<KernelInitFunc, 36> kSedonaKernels = {{
     s2geography::sedona_udf::AreaKernel,
     s2geography::sedona_udf::CentroidKernel,
     s2geography::sedona_udf::ClosestPointKernel,
@@ -217,6 +217,9 @@ static const std::array<KernelInitFunc, 33> kSedonaKernels = {{
     },
     s2geography::sedona_udf::CellIdFromPointKernel,
     s2geography::sedona_udf::CoveringCellIdsKernel,
+    s2geography::sedona_udf::CoveringCellIdsMinLevelKernel,
+    s2geography::sedona_udf::CoveringCellIdsLevelRangeKernel,
+    s2geography::sedona_udf::CoveringCellIdsLevelRangeMaxCellsKernel,
     [](SedonaCScalarKernel* k) {
       s2geography::sedona_udf::LongestLineKernel(k);
     },

@@ -44,6 +44,9 @@ namespace sedona_udf {
 
 void CellIdFromPointKernel(struct SedonaCScalarKernel* out);
 void CoveringCellIdsKernel(struct SedonaCScalarKernel* out);
+void CoveringCellIdsMinLevelKernel(struct SedonaCScalarKernel* out);
+void CoveringCellIdsLevelRangeKernel(struct SedonaCScalarKernel* out);
+void CoveringCellIdsLevelRangeMaxCellsKernel(struct SedonaCScalarKernel* out);
 void BoundingBoxKernel(struct SedonaCScalarKernel* out);
 
 }  // namespace sedona_udf

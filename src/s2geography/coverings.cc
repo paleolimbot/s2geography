@@ -1,6 +1,7 @@
 
 #include "s2geography/coverings.h"
 
+#include <s2/s2cell_id.h>
 #include <s2/s2earth.h>
 #include <s2/s2edge_crosser.h>
 #include <s2/s2latlng_rect_bounder.h>
@@ -225,6 +226,73 @@ S2LatLngRect LatLngRectBounder::BoundLoops(const GeoArrowGeography& value) {
 
 namespace sedona_udf {
 
+static constexpr int kDefaultMinLevel = 0;
+static constexpr int kDefaultMaxLevel = S2CellId::kMaxLevel;
+static constexpr int kDefaultMaxCells = 8;
+
+void ValidateCoveringOptions(int64_t min_level, int64_t max_level,
+                             int64_t max_cells) {
+  if (min_level < 0 || min_level > S2CellId::kMaxLevel) {
+    throw Exception("min_level must be between 0 and 30");
+  }
+
+  if (max_level < 0 || max_level > S2CellId::kMaxLevel) {
+    throw Exception("max_level must be between 0 and 30");
+  }
+
+  if (min_level > max_level) {
+    throw Exception("min_level must be less than or equal to max_level");
+  }
+
+  if (max_cells < 1) {
+    throw Exception("max_cells must be greater than 0");
+  }
+}
+
+void AppendCoveringCellIds(const GeoArrowGeography& value, int64_t min_level,
+                           int64_t max_level, int64_t max_cells,
+                           ListOutputBuilder<IntOutputBuilder>* out,
+                           std::vector<S2CellId>* covering,
+                           S2RegionCoverer* coverer) {
+  ValidateCoveringOptions(min_level, max_level, max_cells);
+
+  if (value.is_empty()) {
+    out->Append();
+    return;
+  }
+
+  // Canonically consider the S2CellId of a Point to be its covering. If a
+  // maximum level is specified, return the containing parent at that level.
+  auto pt = value.Point();
+  if (pt) {
+    S2CellId id(*pt);
+    if (max_level < S2CellId::kMaxLevel) {
+      id = id.parent(static_cast<int>(max_level));
+    }
+
+    out->items().Append(static_cast<int64_t>(id.id()));
+    out->Append();
+    return;
+  }
+
+  S2RegionCoverer::Options* options = coverer->mutable_options();
+  options->set_min_level(static_cast<int>(min_level));
+  options->set_max_level(static_cast<int>(max_level));
+  options->set_max_cells(static_cast<int>(max_cells));
+
+  // For now, don't make any attempt to optimize calculating this.
+  // This will build a shape index for each item and may be slow.
+  // We may want to consider just implementing S2Region for the
+  // GeoArrowGeography.
+  covering->clear();
+  coverer->GetCovering(*value.Region(), covering);
+  for (const S2CellId id : *covering) {
+    out->items().Append(static_cast<int64_t>(id.id()));
+  }
+
+  out->Append();
+}
+
 struct CellIdFromPointExec {
   using arg0_t = GeoArrowGeographyInputView;
   using out_t = IntOutputBuilder;
@@ -250,34 +318,55 @@ struct CoveringCellIdsExec {
   using out_t = ListOutputBuilder<IntOutputBuilder>;
 
   void Exec(arg0_t::c_type value, out_t* out) {
-    if (value.is_empty()) {
-      out->Append();
-      return;
-    }
+    AppendCoveringCellIds(value, kDefaultMinLevel, kDefaultMaxLevel,
+                          kDefaultMaxCells, out, &covering_, &coverer_);
+  }
 
-    // Canonically consider the S2CellId of a Point to be
-    // its covering. Otherwise we get funny coverings for points
-    // (no need to have four cells for a single point).
-    auto pt = value.Point();
-    if (pt) {
-      S2CellId id(*pt);
-      out->items().Append(static_cast<int64_t>(id.id()));
-      out->Append();
-      return;
-    }
+  std::vector<S2CellId> covering_;
+  S2RegionCoverer coverer_;
+};
 
-    // For now, don't make any attempt to optimize calculating this.
-    // This will build a shape index for each item and may be slow.
-    // We may want to consider just implementing S2Region for the
-    // GeoArrowGeography.
-    coverer_.mutable_options()->set_max_cells(8);
-    covering_.clear();
-    coverer_.GetCovering(*value.Region(), &covering_);
-    for (const S2CellId id : covering_) {
-      out->items().Append(static_cast<int64_t>(id.id()));
-    }
+struct CoveringCellIdsMinLevelExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = IntInputView;
+  using out_t = ListOutputBuilder<IntOutputBuilder>;
 
-    out->Append();
+  void Exec(arg0_t::c_type value, arg1_t::c_type min_level, out_t* out) {
+    AppendCoveringCellIds(value, min_level, kDefaultMaxLevel,
+                          kDefaultMaxCells, out, &covering_, &coverer_);
+  }
+
+  std::vector<S2CellId> covering_;
+  S2RegionCoverer coverer_;
+};
+
+struct CoveringCellIdsLevelRangeExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = IntInputView;
+  using arg2_t = IntInputView;
+  using out_t = ListOutputBuilder<IntOutputBuilder>;
+
+  void Exec(arg0_t::c_type value, arg1_t::c_type min_level,
+            arg2_t::c_type max_level, out_t* out) {
+    AppendCoveringCellIds(value, min_level, max_level, kDefaultMaxCells, out,
+                          &covering_, &coverer_);
+  }
+
+  std::vector<S2CellId> covering_;
+  S2RegionCoverer coverer_;
+};
+
+struct CoveringCellIdsLevelRangeMaxCellsExec {
+  using arg0_t = GeoArrowGeographyInputView;
+  using arg1_t = IntInputView;
+  using arg2_t = IntInputView;
+  using arg3_t = IntInputView;
+  using out_t = ListOutputBuilder<IntOutputBuilder>;
+
+  void Exec(arg0_t::c_type value, arg1_t::c_type min_level,
+            arg2_t::c_type max_level, arg3_t::c_type max_cells, out_t* out) {
+    AppendCoveringCellIds(value, min_level, max_level, max_cells, out,
+                          &covering_, &coverer_);
   }
 
   std::vector<S2CellId> covering_;
@@ -319,6 +408,19 @@ void CellIdFromPointKernel(struct SedonaCScalarKernel* out) {
 
 void CoveringCellIdsKernel(struct SedonaCScalarKernel* out) {
   InitUnaryKernel<CoveringCellIdsExec>(out, "s2_coveringcellids");
+}
+
+void CoveringCellIdsMinLevelKernel(struct SedonaCScalarKernel* out) {
+  InitBinaryKernel<CoveringCellIdsMinLevelExec>(out, "s2_coveringcellids");
+}
+
+void CoveringCellIdsLevelRangeKernel(struct SedonaCScalarKernel* out) {
+  InitTernaryKernel<CoveringCellIdsLevelRangeExec>(out, "s2_coveringcellids");
+}
+
+void CoveringCellIdsLevelRangeMaxCellsKernel(struct SedonaCScalarKernel* out) {
+  InitQuaternaryKernel<CoveringCellIdsLevelRangeMaxCellsExec>(
+      out, "s2_coveringcellids");
 }
 
 void BoundingBoxKernel(struct SedonaCScalarKernel* out) {

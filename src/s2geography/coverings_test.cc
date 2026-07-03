@@ -313,6 +313,100 @@ TEST(Coverings, SedonaUdfCoveringCellIdsArray) {
   kernel.release(&kernel);
 }
 
+TEST(Coverings, SedonaUdfCoveringCellIdsOverloadsInit) {
+  struct SedonaCScalarKernel kernel;
+  struct SedonaCScalarKernelImpl impl;
+
+  s2geography::sedona_udf::CoveringCellIdsMinLevelKernel(&kernel);
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32},
+      NANOARROW_TYPE_LIST));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  s2geography::sedona_udf::CoveringCellIdsLevelRangeKernel(&kernel);
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl,
+      {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32, NANOARROW_TYPE_INT32},
+      NANOARROW_TYPE_LIST));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  s2geography::sedona_udf::CoveringCellIdsLevelRangeMaxCellsKernel(&kernel);
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl,
+      {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32, NANOARROW_TYPE_INT32,
+       NANOARROW_TYPE_INT32},
+      NANOARROW_TYPE_LIST));
+  impl.release(&impl);
+  kernel.release(&kernel);
+}
+
+TEST(Coverings, SedonaUdfCoveringCellIdsOptionsArray) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::CoveringCellIdsLevelRangeMaxCellsKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl,
+      {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32, NANOARROW_TYPE_INT32,
+       NANOARROW_TYPE_INT32},
+      NANOARROW_TYPE_LIST));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl,
+      {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32, NANOARROW_TYPE_INT32,
+       NANOARROW_TYPE_INT32},
+      {{"LINESTRING (0 0, 1 1)", "POINT (0 0)"}},
+      {{10, 0}, {10, 10}, {32, 8}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  ASSERT_EQ(out_array->length, 2);
+  ASSERT_EQ(out_array->n_children, 1);
+  auto* offsets = reinterpret_cast<const int32_t*>(out_array->buffers[1]);
+
+  // Row 0: a fixed level-10 covering should produce only level-10 cells.
+  EXPECT_GT(offsets[1] - offsets[0], 0);
+  auto* child = out_array->children[0];
+  ASSERT_NE(child, nullptr);
+  ASSERT_NE(child->buffers[1], nullptr);
+  auto* cell_ids = reinterpret_cast<const int64_t*>(child->buffers[1]);
+  for (int64_t i = offsets[0]; i < offsets[1]; i++) {
+    S2CellId id(static_cast<uint64_t>(cell_ids[i]));
+    EXPECT_EQ(id.level(), 10);
+  }
+
+  // Row 1: constraining max_level for a point should return that parent cell.
+  EXPECT_EQ(offsets[2] - offsets[1], 1);
+  S2CellId actual_point_cell(static_cast<uint64_t>(cell_ids[offsets[1]]));
+  S2CellId expected_point_cell(S2LatLng::FromDegrees(0, 0).ToPoint());
+  EXPECT_EQ(actual_point_cell, expected_point_cell.parent(10));
+}
+
+TEST(Coverings, SedonaUdfCoveringCellIdsMaxCells) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::CoveringCellIdsLevelRangeMaxCellsKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
+      &kernel, &impl,
+      {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32, NANOARROW_TYPE_INT32,
+       NANOARROW_TYPE_INT32},
+      NANOARROW_TYPE_LIST));
+
+  nanoarrow::UniqueArray out_array;
+  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
+      &impl,
+      {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32, NANOARROW_TYPE_INT32,
+       NANOARROW_TYPE_INT32},
+      {{"LINESTRING (0 0, 100 50)"}}, {{0}, {30}, {2}}, out_array.get()));
+  impl.release(&impl);
+  kernel.release(&kernel);
+
+  auto* offsets = reinterpret_cast<const int32_t*>(out_array->buffers[1]);
+  EXPECT_LE(offsets[1] - offsets[0], 2);
+}
+
 TEST(Coverings, SedonaUdfBoundingBox) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::BoundingBoxKernel(&kernel);
