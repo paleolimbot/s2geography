@@ -61,13 +61,13 @@ template <typename T, typename = void>
 struct has_exec_init_quaternary : std::false_type {};
 
 template <typename T>
-struct has_exec_init_quaternary<
-    T, std::void_t<decltype(std::declval<T>().Init(
-           std::declval<typename T::arg0_t*>(),
-           std::declval<typename T::arg1_t*>(),
-           std::declval<typename T::arg2_t*>(),
-           std::declval<typename T::arg3_t*>(),
-           std::declval<typename T::out_t*>()))>> : std::true_type {};
+struct has_exec_init_quaternary<T, std::void_t<decltype(std::declval<T>().Init(
+                                       std::declval<typename T::arg0_t*>(),
+                                       std::declval<typename T::arg1_t*>(),
+                                       std::declval<typename T::arg2_t*>(),
+                                       std::declval<typename T::arg3_t*>(),
+                                       std::declval<typename T::out_t*>()))>>
+    : std::true_type {};
 
 /// \defgroup sedona_udf-utils Arrow UDF Utilities
 ///

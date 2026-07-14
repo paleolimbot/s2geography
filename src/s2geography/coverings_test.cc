@@ -5,6 +5,7 @@
 #include <s2/s2earth.h>
 #include <s2/s2latlng.h>
 
+#include <limits>
 #include <optional>
 #include <string>
 
@@ -318,9 +319,9 @@ TEST(Coverings, SedonaUdfCoveringCellIdsOverloadsInit) {
   struct SedonaCScalarKernelImpl impl;
 
   s2geography::sedona_udf::CoveringCellIdsMinLevelKernel(&kernel);
-  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
-      &kernel, &impl, {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32},
-      NANOARROW_TYPE_LIST));
+  ASSERT_NO_FATAL_FAILURE(TestInitKernel(&kernel, &impl,
+                                         {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32},
+                                         NANOARROW_TYPE_LIST));
   impl.release(&impl);
   kernel.release(&kernel);
 
@@ -333,11 +334,11 @@ TEST(Coverings, SedonaUdfCoveringCellIdsOverloadsInit) {
   kernel.release(&kernel);
 
   s2geography::sedona_udf::CoveringCellIdsLevelRangeMaxCellsKernel(&kernel);
-  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
-      &kernel, &impl,
-      {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32, NANOARROW_TYPE_INT32,
-       NANOARROW_TYPE_INT32},
-      NANOARROW_TYPE_LIST));
+  ASSERT_NO_FATAL_FAILURE(
+      TestInitKernel(&kernel, &impl,
+                     {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32,
+                      NANOARROW_TYPE_INT32, NANOARROW_TYPE_INT32},
+                     NANOARROW_TYPE_LIST));
   impl.release(&impl);
   kernel.release(&kernel);
 }
@@ -346,19 +347,19 @@ TEST(Coverings, SedonaUdfCoveringCellIdsOptionsArray) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::CoveringCellIdsLevelRangeMaxCellsKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
-  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
-      &kernel, &impl,
-      {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32, NANOARROW_TYPE_INT32,
-       NANOARROW_TYPE_INT32},
-      NANOARROW_TYPE_LIST));
+  ASSERT_NO_FATAL_FAILURE(
+      TestInitKernel(&kernel, &impl,
+                     {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32,
+                      NANOARROW_TYPE_INT32, NANOARROW_TYPE_INT32},
+                     NANOARROW_TYPE_LIST));
 
   nanoarrow::UniqueArray out_array;
-  ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
-      &impl,
-      {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32, NANOARROW_TYPE_INT32,
-       NANOARROW_TYPE_INT32},
-      {{"LINESTRING (0 0, 1 1)", "POINT (0 0)"}},
-      {{10, 0}, {10, 10}, {32, 8}}, out_array.get()));
+  ASSERT_NO_FATAL_FAILURE(
+      TestExecuteKernel(&impl,
+                        {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32,
+                         NANOARROW_TYPE_INT32, NANOARROW_TYPE_INT32},
+                        {{"LINESTRING (0 0, 1 1)", "POINT (0 0)"}},
+                        {{10, 0}, {10, 10}, {32, 8}}, out_array.get()));
   impl.release(&impl);
   kernel.release(&kernel);
 
@@ -388,11 +389,11 @@ TEST(Coverings, SedonaUdfCoveringCellIdsMaxCells) {
   struct SedonaCScalarKernel kernel;
   s2geography::sedona_udf::CoveringCellIdsLevelRangeMaxCellsKernel(&kernel);
   struct SedonaCScalarKernelImpl impl;
-  ASSERT_NO_FATAL_FAILURE(TestInitKernel(
-      &kernel, &impl,
-      {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32, NANOARROW_TYPE_INT32,
-       NANOARROW_TYPE_INT32},
-      NANOARROW_TYPE_LIST));
+  ASSERT_NO_FATAL_FAILURE(
+      TestInitKernel(&kernel, &impl,
+                     {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32,
+                      NANOARROW_TYPE_INT32, NANOARROW_TYPE_INT32},
+                     NANOARROW_TYPE_LIST));
 
   nanoarrow::UniqueArray out_array;
   ASSERT_NO_FATAL_FAILURE(TestExecuteKernel(
@@ -405,6 +406,42 @@ TEST(Coverings, SedonaUdfCoveringCellIdsMaxCells) {
 
   auto* offsets = reinterpret_cast<const int32_t*>(out_array->buffers[1]);
   EXPECT_LE(offsets[1] - offsets[0], 2);
+}
+
+TEST(Coverings, SedonaUdfCoveringCellIdsMaxCellsOverflow) {
+  struct SedonaCScalarKernel kernel;
+  s2geography::sedona_udf::CoveringCellIdsLevelRangeMaxCellsKernel(&kernel);
+  struct SedonaCScalarKernelImpl impl;
+  ASSERT_NO_FATAL_FAILURE(
+      TestInitKernel(&kernel, &impl,
+                     {ARROW_TYPE_WKB, NANOARROW_TYPE_INT32,
+                      NANOARROW_TYPE_INT32, NANOARROW_TYPE_UINT64},
+                     NANOARROW_TYPE_LIST));
+
+  auto geog = ArgWkb({"LINESTRING (0 0, 100 50)"});
+  auto min_level = ArgArrow(NANOARROW_TYPE_INT32, {0});
+  auto max_level = ArgArrow(NANOARROW_TYPE_INT32, {30});
+
+  nanoarrow::UniqueArray max_cells;
+  NANOARROW_THROW_NOT_OK(
+      ArrowArrayInitFromType(max_cells.get(), NANOARROW_TYPE_UINT64));
+  NANOARROW_THROW_NOT_OK(ArrowArrayStartAppending(max_cells.get()));
+  NANOARROW_THROW_NOT_OK(ArrowArrayAppendUInt(
+      max_cells.get(),
+      static_cast<uint64_t>(std::numeric_limits<int>::max()) + 1));
+  NANOARROW_THROW_NOT_OK(
+      ArrowArrayFinishBuildingDefault(max_cells.get(), nullptr));
+
+  std::vector<struct ArrowArray*> args = {geog.get(), min_level.get(),
+                                          max_level.get(), max_cells.get()};
+  nanoarrow::UniqueArray out_array;
+  EXPECT_NE(impl.execute(&impl, args.data(), args.size(), 1, out_array.get()),
+            0);
+  EXPECT_STREQ(impl.get_last_error(&impl),
+               "max_cells must be less than or equal to 2147483647");
+
+  impl.release(&impl);
+  kernel.release(&kernel);
 }
 
 TEST(Coverings, SedonaUdfBoundingBox) {

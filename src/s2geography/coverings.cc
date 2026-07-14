@@ -9,6 +9,7 @@
 #include <s2/s2shape_index_buffered_region.h>
 
 #include <cfloat>
+#include <limits>
 
 #include "s2geography/accessors-geog.h"
 #include "s2geography/accessors.h"
@@ -229,6 +230,7 @@ namespace sedona_udf {
 static constexpr int kDefaultMinLevel = 0;
 static constexpr int kDefaultMaxLevel = S2CellId::kMaxLevel;
 static constexpr int kDefaultMaxCells = 8;
+static constexpr int kMaxMaxCells = std::numeric_limits<int>::max();
 
 void ValidateCoveringOptions(int64_t min_level, int64_t max_level,
                              int64_t max_cells) {
@@ -246,6 +248,10 @@ void ValidateCoveringOptions(int64_t min_level, int64_t max_level,
 
   if (max_cells < 1) {
     throw Exception("max_cells must be greater than 0");
+  }
+
+  if (max_cells > kMaxMaxCells) {
+    throw Exception("max_cells must be less than or equal to 2147483647");
   }
 }
 
@@ -332,8 +338,8 @@ struct CoveringCellIdsMinLevelExec {
   using out_t = ListOutputBuilder<IntOutputBuilder>;
 
   void Exec(arg0_t::c_type value, arg1_t::c_type min_level, out_t* out) {
-    AppendCoveringCellIds(value, min_level, kDefaultMaxLevel,
-                          kDefaultMaxCells, out, &covering_, &coverer_);
+    AppendCoveringCellIds(value, min_level, kDefaultMaxLevel, kDefaultMaxCells,
+                          out, &covering_, &coverer_);
   }
 
   std::vector<S2CellId> covering_;
