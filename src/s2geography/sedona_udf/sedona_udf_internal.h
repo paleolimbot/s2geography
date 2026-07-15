@@ -55,6 +55,20 @@ struct has_exec_init_ternary<T, std::void_t<decltype(std::declval<T>().Init(
                                     std::declval<typename T::out_t*>()))>>
     : std::true_type {};
 
+/// \brief Detection trait for optional Exec::Init(arg0_t*, arg1_t*, arg2_t*,
+/// arg3_t*, out_t*) method
+template <typename T, typename = void>
+struct has_exec_init_quaternary : std::false_type {};
+
+template <typename T>
+struct has_exec_init_quaternary<T, std::void_t<decltype(std::declval<T>().Init(
+                                       std::declval<typename T::arg0_t*>(),
+                                       std::declval<typename T::arg1_t*>(),
+                                       std::declval<typename T::arg2_t*>(),
+                                       std::declval<typename T::arg3_t*>(),
+                                       std::declval<typename T::out_t*>()))>>
+    : std::true_type {};
+
 /// \defgroup sedona_udf-utils Arrow UDF Utilities
 ///
 /// To simplify implementations of a large number of functions, we
@@ -939,6 +953,7 @@ struct KernelData {
   bool prepare_arg0_scalar{true};
   bool prepare_arg1_scalar{true};
   bool prepare_arg2_scalar{true};
+  bool prepare_arg3_scalar{true};
 };
 
 inline const char* KernelFunctionName(const struct SedonaCScalarKernel* self) {
@@ -1300,6 +1315,140 @@ class SedonaTernaryKernelAdapter {
   }
 };
 
+/// \brief Sedona C ABI adapter for quaternary UDFs (four arguments)
+template <typename Exec>
+class SedonaQuaternaryKernelAdapter {
+ public:
+  struct ImplData {
+    std::string last_error;
+    std::unique_ptr<typename Exec::arg0_t> arg0;
+    std::unique_ptr<typename Exec::arg1_t> arg1;
+    std::unique_ptr<typename Exec::arg2_t> arg2;
+    std::unique_ptr<typename Exec::arg3_t> arg3;
+    std::unique_ptr<typename Exec::out_t> out;
+    Exec exec;
+    bool prepare_arg0_scalar{true};
+    bool prepare_arg1_scalar{true};
+    bool prepare_arg2_scalar{true};
+    bool prepare_arg3_scalar{true};
+  };
+
+  static int ImplInit(struct SedonaCScalarKernelImpl* self,
+                      const struct ArrowSchema* const* arg_types,
+                      struct ArrowArray* const* /*scalar_args*/, int64_t n_args,
+                      struct ArrowSchema* out) {
+    auto* data = static_cast<ImplData*>(self->private_data);
+    data->last_error.clear();
+    try {
+      // Check if this kernel applies to the input arguments
+      if (n_args != 4 || !Exec::arg0_t::Matches(arg_types[0]) ||
+          !Exec::arg1_t::Matches(arg_types[1]) ||
+          !Exec::arg2_t::Matches(arg_types[2]) ||
+          !Exec::arg3_t::Matches(arg_types[3])) {
+        out->release = nullptr;
+        return NANOARROW_OK;
+      }
+
+      data->arg0 = std::make_unique<typename Exec::arg0_t>(arg_types[0]);
+      data->arg1 = std::make_unique<typename Exec::arg1_t>(arg_types[1]);
+      data->arg2 = std::make_unique<typename Exec::arg2_t>(arg_types[2]);
+      data->arg3 = std::make_unique<typename Exec::arg3_t>(arg_types[3]);
+      data->arg0->SetPrepareScalar(data->prepare_arg0_scalar);
+      data->arg1->SetPrepareScalar(data->prepare_arg1_scalar);
+      data->arg2->SetPrepareScalar(data->prepare_arg2_scalar);
+      data->arg3->SetPrepareScalar(data->prepare_arg3_scalar);
+      data->out = std::make_unique<typename Exec::out_t>();
+
+      if constexpr (has_exec_init_quaternary<Exec>::value) {
+        data->exec.Init(data->arg0.get(), data->arg1.get(), data->arg2.get(),
+                        data->arg3.get(), data->out.get());
+      }
+
+      // We don't have a reliable way to check the equality of CRSes, so
+      // here we just return the first CRS.
+      std::string crs_out = data->arg0->GetCrs();
+      if (crs_out.empty()) {
+        data->out->InitOutputType(out);
+      } else {
+        data->out->InitOutputTypeWithCrs(out, crs_out);
+      }
+
+      return 0;
+    } catch (std::exception& e) {
+      data->last_error = e.what();
+      return EINVAL;
+    }
+  }
+
+  static int ImplExecute(struct SedonaCScalarKernelImpl* self,
+                         struct ArrowArray* const* args, int64_t n_args,
+                         int64_t n_rows, struct ArrowArray* out) {
+    auto* data = static_cast<ImplData*>(self->private_data);
+    data->last_error.clear();
+    try {
+      if (n_args != 4) {
+        data->last_error =
+            "Expected four arguments in quaternary s2geography kernel";
+        return EINVAL;
+      }
+
+      data->arg0->SetArray(args[0], n_rows);
+      data->arg1->SetArray(args[1], n_rows);
+      data->arg2->SetArray(args[2], n_rows);
+      data->arg3->SetArray(args[3], n_rows);
+      int64_t num_iterations = ExecuteNumIterations(n_rows, args, n_args);
+      data->out->Reserve(num_iterations);
+
+      for (int64_t i = 0; i < num_iterations; i++) {
+        if (data->arg0->IsNull(i) || data->arg1->IsNull(i) ||
+            data->arg2->IsNull(i) || data->arg3->IsNull(i)) {
+          data->out->AppendNull();
+        } else {
+          typename Exec::arg0_t::c_type item0 = data->arg0->Get(i);
+          typename Exec::arg1_t::c_type item1 = data->arg1->Get(i);
+          typename Exec::arg2_t::c_type item2 = data->arg2->Get(i);
+          typename Exec::arg3_t::c_type item3 = data->arg3->Get(i);
+          data->exec.Exec(item0, item1, item2, item3, data->out.get());
+        }
+      }
+
+      data->out->Finish(out);
+      return 0;
+    } catch (std::exception& e) {
+      data->last_error = e.what();
+      return EINVAL;
+    }
+  }
+
+  static const char* ImplGetLastError(struct SedonaCScalarKernelImpl* self) {
+    return static_cast<ImplData*>(self->private_data)->last_error.c_str();
+  }
+
+  static void ImplRelease(struct SedonaCScalarKernelImpl* self) {
+    if (self->private_data != nullptr) {
+      delete static_cast<ImplData*>(self->private_data);
+      self->private_data = nullptr;
+    }
+    self->release = nullptr;
+  }
+
+  static void NewImpl(const struct SedonaCScalarKernel* self,
+                      struct SedonaCScalarKernelImpl* out) {
+    auto* kernel_private = static_cast<KernelData*>(self->private_data);
+    auto* impl_private = new ImplData();
+    impl_private->prepare_arg0_scalar = kernel_private->prepare_arg0_scalar;
+    impl_private->prepare_arg1_scalar = kernel_private->prepare_arg1_scalar;
+    impl_private->prepare_arg2_scalar = kernel_private->prepare_arg2_scalar;
+    impl_private->prepare_arg3_scalar = kernel_private->prepare_arg3_scalar;
+
+    out->private_data = impl_private;
+    out->init = &ImplInit;
+    out->execute = &ImplExecute;
+    out->get_last_error = &ImplGetLastError;
+    out->release = &ImplRelease;
+  }
+};
+
 /// \brief Initialize a SedonaCScalarKernel for a unary Exec
 template <typename Exec>
 void InitUnaryKernel(struct SedonaCScalarKernel* out, const char* name,
@@ -1334,6 +1483,21 @@ void InitTernaryKernel(struct SedonaCScalarKernel* out, const char* name,
   out->private_data = data;
   out->function_name = &KernelFunctionName;
   out->new_impl = &SedonaTernaryKernelAdapter<Exec>::NewImpl;
+  out->release = &KernelRelease;
+}
+
+/// \brief Initialize a SedonaCScalarKernel for a quaternary Exec
+template <typename Exec>
+void InitQuaternaryKernel(struct SedonaCScalarKernel* out, const char* name,
+                          bool prepare_arg0_scalar = true,
+                          bool prepare_arg1_scalar = true,
+                          bool prepare_arg2_scalar = true,
+                          bool prepare_arg3_scalar = true) {
+  auto* data = new KernelData{name, prepare_arg0_scalar, prepare_arg1_scalar,
+                              prepare_arg2_scalar, prepare_arg3_scalar};
+  out->private_data = data;
+  out->function_name = &KernelFunctionName;
+  out->new_impl = &SedonaQuaternaryKernelAdapter<Exec>::NewImpl;
   out->release = &KernelRelease;
 }
 
