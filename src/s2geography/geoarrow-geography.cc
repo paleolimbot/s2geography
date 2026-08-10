@@ -340,9 +340,14 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
 void GeoArrowLaxPolygonShape::NormalizeOrientation() {
   for (auto& node : loops_) {
     GeoArrowLoop loop(&node, &point_scratch_);
-    double curvature = loop.GetCurvature();
+    // The sign of the signed area and the sign of the curvature (turning
+    // angle) agree for any valid ring; however, the curvature's sign is
+    // meaningless for a ring with crossing edges (e.g., a sliver spike whose
+    // return path crosses its outgoing path), whereas the signed area still
+    // reflects the ring's net winding direction there.
+    double signed_area = loop.GetSignedArea();
     bool is_hole = (node.flags & internal::kFlagS2GeographyIsHole) != 0;
-    if (is_hole != (curvature < 0)) {
+    if (is_hole != (signed_area < 0)) {
       ReverseNodeInPlace(&node);
     }
   }
