@@ -1054,8 +1054,10 @@ TEST(GeoArrowLaxPolygonShape, LargerThanHemisphereOrientation) {
   GeoArrowLaxPolygonShape shape(geom.geom());
   shape.NormalizeOrientation();
 
-  EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(-90, 0).ToPoint()));
-  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(90, 0).ToPoint()));
+  EXPECT_TRUE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(-90, 0).ToPoint()));
+  EXPECT_FALSE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(90, 0).ToPoint()));
 
   ValidateShape(shape);
 }
