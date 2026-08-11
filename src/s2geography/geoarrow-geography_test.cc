@@ -1036,6 +1036,30 @@ TEST(GeoArrowLaxPolygonShape, SelfIntersectingSliverOrientation) {
   ValidateShape(shape);
 }
 
+TEST(GeoArrowLaxPolygonShape, LargerThanHemisphereOrientation) {
+  // A valid ring enclosing ~5/8 of the sphere (a cap south of latitude
+  // -14.5 degrees is on its right). Its curvature falls within (-Pi, Pi),
+  // exercising the signed-area path of the orientation check for valid
+  // rings. Like a ring with any other winding, the shell's interior must
+  // come out as the smaller side.
+  std::string wkt = "POLYGON ((";
+  for (int i = 0; i <= 24; i++) {
+    if (i > 0) wkt += ", ";
+    double lng = (i % 24) * 15.0 - 180.0;
+    wkt += std::to_string(lng) + " -14.5";
+  }
+  wkt += "))";
+
+  auto geom = TestGeometry::FromWKT(wkt);
+  GeoArrowLaxPolygonShape shape(geom.geom());
+  shape.NormalizeOrientation();
+
+  EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(-90, 0).ToPoint()));
+  EXPECT_FALSE(shape.BruteForceContains(S2LatLng::FromDegrees(90, 0).ToPoint()));
+
+  ValidateShape(shape);
+}
+
 TEST(GeoArrowLaxPolygonShape, MultiPolygon2Components) {
   auto geom = TestGeometry::FromWKT(
       "MULTIPOLYGON (((0 0, 1 0, 0 1, 0 0)), "
