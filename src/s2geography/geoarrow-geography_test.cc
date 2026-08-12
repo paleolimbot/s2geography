@@ -999,6 +999,69 @@ TEST(GeoArrowLaxPolygonShape, PolygonWithHole) {
   ValidateShape(shape);
 }
 
+TEST(GeoArrowLaxPolygonShape, SelfIntersectingSliverOrientation) {
+  // A counterclockwise square with a "spike" whose return path crosses its
+  // outgoing path (edges 3 and 5 cross). Rings like this occur in real data
+  // (e.g., boundaries digitized as an out-and-back tail with a small offset,
+  // where the offset flips sides when segments are interpreted as geodesics).
+  // The ring's turning angle is meaningless (the crossing collapses the
+  // turning number to zero), so orientation must be derived from the signed
+  // area or the interior inverts to cover almost the entire sphere.
+  auto geom = TestGeometry::FromWKT(
+      "POLYGON ((0 0, 10 0, 10 10, 6 10, 7 14, 6.2 10.5, 5 10, 0 10, 0 0))");
+
+  // Document the pathology at the loop level (before normalization):
+  // curvature has the wrong sign while the signed area has the correct
+  // (positive/counterclockwise) sign.
+  GeoArrowLaxPolygonShape shape(geom.geom());
+  std::vector<S2Point> scratch;
+  int num_loops_visited = 0;
+  shape.geom().VisitLoops(&scratch, [&](GeoArrowLoop loop) {
+    EXPECT_LT(loop.GetCurvature(), 0);
+    EXPECT_GT(loop.GetSignedArea(), 0);
+    ++num_loops_visited;
+    return true;
+  });
+  ASSERT_EQ(num_loops_visited, 1);
+
+  shape.NormalizeOrientation();
+
+  // The interior must be the small region, not the rest of the globe
+  EXPECT_TRUE(shape.BruteForceContains(S2LatLng::FromDegrees(5, 5).ToPoint()));
+  EXPECT_FALSE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(0, -150).ToPoint()));
+  EXPECT_FALSE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(-45, 100).ToPoint()));
+
+  ValidateShape(shape);
+}
+
+TEST(GeoArrowLaxPolygonShape, LargerThanHemisphereOrientation) {
+  // A valid ring enclosing ~5/8 of the sphere (a cap south of latitude
+  // -14.5 degrees is on its right). Its curvature falls within (-Pi, Pi),
+  // exercising the signed-area path of the orientation check for valid
+  // rings. Like a ring with any other winding, the shell's interior must
+  // come out as the smaller side.
+  std::string wkt = "POLYGON ((";
+  for (int i = 0; i <= 24; i++) {
+    if (i > 0) wkt += ", ";
+    double lng = (i % 24) * 15.0 - 180.0;
+    wkt += std::to_string(lng) + " -14.5";
+  }
+  wkt += "))";
+
+  auto geom = TestGeometry::FromWKT(wkt);
+  GeoArrowLaxPolygonShape shape(geom.geom());
+  shape.NormalizeOrientation();
+
+  EXPECT_TRUE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(-90, 0).ToPoint()));
+  EXPECT_FALSE(
+      shape.BruteForceContains(S2LatLng::FromDegrees(90, 0).ToPoint()));
+
+  ValidateShape(shape);
+}
+
 TEST(GeoArrowLaxPolygonShape, MultiPolygon2Components) {
   auto geom = TestGeometry::FromWKT(
       "MULTIPOLYGON (((0 0, 1 0, 0 1, 0 0)), "

@@ -340,9 +340,30 @@ void GeoArrowLaxPolygonShape::Init(struct GeoArrowGeometryView geom) {
 void GeoArrowLaxPolygonShape::NormalizeOrientation() {
   for (auto& node : loops_) {
     GeoArrowLoop loop(&node, &point_scratch_);
+    // The sign of the curvature (turning angle) and the sign of the signed
+    // area agree for any valid ring, and the curvature is ~3x cheaper to
+    // compute; however, the curvature's sign is meaningless for a ring with
+    // crossing edges (e.g., a sliver spike whose return path crosses its
+    // outgoing path collapses the turning number to zero), whereas the signed
+    // area still reflects the ring's net winding direction there.
+    //
+    // A valid ring has |curvature| == |2 * Pi - area(left side)|, so its
+    // curvature can only fall within (-Pi, Pi) when the ring encloses between
+    // a quarter and three quarters of the sphere. Trust the curvature outside
+    // that band and consult the signed area only within it, where the ring is
+    // either unusually large or invalid.
     double curvature = loop.GetCurvature();
+    bool is_ccw;
+    if (curvature >= M_PI) {
+      is_ccw = true;
+    } else if (curvature <= -M_PI) {
+      is_ccw = false;
+    } else {
+      is_ccw = loop.GetSignedArea() >= 0;
+    }
+
     bool is_hole = (node.flags & internal::kFlagS2GeographyIsHole) != 0;
-    if (is_hole != (curvature < 0)) {
+    if (is_hole == is_ccw) {
       ReverseNodeInPlace(&node);
     }
   }
