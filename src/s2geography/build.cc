@@ -1756,4 +1756,43 @@ void BufferParamsKernel(struct SedonaCScalarKernel* out) {
 
 }  // namespace sedona_udf
 
+class BufferOperation : public Operation {
+ public:
+  BufferOperation() : name_("buffer") {}
+
+  const std::string& name() const override { return name_; }
+
+  OutputType output_type() const override {
+    return Operation::OutputType::kWkb;
+  }
+
+  void ExecGeogDoubleString(const GeoArrowGeography& arg0, double distance,
+                            std::string_view params) override {
+    result_array_.reset();
+    string_result_ = {};
+    exec_.Exec(arg0, distance, params, &out_);
+
+    out_.Finish(result_array_.get());
+    if (result_array_->length != 1) {
+      throw Exception("Expected geometry output of length 1");
+    }
+
+    const auto offsets = static_cast<const int32_t*>(result_array_->buffers[1]);
+    const auto data = static_cast<const char*>(result_array_->buffers[2]);
+    const int64_t offset = result_array_->offset;
+    string_result_ = std::string_view(data + offsets[offset],
+                                      offsets[offset + 1] - offsets[offset]);
+  }
+
+ private:
+  std::string name_;
+  sedona_udf::BufferParamsExec exec_;
+  sedona_udf::GeoArrowGeographyOutputBuilder out_;
+  nanoarrow::UniqueArray result_array_;
+};
+
+std::unique_ptr<Operation> Buffer() {
+  return std::make_unique<BufferOperation>();
+}
+
 }  // namespace s2geography

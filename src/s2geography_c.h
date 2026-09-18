@@ -337,8 +337,15 @@ struct S2GeogOp;
 /// boolean
 #define S2GEOGRAPHY_OP_DISJOINT 6
 
+/// \brief Buffer a geography by a distance using PostGIS-style parameters,
+/// returning WKB
+#define S2GEOGRAPHY_OP_BUFFER 7
+
 /// \brief Returned by S2GeogOpOutputType when the output type is a bool
 #define S2GEOGRAPHY_OUTPUT_TYPE_BOOL 1
+
+/// \brief Returned by S2GeogOpOutputType when the output type is WKB
+#define S2GEOGRAPHY_OUTPUT_TYPE_WKB 4
 
 /// \brief Create a new operator object
 ///
@@ -374,10 +381,31 @@ S2GeogErrorCode S2GeogOpEvalGeogGeogDouble(struct S2GeogOp* op,
                                            const S2Geog* arg1, double arg2,
                                            struct S2GeogError* err);
 
+/// \brief Evaluate an operation with a geography, double, and string as input
+///
+/// The string does not need to be null terminated.
+///
+/// \pre op != NULL
+/// \pre arg0 != NULL
+/// \pre arg2 != NULL || arg2_size == 0
+S2GeogErrorCode S2GeogOpEvalGeogDoubleString(struct S2GeogOp* op,
+                                             const S2Geog* arg0, double arg1,
+                                             const char* arg2, size_t arg2_size,
+                                             struct S2GeogError* err);
+
 /// \brief Get integer or boolean output for this operation
 ///
 /// \pre op != NULL
 int64_t S2GeogOpGetInt(struct S2GeogOp* op);
+
+/// \brief Get the WKB output for this operation
+///
+/// The returned view is owned by op and remains valid until the next eval call
+/// on op or until op is destroyed.
+///
+/// \pre op != NULL
+/// \pre size != NULL
+const uint8_t* S2GeogOpGetResultWkb(const struct S2GeogOp* op, size_t* size);
 
 /// \brief Destroy an op object
 ///

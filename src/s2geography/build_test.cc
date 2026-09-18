@@ -1223,6 +1223,41 @@ TEST(Build, SedonaUdfBufferParams) {
       out_array.get(), {"POLYGON EMPTY", "POLYGON EMPTY", std::nullopt}));
 }
 
+TEST(Build, BufferOperation) {
+  auto input_geom = TestGeometry::FromWKT("POINT (0 0)");
+  GeoArrowGeography input;
+  input.Init(input_geom.geom());
+
+  auto buffer = Buffer();
+  EXPECT_EQ(buffer->name(), "buffer");
+  EXPECT_EQ(buffer->output_type(), Operation::OutputType::kWkb);
+
+  buffer->ExecGeogDoubleString(input, 100000.0, "quad_segs=4");
+  std::string_view result = buffer->GetResultWkb();
+  ASSERT_FALSE(result.empty());
+
+  std::vector<uint8_t> result_bytes(result.begin(), result.end());
+  auto result_geom = TestGeometry::FromWKB(std::move(result_bytes));
+  EXPECT_EQ(result_geom.ToWKT(6),
+            "POLYGON ((-0.899308 0.004766, -0.832686 -0.339735, "
+            "-0.639303 -0.632523, -0.348578 -0.829023, "
+            "-0.004767 -0.899308, 0.339771 -0.832671, "
+            "0.632562 -0.639264, 0.829038 -0.348541, "
+            "0.899308 -0.004766, 0.832686 0.339735, "
+            "0.639303 0.632523, 0.348578 0.829023, "
+            "0.004767 0.899308, -0.339771 0.832671, "
+            "-0.632562 0.639264, -0.829038 0.348541, "
+            "-0.899308 0.004766))");
+
+  // The operation and its output builder can be reused. The returned view is
+  // replaced by the next execution rather than accumulating features.
+  buffer->ExecGeogDoubleString(input, 0.0, "");
+  result = buffer->GetResultWkb();
+  result_bytes.assign(result.begin(), result.end());
+  result_geom = TestGeometry::FromWKB(std::move(result_bytes));
+  EXPECT_EQ(result_geom.ToWKT(6), "POLYGON EMPTY");
+}
+
 struct BufferParamsOpParam {
   std::string name;
   std::optional<std::string> input_wkt;

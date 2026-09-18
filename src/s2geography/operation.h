@@ -58,6 +58,15 @@ class Operation {
     throw Exception("Can't call " + name() + " with geog + geog + double");
   }
 
+  /// \brief Execute a function with a geography, double, and string as input
+  virtual void ExecGeogDoubleString(const GeoArrowGeography& arg0, double arg1,
+                                    std::string_view arg2) {
+    S2GEOGRAPHY_UNUSED(arg0);
+    S2GEOGRAPHY_UNUSED(arg1);
+    S2GEOGRAPHY_UNUSED(arg2);
+    throw Exception("Can't call " + name() + " with geog + double + string");
+  }
+
   /// \brief Return true if the output of the last Exec call is non-null
   ///
   /// This is needed for functions that can return null even for non-null
@@ -82,8 +91,15 @@ class Operation {
   /// kWkb
   ///
   /// The result before a call to an Exec or for a function with a different
-  /// output type is not defined.
-  std::string_view GetStringView() const { return string_result_; }
+  /// output type is not defined. The returned view remains valid until the
+  /// next Exec call or until this operation is destroyed.
+  std::string_view GetResultWkb() const { return string_result_; }
+
+  /// \brief Return the string result for operations whose output type is kWkb
+  ///
+  /// Deprecated spelling retained for source compatibility. Prefer
+  /// GetResultWkb(), which describes the encoding of the returned bytes.
+  std::string_view GetStringView() const { return GetResultWkb(); }
 
  protected:
   bool has_result_{true};

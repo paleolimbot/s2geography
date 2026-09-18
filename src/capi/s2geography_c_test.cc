@@ -522,3 +522,52 @@ TEST(S2GeographyC, DistanceWithinOperation) {
   S2GeogDestroy(lhs);
   S2GeogFactoryDestroy(factory);
 }
+
+TEST(S2GeographyC, BufferOperation) {
+  struct S2GeogFactory* factory = nullptr;
+  ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
+
+  struct S2Geog* input = nullptr;
+  struct S2Geog* result = nullptr;
+  ASSERT_EQ(S2GeogCreate(&input), S2GEOGRAPHY_OK);
+  ASSERT_EQ(S2GeogCreate(&result), S2GEOGRAPHY_OK);
+
+  struct S2GeogError* err = nullptr;
+  ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
+  const char* input_wkt = "POINT (0 0)";
+  ASSERT_EQ(S2GeogFactoryInitFromWkt(factory, input_wkt, strlen(input_wkt),
+                                     input, err),
+            S2GEOGRAPHY_OK);
+
+  struct S2GeogOp* buffer = nullptr;
+  ASSERT_EQ(S2GeogOpCreate(&buffer, S2GEOGRAPHY_OP_BUFFER), S2GEOGRAPHY_OK);
+  ASSERT_STREQ(S2GeogOpName(buffer), "buffer");
+  ASSERT_EQ(S2GeogOpOutputType(buffer), S2GEOGRAPHY_OUTPUT_TYPE_WKB);
+
+  const char* params = "quad_segs=4";
+  ASSERT_EQ(S2GeogOpEvalGeogDoubleString(buffer, input, 100000.0, params,
+                                         strlen(params), err),
+            S2GEOGRAPHY_OK)
+      << S2GeogErrorGetMessage(err);
+
+  size_t result_size = 0;
+  const uint8_t* result_wkb = S2GeogOpGetResultWkb(buffer, &result_size);
+  ASSERT_NE(result_wkb, nullptr);
+  ASSERT_GT(result_size, 0);
+  ASSERT_EQ(S2GeogFactoryInitFromWkbNonOwning(factory, result_wkb, result_size,
+                                              result, err),
+            S2GEOGRAPHY_OK)
+      << S2GeogErrorGetMessage(err);
+
+  struct S2GeogOp* contains = nullptr;
+  ASSERT_EQ(S2GeogOpCreate(&contains, S2GEOGRAPHY_OP_CONTAINS), S2GEOGRAPHY_OK);
+  ASSERT_EQ(S2GeogOpEvalGeogGeog(contains, result, input, err), S2GEOGRAPHY_OK);
+  EXPECT_EQ(S2GeogOpGetInt(contains), 1);
+
+  S2GeogOpDestroy(contains);
+  S2GeogOpDestroy(buffer);
+  S2GeogErrorDestroy(err);
+  S2GeogDestroy(result);
+  S2GeogDestroy(input);
+  S2GeogFactoryDestroy(factory);
+}

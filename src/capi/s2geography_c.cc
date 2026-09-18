@@ -549,6 +549,9 @@ S2GeogErrorCode S2GeogOpCreate(struct S2GeogOp** op, int op_id) {
     case S2GEOGRAPHY_OP_DISJOINT:
       inner = s2geography::Disjoint();
       break;
+    case S2GEOGRAPHY_OP_BUFFER:
+      inner = s2geography::Buffer();
+      break;
     default:
       return ENOTSUP;
   }
@@ -570,6 +573,8 @@ int S2GeogOpOutputType(const struct S2GeogOp* op) {
   switch (op->op->output_type()) {
     case s2geography::Operation::OutputType::kBool:
       return S2GEOGRAPHY_OUTPUT_TYPE_BOOL;
+    case s2geography::Operation::OutputType::kWkb:
+      return S2GEOGRAPHY_OUTPUT_TYPE_WKB;
     default:
       return 0;
   }
@@ -604,10 +609,37 @@ S2GeogErrorCode S2GeogOpEvalGeogGeogDouble(struct S2GeogOp* op,
   S2GEOGRAPHY_C_END(err);
 }
 
+S2GeogErrorCode S2GeogOpEvalGeogDoubleString(struct S2GeogOp* op,
+                                             const S2Geog* arg0, double arg1,
+                                             const char* arg2, size_t arg2_size,
+                                             struct S2GeogError* err) {
+  S2GEOGRAPHY_C_BEGIN(err);
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+  S2GEOGRAPHY_DCHECK(op->op != nullptr);
+  S2GEOGRAPHY_DCHECK(arg0 != nullptr);
+  S2GEOGRAPHY_DCHECK(arg2 != nullptr || arg2_size == 0);
+
+  std::string_view params =
+      arg2 == nullptr ? std::string_view() : std::string_view(arg2, arg2_size);
+  op->op->ExecGeogDoubleString(arg0->geog, arg1, params);
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(err);
+}
+
 int64_t S2GeogOpGetInt(struct S2GeogOp* op) {
   S2GEOGRAPHY_DCHECK(op != nullptr);
   S2GEOGRAPHY_DCHECK(op->op != nullptr);
   return op->op->GetInt();
+}
+
+const uint8_t* S2GeogOpGetResultWkb(const struct S2GeogOp* op, size_t* size) {
+  S2GEOGRAPHY_DCHECK(op != nullptr);
+  S2GEOGRAPHY_DCHECK(op->op != nullptr);
+  S2GEOGRAPHY_DCHECK(size != nullptr);
+
+  std::string_view result = op->op->GetResultWkb();
+  *size = result.size();
+  return reinterpret_cast<const uint8_t*>(result.data());
 }
 
 void S2GeogOpDestroy(struct S2GeogOp* op) {
