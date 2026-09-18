@@ -155,6 +155,22 @@ S2GeogErrorCode S2GeogFactoryInitFromWkbNonOwning(
     struct S2GeogFactory* geog_factory, const uint8_t* buf, size_t buf_size,
     struct S2Geog* out, struct S2GeogError* err);
 
+/// \brief Create a geography from WKB by copying the input buffer
+///
+/// The output S2Geog must have been created before this call with
+/// S2GeogCreate(). The resulting geography owns its coordinates and is not
+/// tied to the lifecycle of the input buffer. This S2Geog can and should be
+/// reused for multiple calls to this or other factory functions (geographies
+/// have internal scratch space that can be reused).
+///
+/// \pre geog_factory != NULL
+/// \pre out != NULL
+/// \pre buf != NULL || buf_size == 0
+S2GeogErrorCode S2GeogFactoryInitFromWkb(struct S2GeogFactory* geog_factory,
+                                         const uint8_t* buf, size_t buf_size,
+                                         struct S2Geog* out,
+                                         struct S2GeogError* err);
+
 /// \brief Create a geography from WKT
 ///
 /// The output S2Geog must have been created before this call with

@@ -156,6 +156,48 @@ TEST(S2GeographyC, FactoryInitFromWkbPoint) {
   S2GeogFactoryDestroy(factory);
 }
 
+TEST(S2GeographyC, FactoryInitFromWkbOwnsCoordinates) {
+  // WKB for POINT(10 20) - little endian
+  uint8_t wkb_point[] = {
+      0x01,                    // byte order: little endian
+      0x01, 0x00, 0x00, 0x00,  // type: Point (1)
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x24, 0x40,  // x: 10.0
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x34, 0x40   // y: 20.0
+  };
+
+  struct S2GeogFactory* factory = nullptr;
+  ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
+
+  struct S2Geog* geog = nullptr;
+  ASSERT_EQ(S2GeogCreate(&geog), S2GEOGRAPHY_OK);
+
+  struct S2GeogError* err = nullptr;
+  ASSERT_EQ(S2GeogErrorCreate(&err), S2GEOGRAPHY_OK);
+
+  ASSERT_EQ(S2GeogFactoryInitFromWkb(factory, wkb_point, sizeof(wkb_point),
+                                     geog, err),
+            S2GEOGRAPHY_OK);
+
+  // The geography must remain valid after the source coordinates are changed.
+  memset(wkb_point, 0, sizeof(wkb_point));
+
+  struct S2GeogRectBounder* bounder = nullptr;
+  ASSERT_EQ(S2GeogRectBounderCreate(&bounder), S2GEOGRAPHY_OK);
+  ASSERT_EQ(S2GeogRectBounderBound(bounder, geog, err), S2GEOGRAPHY_OK);
+
+  struct S2GeogVertex lo, hi;
+  ASSERT_EQ(S2GeogRectBounderFinish(bounder, &lo, &hi, err), S2GEOGRAPHY_OK);
+  EXPECT_NEAR(lo.v[0], 10.0, 1e-12);
+  EXPECT_NEAR(hi.v[0], 10.0, 1e-12);
+  EXPECT_NEAR(lo.v[1], 20.0, 1e-12);
+  EXPECT_NEAR(hi.v[1], 20.0, 1e-12);
+
+  S2GeogRectBounderDestroy(bounder);
+  S2GeogErrorDestroy(err);
+  S2GeogDestroy(geog);
+  S2GeogFactoryDestroy(factory);
+}
+
 TEST(S2GeographyC, FactoryInitFromInvalidWkb) {
   struct S2GeogFactory* factory = nullptr;
   ASSERT_EQ(S2GeogFactoryCreate(&factory), S2GEOGRAPHY_OK);
