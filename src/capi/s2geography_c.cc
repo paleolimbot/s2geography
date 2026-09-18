@@ -337,6 +337,50 @@ S2GeogErrorCode S2GeogFactoryInitFromWkbNonOwning(
   S2GEOGRAPHY_C_END(err);
 }
 
+S2GeogErrorCode S2GeogFactoryInitFromWkb(struct S2GeogFactory* geog_factory,
+                                         const uint8_t* buf, size_t buf_size,
+                                         struct S2Geog* out,
+                                         struct S2GeogError* err) {
+  S2GEOGRAPHY_C_BEGIN(err);
+
+  S2GEOGRAPHY_DCHECK(geog_factory != nullptr);
+  S2GEOGRAPHY_DCHECK(out != nullptr);
+  S2GEOGRAPHY_DCHECK(buf != nullptr || buf_size == 0);
+
+  // Reset the parse error
+  geog_factory->error.message[0] = '\0';
+
+  // Lazily initialize the WKB reader
+  GeoArrowErrorCode ec = geog_factory->EnsureWkbReader();
+  if (ec != GEOARROW_OK) {
+    S2GEOGRAPHY_SET_ERROR(err, "error initializing WKB reader");
+    return ec;
+  }
+
+  struct GeoArrowBufferView src;
+  src.data = buf;
+  src.size_bytes = static_cast<int64_t>(buf_size);
+
+  struct GeoArrowGeometryView parsed;
+  ec = GeoArrowWKBReaderRead(&geog_factory->wkb_reader, src, &parsed,
+                             &geog_factory->error);
+  if (ec != GEOARROW_OK) {
+    S2GEOGRAPHY_SET_ERROR(err, geog_factory->error.message);
+    return ec;
+  }
+
+  ec = GeoArrowGeometryDeepCopy(parsed, &out->geom);
+  if (ec != GEOARROW_OK) {
+    S2GEOGRAPHY_SET_ERROR(err, "error copying geometry nodes and coordinates");
+    return ec;
+  }
+
+  out->geog.Init(GeoArrowGeometryAsView(&out->geom));
+
+  return S2GEOGRAPHY_OK;
+  S2GEOGRAPHY_C_END(err);
+}
+
 S2GeogErrorCode S2GeogFactoryInitFromWkt(struct S2GeogFactory* geog_factory,
                                          const char* buf, size_t buf_size,
                                          struct S2Geog* out,
