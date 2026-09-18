@@ -9,6 +9,7 @@
 
 #include "s2geography/aggregator.h"
 #include "s2geography/geography.h"
+#include "s2geography/operation.h"
 #include "s2geography/sedona_udf/sedona_extension.h"
 
 namespace s2geography {
@@ -104,6 +105,9 @@ class S2UnionAggregator : public Aggregator<std::unique_ptr<Geography>> {
   Node root_;
   std::vector<std::unique_ptr<Node>> other_;
 };
+
+/// \brief Create a reusable buffer operation
+std::unique_ptr<Operation> Buffer();
 
 namespace sedona_udf {
 
