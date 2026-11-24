@@ -329,9 +329,8 @@ class StructOutputBuilder {
       nulls_.reserve(current_length_ + 1);
       nulls_.resize(current_length_);
       std::fill_n(nulls_.begin(), current_length_, 1);
-    }
-
-    if (!nulls_.empty()) {
+      nulls_.push_back(0);
+    } else if (!nulls_.empty()) {
       nulls_.push_back(is_valid);
     }
 

@@ -3,10 +3,11 @@
 
 #include <s2/s2cell_id.h>
 #include <s2/s2earth.h>
-#include <s2/s2edge_crosser.h>
 #include <s2/s2latlng_rect_bounder.h>
+#include <s2/s2lax_loop_shape.h>
 #include <s2/s2region_coverer.h>
 #include <s2/s2shape_index_buffered_region.h>
+#include <s2/s2shapeutil_contains_brute_force.h>
 
 #include <cfloat>
 #include <limits>
@@ -163,7 +164,7 @@ S2LatLngRect LatLngRectBounder::BoundLines(const GeoArrowGeography& value) {
 
 S2LatLngRect LatLngRectBounder::BoundLoops(const GeoArrowGeography& value) {
   S2LatLngRect bounds = S2LatLngRect::Empty();
-  auto reference = value.polygons()->GetReferencePoint();
+  S2LaxLoopShape shell;
 
   // Adapted from the s2loop.cc implementation of bounding
   value.polygons()->geom().VisitLoops(&scratch_, [&](const GeoArrowLoop& loop) {
@@ -172,30 +173,25 @@ S2LatLngRect LatLngRectBounder::BoundLoops(const GeoArrowGeography& value) {
       return true;
     }
 
-    // Loop through all the vertices, bounding the edges and checking
-    // for edge crossings between the reference point and the north pole.
-    // We brute force both containment checks because (1) we have to loop
-    // through all the vertices anyway and (2) in most cases we can avoid
-    // the check for south pole containment.
+    // Containment must use a reference point for this shell, not for the
+    // combined polygon shape: other shells/holes can change whether the
+    // combined shape contains the reference point.
+    scratch_.clear();
+    loop.VisitVertices(0, loop.size() - 1, [&](const S2Point& vertex) {
+      scratch_.push_back(vertex);
+      return true;
+    });
+    shell.Init(scratch_);
+
     S2LatLngRectBounder bounder;
-
-    S2Point north_pole = S2Point(0, 0, 1);
-    internal::GeoArrowVertex nv0 = loop.native_vertex(0);
-    S2CopyingEdgeCrosser crosser(reference.point, north_pole, nv0.ToPoint());
-    bool contains_north_pole = reference.contained;
-
-    bounder.AddLatLng(S2LatLng::FromDegrees(nv0.lat, nv0.lng).Normalized());
-    loop.VisitNativeVertices(
-        1, loop.size() - 1, [&](const internal::GeoArrowVertex& v) {
-          S2LatLng ll = S2LatLng::FromDegrees(v.lat, v.lng).Normalized();
-          bounder.AddLatLng(ll);
-          contains_north_pole ^= crosser.EdgeOrVertexCrossing(ll.ToPoint());
-          return true;
-        });
+    loop.VisitNativeVertices([&](const internal::GeoArrowVertex& v) {
+      bounder.AddLatLng(S2LatLng::FromDegrees(v.lat, v.lng).Normalized());
+      return true;
+    });
     S2LatLngRect b = bounder.GetBound();
 
     // Check north pole containment
-    if (contains_north_pole) {
+    if (s2shapeutil::ContainsBruteForce(shell, S2Point(0, 0, 1))) {
       b = S2LatLngRect(R1Interval(b.lat().lo(), M_PI_2), S1Interval::Full());
     }
 
@@ -205,15 +201,7 @@ S2LatLngRect LatLngRectBounder::BoundLoops(const GeoArrowGeography& value) {
     // Either way, we only need to do the south pole containment test if
     // b.lng().is_full().
     if (b.lng().is_full()) {
-      bool contains_south_pole = reference.contained;
-      S2Point south_pole(0, 0, -1);
-      S2CopyingEdgeCrosser crosser(reference.point, south_pole, nv0.ToPoint());
-      loop.VisitVertices(1, loop.size() - 1, [&](const S2Point& vertex) {
-        contains_south_pole ^= crosser.EdgeOrVertexCrossing(vertex);
-        return true;
-      });
-
-      if (contains_south_pole) {
+      if (s2shapeutil::ContainsBruteForce(shell, S2Point(0, 0, -1))) {
         b.mutable_lat()->set_lo(-M_PI_2);
       }
     }

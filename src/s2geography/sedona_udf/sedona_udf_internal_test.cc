@@ -1,3 +1,5 @@
+#include "s2geography/sedona_udf/sedona_udf_internal.h"
+
 #include <gtest/gtest.h>
 
 #include "geoarrow/geoarrow.hpp"
@@ -6,6 +8,39 @@
 #include "s2geography/accessors.h"
 #include "s2geography/linear-referencing.h"
 #include "s2geography/sedona_udf/sedona_udf_test_internal.h"
+
+TEST(SedonaUdf, StructOutputLeadingNull) {
+  using namespace s2geography::sedona_udf;
+  StructOutputBuilder<DoubleOutputBuilder> builder;
+  nanoarrow::UniqueSchema schema;
+  builder.InitOutputType(schema.get());
+
+  // Exercise a scalar NULL, an all-NULL batch, and a leading NULL followed by
+  // valid values. Reusing the builder must also reset the validity bitmap.
+  for (int n : {1, 3, 4}) {
+    builder.Reserve(n);
+    for (int i = 0; i < n; i++) {
+      if (n != 4 || i % 2 == 0) {
+        builder.AppendNull();
+      } else {
+        builder.field<0>().Append(i);
+        builder.Append();
+      }
+    }
+
+    nanoarrow::UniqueArray array;
+    builder.Finish(array.get());
+    nanoarrow::UniqueArrayView view;
+    ASSERT_EQ(ArrowArrayViewInitFromSchema(view.get(), schema.get(), nullptr),
+              NANOARROW_OK);
+    ASSERT_EQ(ArrowArrayViewSetArray(view.get(), array.get(), nullptr),
+              NANOARROW_OK);
+    ASSERT_EQ(array->length, n);
+    for (int i = 0; i < n; i++) {
+      EXPECT_EQ(ArrowArrayViewIsNull(view.get(), i), n != 4 || i % 2 == 0);
+    }
+  }
+}
 
 // Tests the matching of the Arrow argument and also propagation of the CRS from
 // the first argument in a binary kernel.
