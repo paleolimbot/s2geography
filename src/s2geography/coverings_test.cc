@@ -131,6 +131,26 @@ INSTANTIATE_TEST_SUITE_P(
 
         ));
 
+// Each shell needs its own containment reference. Also use the same vertex
+// conversion for the reference and its edges when a pole ray touches a vertex.
+TEST(LatLngRectBounderTest, MultipartShellsDoNotIncludePoles) {
+  for (double x : {-140.99778, -99.3, 5.988658, 52.12345, 140.1}) {
+    std::string x0 = std::to_string(x);
+    std::string x1 = std::to_string(x + 1);
+    std::string wkt = "MULTIPOLYGON (((" + x0 + " 40.2, " + x1 + " 40.1, " +
+                      x1 + " 41.2, " + x0 + " 40.2)), ((0 0, 1 0, 0 1, 0 0)))";
+    auto geom = TestGeometry::FromWKT(wkt);
+    GeoArrowGeography geog;
+    geog.Init(geom.geom());
+    LatLngRectBounder bounder;
+    bounder.Update(geog);
+    auto bounds = bounder.Finish();
+    EXPECT_FALSE(bounds.lng().is_full()) << wkt;
+    EXPECT_NEAR(bounds.lat_lo().degrees(), 0, 1e-10) << wkt;
+    EXPECT_NEAR(bounds.lat_hi().degrees(), 41.2, 1e-10) << wkt;
+  }
+}
+
 // Test that Clear() resets state properly
 TEST(LatLngRectBounderTest, ClearResetsState) {
   auto test_geom = TestGeometry::FromWKT("POINT (10 20)");
